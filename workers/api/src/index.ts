@@ -215,8 +215,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     // 初始化数据库表
     await initDatabase(env.DB);
 
-    // 检查用户名是否已存在
-    const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ?')
+    // 检查用户名是否已存在（大小写不敏感）
+    const existing = await env.DB.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)')
       .bind(username)
       .first();
 
@@ -224,15 +224,16 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       return json({ error: '用户名已存在' }, 409);
     }
 
-    // 创建用户
+    // 创建用户（统一转小写存储）
     const userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
     const finalNickname = nickname || username;
+    const normalizedUsername = username.toLowerCase();
 
     await env.DB.prepare(
       'INSERT INTO users (id, username, password_hash, nickname) VALUES (?, ?, ?, ?)'
     )
-      .bind(userId, username, passwordHash, finalNickname)
+      .bind(userId, normalizedUsername, passwordHash, finalNickname)
       .run();
 
     // 生成 token
@@ -261,9 +262,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     // 初始化数据库表
     await initDatabase(env.DB);
 
-    // 查找用户
+    // 查找用户（大小写不敏感）
     const user = await env.DB.prepare(
-      'SELECT id, username, password_hash, nickname FROM users WHERE username = ?'
+      'SELECT id, username, password_hash, nickname FROM users WHERE LOWER(username) = LOWER(?)'
     )
       .bind(username)
       .first() as any;
