@@ -106,40 +106,60 @@ class DashboardPage extends StatelessWidget {
         // 领域卡片：加载中显示骨架屏，加载完显示卡片
         contentProvider.isLoading
             ? const _DomainSkeleton()
-            : Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: domains.map((domain) {
-                  final dp = progressProvider.getDomainProgress(
-                    domain.id,
-                    contentProvider.topics.values.toList(),
-                  );
-                  final loaded = contentProvider.getLoadedTopicCount(domain.id);
-                  final total = domain.topicCount;
-                  return _DomainCardWrapper(
-                    domain: domain,
-                    masteryPercent: dp.masteryPercent,
-                    selected: domain.id == currentDomainId,
-                    loadingProgress: total > 0 ? loaded / total : 0,
-                    isTopicLoading:
-                        contentProvider.isLoadingTopics &&
-                        domain.id == currentDomainId,
-                    onTap: () {
-                      onDomainChanged(domain.id);
-                      // 切换领域时自动加载该领域的 topics
-                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                        contentProvider.loadDomainTopics(domain.id);
-                      }
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 1040
+                      ? 3
+                      : constraints.maxWidth >= 680
+                      ? 2
+                      : 1;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: domains.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                      mainAxisExtent: 190,
+                    ),
+                    itemBuilder: (context, index) {
+                      final domain = domains[index];
+                      final dp = progressProvider.getDomainProgress(
+                        domain.id,
+                        contentProvider.topics.values.toList(),
+                      );
+                      final loaded = contentProvider.getLoadedTopicCount(
+                        domain.id,
+                      );
+                      final total = domain.topicCount;
+                      return _DomainCardWrapper(
+                        domain: domain,
+                        masteryPercent: dp.masteryPercent,
+                        selected: domain.id == currentDomainId,
+                        loadingProgress: total > 0 ? loaded / total : 0,
+                        isTopicLoading:
+                            contentProvider.isLoadingTopics &&
+                            domain.id == currentDomainId,
+                        onTap: () {
+                          onDomainChanged(domain.id);
+                          if (contentProvider.getLoadedTopicCount(domain.id) ==
+                              0) {
+                            contentProvider.loadDomainTopics(domain.id);
+                          }
+                        },
+                        onViewDetail: () {
+                          onDomainChanged(domain.id);
+                          if (contentProvider.getLoadedTopicCount(domain.id) ==
+                              0) {
+                            contentProvider.loadDomainTopics(domain.id);
+                          }
+                          onViewDomainCatalog(domain.id);
+                        },
+                      );
                     },
-                    onViewDetail: () {
-                      onDomainChanged(domain.id);
-                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                        contentProvider.loadDomainTopics(domain.id);
-                      }
-                      onViewDomainCatalog(domain.id);
-                    },
                   );
-                }).toList(),
+                },
               ),
         const SizedBox(height: 20),
         LayoutBuilder(
@@ -259,15 +279,24 @@ class _DomainSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 14,
-      runSpacing: 14,
-      children: List.generate(
-        3,
-        (_) => SizedBox(
-          width: 330,
-          height: 180,
-          child: Container(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1040
+            ? 3
+            : constraints.maxWidth >= 680
+            ? 2
+            : 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 3,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            mainAxisExtent: 190,
+          ),
+          itemBuilder: (context, index) => Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
@@ -316,8 +345,8 @@ class _DomainSkeleton extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -430,91 +459,91 @@ class _DomainCardWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final domainColor = domain.color;
-    return SizedBox(
-      width: 330,
-      height: 180,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? domainColor : Theme.of(context).dividerColor,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? domainColor : Theme.of(context).dividerColor,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    domain.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
+                  ),
+                ),
+                if (isTopicLoading)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: domainColor,
+                    ),
+                  ),
+              ],
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      domain.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                      ),
+            const SizedBox(height: 8),
+            Text(
+              domain.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Spacer(),
+            LinearProgressIndicator(
+              value: loadingProgress < 1.0 && loadingProgress > 0
+                  ? loadingProgress
+                  : masteryPercent / 100,
+              color: domainColor,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    loadingProgress < 1.0 && loadingProgress > 0
+                        ? '加载中 ${domain.topicCount} 个知识点...'
+                        : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: onViewDetail,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: selected
+                        ? domainColor
+                        : Theme.of(context).colorScheme.secondaryContainer,
+                    foregroundColor: selected
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  if (isTopicLoading)
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: domainColor,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(domain.description),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: loadingProgress < 1.0 && loadingProgress > 0
-                    ? loadingProgress
-                    : masteryPercent / 100,
-                color: domainColor,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      loadingProgress < 1.0 && loadingProgress > 0
-                          ? '加载中 ${domain.topicCount} 个知识点...'
-                          : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
-                    ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: onViewDetail,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: selected
-                          ? domainColor
-                          : Theme.of(context).colorScheme.secondaryContainer,
-                      foregroundColor: selected
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSecondaryContainer,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: const Icon(Icons.arrow_forward, size: 16),
-                    label: const Text('查看知识'),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: const Text('查看知识'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

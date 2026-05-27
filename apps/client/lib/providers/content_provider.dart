@@ -58,6 +58,7 @@ class ContentProvider extends ChangeNotifier {
         _topics = cached.map(
           (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
         );
+        await _pruneCachedTopics();
       }
 
       _isLoading = false;
@@ -134,9 +135,7 @@ class ContentProvider extends ChangeNotifier {
   }
 
   List<Topic> getTopicsByDomain(String domainId) {
-    return _topics.values
-        .where((t) => t.domainId == domainId)
-        .toList()
+    return _topics.values.where((t) => t.domainId == domainId).toList()
       ..sort((a, b) {
         // 先按难度升序（由易到难），难度相同再按 order
         final diff = a.difficulty.compareTo(b.difficulty);
@@ -158,6 +157,15 @@ class ContentProvider extends ChangeNotifier {
 
   Topic? getTopicById(String topicId) => _topics[topicId];
 
+  Topic? findTopic(String topicId) {
+    final direct = _topics[topicId];
+    if (direct != null) return direct;
+    for (final topic in _topics.values) {
+      if (topic.id == topicId) return topic;
+    }
+    return null;
+  }
+
   /// 切换知识源环境：更新 baseUrl 并重载内容
   Future<void> switchContentEnv(String newBaseUrl) async {
     _api.switchBaseUrl(newBaseUrl);
@@ -166,5 +174,36 @@ class ContentProvider extends ChangeNotifier {
     _manifest = null;
     notifyListeners();
     await loadContent();
+  }
+
+  Set<String> _referencedTopicPaths() {
+    final refs = <String>{};
+    for (final domain in _domains) {
+      for (final category in domain.categories) {
+        for (final topicPath in category.topics) {
+          refs.add(topicPath.replaceAll('topics/', '').replaceAll('.json', ''));
+        }
+      }
+    }
+    return refs;
+  }
+
+  Future<void> _pruneCachedTopics() async {
+    final refs = _referencedTopicPaths();
+    if (refs.isEmpty || _topics.isEmpty) return;
+
+    final before = _topics.length;
+    _topics.removeWhere(
+      (cacheKey, topic) =>
+          !refs.contains(cacheKey) &&
+          !refs.contains('${topic.domain}/${topic.id.split('.').last}'),
+    );
+
+    if (_topics.length != before) {
+      await _storage.save(
+        'topics_cache',
+        _topics.map((k, v) => MapEntry(k, v.toJson())),
+      );
+    }
   }
 }

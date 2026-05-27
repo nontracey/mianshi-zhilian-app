@@ -8,10 +8,7 @@ import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class RecallPage extends StatefulWidget {
-  const RecallPage({
-    super.key,
-    required this.topicIds,
-  });
+  const RecallPage({super.key, required this.topicIds});
 
   final List<String> topicIds;
 
@@ -38,7 +35,7 @@ class _RecallPageState extends State<RecallPage> {
     }
 
     final contentProvider = context.watch<ContentProvider>();
-    final topic = contentProvider.getTopicById(widget.topicIds[_currentIndex]);
+    final topic = contentProvider.findTopic(widget.topicIds[_currentIndex]);
 
     if (topic == null) {
       return const Center(child: Text('知识点未找到'));
@@ -123,12 +120,14 @@ class _RecallPageState extends State<RecallPage> {
       final aiProvider = context.read<AiProvider>();
       final contentProvider = context.read<ContentProvider>();
       final topicId = widget.topicIds[_currentIndex];
-      final topic = contentProvider.getTopicById(topicId);
+      final topic = contentProvider.findTopic(topicId);
       if (topic == null) return;
 
       final result = await aiProvider.evaluateAnswer(
         topicId: topicId,
-        question: topic.recallPrompts.isNotEmpty ? topic.recallPrompts.first.prompt : topic.title,
+        question: topic.recallPrompts.isNotEmpty
+            ? topic.recallPrompts.first.prompt
+            : topic.title,
         userAnswer: answer,
         rubric: topic.rubric,
       );
@@ -137,16 +136,13 @@ class _RecallPageState extends State<RecallPage> {
         setState(() => _evaluationResult = result);
         final progressProvider = context.read<ProgressProvider>();
         final score = result['score'] as int? ?? 0;
-        await progressProvider.updateTopicProgress(
-          topicId,
-          score: score,
-        );
+        await progressProvider.updateTopicProgress(topicId, score: score);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('评估失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('评估失败：$e')));
       }
     } finally {
       if (mounted) {
@@ -177,10 +173,7 @@ class _RecallPageState extends State<RecallPage> {
 }
 
 class _ProgressIndicator extends StatelessWidget {
-  const _ProgressIndicator({
-    required this.current,
-    required this.total,
-  });
+  const _ProgressIndicator({required this.current, required this.total});
 
   final int current;
   final int total;
@@ -194,9 +187,7 @@ class _ProgressIndicator extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         const SizedBox(width: 16),
-        Expanded(
-          child: LinearProgressIndicator(value: current / total),
-        ),
+        Expanded(child: LinearProgressIndicator(value: current / total)),
       ],
     );
   }
@@ -222,45 +213,66 @@ class _EvaluationResultPanel extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '遗漏点',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.warning),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.warning,
+            ),
           ),
           const SizedBox(height: 6),
-          ...missed.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.tips_and_updates_outlined, size: 18, color: AppColors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item.toString())),
-                  ],
-                ),
-              )),
+          ...missed.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 18,
+                    color: AppColors.warning,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item.toString())),
+                ],
+              ),
+            ),
+          ),
         ],
         if (errors.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
             '错误点',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.danger),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.danger,
+            ),
           ),
           const SizedBox(height: 6),
-          ...errors.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.cancel_outlined, size: 18, color: AppColors.danger),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item.toString())),
-                  ],
-                ),
-              )),
+          ...errors.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.cancel_outlined,
+                    size: 18,
+                    color: AppColors.danger,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item.toString())),
+                ],
+              ),
+            ),
+          ),
         ],
         if (optimized.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
             '优化回答',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.success),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.success,
+            ),
           ),
           const SizedBox(height: 6),
           Container(
