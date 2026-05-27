@@ -329,6 +329,30 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
+  /// 清空所有领域缓存（用于手动刷新）
+  Future<void> clearAllDomainCache() async {
+    try {
+      _topics = {};
+      
+      // 清除所有领域的缓存
+      for (final domain in _domains) {
+        await _storage.save('domain_cache_${domain.id}', null);
+        await _storage.save('domain_version_${domain.id}', null);
+      }
+      
+      // 清除 topics_cache
+      await _storage.save('topics_cache', {});
+      
+      // 清除 pending version
+      await _storage.save('content_version_pending', null);
+      
+      notifyListeners();
+      debugPrint('All domain caches cleared');
+    } catch (e) {
+      debugPrint('Failed to clear all domain cache: $e');
+    }
+  }
+
   Set<String> _referencedTopicPaths() {
     final refs = <String>{};
     for (final domain in _domains) {

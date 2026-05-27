@@ -51,15 +51,18 @@ class ProfilePage extends StatelessWidget {
             await settingsProvider.setCustomProdContentUrl(url);
           },
           onApplyChanged: () async {
-            // 应用 URL 变更后重载内容
+            // 清空本地知识缓存
             final contentProvider = context.read<ContentProvider>();
+            await contentProvider.clearAllDomainCache();
+
+            // 重新加载内容
             await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
 
             // 显示提示
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('内容源已切换，正在重新加载...'),
+                  content: Text('缓存已清除，正在重新加载当前领域...'),
                   duration: Duration(seconds: 2),
                 ),
               );
