@@ -306,38 +306,56 @@ class _ExplainCard extends StatelessWidget {
     formatted = formatted.replaceAll('\\n', '\n');
 
     // 识别裸代码块（没有被 ``` 包裹的代码）
-    // 匹配以 Java 关键字开头的代码行
     final lines = formatted.split('\n');
     final buffer = StringBuffer();
     bool inCodeBlock = false;
+    int consecutiveCodeLines = 0;
+    int lastCodeStartIndex = -1;
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final trimmed = line.trim();
 
-      // 检测是否是代码行（以 Java 关键字开头或包含典型的代码模式）
-      final isCodeLine = RegExp(
-            r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set)\b',
-          ).hasMatch(trimmed) ||
-          RegExp(r'[{}();]\s*$').hasMatch(trimmed) ||
-          RegExp(r'^\s*(?://|/\*|\*)').hasMatch(trimmed);
+      // 检测是否是代码行
+      final isCodeLine = _isCodeLine(trimmed);
 
-      // 检测是否是 Markdown 标题或列表
-      final isMarkdownLine = trimmed.startsWith('#') ||
-          trimmed.startsWith('- ') ||
-          trimmed.startsWith('* ') ||
-          trimmed.startsWith('> ') ||
-          RegExp(r'^\d+\.\s').hasMatch(trimmed);
+      // 检测是否是 Markdown 格式行
+      final isMarkdownLine = _isMarkdownLine(trimmed);
 
       if (isCodeLine && !inCodeBlock && !isMarkdownLine) {
         // 开始代码块
-        buffer.writeln('```java');
-        inCodeBlock = true;
-      } else if (inCodeBlock && !isCodeLine && trimmed.isNotEmpty && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')) {
-        // 结束代码块
-        buffer.writeln('```');
-        buffer.writeln();
-        inCodeBlock = false;
+        if (consecutiveCodeLines == 0) {
+          lastCodeStartIndex = buffer.length;
+        }
+        consecutiveCodeLines++;
+        if (consecutiveCodeLines >= 2) {
+          // 连续多行代码，确认是代码块
+          if (lastCodeStartIndex >= 0) {
+            // 回溯插入代码块开始标记
+            final current = buffer.toString();
+            buffer.clear();
+            buffer.write(current.substring(0, lastCodeStartIndex));
+            buffer.writeln('```java');
+            buffer.write(current.substring(lastCodeStartIndex));
+          }
+          inCodeBlock = true;
+          consecutiveCodeLines = 0;
+          lastCodeStartIndex = -1;
+        }
+      } else if (!isCodeLine) {
+        if (consecutiveCodeLines > 0 && !inCodeBlock) {
+          // 不是连续代码行，重置计数
+          consecutiveCodeLines = 0;
+          lastCodeStartIndex = -1;
+        }
+        if (inCodeBlock && trimmed.isNotEmpty && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')) {
+          // 结束代码块
+          buffer.writeln('```');
+          buffer.writeln();
+          inCodeBlock = false;
+        }
+      } else {
+        consecutiveCodeLines = 0;
       }
 
       buffer.writeln(line);
@@ -349,6 +367,56 @@ class _ExplainCard extends StatelessWidget {
     }
 
     return buffer.toString();
+  }
+
+  bool _isCodeLine(String trimmed) {
+    if (trimmed.isEmpty) return false;
+
+    // Java 关键字开头
+    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set|super|this|extends|implements|throws|synchronized|volatile|transient|native)\b').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 包含典型代码符号
+    if (RegExp(r'^[{}\[\]();]').hasMatch(trimmed) || RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 注释
+    if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+      return true;
+    }
+
+    // 赋值语句
+    if (RegExp(r'^\w+\s*=\s*').hasMatch(trimmed) && !trimmed.startsWith('-') && !trimmed.startsWith('*')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _isMarkdownLine(String trimmed) {
+    if (trimmed.isEmpty) return false;
+
+    // 标题
+    if (trimmed.startsWith('#')) return true;
+
+    // 列表
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
+
+    // 引用
+    if (trimmed.startsWith('> ')) return true;
+
+    // 有序列表
+    if (RegExp(r'^\d+\.\s').hasMatch(trimmed)) return true;
+
+    // 表格
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) return true;
+
+    // 粗体或斜体开头
+    if (trimmed.startsWith('**') || trimmed.startsWith('__')) return true;
+
+    return false;
   }
 
   @override
@@ -508,68 +576,270 @@ class _ChecklistCard extends StatelessWidget {
   }
 }
 
-// ── 代码卡片（深色代码块）────────────────────────────────────
+// ── 代码卡片（深色代码块 + 语法高亮）─────────────────────────
 
 class _CodeCard extends StatelessWidget {
   const _CodeCard({required this.card});
   final LearningCard card;
 
-  String _cleanCodeContent(String content) {
-    // 移除开头和结尾的 ``` 标记
+  ({String language, String code}) _parseCodeContent(String content) {
     String cleaned = content.trim();
+    String language = 'java'; // 默认语言
+
+    // 检测并移除 ``` 标记
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.substring(3);
-      // 移除语言标识（如 ```java）
+      // 提取语言标识
       final firstNewline = cleaned.indexOf('\n');
       if (firstNewline != -1) {
+        final langCandidate = cleaned.substring(0, firstNewline).trim();
+        if (langCandidate.isNotEmpty && !langCandidate.contains(' ')) {
+          language = langCandidate;
+        }
         cleaned = cleaned.substring(firstNewline + 1);
       }
     }
     if (cleaned.endsWith('```')) {
       cleaned = cleaned.substring(0, cleaned.length - 3);
     }
-    return cleaned.trim();
+
+    // 自动检测语言（如果没有指定）
+    if (language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
+      if (cleaned.contains('def ') || cleaned.contains('import ') && cleaned.contains('self')) {
+        language = 'python';
+      } else if (cleaned.contains('function ') || cleaned.contains('const ') || cleaned.contains('let ')) {
+        language = 'javascript';
+      } else if (cleaned.contains('fn ') || cleaned.contains('let mut ')) {
+        language = 'rust';
+      }
+    }
+
+    return (language: language, code: cleaned.trim());
   }
 
   @override
   Widget build(BuildContext context) {
-    final cleanedContent = _cleanCodeContent(card.content);
+    final parsed = _parseCodeContent(card.content);
 
     return WorkPanel(
       title: card.title,
       children: [
-        Scrollbar(
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 600),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1220),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.28),
-                  ),
-                ),
-                child: SelectableText(
-                  cleanedContent,
-                  style: const TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontSize: 13,
-                    height: 1.55,
-                    color: Color(0xFFE7EEF8),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        _HighlightedCode(
+          code: parsed.code,
+          language: parsed.language,
         ),
       ],
     );
   }
+}
+
+// ── 语法高亮代码组件 ─────────────────────────────────────────
+
+class _HighlightedCode extends StatelessWidget {
+  const _HighlightedCode({
+    required this.code,
+    this.language = 'java',
+  });
+
+  final String code;
+  final String language;
+
+  // 颜色方案：关键字、字符串、注释、数字等
+  static const _keywordColor = Color(0xFFC792EA);   // 紫色
+  static const _stringColor = Color(0xFFC3E88D);    // 绿色
+  static const _commentColor = Color(0xFF546E7A);   // 灰色
+  static const _numberColor = Color(0xFFF78C6C);    // 橙色
+  static const _typeColor = Color(0xFF82AAFF);      // 蓝色
+  static const _functionColor = Color(0xFFEEFFFF);  // 白色
+  static const _defaultColor = Color(0xFFE7EEF8);   // 默认色
+
+  List<_CodeToken> _tokenize(String code) {
+    final tokens = <_CodeToken>[];
+    final keywords = {
+      'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+      'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+      'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+      'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+      'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+      'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+      'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
+      'var', 'record', 'sealed', 'permits', 'yield', 'with',
+    };
+
+    final typeKeywords = {
+      'String', 'Object', 'List', 'Map', 'Set', 'Collection', 'Iterator',
+      'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character', 'Byte',
+      'Short', 'Number', 'Comparable', 'Iterable', 'Stream', 'Optional',
+      'ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
+      'ConcurrentHashMap', 'CopyOnWriteArrayList', 'ThreadPoolExecutor',
+      'ExecutorService', 'Future', 'CompletableFuture', 'Thread', 'Runnable',
+    };
+
+    final buffer = StringBuffer();
+    var i = 0;
+
+    while (i < code.length) {
+      // 单行注释
+      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '/') {
+        if (buffer.isNotEmpty) {
+          tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && code[i] != '\n') {
+          i++;
+        }
+        tokens.add(_CodeToken(code.substring(start, i), _commentColor));
+        continue;
+      }
+
+      // 多行注释
+      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '*') {
+        if (buffer.isNotEmpty) {
+          tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+          buffer.clear();
+        }
+        final start = i;
+        i += 2;
+        while (i + 1 < code.length && !(code[i] == '*' && code[i + 1] == '/')) {
+          i++;
+        }
+        i += 2;
+        tokens.add(_CodeToken(code.substring(start, i), _commentColor));
+        continue;
+      }
+
+      // 字符串
+      if (code[i] == '"' || code[i] == '\'') {
+        if (buffer.isNotEmpty) {
+          tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+          buffer.clear();
+        }
+        final quote = code[i];
+        final start = i;
+        i++;
+        while (i < code.length && code[i] != quote) {
+          if (code[i] == '\\') i++; // 跳过转义字符
+          i++;
+        }
+        i++; // 跳过结束引号
+        tokens.add(_CodeToken(code.substring(start, i), _stringColor));
+        continue;
+      }
+
+      // 数字
+      if (RegExp(r'[0-9]').hasMatch(code[i])) {
+        if (buffer.isNotEmpty) {
+          tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && RegExp(r'[0-9.xXa-fA-F]').hasMatch(code[i])) {
+          i++;
+        }
+        tokens.add(_CodeToken(code.substring(start, i), _numberColor));
+        continue;
+      }
+
+      // 标识符或关键字
+      if (RegExp(r'[a-zA-Z_$]').hasMatch(code[i])) {
+        if (buffer.isNotEmpty) {
+          tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && RegExp(r'[a-zA-Z0-9_$]').hasMatch(code[i])) {
+          i++;
+        }
+        final word = code.substring(start, i);
+        Color color;
+        if (keywords.contains(word)) {
+          color = _keywordColor;
+        } else if (typeKeywords.contains(word)) {
+          color = _typeColor;
+        } else if (i < code.length && code[i] == '(') {
+          color = _functionColor;
+        } else {
+          color = _defaultColor;
+        }
+        tokens.add(_CodeToken(word, color));
+        continue;
+      }
+
+      // 其他字符
+      buffer.write(code[i]);
+      i++;
+    }
+
+    if (buffer.isNotEmpty) {
+      tokens.add(_CodeToken(buffer.toString(), _defaultColor));
+    }
+
+    return tokens;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _tokenize(code);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1220),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 语言标签
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              language.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.accent,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 代码内容
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SelectableText.rich(
+              TextSpan(
+                children: tokens.map((token) => TextSpan(
+                  text: token.text,
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 13,
+                    height: 1.6,
+                    color: token.color,
+                  ),
+                )).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CodeToken {
+  final String text;
+  final Color color;
+  _CodeToken(this.text, this.color);
 }
 
 // ── 图解卡片 ─────────────────────────────────────────────
@@ -884,6 +1154,7 @@ class _MarkdownContent extends StatelessWidget {
     return MarkdownBody(
       data: data,
       selectable: true,
+      syntaxHighlighter: _CodeSyntaxHighlighter(),
       styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
         p: baseStyle.copyWith(height: 1.7),
         h1: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -922,6 +1193,182 @@ class _MarkdownContent extends StatelessWidget {
         blockquotePadding: const EdgeInsets.only(left: 16),
       ),
     );
+  }
+}
+
+// ── 代码语法高亮器 ─────────────────────────────────────────
+
+class _CodeSyntaxHighlighter extends SyntaxHighlighter {
+  // 关键字颜色
+  static const _keywordColor = Color(0xFFC792EA);
+  static const _stringColor = Color(0xFFC3E88D);
+  static const _commentColor = Color(0xFF546E7A);
+  static const _numberColor = Color(0xFFF78C6C);
+  static const _typeColor = Color(0xFF82AAFF);
+  static const _functionColor = Color(0xFFEEFFFF);
+  static const _defaultColor = Color(0xFFE7EEF8);
+
+  static const _keywords = {
+    'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+    'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+    'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+    'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+    'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+    'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+    'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
+    'var', 'record', 'sealed', 'permits', 'yield', 'with',
+    'def', 'fn', 'let', 'async', 'await',
+  };
+
+  static const _typeKeywords = {
+    'String', 'Object', 'List', 'Map', 'Set', 'Collection', 'Iterator',
+    'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character', 'Byte',
+    'Short', 'Number', 'Comparable', 'Iterable', 'Stream', 'Optional',
+    'ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
+  };
+
+  @override
+  TextSpan format(String source) {
+    final tokens = _tokenize(source);
+    return TextSpan(children: tokens);
+  }
+
+  List<TextSpan> _tokenize(String code) {
+    final tokens = <TextSpan>[];
+    final buffer = StringBuffer();
+    var i = 0;
+
+    while (i < code.length) {
+      // 单行注释
+      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '/') {
+        if (buffer.isNotEmpty) {
+          tokens.add(TextSpan(
+            text: buffer.toString(),
+            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+          ));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && code[i] != '\n') {
+          i++;
+        }
+        tokens.add(TextSpan(
+          text: code.substring(start, i),
+          style: TextStyle(color: _commentColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+        ));
+        continue;
+      }
+
+      // 多行注释
+      if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '*') {
+        if (buffer.isNotEmpty) {
+          tokens.add(TextSpan(
+            text: buffer.toString(),
+            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+          ));
+          buffer.clear();
+        }
+        final start = i;
+        i += 2;
+        while (i + 1 < code.length && !(code[i] == '*' && code[i + 1] == '/')) {
+          i++;
+        }
+        i += 2;
+        tokens.add(TextSpan(
+          text: code.substring(start, i),
+          style: TextStyle(color: _commentColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+        ));
+        continue;
+      }
+
+      // 字符串
+      if (code[i] == '"' || code[i] == '\'') {
+        if (buffer.isNotEmpty) {
+          tokens.add(TextSpan(
+            text: buffer.toString(),
+            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+          ));
+          buffer.clear();
+        }
+        final quote = code[i];
+        final start = i;
+        i++;
+        while (i < code.length && code[i] != quote) {
+          if (code[i] == '\\') i++;
+          i++;
+        }
+        i++;
+        tokens.add(TextSpan(
+          text: code.substring(start, i),
+          style: TextStyle(color: _stringColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+        ));
+        continue;
+      }
+
+      // 数字
+      if (RegExp(r'[0-9]').hasMatch(code[i])) {
+        if (buffer.isNotEmpty) {
+          tokens.add(TextSpan(
+            text: buffer.toString(),
+            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+          ));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && RegExp(r'[0-9.xXa-fA-F]').hasMatch(code[i])) {
+          i++;
+        }
+        tokens.add(TextSpan(
+          text: code.substring(start, i),
+          style: TextStyle(color: _numberColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+        ));
+        continue;
+      }
+
+      // 标识符或关键字
+      if (RegExp(r'[a-zA-Z_$]').hasMatch(code[i])) {
+        if (buffer.isNotEmpty) {
+          tokens.add(TextSpan(
+            text: buffer.toString(),
+            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+          ));
+          buffer.clear();
+        }
+        final start = i;
+        while (i < code.length && RegExp(r'[a-zA-Z0-9_$]').hasMatch(code[i])) {
+          i++;
+        }
+        final word = code.substring(start, i);
+        Color color;
+        if (_keywords.contains(word)) {
+          color = _keywordColor;
+        } else if (_typeKeywords.contains(word)) {
+          color = _typeColor;
+        } else if (i < code.length && code[i] == '(') {
+          color = _functionColor;
+        } else {
+          color = _defaultColor;
+        }
+        tokens.add(TextSpan(
+          text: word,
+          style: TextStyle(color: color, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+        ));
+        continue;
+      }
+
+      // 其他字符
+      buffer.write(code[i]);
+      i++;
+    }
+
+    if (buffer.isNotEmpty) {
+      tokens.add(TextSpan(
+        text: buffer.toString(),
+        style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
+      ));
+    }
+
+    return tokens;
   }
 }
 
