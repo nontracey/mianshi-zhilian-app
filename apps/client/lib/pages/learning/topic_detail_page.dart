@@ -309,8 +309,6 @@ class _ExplainCard extends StatelessWidget {
     final lines = formatted.split('\n');
     final buffer = StringBuffer();
     bool inCodeBlock = false;
-    int consecutiveCodeLines = 0;
-    int lastCodeStartIndex = -1;
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -322,40 +320,18 @@ class _ExplainCard extends StatelessWidget {
       // 检测是否是 Markdown 格式行
       final isMarkdownLine = _isMarkdownLine(trimmed);
 
+      // 特殊处理：以 // 开头的注释行，如果前面是代码行，也视为代码
+      final isCommentLine = trimmed.startsWith('//');
+
       if (isCodeLine && !inCodeBlock && !isMarkdownLine) {
         // 开始代码块
-        if (consecutiveCodeLines == 0) {
-          lastCodeStartIndex = buffer.length;
-        }
-        consecutiveCodeLines++;
-        if (consecutiveCodeLines >= 2) {
-          // 连续多行代码，确认是代码块
-          if (lastCodeStartIndex >= 0) {
-            // 回溯插入代码块开始标记
-            final current = buffer.toString();
-            buffer.clear();
-            buffer.write(current.substring(0, lastCodeStartIndex));
-            buffer.writeln('```java');
-            buffer.write(current.substring(lastCodeStartIndex));
-          }
-          inCodeBlock = true;
-          consecutiveCodeLines = 0;
-          lastCodeStartIndex = -1;
-        }
-      } else if (!isCodeLine) {
-        if (consecutiveCodeLines > 0 && !inCodeBlock) {
-          // 不是连续代码行，重置计数
-          consecutiveCodeLines = 0;
-          lastCodeStartIndex = -1;
-        }
-        if (inCodeBlock && trimmed.isNotEmpty && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')) {
-          // 结束代码块
-          buffer.writeln('```');
-          buffer.writeln();
-          inCodeBlock = false;
-        }
-      } else {
-        consecutiveCodeLines = 0;
+        buffer.writeln('```java');
+        inCodeBlock = true;
+      } else if (inCodeBlock && !isCodeLine && !isCommentLine && trimmed.isNotEmpty) {
+        // 结束代码块（非代码行、非注释行、非空行）
+        buffer.writeln('```');
+        buffer.writeln();
+        inCodeBlock = false;
       }
 
       buffer.writeln(line);
@@ -372,23 +348,33 @@ class _ExplainCard extends StatelessWidget {
   bool _isCodeLine(String trimmed) {
     if (trimmed.isEmpty) return false;
 
-    // Java 关键字开头
-    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set|super|this|extends|implements|throws|synchronized|volatile|transient|native)\b').hasMatch(trimmed)) {
-      return true;
-    }
-
-    // 包含典型代码符号
-    if (RegExp(r'^[{}\[\]();]').hasMatch(trimmed) || RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
-      return true;
-    }
-
-    // 注释
+    // 注释行视为代码行
     if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
       return true;
     }
 
-    // 赋值语句
-    if (RegExp(r'^\w+\s*=\s*').hasMatch(trimmed) && !trimmed.startsWith('-') && !trimmed.startsWith('*')) {
+    // Java 关键字开头
+    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set|super|this|extends|implements|synchronized|volatile|transient|native)\b').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 包含典型代码符号
+    if (RegExp(r'^[{}\[\]()];').hasMatch(trimmed) || RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 赋值语句（如 Object obj1 = new Object();）
+    if (RegExp(r'^(?:Object|String|List|Map|Set|int|long|double|float|boolean|var)\s+\w+\s*=').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 包含 new 关键字
+    if (trimmed.contains('new ') && trimmed.contains('(')) {
+      return true;
+    }
+
+    // 包含方法调用
+    if (RegExp(r'\w+\.\w+\(').hasMatch(trimmed)) {
       return true;
     }
 
@@ -848,12 +834,27 @@ class _DiagramCard extends StatelessWidget {
   const _DiagramCard({required this.card});
   final LearningCard card;
 
+  bool _isMemoryLayoutDiagram() {
+    // 检测是否是内存布局相关的图解
+    final content = '${card.title} ${card.content} ${card.items.join(' ')}'.toLowerCase();
+    return content.contains('内存') ||
+        content.contains('区域') ||
+        content.contains('堆') ||
+        content.contains('栈') ||
+        content.contains('方法区') ||
+        content.contains('jvm') ||
+        content.contains('memory');
+  }
+
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
       title: card.title,
       children: [
-        _FlowDiagram(card: card),
+        if (_isMemoryLayoutDiagram())
+          _MemoryLayoutDiagram(card: card)
+        else
+          _FlowDiagram(card: card),
         if (card.content.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(card.content, style: const TextStyle(height: 1.6)),
@@ -862,6 +863,226 @@ class _DiagramCard extends StatelessWidget {
     );
   }
 }
+
+// ── JVM 内存布局图 ─────────────────────────────────────────
+
+class _MemoryLayoutDiagram extends StatelessWidget {
+  const _MemoryLayoutDiagram({required this.card});
+  final LearningCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07182A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // JVM 内存区域标题
+          _buildSectionTitle('JVM 运行时数据区'),
+          const SizedBox(height: 20),
+
+          // 线程私有区域
+          _buildThreadPrivateSection(),
+          const SizedBox(height: 16),
+
+          // 线程共享区域
+          _buildThreadSharedSection(),
+
+          if (card.fallback != null && card.fallback!.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _buildFallbackHint(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.memory, size: 18, color: AppColors.accent),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThreadPrivateSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('线程私有', AppColors.warning),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildMemoryBlock('程序计数器', '记录当前线程执行的字节码行号', AppColors.success, isSmall: true)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMemoryBlock('虚拟机栈', '栈帧：局部变量表、操作数栈、动态链接、返回地址', AppColors.accent, isSmall: true)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMemoryBlock('本地方法栈', 'Native 方法执行', AppColors.warning, isSmall: true)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThreadSharedSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('线程共享', AppColors.danger),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: _buildMemoryBlock(
+                '堆 (Heap)',
+                '对象实例、数组\n新生代 (Eden + S0 + S1)\n老年代',
+                AppColors.danger,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  _buildMemoryBlock(
+                    '方法区 / 元空间',
+                    '类信息、常量、静态变量\nJIT 编译后的代码',
+                    const Color(0xFF8B5CF6),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMemoryBlock(
+                    '运行时常量池',
+                    '字面量、符号引用',
+                    const Color(0xFF8B5CF6),
+                    isSmall: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemoryBlock(String title, String description, Color color, {bool isSmall = false}) {
+    return Container(
+      padding: EdgeInsets.all(isSmall ? 12 : 16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: isSmall ? 12 : 14,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: isSmall ? 11 : 12,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFallbackHint() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: AppColors.accent.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              card.fallback!,
+              style: const TextStyle(
+                color: Color(0xFFBFD6EA),
+                height: 1.5,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 流程图 ─────────────────────────────────────────────────
 
 class _FlowDiagram extends StatelessWidget {
   const _FlowDiagram({required this.card});
@@ -894,37 +1115,7 @@ class _FlowDiagram extends StatelessWidget {
             _buildHorizontalLayout(steps),
           if (card.fallback != null && card.fallback!.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.15),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: AppColors.accent.withValues(alpha: 0.7),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      card.fallback!,
-                      style: const TextStyle(
-                        color: Color(0xFFBFD6EA),
-                        height: 1.5,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildFallbackHint(),
           ],
         ],
       ),
@@ -973,6 +1164,40 @@ class _FlowDiagram extends StatelessWidget {
           ],
         ],
       ],
+    );
+  }
+
+  Widget _buildFallbackHint() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: AppColors.accent.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              card.fallback!,
+              style: const TextStyle(
+                color: Color(0xFFBFD6EA),
+                height: 1.5,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
