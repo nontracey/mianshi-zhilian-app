@@ -66,7 +66,9 @@ class DashboardPage extends StatelessWidget {
     }
 
     final domains = contentProvider.domains;
-    final currentDomain = domains.where((d) => d.id == currentDomainId).firstOrNull;
+    final currentDomain = domains
+        .where((d) => d.id == currentDomainId)
+        .firstOrNull;
 
     if (currentDomain == null && domains.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,12 +76,19 @@ class DashboardPage extends StatelessWidget {
       });
     }
 
-    final domainProgress = progressProvider.getDomainProgress(currentDomainId, contentProvider.topics.values.toList());
+    final domainProgress = progressProvider.getDomainProgress(
+      currentDomainId,
+      contentProvider.topics.values.toList(),
+    );
     final masteryPercent = domainProgress.masteryPercent;
     final topicCount = domainProgress.topicCount;
     final reviewCount = progressProvider.getReviewCount(currentDomainId);
 
-    final recommendedTopics = progressProvider.getRecommendedTopics(currentDomainId, contentProvider.topics.values.toList(), 'low-score-first');
+    final recommendedTopics = progressProvider.getRecommendedTopics(
+      currentDomainId,
+      contentProvider.topics.values.toList(),
+      'low-score-first',
+    );
 
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -92,10 +101,7 @@ class DashboardPage extends StatelessWidget {
           onPractice: onPractice,
         ),
         const SizedBox(height: 20),
-        Text(
-          '领域选择',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('领域选择', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         // 领域卡片：加载中显示骨架屏，加载完显示卡片
         contentProvider.isLoading
@@ -104,7 +110,10 @@ class DashboardPage extends StatelessWidget {
                 spacing: 14,
                 runSpacing: 14,
                 children: domains.map((domain) {
-                  final dp = progressProvider.getDomainProgress(domain.id, contentProvider.topics.values.toList());
+                  final dp = progressProvider.getDomainProgress(
+                    domain.id,
+                    contentProvider.topics.values.toList(),
+                  );
                   final loaded = contentProvider.getLoadedTopicCount(domain.id);
                   final total = domain.topicCount;
                   return _DomainCardWrapper(
@@ -112,7 +121,9 @@ class DashboardPage extends StatelessWidget {
                     masteryPercent: dp.masteryPercent,
                     selected: domain.id == currentDomainId,
                     loadingProgress: total > 0 ? loaded / total : 0,
-                    isTopicLoading: contentProvider.isLoadingTopics && domain.id == currentDomainId,
+                    isTopicLoading:
+                        contentProvider.isLoadingTopics &&
+                        domain.id == currentDomainId,
                     onTap: () {
                       onDomainChanged(domain.id);
                       // 切换领域时自动加载该领域的 topics
@@ -140,7 +151,9 @@ class DashboardPage extends StatelessWidget {
                 children: recommendedTopics.isEmpty
                     ? [_EmptyContinueLearning(onPractice: onPractice)]
                     : recommendedTopics.take(3).map((topic) {
-                        final progress = progressProvider.getTopicProgress(topic.id);
+                        final progress = progressProvider.getTopicProgress(
+                          topic.id,
+                        );
                         return _TopicTile(
                           topic: topic,
                           progress: progress,
@@ -165,16 +178,21 @@ class DashboardPage extends StatelessWidget {
               ),
             ];
             return wide
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: children
-                        .map((c) => Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 12),
-                                child: c,
+                ? IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var index = 0; index < children.length; index += 1)
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                right: index == children.length - 1 ? 0 : 12,
                               ),
-                            ))
-                        .toList(),
+                              child: children[index],
+                            ),
+                          ),
+                      ],
+                    ),
                   )
                 : Column(children: children);
           },
@@ -196,7 +214,9 @@ class _EmptyContinueLearning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
@@ -205,7 +225,11 @@ class _EmptyContinueLearning extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.auto_stories_outlined, size: 36, color: Colors.grey.shade400),
+          Icon(
+            Icons.auto_stories_outlined,
+            size: 36,
+            color: Colors.grey.shade400,
+          ),
           const SizedBox(height: 10),
           const Text(
             '暂未学习',
@@ -238,29 +262,62 @@ class _DomainSkeleton extends StatelessWidget {
     return Wrap(
       spacing: 14,
       runSpacing: 14,
-      children: List.generate(3, (_) => SizedBox(
-        width: 330,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(width: 120, height: 18, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4))),
-              const SizedBox(height: 8),
-              Container(width: 200, height: 14, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(4))),
-              const SizedBox(height: 12),
-              Container(height: 4, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 8),
-              Container(width: 80, height: 12, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(4))),
-            ],
+      children: List.generate(
+        3,
+        (_) => SizedBox(
+          width: 330,
+          height: 180,
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 120,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 200,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 80,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      )),
+      ),
     );
   }
 }
@@ -299,9 +356,9 @@ class _HeroPanel extends StatelessWidget {
                 Text(
                   '把面试知识练成可以讲出来的答案',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -334,21 +391,21 @@ class _StatBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 18),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 28,
-              ),
-            ),
-            Text(label, style: const TextStyle(color: Colors.white70)),
-          ],
+    padding: const EdgeInsets.only(left: 18),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 28,
+          ),
         ),
-      );
+        Text(label, style: const TextStyle(color: Colors.white70)),
+      ],
+    ),
+  );
 }
 
 class _DomainCardWrapper extends StatelessWidget {
@@ -375,6 +432,7 @@ class _DomainCardWrapper extends StatelessWidget {
     final domainColor = domain.color;
     return SizedBox(
       width: 330,
+      height: 180,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -395,7 +453,10 @@ class _DomainCardWrapper extends StatelessWidget {
                   Expanded(
                     child: Text(
                       domain.title,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
                     ),
                   ),
                   if (isTopicLoading)
@@ -413,7 +474,9 @@ class _DomainCardWrapper extends StatelessWidget {
               Text(domain.description),
               const SizedBox(height: 12),
               LinearProgressIndicator(
-                value: loadingProgress < 1.0 && loadingProgress > 0 ? loadingProgress : masteryPercent / 100,
+                value: loadingProgress < 1.0 && loadingProgress > 0
+                    ? loadingProgress
+                    : masteryPercent / 100,
                 color: domainColor,
               ),
               const SizedBox(height: 8),
@@ -426,15 +489,27 @@ class _DomainCardWrapper extends StatelessWidget {
                           : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
                     ),
                   ),
-                  TextButton(
+                  FilledButton.icon(
                     onPressed: onViewDetail,
-                    style: TextButton.styleFrom(
-                      foregroundColor: domainColor,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      minimumSize: Size.zero,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: selected
+                          ? domainColor
+                          : Theme.of(context).colorScheme.secondaryContainer,
+                      foregroundColor: selected
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSecondaryContainer,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      minimumSize: const Size(0, 36),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    child: const Text('查看知识 →'),
+                    icon: const Icon(Icons.arrow_forward, size: 16),
+                    label: const Text('查看知识'),
                   ),
                 ],
               ),
@@ -473,7 +548,10 @@ class _TopicTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(topic.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    topic.title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   Text(topic.summary),
                 ],
               ),
@@ -509,7 +587,10 @@ class _InfoRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 Text(subtitle),
               ],
             ),
