@@ -54,6 +54,16 @@ class ProfilePage extends StatelessWidget {
             // 应用 URL 变更后重载内容
             final contentProvider = context.read<ContentProvider>();
             await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
+
+            // 显示提示
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('内容源已切换，正在重新加载...'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
           },
         ),
         const SizedBox(height: 16),
