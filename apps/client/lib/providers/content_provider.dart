@@ -14,12 +14,14 @@ class ContentProvider extends ChangeNotifier {
   Map<String, Topic> _topics = {};
   Map<String, dynamic>? _manifest;
   bool _isLoading = false;
+  bool _isLoadingTopics = false;
   String? _error;
 
   List<Domain> get domains => _domains;
   Map<String, Topic> get topics => _topics;
   Map<String, dynamic>? get manifest => _manifest;
   bool get isLoading => _isLoading;
+  bool get isLoadingTopics => _isLoadingTopics;
   String? get error => _error;
 
   Future<void> loadContent() async {
@@ -44,7 +46,6 @@ class ContentProvider extends ChangeNotifier {
           final fullDomain = await _api.fetchDomain(domain.id);
           fullDomains.add(fullDomain);
         } catch (e) {
-          // 单个 domain 加载失败不阻断，用 manifest 里的基础信息
           debugPrint('Failed to load domain detail ${domain.id}: $e');
           fullDomains.add(domain);
         }
@@ -61,6 +62,12 @@ class ContentProvider extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+
+      // 5. 自动加载默认 domain 的 topics（后台加载，不阻塞 UI）
+      final defaultDomainId = _manifest?['defaultDomain'] as String? ?? 'java';
+      if (_topics.values.where((t) => t.domainId == defaultDomainId).isEmpty) {
+        loadDomainTopics(defaultDomainId);
+      }
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -69,15 +76,14 @@ class ContentProvider extends ChangeNotifier {
   }
 
   Future<void> loadDomainTopics(String domainId) async {
-    _isLoading = true;
-    _error = null;
+    _isLoadingTopics = true;
     notifyListeners();
 
     try {
       // 找到对应的 domain，从 categories 中获取 topic 路径列表
       final domain = _domains.where((d) => d.id == domainId).firstOrNull;
       if (domain == null) {
-        _isLoading = false;
+        _isLoadingTopics = false;
         notifyListeners();
         return;
       }
@@ -92,6 +98,8 @@ class ContentProvider extends ChangeNotifier {
             try {
               final topic = await _api.fetchTopic(cleanPath);
               _topics[cleanPath] = topic;
+              // 每加载一个 topic 就通知 UI 更新，让用户看到渐进式加载
+              notifyListeners();
             } catch (e) {
               debugPrint('Failed to load topic $cleanPath: $e');
             }
@@ -105,13 +113,24 @@ class ContentProvider extends ChangeNotifier {
         _topics.map((k, v) => MapEntry(k, v.toJson())),
       );
 
-      _isLoading = false;
+      _isLoadingTopics = false;
       notifyListeners();
     } catch (e) {
       _error = e.toString();
-      _isLoading = false;
+      _isLoadingTopics = false;
       notifyListeners();
     }
+  }
+
+  /// 获取指定 domain 下已加载的 topic 数量
+  int getLoadedTopicCount(String domainId) {
+    return _topics.values.where((t) => t.domainId == domainId).length;
+  }
+
+  /// 获取指定 domain 的预期 topic 总数（从 manifest 读取）
+  int getTotalTopicCount(String domainId) {
+    final domain = _domains.where((d) => d.id == domainId).firstOrNull;
+    return domain?.topicCount ?? 0;
   }
 
   List<Topic> getTopicsByDomain(String domainId) {

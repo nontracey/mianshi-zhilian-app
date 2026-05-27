@@ -170,7 +170,6 @@ class _LearningShellState extends State<LearningShell> {
   }
 
   Widget _buildCurrentPage(bool wide) {
-    final padding = wide ? 24.0 : 16.0;
     if (_selectedTopicId != null) {
       final content = context.read<ContentProvider>();
       final topic = content.topics[_selectedTopicId!];
@@ -182,10 +181,8 @@ class _LearningShellState extends State<LearningShell> {
       }
     }
 
-    return ListView(
-      padding: EdgeInsets.all(padding),
-      children: [_currentPage()],
-    );
+    // 各页面自行管理滚动和 padding，避免嵌套 ListView
+    return _currentPage();
   }
 
   Widget _currentPage() {

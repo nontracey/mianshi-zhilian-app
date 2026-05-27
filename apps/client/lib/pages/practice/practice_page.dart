@@ -24,9 +24,33 @@ class PracticePage extends StatelessWidget {
     final reviewCount = progressProvider.getReviewCount(currentDomainId);
     final contentProvider = context.watch<ContentProvider>();
     final domains = contentProvider.domains;
+    final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // 还没有加载到任何知识点时显示空状态
+    if (domainTopics.isEmpty && contentProvider.isLoadingTopics) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              '正在加载知识点...',
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (domainTopics.isEmpty) {
+      return _EmptyPracticeState(
+        onRetry: () => contentProvider.loadDomainTopics(currentDomainId),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         Text(
           '选择练习模式',
@@ -97,6 +121,71 @@ class PracticePage extends StatelessWidget {
                   child: Text(domain.title),
                 ))
             .toList(),
+      ),
+    );
+  }
+}
+
+// ── 美化的空练习状态 ──────────────────────────────────────────────
+
+class _EmptyPracticeState extends StatelessWidget {
+  const _EmptyPracticeState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40),
+        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.psychology_alt_outlined,
+                size: 48,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              '暂无可练习的知识点',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '知识点正在加载中，请稍等片刻再试',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.tonalIcon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重新加载'),
+            ),
+          ],
+        ),
       ),
     );
   }

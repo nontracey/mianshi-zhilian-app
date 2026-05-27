@@ -16,6 +16,7 @@ class ProfilePage extends StatelessWidget {
     final settings = settingsProvider.settings;
 
     return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         _ContentEnvPanel(
           settings: settings,

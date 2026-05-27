@@ -27,6 +27,42 @@ class DashboardPage extends StatelessWidget {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
 
+    // 内容加载中
+    if (contentProvider.isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('正在加载知识库...'),
+          ],
+        ),
+      );
+    }
+
+    // 加载出错
+    if (contentProvider.error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text('加载失败', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(contentProvider.error!, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: () => contentProvider.loadContent(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+
     final domains = contentProvider.domains;
     final currentDomain = domains.where((d) => d.id == currentDomainId).firstOrNull;
 
@@ -43,8 +79,8 @@ class DashboardPage extends StatelessWidget {
 
     final recommendedTopics = progressProvider.getRecommendedTopics(currentDomainId, contentProvider.topics.values.toList(), 'low-score-first');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         _HeroPanel(
           domainTitle: currentDomain?.title ?? '',
@@ -59,19 +95,32 @@ class DashboardPage extends StatelessWidget {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          children: domains.map((domain) {
-            final dp = progressProvider.getDomainProgress(domain.id, contentProvider.topics.values.toList());
-            return _DomainCardWrapper(
-              domain: domain,
-              masteryPercent: dp.masteryPercent,
-              selected: domain.id == currentDomainId,
-              onTap: () => onDomainChanged(domain.id),
-            );
-          }).toList(),
-        ),
+        // 领域卡片：加载中显示骨架屏，加载完显示卡片
+        contentProvider.isLoading
+            ? const _DomainSkeleton()
+            : Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: domains.map((domain) {
+                  final dp = progressProvider.getDomainProgress(domain.id, contentProvider.topics.values.toList());
+                  final loaded = contentProvider.getLoadedTopicCount(domain.id);
+                  final total = domain.topicCount;
+                  return _DomainCardWrapper(
+                    domain: domain,
+                    masteryPercent: dp.masteryPercent,
+                    selected: domain.id == currentDomainId,
+                    loadingProgress: total > 0 ? loaded / total : 0,
+                    isTopicLoading: contentProvider.isLoadingTopics && domain.id == currentDomainId,
+                    onTap: () {
+                      onDomainChanged(domain.id);
+                      // 切换领域时自动加载该领域的 topics
+                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                        contentProvider.loadDomainTopics(domain.id);
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
         const SizedBox(height: 20),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -79,14 +128,16 @@ class DashboardPage extends StatelessWidget {
             final children = [
               WorkPanel(
                 title: '继续学习 ${currentDomain?.title ?? ''}',
-                children: recommendedTopics.take(3).map((topic) {
-                  final progress = progressProvider.getTopicProgress(topic.id);
-                  return _TopicTile(
-                    topic: topic,
-                    progress: progress,
-                    onTap: () => onTopicTap(topic.id),
-                  );
-                }).toList(),
+                children: recommendedTopics.isEmpty
+                    ? [_EmptyContinueLearning(onPractice: onPractice)]
+                    : recommendedTopics.take(3).map((topic) {
+                        final progress = progressProvider.getTopicProgress(topic.id);
+                        return _TopicTile(
+                          topic: topic,
+                          progress: progress,
+                          onTap: () => onTopicTap(topic.id),
+                        );
+                      }).toList(),
               ),
               WorkPanel(
                 title: '学习节奏',
@@ -120,6 +171,87 @@ class DashboardPage extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+// ── 空状态：暂未学习 ──────────────────────────────────────────────
+
+class _EmptyContinueLearning extends StatelessWidget {
+  const _EmptyContinueLearning({required this.onPractice});
+
+  final VoidCallback onPractice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.auto_stories_outlined, size: 36, color: Colors.grey.shade400),
+          const SizedBox(height: 10),
+          const Text(
+            '暂未学习',
+            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '还没有学习记录，开始练习来提升掌握度吧',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.tonalIcon(
+            onPressed: onPractice,
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('开始练习'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 领域卡片骨架屏 ──────────────────────────────────────────────
+
+class _DomainSkeleton extends StatelessWidget {
+  const _DomainSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 14,
+      runSpacing: 14,
+      children: List.generate(3, (_) => SizedBox(
+        width: 330,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 120, height: 18, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4))),
+              const SizedBox(height: 8),
+              Container(width: 200, height: 14, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(4))),
+              const SizedBox(height: 12),
+              Container(height: 4, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 8),
+              Container(width: 80, height: 12, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(4))),
+            ],
+          ),
+        ),
+      )),
     );
   }
 }
@@ -215,12 +347,16 @@ class _DomainCardWrapper extends StatelessWidget {
     required this.domain,
     required this.masteryPercent,
     required this.selected,
+    required this.loadingProgress,
+    required this.isTopicLoading,
     required this.onTap,
   });
 
   final Domain domain;
   final int masteryPercent;
   final bool selected;
+  final double loadingProgress;
+  final bool isTopicLoading;
   final VoidCallback onTap;
 
   @override
@@ -243,19 +379,38 @@ class _DomainCardWrapper extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                domain.title,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      domain.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                    ),
+                  ),
+                  if (isTopicLoading)
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: domainColor,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(domain.description),
               const SizedBox(height: 12),
               LinearProgressIndicator(
-                value: masteryPercent / 100,
+                value: loadingProgress < 1.0 && loadingProgress > 0 ? loadingProgress : masteryPercent / 100,
                 color: domainColor,
               ),
               const SizedBox(height: 8),
-              Text('$masteryPercent% 熟练 · 点击切换领域'),
+              Text(
+                loadingProgress < 1.0 && loadingProgress > 0
+                    ? '加载中 ${domain.topicCount} 个知识点...'
+                    : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+              ),
             ],
           ),
         ),
