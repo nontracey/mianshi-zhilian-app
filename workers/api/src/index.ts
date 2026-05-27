@@ -31,7 +31,7 @@ export default {
     }
 
     if (url.pathname === '/ai/proxy' && request.method === 'POST') {
-      return json({ error: 'AI proxy is not configured in MVP. Use a local client AI configuration first.' }, 501);
+      return handleAiProxy(request, env);
     }
 
     if (url.pathname.startsWith('/sync/')) {
@@ -62,6 +62,97 @@ async function proxyFetch(targetUrl: string, originalRequest: Request): Promise<
     });
   } catch (e) {
     return json({ error: 'Upstream fetch failed', detail: String(e) }, 502);
+  }
+}
+
+async function handleAiProxy(request: Request, env: Env): Promise<Response> {
+  try {
+    const body = await request.json() as any;
+
+    // 从请求中获取用户的 AI 配置（不存储，只转发）
+    const { apiKey, baseUrl, model, topicTitle, mustHave, commonMistakes, userAnswer, language } = body;
+
+    if (!apiKey || !baseUrl || !model) {
+      return json({ error: 'Missing required fields: apiKey, baseUrl, model' }, 400);
+    }
+
+    // 构建系统提示词
+    const systemPrompt = `你是一个技术面试评估专家。请评估用户对知识点的回答。
+
+评估维度：
+1. 核心概念完整性 (40%)：是否覆盖标准要点
+2. 表达准确性 (25%)：是否有明显错误或混淆
+3. 面试表达质量 (20%)：是否像面试回答，结构是否清晰
+4. 扩展深度 (15%)：是否能结合场景、优缺点、实践经验
+
+标准要点：${(mustHave || []).join('、')}
+常见错误：${(commonMistakes || []).join('、')}
+
+请用${language || '中文'}回答，并以如下 JSON 格式输出：
+{
+  "score": 86,
+  "level": "skilled",
+  "summary": "整体理解正确，但可以补充...",
+  "missedPoints": ["遗漏要点1"],
+  "wrongPoints": ["错误点1"],
+  "improvedAnswer": "面试时可以这样回答：...",
+  "nextAction": "进入下一知识点"
+}
+
+score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。`;
+
+    // 转发请求到用户配置的 AI 服务
+    const targetUrl = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+    const aiResponse = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `知识点：${topicTitle}\n\n我的回答：\n${userAnswer}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      return json({
+        error: 'AI service error',
+        status: aiResponse.status,
+        detail: errorText,
+      }, aiResponse.status);
+    }
+
+    const aiResult = await aiResponse.json() as any;
+    const content = aiResult.choices?.[0]?.message?.content || '';
+
+    // 尝试从回复中提取 JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return json(JSON.parse(jsonMatch[0]));
+      } catch (_) {
+        // JSON 解析失败，返回原始内容
+      }
+    }
+
+    return json({
+      score: 0,
+      level: 'unfamiliar',
+      summary: content,
+      missedPoints: [],
+      wrongPoints: [],
+      improvedAnswer: '',
+      nextAction: '重试',
+    });
+  } catch (e) {
+    return json({ error: 'AI proxy error', detail: String(e) }, 500);
   }
 }
 
