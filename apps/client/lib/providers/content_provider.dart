@@ -44,7 +44,17 @@ class ContentProvider extends ChangeNotifier {
       for (final domain in baseDomains) {
         try {
           final fullDomain = await _api.fetchDomain(domain.id);
-          fullDomains.add(fullDomain);
+          fullDomains.add(
+            Domain(
+              id: fullDomain.id,
+              title: fullDomain.title,
+              description: fullDomain.description,
+              categories: fullDomain.categories,
+              topicCount: domain.topicCount,
+              updatedAt: domain.updatedAt,
+              color: fullDomain.color,
+            ),
+          );
         } catch (e) {
           debugPrint('Failed to load domain detail ${domain.id}: $e');
           fullDomains.add(domain);

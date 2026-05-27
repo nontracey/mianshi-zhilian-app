@@ -22,7 +22,10 @@ class CatalogPage extends StatelessWidget {
   final ValueChanged<String> onTopicPractice;
 
   /// 按分类下已加载 topic 的平均难度升序排列（由易到难）
-  List<Category> _sortedCategories(List<Category> categories, List<Topic> domainTopics) {
+  List<Category> _sortedCategories(
+    List<Category> categories,
+    List<Topic> domainTopics,
+  ) {
     final sorted = List<Category>.from(categories);
     sorted.sort((a, b) {
       final avgA = _avgDifficulty(a.id, domainTopics);
@@ -35,7 +38,8 @@ class CatalogPage extends StatelessWidget {
   double _avgDifficulty(String categoryId, List<Topic> domainTopics) {
     final topics = domainTopics.where((t) => t.category == categoryId).toList();
     if (topics.isEmpty) return 999; // 无数据的排最后
-    return topics.map((t) => t.difficulty).reduce((a, b) => a + b) / topics.length;
+    return topics.map((t) => t.difficulty).reduce((a, b) => a + b) /
+        topics.length;
   }
 
   @override
@@ -44,13 +48,18 @@ class CatalogPage extends StatelessWidget {
     final progressProvider = context.watch<ProgressProvider>();
 
     final domains = contentProvider.domains;
-    final currentDomain = domains.where((d) => d.id == currentDomainId).firstOrNull;
+    final currentDomain = domains
+        .where((d) => d.id == currentDomainId)
+        .firstOrNull;
     if (currentDomain == null) {
       return const Center(child: Text('请选择一个领域'));
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
-    final domainProgress = progressProvider.getDomainProgress(currentDomainId, contentProvider.topics.values.toList());
+    final domainProgress = progressProvider.getDomainProgress(
+      currentDomainId,
+      contentProvider.topics.values.toList(),
+    );
     final masteryPercent = domainProgress.masteryPercent;
     final loaded = contentProvider.getLoadedTopicCount(currentDomainId);
     final total = currentDomain.topicCount;
@@ -90,7 +99,9 @@ class CatalogPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -110,7 +121,9 @@ class CatalogPage extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 18),
-            ..._sortedCategories(currentDomain.categories, domainTopics).map((category) {
+            ..._sortedCategories(currentDomain.categories, domainTopics).map((
+              category,
+            ) {
               final categoryTopics = domainTopics
                   .where((t) => t.category == category.id)
                   .toList();
@@ -167,11 +180,12 @@ class _CategorySection extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           category.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
-        if (category.description != null && category.description!.isNotEmpty) ...[
+        if (category.description != null &&
+            category.description!.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
             category.description!,
@@ -181,15 +195,39 @@ class _CategorySection extends StatelessWidget {
         const SizedBox(height: 8),
         if (isLoading && topics.isEmpty)
           // 加载中骨架
-          ...List.generate(3, (_) => Card(
-            elevation: 0,
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: Container(width: 12, height: 12, decoration: BoxDecoration(color: Colors.grey.shade200, shape: BoxShape.circle)),
-              title: Container(width: 160, height: 14, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(4))),
-              subtitle: Container(width: 240, height: 12, decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(4))),
+          ...List.generate(
+            3,
+            (_) => Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                title: Container(
+                  width: 160,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                subtitle: Container(
+                  width: 240,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
             ),
-          ))
+          )
         else if (topics.isEmpty)
           // 暂无数据
           Padding(
@@ -222,9 +260,14 @@ class _CategorySection extends StatelessWidget {
                     Expanded(child: Text(topic.title)),
                     if (difficultyLabel.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: _difficultyColor(topic.difficulty).withValues(alpha: 0.12),
+                          color: _difficultyColor(
+                            topic.difficulty,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -246,10 +289,13 @@ class _CategorySection extends StatelessWidget {
                     FilledButton.tonal(
                       onPressed: () => onTopicLearn(topic.id),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF00CCF9).withValues(alpha: 0.15),
-                        foregroundColor: const Color(0xFF00A0C4),
+                        backgroundColor: const Color(0xFF00CCF9),
+                        foregroundColor: const Color(0xFF06111F),
                         textStyle: const TextStyle(fontWeight: FontWeight.w600),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         minimumSize: Size.zero,
                       ),
                       child: const Text('知识查阅'),
@@ -258,10 +304,13 @@ class _CategorySection extends StatelessWidget {
                     FilledButton(
                       onPressed: () => onTopicPractice(topic.id),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A2540),
+                        backgroundColor: const Color(0xFF334B66),
                         foregroundColor: Colors.white,
                         textStyle: const TextStyle(fontWeight: FontWeight.w600),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         minimumSize: Size.zero,
                       ),
                       child: const Text('学习模式'),

@@ -283,8 +283,8 @@ class _KnowledgeTab extends StatelessWidget {
       'interview' => _InterviewAnswerCard(card: card),
       'checklist' => _ChecklistCard(card: card),
       'code' => _CodeCard(card: card),
-      'animation' => _AnimationCard(card: card),
-      'diagram' => _AnimationCard(card: card),
+      'animation' => _DiagramCard(card: card),
+      'diagram' => _DiagramCard(card: card),
       'table' => _TableCard(card: card),
       'compareTable' => _TableCard(card: card),
       _ => _GenericCard(card: card),
@@ -314,7 +314,7 @@ class _ExplainCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: MarkdownBody(data: card.content, selectable: true),
+          child: _MarkdownContent(data: card.content),
         ),
       ],
     );
@@ -433,20 +433,31 @@ class _CodeCard extends StatelessWidget {
     return WorkPanel(
       title: card.title,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SelectableText(
-            card.content,
-            style: const TextStyle(
-              fontFamily: 'JetBrainsMono',
-              fontSize: 13,
-              height: 1.5,
-              color: Color(0xFFE2E8F0),
+        Scrollbar(
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 720),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B1220),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: SelectableText(
+                  card.content,
+                  style: const TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 13,
+                    height: 1.55,
+                    color: Color(0xFFE7EEF8),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -455,10 +466,10 @@ class _CodeCard extends StatelessWidget {
   }
 }
 
-// ── 动画/图示卡片 ─────────────────────────────────────────────
+// ── 图解卡片 ─────────────────────────────────────────────
 
-class _AnimationCard extends StatelessWidget {
-  const _AnimationCard({required this.card});
+class _DiagramCard extends StatelessWidget {
+  const _DiagramCard({required this.card});
   final LearningCard card;
 
   @override
@@ -466,50 +477,102 @@ class _AnimationCard extends StatelessWidget {
     return WorkPanel(
       title: card.title,
       children: [
-        if (card.asset != null)
-          Image.asset(
-            card.asset!,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-                _AnimationPlaceholder(fallback: card.fallback),
-          )
-        else
-          _AnimationPlaceholder(fallback: card.fallback),
+        _FlowDiagram(card: card),
         const SizedBox(height: 12),
-        Text(card.content),
+        Text(card.content, style: const TextStyle(height: 1.6)),
       ],
     );
   }
 }
 
-class _AnimationPlaceholder extends StatelessWidget {
-  const _AnimationPlaceholder({this.fallback});
-  final String? fallback;
+class _FlowDiagram extends StatelessWidget {
+  const _FlowDiagram({required this.card});
+  final LearningCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = card.items.isNotEmpty
+        ? card.items
+        : ['输入/触发', '核心机制', '状态变化', '输出/风险'];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07182A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (var index = 0; index < steps.length; index += 1) ...[
+                _DiagramStep(index: index + 1, text: steps[index]),
+                if (index < steps.length - 1)
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: AppColors.accent,
+                    size: 20,
+                  ),
+              ],
+            ],
+          ),
+          if (card.fallback != null && card.fallback!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              card.fallback!,
+              style: const TextStyle(color: Color(0xFFBFD6EA), height: 1.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagramStep extends StatelessWidget {
+  const _DiagramStep({required this.index, required this.text});
+  final int index;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 200,
+      constraints: const BoxConstraints(minWidth: 150, maxWidth: 260),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: AppColors.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
       ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.animation_outlined,
-              size: 48,
-              color: AppColors.accent,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: AppColors.accent,
+            child: Text(
+              '$index',
+              style: const TextStyle(
+                color: AppColors.bgDark,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              fallback ?? '动画/图示占位区域',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white, height: 1.35),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -525,7 +588,15 @@ class _TableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkPanel(
       title: card.title,
-      children: [MarkdownBody(data: card.content, selectable: true)],
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 720),
+            child: _MarkdownContent(data: card.content),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -544,10 +615,46 @@ class _GenericCard extends StatelessWidget {
         if (card.content.contains('#') ||
             card.content.contains('**') ||
             card.content.contains('```'))
-          MarkdownBody(data: card.content, selectable: true)
+          _MarkdownContent(data: card.content)
         else
           Text(card.content, style: const TextStyle(height: 1.7)),
       ],
+    );
+  }
+}
+
+class _MarkdownContent extends StatelessWidget {
+  const _MarkdownContent({required this.data});
+  final String data;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = DefaultTextStyle.of(context).style;
+    return MarkdownBody(
+      data: data,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        p: baseStyle.copyWith(height: 1.7),
+        h1: Theme.of(
+          context,
+        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+        h2: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+        h3: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+        code: const TextStyle(
+          fontFamily: 'JetBrainsMono',
+          color: Color(0xFFE7EEF8),
+          backgroundColor: Color(0xFF14263A),
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: const Color(0xFF0B1220),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+        ),
+      ),
     );
   }
 }

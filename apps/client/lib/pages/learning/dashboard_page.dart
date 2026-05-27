@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/status_dot.dart';
 
@@ -399,6 +400,14 @@ class _HeroPanel extends StatelessWidget {
                   onPressed: onPractice,
                   icon: const Icon(Icons.auto_awesome),
                   label: const Text('进入复述练习'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.bgDark,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -514,20 +523,17 @@ class _DomainCardWrapper extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    loadingProgress < 1.0 && loadingProgress > 0
-                        ? '加载中 ${domain.topicCount} 个知识点...'
-                        : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+                    '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
                 FilledButton.icon(
                   onPressed: onViewDetail,
                   style: FilledButton.styleFrom(
                     backgroundColor: selected
-                        ? domainColor
-                        : Theme.of(context).colorScheme.secondaryContainer,
-                    foregroundColor: selected
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                        ? Theme.of(context).colorScheme.secondary
+                        : const Color(0xFF31445A),
+                    foregroundColor: selected ? AppColors.bgDark : Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
