@@ -60,7 +60,7 @@ class _RecallPageState extends State<RecallPage> {
                 children: [
                   Text(
                     topic.recallPrompts.isNotEmpty
-                        ? topic.recallPrompts.first
+                        ? topic.recallPrompts.first.prompt
                         : '请用自己的话解释 ${topic.title} 的核心内容。',
                     style: const TextStyle(fontSize: 16),
                   ),
@@ -128,7 +128,7 @@ class _RecallPageState extends State<RecallPage> {
 
       final result = await aiProvider.evaluateAnswer(
         topicId: topicId,
-        question: topic.recallPrompts.isNotEmpty ? topic.recallPrompts.first : topic.title,
+        question: topic.recallPrompts.isNotEmpty ? topic.recallPrompts.first.prompt : topic.title,
         userAnswer: answer,
         rubric: topic.rubric,
       );

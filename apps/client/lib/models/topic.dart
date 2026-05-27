@@ -11,7 +11,7 @@ class Topic {
   final int order;
   final int recommendWeight;
   final List<LearningCard> learningCards;
-  final List<String> recallPrompts;
+  final List<RecallPrompt> recallPrompts;
   final Rubric? rubric;
   final String? updatedAt;
 
@@ -52,15 +52,27 @@ class Topic {
                 ?.map((e) => LearningCard.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
-        recallPrompts: (json['recallPrompts'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            [],
+        recallPrompts: _parseRecallPrompts(json['recallPrompts']),
         rubric: json['rubric'] != null
             ? Rubric.fromJson(json['rubric'] as Map<String, dynamic>)
             : null,
         updatedAt: json['updatedAt'] as String?,
       );
+
+  /// 兼容处理：recallPrompts 可能是 String[] 或 Object[]
+  static List<RecallPrompt> _parseRecallPrompts(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is! List) return [];
+    return raw.map((e) {
+      if (e is String) {
+        return RecallPrompt(id: '', prompt: e, mode: 'text');
+      }
+      if (e is Map<String, dynamic>) {
+        return RecallPrompt.fromJson(e);
+      }
+      return RecallPrompt(id: '', prompt: e.toString(), mode: 'text');
+    }).toList();
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -75,7 +87,7 @@ class Topic {
         'order': order,
         'recommendWeight': recommendWeight,
         'learningCards': learningCards.map((e) => e.toJson()).toList(),
-        'recallPrompts': recallPrompts,
+        'recallPrompts': recallPrompts.map((e) => e.toJson()).toList(),
         if (rubric != null) 'rubric': rubric!.toJson(),
         'updatedAt': updatedAt,
       };
@@ -91,12 +103,45 @@ class Topic {
   bool get highFrequency => recommendWeight >= 80;
 }
 
+class RecallPrompt {
+  final String id;
+  final String prompt;
+  final String mode; // text, code, voice
+  final int? expectedMinutes;
+  final int? difficulty;
+
+  const RecallPrompt({
+    required this.id,
+    required this.prompt,
+    this.mode = 'text',
+    this.expectedMinutes,
+    this.difficulty,
+  });
+
+  factory RecallPrompt.fromJson(Map<String, dynamic> json) => RecallPrompt(
+        id: json['id'] as String? ?? '',
+        prompt: json['prompt'] as String? ?? '',
+        mode: json['mode'] as String? ?? 'text',
+        expectedMinutes: (json['expectedMinutes'] as num?)?.toInt(),
+        difficulty: (json['difficulty'] as num?)?.toInt(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'prompt': prompt,
+        'mode': mode,
+        if (expectedMinutes != null) 'expectedMinutes': expectedMinutes,
+        if (difficulty != null) 'difficulty': difficulty,
+      };
+}
+
 class LearningCard {
-  final String type; // explain, code, animation, table, interview
+  final String type; // explain, code, animation, table, interview, checklist, interviewAnswer
   final String title;
   final String content;
   final String? asset;
   final String? fallback;
+  final List<String> items; // for checklist type
 
   const LearningCard({
     required this.type,
@@ -104,6 +149,7 @@ class LearningCard {
     required this.content,
     this.asset,
     this.fallback,
+    this.items = const [],
   });
 
   factory LearningCard.fromJson(Map<String, dynamic> json) => LearningCard(
@@ -112,6 +158,10 @@ class LearningCard {
         content: json['content'] as String? ?? '',
         asset: json['asset'] as String?,
         fallback: json['fallback'] as String?,
+        items: (json['items'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -120,16 +170,21 @@ class LearningCard {
         'content': content,
         if (asset != null) 'asset': asset,
         if (fallback != null) 'fallback': fallback,
+        if (items.isNotEmpty) 'items': items,
       };
 }
 
 class Rubric {
   final List<String> mustHave;
+  final List<String> goodToHave;
   final List<String> commonMistakes;
+  final Map<String, int>? scoreWeights;
 
   const Rubric({
     this.mustHave = const [],
+    this.goodToHave = const [],
     this.commonMistakes = const [],
+    this.scoreWeights,
   });
 
   factory Rubric.fromJson(Map<String, dynamic> json) => Rubric(
@@ -137,14 +192,22 @@ class Rubric {
                 ?.map((e) => e as String)
                 .toList() ??
             [],
+        goodToHave: (json['goodToHave'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
         commonMistakes: (json['commonMistakes'] as List<dynamic>?)
                 ?.map((e) => e as String)
                 .toList() ??
             [],
+        scoreWeights: (json['scoreWeights'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, (v as num).toInt())),
       );
 
   Map<String, dynamic> toJson() => {
         'mustHave': mustHave,
+        'goodToHave': goodToHave,
         'commonMistakes': commonMistakes,
+        if (scoreWeights != null) 'scoreWeights': scoreWeights,
       };
 }
