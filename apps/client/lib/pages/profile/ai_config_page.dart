@@ -190,7 +190,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
 
                 final aiProvider = context.read<AiProvider>();
                 if (isEditing) {
-                  final updated = config!.copyWith(
+                  final updated = config.copyWith(
                     name: name,
                     baseUrl: baseUrl,
                     apiKey: apiKey,

@@ -248,7 +248,7 @@ class _LearningCardWidget extends StatelessWidget {
                   Image.asset(
                     card.asset!,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const _AnimationPlaceholder(),
+                    errorBuilder: (context, error, stackTrace) => const _AnimationPlaceholder(),
                   )
                 else
                   _AnimationPlaceholder(),
