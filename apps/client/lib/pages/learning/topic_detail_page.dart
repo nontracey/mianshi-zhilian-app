@@ -568,7 +568,7 @@ class _CodeCard extends StatelessWidget {
   const _CodeCard({required this.card});
   final LearningCard card;
 
-  ({String language, String code}) _parseCodeContent(String content) {
+  ({String language, String code, bool isDiagram}) _parseCodeContent(String content) {
     String cleaned = content.trim();
     String language = 'java'; // 默认语言
 
@@ -589,9 +589,14 @@ class _CodeCard extends StatelessWidget {
       cleaned = cleaned.substring(0, cleaned.length - 3);
     }
 
-    // 自动检测语言（如果没有指定）
-    if (language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
-      if (cleaned.contains('def ') || cleaned.contains('import ') && cleaned.contains('self')) {
+    cleaned = cleaned.trim();
+
+    // 检测是否是文字图形（ASCII 艺术、结构图等）
+    final isDiagram = _isAsciiDiagram(cleaned);
+
+    // 自动检测语言（如果不是图形）
+    if (!isDiagram && language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
+      if (cleaned.contains('def ') || (cleaned.contains('import ') && cleaned.contains('self'))) {
         language = 'python';
       } else if (cleaned.contains('function ') || cleaned.contains('const ') || cleaned.contains('let ')) {
         language = 'javascript';
@@ -600,13 +605,61 @@ class _CodeCard extends StatelessWidget {
       }
     }
 
-    return (language: language, code: cleaned.trim());
+    return (language: language, code: cleaned, isDiagram: isDiagram);
+  }
+
+  bool _isAsciiDiagram(String content) {
+    if (content.isEmpty) return false;
+
+    final lines = content.split('\n');
+    int diagramScore = 0;
+
+    for (final line in lines) {
+      // 检测箭头符号（流程指示）
+      if (line.contains('→') || line.contains('←') || line.contains('↑') || line.contains('↓') ||
+          line.contains('->') || line.contains('<-') || line.contains('=>') || line.contains('<=') ||
+          line.contains('┌') || line.contains('┐') || line.contains('└') || line.contains('┘') ||
+          line.contains('│') || line.contains('─') || line.contains('├') || line.contains('┤')) {
+        diagramScore += 2;
+      }
+
+      // 检测大量空格对齐（结构图特征）
+      final leadingSpaces = line.length - line.trimLeft().length;
+      if (leadingSpaces > 4 && line.trim().isNotEmpty) {
+        diagramScore += 1;
+      }
+
+      // 检测 box-drawing 字符
+      if (RegExp(r'[╔╗╚╝║═╠╣╦╩╬]').hasMatch(line)) {
+        diagramScore += 3;
+      }
+
+      // 检测简单的 ASCII 图形字符
+      if (line.contains('+--') || line.contains('| ') || line.contains('+-+') ||
+          line.contains('[->') || line.contains(']--') || line.contains('-->')) {
+        diagramScore += 2;
+      }
+    }
+
+    // 如果得分超过阈值，认为是图形
+    return diagramScore >= lines.length * 0.5 || diagramScore >= 4;
   }
 
   @override
   Widget build(BuildContext context) {
     final parsed = _parseCodeContent(card.content);
 
+    // 如果是文字图形，使用图解组件渲染
+    if (parsed.isDiagram) {
+      return WorkPanel(
+        title: card.title,
+        children: [
+          _AsciiDiagramView(content: parsed.code),
+        ],
+      );
+    }
+
+    // 否则使用代码高亮渲染
     return WorkPanel(
       title: card.title,
       children: [
@@ -615,6 +668,39 @@ class _CodeCard extends StatelessWidget {
           language: parsed.language,
         ),
       ],
+    );
+  }
+}
+
+// ── ASCII 图形视图 ──────────────────────────────────────────
+
+class _AsciiDiagramView extends StatelessWidget {
+  const _AsciiDiagramView({required this.content});
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07182A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SelectableText(
+          content,
+          style: const TextStyle(
+            fontFamily: 'JetBrainsMono',
+            fontSize: 14,
+            height: 1.6,
+            color: Color(0xFFE7EEF8),
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
     );
   }
 }
