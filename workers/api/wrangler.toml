@@ -3,4 +3,4 @@ main = "src/index.ts"
 compatibility_date = "2026-05-27"
 
 [vars]
-CONTENT_MANIFEST_URL = "https://raw.githubusercontent.com/nontracey/mianshi-zhilian-content/main/manifest.json"
+CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
