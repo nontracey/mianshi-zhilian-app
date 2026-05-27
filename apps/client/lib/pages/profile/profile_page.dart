@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
@@ -16,6 +17,29 @@ class ProfilePage extends StatelessWidget {
 
     return ListView(
       children: [
+        _ContentEnvPanel(
+          settings: settings,
+          onEnvChanged: (env) async {
+            await settingsProvider.setContentEnv(env);
+            // 切换环境后，自动重载内容
+            if (context.mounted) {
+              final contentProvider = context.read<ContentProvider>();
+              await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
+            }
+          },
+          onTestUrlChanged: (url) async {
+            await settingsProvider.setCustomTestContentUrl(url);
+          },
+          onProdUrlChanged: (url) async {
+            await settingsProvider.setCustomProdContentUrl(url);
+          },
+          onApplyChanged: () async {
+            // 应用 URL 变更后重载内容
+            final contentProvider = context.read<ContentProvider>();
+            await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
+          },
+        ),
+        const SizedBox(height: 16),
         _AiConfigPanel(
           onNavigateToConfig: () {
             Navigator.of(context).push(
@@ -55,6 +79,141 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
+// ── 知识源配置面板 ──────────────────────────────────────────────
+
+class _ContentEnvPanel extends StatelessWidget {
+  const _ContentEnvPanel({
+    required this.settings,
+    required this.onEnvChanged,
+    required this.onTestUrlChanged,
+    required this.onProdUrlChanged,
+    required this.onApplyChanged,
+  });
+
+  final AppSettings settings;
+  final ValueChanged<ContentEnv> onEnvChanged;
+  final ValueChanged<String?> onTestUrlChanged;
+  final ValueChanged<String?> onProdUrlChanged;
+  final VoidCallback onApplyChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final testController = TextEditingController(
+      text: settings.customTestContentUrl ?? '',
+    );
+    final prodController = TextEditingController(
+      text: settings.customProdContentUrl ?? '',
+    );
+
+    return WorkPanel(
+      title: '知识源配置',
+      trailing: FilledButton.tonalIcon(
+        onPressed: onApplyChanged,
+        icon: const Icon(Icons.refresh),
+        label: const Text('应用并重载'),
+      ),
+      children: [
+        // 环境切换
+        SegmentedButton<ContentEnv>(
+          segments: const [
+            ButtonSegment(value: ContentEnv.test, label: Text('测试版')),
+            ButtonSegment(value: ContentEnv.production, label: Text('发布版')),
+          ],
+          selected: {settings.contentEnv},
+          onSelectionChanged: (value) => onEnvChanged(value.first),
+        ),
+        const SizedBox(height: 16),
+
+        // 当前生效地址
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                settings.contentEnv == ContentEnv.test
+                    ? Icons.science_outlined
+                    : Icons.verified_outlined,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '当前：${settings.contentBaseUrl}',
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 测试版自定义 URL
+        Text(
+          '测试版地址（留空使用默认）',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '默认：${AppSettings.defaultWorkerApiUrl}/content/test',
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: testController,
+          decoration: const InputDecoration(
+            hintText: '自定义测试版 URL',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => onTestUrlChanged(value.isEmpty ? null : value),
+        ),
+        const SizedBox(height: 16),
+
+        // 发布版自定义 URL
+        Text(
+          '发布版地址（留空使用默认）',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '默认：${AppSettings.defaultWorkerApiUrl}/content/production',
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: prodController,
+          decoration: const InputDecoration(
+            hintText: '自定义发布版 URL',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => onProdUrlChanged(value.isEmpty ? null : value),
+        ),
+      ],
+    );
+  }
+}
+
+// ── AI 配置面板 ──────────────────────────────────────────────
+
 class _AiConfigPanel extends StatelessWidget {
   const _AiConfigPanel({required this.onNavigateToConfig});
 
@@ -91,6 +250,8 @@ class _AiConfigPanel extends StatelessWidget {
     );
   }
 }
+
+// ── 外观面板 ──────────────────────────────────────────────
 
 class _AppearancePanel extends StatelessWidget {
   const _AppearancePanel({
@@ -313,7 +474,6 @@ class _DataManagementPanel extends StatelessWidget {
       ],
     );
   }
-
 }
 
 class _AboutPanel extends StatelessWidget {

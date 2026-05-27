@@ -106,4 +106,15 @@ class ContentProvider extends ChangeNotifier {
   }
 
   Topic? getTopicById(String topicId) => _topics[topicId];
+
+  /// 切换知识源环境：更新 baseUrl 并重载内容
+  Future<void> switchContentEnv(String newBaseUrl) async {
+    _api.switchBaseUrl(newBaseUrl);
+    // 清空缓存，重新加载
+    _domains = [];
+    _topics = {};
+    _manifest = null;
+    notifyListeners();
+    await loadContent();
+  }
 }

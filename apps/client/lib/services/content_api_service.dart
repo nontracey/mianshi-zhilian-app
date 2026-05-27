@@ -5,9 +5,15 @@ import '../models/domain.dart';
 import '../models/topic.dart';
 
 class ContentApiService {
-  final String baseUrl;
+  String baseUrl;
 
   ContentApiService({this.baseUrl = 'https://mianshi-zhilian-content.pages.dev'});
+
+  /// 切换内容源 baseUrl，返回 this 以便链式调用
+  ContentApiService switchBaseUrl(String newBaseUrl) {
+    baseUrl = newBaseUrl;
+    return this;
+  }
 
   Future<Map<String, dynamic>> fetchManifest() async {
     final response = await http.get(Uri.parse('$baseUrl/manifest.json'));

@@ -58,6 +58,31 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 切换知识源环境（测试版 / 发布版）
+  Future<void> setContentEnv(ContentEnv env) async {
+    _settings = _settings.copyWith(contentEnv: env);
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// 设置自定义测试版内容 URL（传空字符串恢复默认）
+  Future<void> setCustomTestContentUrl(String? url) async {
+    _settings = _settings.copyWith(
+      customTestContentUrl: (url != null && url.isEmpty) ? null : url,
+    );
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// 设置自定义发布版内容 URL（传空字符串恢复默认）
+  Future<void> setCustomProdContentUrl(String? url) async {
+    _settings = _settings.copyWith(
+      customProdContentUrl: (url != null && url.isEmpty) ? null : url,
+    );
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   // Convenience aliases used by profile page
   Future<void> updateThemeMode(ThemeMode mode) async => setThemeMode(mode);
   Future<void> updatePrimaryColor(Color color) async => setPrimaryColor(color);

@@ -4,3 +4,5 @@ compatibility_date = "2026-05-27"
 
 [vars]
 CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
+TEST_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
+PROD_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
