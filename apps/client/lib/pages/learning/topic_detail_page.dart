@@ -13,10 +13,12 @@ class TopicDetailPage extends StatefulWidget {
     super.key,
     required this.topic,
     required this.onBack,
+    this.initialTabIndex = 0,
   });
 
   final Topic topic;
   final VoidCallback onBack;
+  final int initialTabIndex;
 
   @override
   State<TopicDetailPage> createState() => _TopicDetailPageState();
@@ -32,7 +34,11 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      initialIndex: widget.initialTabIndex.clamp(0, 1),
+      vsync: this,
+    );
   }
 
   @override
@@ -61,9 +67,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
               Expanded(
                 child: Text(
                   topic.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
               // 右侧快捷操作
@@ -110,17 +116,17 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   Future<void> _handleEvaluate() async {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先输入你的回答')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先输入你的回答')));
       return;
     }
 
     final aiProvider = context.read<AiProvider>();
     if (aiProvider.defaultConfig == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在个人中心配置 AI')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先在个人中心配置 AI')));
       return;
     }
 
@@ -130,7 +136,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       final topic = widget.topic;
       final result = await aiProvider.evaluateAnswer(
         topicId: topic.id,
-        question: topic.recallPrompts.isNotEmpty ? topic.recallPrompts.first.prompt : topic.title,
+        question: topic.recallPrompts.isNotEmpty
+            ? topic.recallPrompts.first.prompt
+            : topic.title,
         userAnswer: answer,
         rubric: topic.rubric,
       );
@@ -146,10 +154,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('AI 评估失败：$e'),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: _handleEvaluate,
-            ),
+            action: SnackBarAction(label: '重试', onPressed: _handleEvaluate),
           ),
         );
       }
@@ -193,27 +198,46 @@ class _TopicHeader extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: [
-          ...topic.tags.map((tag) => Chip(
-                label: Text(tag, style: const TextStyle(fontSize: 12)),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              )),
+          ...topic.tags.map(
+            (tag) => Chip(
+              label: Text(tag, style: const TextStyle(fontSize: 12)),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
           Chip(
-            label: Text(difficultyLabel, style: TextStyle(fontSize: 12, color: difficultyColor)),
-            avatar: Icon(Icons.signal_cellular_alt, size: 14, color: difficultyColor),
+            label: Text(
+              difficultyLabel,
+              style: TextStyle(fontSize: 12, color: difficultyColor),
+            ),
+            avatar: Icon(
+              Icons.signal_cellular_alt,
+              size: 14,
+              color: difficultyColor,
+            ),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           ),
           Chip(
-            label: Text('${topic.estimatedMinutes} 分钟', style: const TextStyle(fontSize: 12)),
+            label: Text(
+              '${topic.estimatedMinutes} 分钟',
+              style: const TextStyle(fontSize: 12),
+            ),
             avatar: const Icon(Icons.timer_outlined, size: 14),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           ),
           if (topic.highFrequency)
             Chip(
-              label: const Text('高频', style: TextStyle(fontSize: 12, color: AppColors.danger)),
-              avatar: const Icon(Icons.local_fire_department, size: 14, color: AppColors.danger),
+              label: const Text(
+                '高频',
+                style: TextStyle(fontSize: 12, color: AppColors.danger),
+              ),
+              avatar: const Icon(
+                Icons.local_fire_department,
+                size: 14,
+                color: AppColors.danger,
+              ),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
@@ -236,10 +260,12 @@ class _KnowledgeTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
         // 知识卡片：按类型分别渲染
-        ...topic.learningCards.map((card) => Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildCard(context, card),
-        )),
+        ...topic.learningCards.map(
+          (card) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildCard(context, card),
+          ),
+        ),
         // 评分标准（Rubric）
         if (topic.rubric != null) ...[
           const SizedBox(height: 8),
@@ -258,7 +284,9 @@ class _KnowledgeTab extends StatelessWidget {
       'checklist' => _ChecklistCard(card: card),
       'code' => _CodeCard(card: card),
       'animation' => _AnimationCard(card: card),
+      'diagram' => _AnimationCard(card: card),
       'table' => _TableCard(card: card),
+      'compareTable' => _TableCard(card: card),
       _ => _GenericCard(card: card),
     };
   }
@@ -286,10 +314,7 @@ class _ExplainCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: MarkdownBody(
-            data: card.content,
-            selectable: true,
-          ),
+          child: MarkdownBody(data: card.content, selectable: true),
         ),
       ],
     );
@@ -319,7 +344,11 @@ class _InterviewAnswerCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.auto_awesome, size: 16, color: AppColors.accent),
+                  const Icon(
+                    Icons.auto_awesome,
+                    size: 16,
+                    color: AppColors.accent,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     '面试回答框架',
@@ -360,26 +389,34 @@ class _ChecklistCard extends StatelessWidget {
     return WorkPanel(
       title: card.title,
       children: [
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 3),
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.accent),
-                  borderRadius: BorderRadius.circular(4),
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 3),
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.accent),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    size: 12,
+                    color: AppColors.accent,
+                  ),
                 ),
-                child: const Icon(Icons.check, size: 12, color: AppColors.accent),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: Text(item, style: const TextStyle(height: 1.5))),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(item, style: const TextStyle(height: 1.5)),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -461,7 +498,11 @@ class _AnimationPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.animation_outlined, size: 48, color: AppColors.accent),
+            const Icon(
+              Icons.animation_outlined,
+              size: 48,
+              color: AppColors.accent,
+            ),
             const SizedBox(height: 8),
             Text(
               fallback ?? '动画/图示占位区域',
@@ -484,12 +525,7 @@ class _TableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkPanel(
       title: card.title,
-      children: [
-        MarkdownBody(
-          data: card.content,
-          selectable: true,
-        ),
-      ],
+      children: [MarkdownBody(data: card.content, selectable: true)],
     );
   }
 }
@@ -505,7 +541,9 @@ class _GenericCard extends StatelessWidget {
     return WorkPanel(
       title: card.title,
       children: [
-        if (card.content.contains('#') || card.content.contains('**') || card.content.contains('```'))
+        if (card.content.contains('#') ||
+            card.content.contains('**') ||
+            card.content.contains('```'))
           MarkdownBody(data: card.content, selectable: true)
         else
           Text(card.content, style: const TextStyle(height: 1.7)),
@@ -528,59 +566,82 @@ class _RubricSection extends StatelessWidget {
         // 必须覆盖的关键点
         Text(
           '必须覆盖的关键点',
-          style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.success),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: AppColors.success,
+          ),
         ),
         const SizedBox(height: 8),
-        ...rubric.mustHave.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.check_circle_outline, size: 18, color: AppColors.success),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(item)),
-                ],
-              ),
-            )),
+        ...rubric.mustHave.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(item)),
+              ],
+            ),
+          ),
+        ),
         // 加分项
         if (rubric.goodToHave.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
             '加分项',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.accent),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.accent,
+            ),
           ),
           const SizedBox(height: 8),
-          ...rubric.goodToHave.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.star_outline, size: 18, color: AppColors.accent),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item)),
-                  ],
-                ),
-              )),
+          ...rubric.goodToHave.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.star_outline, size: 18, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item)),
+                ],
+              ),
+            ),
+          ),
         ],
         // 常见错误
         if (rubric.commonMistakes.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
             '常见错误',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.danger),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.danger,
+            ),
           ),
           const SizedBox(height: 8),
-          ...rubric.commonMistakes.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.cancel_outlined, size: 18, color: AppColors.danger),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item)),
-                  ],
-                ),
-              )),
+          ...rubric.commonMistakes.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.cancel_outlined,
+                    size: 18,
+                    color: AppColors.danger,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item)),
+                ],
+              ),
+            ),
+          ),
         ],
       ],
     );
@@ -614,10 +675,7 @@ class _RecallTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 左侧：Prompt（题目 + checklist）
-          Expanded(
-            flex: 5,
-            child: _PromptPanel(topic: topic),
-          ),
+          Expanded(flex: 5, child: _PromptPanel(topic: topic)),
           const VerticalDivider(width: 1),
           // 右侧：Answer（输入 + 评估）
           Expanded(
@@ -690,27 +748,38 @@ class _PromptPanel extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               if (topic.recallPrompts.isNotEmpty)
-                ...topic.recallPrompts.map((prompt) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.accent.withValues(alpha: 0.2),
+                ...topic.recallPrompts.map(
+                  (prompt) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.lightbulb_outline,
+                            size: 18,
+                            color: AppColors.warning,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              prompt.prompt,
+                              style: const TextStyle(height: 1.6),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.lightbulb_outline, size: 18, color: AppColors.warning),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(prompt.prompt, style: const TextStyle(height: 1.6))),
-                      ],
-                    ),
                   ),
-                ))
+                )
               else
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -720,7 +789,11 @@ class _PromptPanel extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.lightbulb_outline, size: 18, color: AppColors.warning),
+                      Icon(
+                        Icons.lightbulb_outline,
+                        size: 18,
+                        color: AppColors.warning,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(child: Text('用自己的话解释这个知识点的核心内容。')),
                     ],
@@ -746,7 +819,10 @@ class _PromptPanel extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.checklist_outlined, color: AppColors.success),
+                    const Icon(
+                      Icons.checklist_outlined,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '必须说到的关键点',
@@ -757,16 +833,27 @@ class _PromptPanel extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                ...topic.rubric!.mustHave.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item, style: const TextStyle(fontSize: 13))),
-                    ],
+                ...topic.rubric!.mustHave.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: AppColors.success,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -787,27 +874,40 @@ class _PromptPanel extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.warning_amber_outlined, color: AppColors.danger),
+                      const Icon(
+                        Icons.warning_amber_outlined,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '常见错误',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ...topic.rubric!.commonMistakes.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Icon(Icons.cancel_outlined, size: 16, color: AppColors.danger),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(item, style: const TextStyle(fontSize: 13))),
-                      ],
+                  ...topic.rubric!.commonMistakes.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cancel_outlined,
+                            size: 16,
+                            color: AppColors.danger,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  )),
+                  ),
                 ],
               ),
             ),
@@ -944,9 +1044,9 @@ class _EvaluationResultPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 'AI 评估结果',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -966,17 +1066,30 @@ class _EvaluationResultPanel extends StatelessWidget {
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: feedbackTags.map((tag) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            tag.toString(),
-                            style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w600),
-                          ),
-                        )).toList(),
+                        children: feedbackTags
+                            .map(
+                              (tag) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  tag.toString(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.accent,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
                     ],
                   ],
@@ -989,47 +1102,68 @@ class _EvaluationResultPanel extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               '遗漏点',
-              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.warning),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.warning,
+              ),
             ),
             const SizedBox(height: 6),
-            ...missed.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.tips_and_updates_outlined, size: 18, color: AppColors.warning),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item.toString())),
-                    ],
-                  ),
-                )),
+            ...missed.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.tips_and_updates_outlined,
+                      size: 18,
+                      color: AppColors.warning,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(item.toString())),
+                  ],
+                ),
+              ),
+            ),
           ],
           // 错误点
           if (errors.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
               '错误点',
-              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.danger),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.danger,
+              ),
             ),
             const SizedBox(height: 6),
-            ...errors.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.cancel_outlined, size: 18, color: AppColors.danger),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item.toString())),
-                    ],
-                  ),
-                )),
+            ...errors.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.cancel_outlined,
+                      size: 18,
+                      color: AppColors.danger,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(item.toString())),
+                  ],
+                ),
+              ),
+            ),
           ],
           // 优化回答
           if (optimized.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
               '优化回答',
-              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.success),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.success,
+              ),
             ),
             const SizedBox(height: 6),
             Container(
@@ -1105,10 +1239,7 @@ class _ScoreRing extends StatelessWidget {
               ),
               Text(
                 '分',
-                style: TextStyle(
-                  fontSize: size * 0.12,
-                  color: _color,
-                ),
+                style: TextStyle(fontSize: size * 0.12, color: _color),
               ),
             ],
           ),

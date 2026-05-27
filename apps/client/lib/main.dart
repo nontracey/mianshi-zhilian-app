@@ -29,12 +29,14 @@ void main() async {
   final aiService = AiService();
   final updateService = UpdateService();
 
-  runApp(MianshiZhilianApp(
-    storage: storage,
-    contentApi: contentApi,
-    aiService: aiService,
-    updateService: updateService,
-  ));
+  runApp(
+    MianshiZhilianApp(
+      storage: storage,
+      contentApi: contentApi,
+      aiService: aiService,
+      updateService: updateService,
+    ),
+  );
 }
 
 enum AppSection { dashboard, catalog, practice, mastery, profile }
@@ -105,6 +107,7 @@ class LearningShell extends StatefulWidget {
 class _LearningShellState extends State<LearningShell> {
   AppSection _section = AppSection.dashboard;
   String? _selectedTopicId;
+  int _selectedTopicInitialTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -129,9 +132,7 @@ class _LearningShellState extends State<LearningShell> {
                   title: _sectionTitle(_section),
                   onProfile: () => _setSection(AppSection.profile),
                 ),
-                Expanded(
-                  child: _buildCurrentPage(wide),
-                ),
+                Expanded(child: _buildCurrentPage(wide)),
               ],
             ),
           ),
@@ -141,8 +142,7 @@ class _LearningShellState extends State<LearningShell> {
           ? null
           : NavigationBar(
               selectedIndex: _section.index,
-              onDestinationSelected: (i) =>
-                  _setSection(AppSection.values[i]),
+              onDestinationSelected: (i) => _setSection(AppSection.values[i]),
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.dashboard_outlined),
@@ -172,10 +172,11 @@ class _LearningShellState extends State<LearningShell> {
   Widget _buildCurrentPage(bool wide) {
     if (_selectedTopicId != null) {
       final content = context.read<ContentProvider>();
-      final topic = content.topics[_selectedTopicId!];
+      final topic = content.findTopic(_selectedTopicId!);
       if (topic != null) {
         return TopicDetailPage(
           topic: topic,
+          initialTabIndex: _selectedTopicInitialTab,
           onBack: () => setState(() => _selectedTopicId = null),
         );
       }
@@ -192,63 +193,77 @@ class _LearningShellState extends State<LearningShell> {
 
     return switch (_section) {
       AppSection.dashboard => DashboardPage(
-          currentDomainId: settings.settings.currentDomain,
-          onDomainChanged: (id) => settings.updateSettings(
-            settings.settings.copyWith(currentDomain: id),
-          ),
-          onPractice: () => _setSection(AppSection.practice),
-          onTopicTap: (topicId) => setState(() => _selectedTopicId = topicId),
-          onViewDomainCatalog: (domainId) {
-            settings.updateSettings(settings.settings.copyWith(currentDomain: domainId));
-            setState(() => _section = AppSection.catalog);
-          },
+        currentDomainId: settings.settings.currentDomain,
+        onDomainChanged: (id) => settings.updateSettings(
+          settings.settings.copyWith(currentDomain: id),
         ),
+        onPractice: () => _setSection(AppSection.practice),
+        onTopicTap: (topicId) => setState(() {
+          _selectedTopicId = topicId;
+          _selectedTopicInitialTab = 0;
+        }),
+        onViewDomainCatalog: (domainId) {
+          settings.updateSettings(
+            settings.settings.copyWith(currentDomain: domainId),
+          );
+          setState(() => _section = AppSection.catalog);
+        },
+      ),
       AppSection.catalog => CatalogPage(
-          currentDomainId: settings.settings.currentDomain,
-          onDomainChanged: (id) => settings.updateSettings(
-            settings.settings.copyWith(currentDomain: id),
-          ),
-          onTopicLearn: (topicId) => setState(() => _selectedTopicId = topicId),
-          onTopicPractice: (topicId) => setState(() => _selectedTopicId = topicId),
+        currentDomainId: settings.settings.currentDomain,
+        onDomainChanged: (id) => settings.updateSettings(
+          settings.settings.copyWith(currentDomain: id),
         ),
+        onTopicLearn: (topicId) => setState(() {
+          _selectedTopicId = topicId;
+          _selectedTopicInitialTab = 0;
+        }),
+        onTopicPractice: (topicId) => setState(() {
+          _selectedTopicId = topicId;
+          _selectedTopicInitialTab = 1;
+        }),
+      ),
       AppSection.practice => PracticePage(
-          currentDomainId: settings.settings.currentDomain,
-          onDailyReview: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RecallPage(
-                  topicIds: progress.getTodayReviewTopics(
-                    content.topics.values.toList(),
-                  ).map((t) => t.id).toList(),
-                ),
+        currentDomainId: settings.settings.currentDomain,
+        onDailyReview: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecallPage(
+                topicIds: progress
+                    .getTodayReviewTopics(content.topics.values.toList())
+                    .map((t) => t.id)
+                    .toList(),
               ),
-            );
-          },
-          onRandomQuiz: (domainId) {
-            final domainTopics = content.getTopicsByDomain(domainId);
-            final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
-              ),
-            );
-          },
-          onMockInterview: () {
-            final domainTopics = content.getTopicsByDomain(settings.settings.currentDomain);
-            final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RecallPage(topicIds: topicIds.take(10).toList()),
-              ),
-            );
-          },
-        ),
+            ),
+          );
+        },
+        onRandomQuiz: (domainId) {
+          final domainTopics = content.getTopicsByDomain(domainId);
+          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
+            ),
+          );
+        },
+        onMockInterview: () {
+          final domainTopics = content.getTopicsByDomain(
+            settings.settings.currentDomain,
+          );
+          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecallPage(topicIds: topicIds.take(10).toList()),
+            ),
+          );
+        },
+      ),
       AppSection.mastery => MasteryPage(
-          currentDomainId: settings.settings.currentDomain,
-          onDomainChanged: (id) => settings.updateSettings(
-            settings.settings.copyWith(currentDomain: id),
-          ),
+        currentDomainId: settings.settings.currentDomain,
+        onDomainChanged: (id) => settings.updateSettings(
+          settings.settings.copyWith(currentDomain: id),
         ),
+      ),
       AppSection.profile => const ProfilePage(),
     };
   }
@@ -261,10 +276,10 @@ class _LearningShellState extends State<LearningShell> {
   }
 
   String _sectionTitle(AppSection section) => switch (section) {
-        AppSection.dashboard => '学习中心',
-        AppSection.catalog => '领域知识目录',
-        AppSection.practice => 'AI 主动复述',
-        AppSection.mastery => '掌握度看板',
-        AppSection.profile => '个人中心',
-      };
+    AppSection.dashboard => '学习中心',
+    AppSection.catalog => '领域知识目录',
+    AppSection.practice => 'AI 主动复述',
+    AppSection.mastery => '掌握度看板',
+    AppSection.profile => '个人中心',
+  };
 }
