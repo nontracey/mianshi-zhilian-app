@@ -23,8 +23,9 @@ import 'widgets/header_bar.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final storage = StorageService();
-  // 初始使用发布版默认地址，SettingsProvider 加载后会通过 contentBaseUrl 给出正确的 URL
-  final contentApi = ContentApiService();
+  // 先加载已保存的设置，获取正确的 contentBaseUrl
+  final savedSettings = await storage.loadSettings();
+  final contentApi = ContentApiService(baseUrl: savedSettings.contentBaseUrl);
   final aiService = AiService();
   final updateService = UpdateService();
 
@@ -104,29 +105,12 @@ class LearningShell extends StatefulWidget {
 class _LearningShellState extends State<LearningShell> {
   AppSection _section = AppSection.dashboard;
   String? _selectedTopicId;
-  bool _contentSynced = false;
 
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 860;
     final settings = context.watch<SettingsProvider>();
     final content = context.watch<ContentProvider>();
-
-    // Settings 加载完成后，同步 ContentApiService 的 baseUrl
-    if (!_contentSynced && settings.settings.contentBaseUrl.isNotEmpty) {
-      _contentSynced = true;
-      final api = content;
-      if (api.error == null && api.domains.isEmpty && !api.isLoading) {
-        // ContentProvider 还没加载过，用 settings 的 baseUrl 初始化
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            context.read<ContentProvider>().switchContentEnv(
-                  settings.settings.contentBaseUrl,
-                );
-          }
-        });
-      }
-    }
 
     return Scaffold(
       body: Row(

@@ -73,6 +73,12 @@ class NavigationRailPanel extends StatelessWidget {
             onPressed: () => onSelect(AppSection.practice),
             icon: const Icon(Icons.play_arrow),
             label: const Text('开始今日练习'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF00CCF9),
+              foregroundColor: const Color(0xFF000F22),
+              minimumSize: const Size.fromHeight(48),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
           ),
           const SizedBox(height: 16),
           Text(

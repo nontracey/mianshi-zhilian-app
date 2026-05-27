@@ -1,33 +1,36 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ai_config.dart';
 import '../models/user_progress.dart';
 import '../models/app_settings.dart';
 
+/// Web + 通用存储服务，使用 SharedPreferences 替代 dart:io File
 class StorageService {
-  Future<String> get _localPath async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
+  SharedPreferences? _prefs;
 
-  Future<File> _localFile(String name) async {
-    final path = await _localPath;
-    return File('$path/$name');
+  Future<SharedPreferences> get _instance async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
   }
 
   Future<void> save(String key, dynamic data) async {
-    final file = await _localFile('$key.json');
-    await file.writeAsString(json.encode(data));
+    try {
+      final prefs = await _instance;
+      await prefs.setString(key, json.encode(data));
+    } catch (e) {
+      debugPrint('StorageService.save($key) failed: $e');
+    }
   }
 
   Future<dynamic> load(String key) async {
     try {
-      final file = await _localFile('$key.json');
-      if (!await file.exists()) return null;
-      final contents = await file.readAsString();
-      return json.decode(contents);
-    } catch (_) {
+      final prefs = await _instance;
+      final raw = prefs.getString(key);
+      if (raw == null) return null;
+      return json.decode(raw);
+    } catch (e) {
+      debugPrint('StorageService.load($key) failed: $e');
       return null;
     }
   }
