@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -570,29 +571,111 @@ class _DataManagementPanel extends StatelessWidget {
   }
 }
 
-class _AboutPanel extends StatelessWidget {
+class _AboutPanel extends StatefulWidget {
   const _AboutPanel();
+
+  @override
+  State<_AboutPanel> createState() => _AboutPanelState();
+}
+
+class _AboutPanelState extends State<_AboutPanel> {
+  bool _isChecking = false;
+  String? _updateMessage;
+
+  Future<void> _checkUpdate() async {
+    setState(() {
+      _isChecking = true;
+      _updateMessage = null;
+    });
+
+    try {
+      final updateService = UpdateService();
+      final updateInfo = await updateService.checkForUpdate('0.1.0');
+
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+          if (updateInfo != null) {
+            _updateMessage = '发现新版本 v${updateInfo.version}';
+            _showUpdateDialog(updateInfo);
+          } else {
+            _updateMessage = '已是最新版本';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+          _updateMessage = '检查更新失败';
+        });
+      }
+    }
+  }
+
+  void _showUpdateDialog(UpdateInfo updateInfo) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('发现新版本 v${updateInfo.version}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('发布日期：${updateInfo.releaseDate}'),
+            const SizedBox(height: 12),
+            const Text('更新内容：', style: TextStyle(fontWeight: FontWeight.w700)),
+            ...updateInfo.notes.map((note) => Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('• $note'),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('稍后再说'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // TODO: 下载并安装更新
+            },
+            child: const Text('立即更新'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
       title: '关于面试智练',
-      children: const [
-        InfoRow(
+      children: [
+        const InfoRow(
           icon: Icons.info_outline,
-          title: '版本 1.0.0',
+          title: '版本 0.1.0',
           subtitle: 'AI 主动回忆学习工作台',
         ),
-        InfoRow(
+        const InfoRow(
           icon: Icons.cloud_sync_outlined,
           title: '本地优先 + 云端同步',
           subtitle: '云同步失败不会阻断学习，本地事件会等待重试。',
         ),
-        InfoRow(
-          icon: Icons.system_update_alt_outlined,
-          title: '检查更新',
-          subtitle: '读取 GitHub Releases / update.json，校验 sha256 后引导安装。',
+        InkWell(
+          onTap: _isChecking ? null : _checkUpdate,
+          child: InfoRow(
+            icon: Icons.system_update_alt_outlined,
+            title: '检查更新',
+            subtitle: _updateMessage ?? '点击检查是否有新版本',
+          ),
         ),
+        if (_isChecking)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(),
+          ),
       ],
     );
   }
