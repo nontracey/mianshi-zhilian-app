@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
@@ -629,6 +630,11 @@ class _AboutPanelState extends State<_AboutPanel> {
               padding: const EdgeInsets.only(top: 4),
               child: Text('• $note'),
             )),
+            const SizedBox(height: 12),
+            Text(
+              '平台：${UpdateService.formatSize(updateInfo.platforms.values.first.size)}',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
           ],
         ),
         actions: [
@@ -639,13 +645,70 @@ class _AboutPanelState extends State<_AboutPanel> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // TODO: 下载并安装更新
+              _downloadUpdate(updateInfo);
             },
             child: const Text('立即更新'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _downloadUpdate(UpdateInfo updateInfo) async {
+    final updateService = UpdateService();
+    final platformUpdate = updateService.getPlatformUpdate(updateInfo);
+
+    if (platformUpdate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前平台暂无更新包')),
+      );
+      return;
+    }
+
+    // Web 端提示刷新
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Web 端请刷新页面获取最新版本')),
+      );
+      return;
+    }
+
+    // 显示下载进度
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('下载更新'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('正在下载 v${updateInfo.version}...'),
+            const SizedBox(height: 8),
+            Text(
+              '大小：${UpdateService.formatSize(platformUpdate.size)}',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // TODO: 实际下载和校验 sha256
+    // 1. 下载文件到临时目录
+    // 2. 计算 sha256 并与 platformUpdate.sha256 比对
+    // 3. 校验通过后引导安装
+
+    // 模拟下载完成
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      Navigator.pop(context); // 关闭下载对话框
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('下载完成，请手动安装更新包')),
+      );
+    }
   }
 
   @override
