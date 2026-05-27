@@ -45,7 +45,6 @@ class NavigationRailPanel extends StatelessWidget {
             'assets/logo.svg',
             width: 36,
             height: 36,
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
           ),
           const SizedBox(height: 12),
           const Text(

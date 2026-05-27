@@ -1,8 +1,50 @@
-<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100" height="100" rx="20" fill="#0A2540"/>
-  <path d="M25 70L42 30L65 55L80 20" stroke="#00CCF9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="25" cy="70" r="5" fill="#10B981"/>
-  <circle cx="42" cy="30" r="5" fill="#00CCF9"/>
-  <circle cx="65" cy="55" r="5" fill="#10B981"/>
-  <circle cx="80" cy="20" r="5" fill="#00CCF9"/>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="appBg" x1="32" y1="24" x2="224" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A2540"/>
+      <stop offset="0.58" stop-color="#001A33"/>
+      <stop offset="1" stop-color="#000F22"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="73" y1="61" x2="183" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FCFF"/>
+      <stop offset="1" stop-color="#DFF7FF"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="69" y1="69" x2="198" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00CCF9"/>
+      <stop offset="1" stop-color="#4EDEA3"/>
+    </linearGradient>
+    <filter id="deepShadow" x="30" y="30" width="198" height="198" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000F22" flood-opacity="0.42"/>
+    </filter>
+    <filter id="cyanGlow" x="42" y="42" width="172" height="172" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#00CCF9" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="58" fill="url(#appBg)"/>
+
+  <path d="M45 72C45 57.0883 57.0883 45 72 45H184C198.912 45 211 57.0883 211 72V184C211 198.912 198.912 211 184 211H72C57.0883 211 45 198.912 45 184V72Z" fill="#06192D" stroke="#16446A" stroke-width="3"/>
+  <path d="M62 68H194" stroke="#00CCF9" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M62 188H194" stroke="#4EDEA3" stroke-opacity="0.24" stroke-width="2"/>
+
+  <g filter="url(#deepShadow)">
+    <path d="M68 86C68 73.8497 77.8497 64 90 64H166C178.15 64 188 73.8497 188 86V136C188 148.15 178.15 158 166 158H137.5L108.2 184.5C103.671 188.597 96.5 185.383 96.5 179.274V158H90C77.8497 158 68 148.15 68 136V86Z" fill="url(#cardGrad)"/>
+  </g>
+
+  <g filter="url(#cyanGlow)">
+    <rect x="88" y="84" width="80" height="13" rx="6.5" fill="url(#accentGrad)"/>
+    <rect x="88" y="109" width="58" height="11" rx="5.5" fill="#0A2540" fill-opacity="0.84"/>
+    <rect x="88" y="132" width="42" height="11" rx="5.5" fill="#0A2540" fill-opacity="0.58"/>
+  </g>
+
+  <circle cx="170" cy="157" r="31" fill="url(#accentGrad)" filter="url(#cyanGlow)"/>
+  <path d="M155 156L166 167L187 140" stroke="#000F22" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M58 118H39" stroke="#00CCF9" stroke-width="6" stroke-linecap="round" opacity="0.86"/>
+  <path d="M58 142H30" stroke="#4EDEA3" stroke-width="6" stroke-linecap="round" opacity="0.78"/>
+  <path d="M198 99H217" stroke="#00CCF9" stroke-width="6" stroke-linecap="round" opacity="0.86"/>
+  <path d="M198 123H226" stroke="#4EDEA3" stroke-width="6" stroke-linecap="round" opacity="0.78"/>
+
+  <circle cx="73" cy="199" r="5" fill="#00CCF9"/>
+  <circle cx="198" cy="61" r="5" fill="#4EDEA3"/>
 </svg>
