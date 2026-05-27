@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_settings.dart';
 import '../services/storage_service.dart';
+
+// Web 端下载（条件导入）
+import 'web_download/web_download_stub.dart'
+    if (dart.library.html) 'web_download/web_download_web.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
@@ -103,6 +109,18 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> exportData() async {
-    // Export not yet implemented
+    try {
+      final data = await _storage.exportAllData();
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
+      final fileName = 'mianshi-zhilian-export-${DateTime.now().millisecondsSinceEpoch}.json';
+
+      if (kIsWeb) {
+        downloadFile(fileName, jsonStr);
+      }
+
+      debugPrint('Data exported: $fileName');
+    } catch (e) {
+      debugPrint('Export failed: $e');
+    }
   }
 }

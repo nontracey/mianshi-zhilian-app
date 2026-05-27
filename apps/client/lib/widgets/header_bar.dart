@@ -4,10 +4,16 @@ import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 
 class HeaderBar extends StatefulWidget {
-  const HeaderBar({super.key, required this.title, required this.onProfile});
+  const HeaderBar({
+    super.key,
+    required this.title,
+    required this.onProfile,
+    this.onTopicTap,
+  });
 
   final String title;
   final VoidCallback onProfile;
+  final ValueChanged<String>? onTopicTap;
 
   @override
   State<HeaderBar> createState() => _HeaderBarState();
@@ -111,7 +117,10 @@ class _HeaderBarState extends State<HeaderBar> {
                     _isSearching = false;
                     _searchResults = [];
                   });
-                  // TODO: 导航到知识点详情
+                  // 导航到知识点详情
+                  if (widget.onTopicTap != null) {
+                    widget.onTopicTap!(topic.id);
+                  }
                 },
               )).toList(),
             ),

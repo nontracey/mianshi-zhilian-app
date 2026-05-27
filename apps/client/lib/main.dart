@@ -131,6 +131,10 @@ class _LearningShellState extends State<LearningShell> {
                 HeaderBar(
                   title: _sectionTitle(_section),
                   onProfile: () => _setSection(AppSection.profile),
+                  onTopicTap: (topicId) => setState(() {
+                    _selectedTopicId = topicId;
+                    _selectedTopicInitialTab = 0;
+                  }),
                 ),
                 Expanded(child: _buildCurrentPage(wide)),
               ],

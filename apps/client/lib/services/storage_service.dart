@@ -80,4 +80,29 @@ class StorageService {
     if (data == null) return const AppSettings();
     return AppSettings.fromJson(data as Map<String, dynamic>);
   }
+
+  /// 导出所有本地数据为 JSON
+  Future<Map<String, dynamic>> exportAllData() async {
+    final prefs = await _instance;
+    final keys = prefs.getKeys();
+
+    final exportData = <String, dynamic>{
+      'version': '1.0',
+      'exportedAt': DateTime.now().toIso8601String(),
+      'data': <String, dynamic>{},
+    };
+
+    for (final key in keys) {
+      final value = prefs.getString(key);
+      if (value != null) {
+        try {
+          exportData['data'][key] = json.decode(value);
+        } catch (_) {
+          exportData['data'][key] = value;
+        }
+      }
+    }
+
+    return exportData;
+  }
 }
