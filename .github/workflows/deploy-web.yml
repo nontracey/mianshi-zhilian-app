@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
     defaults:
       run:
         working-directory: apps/client
@@ -17,9 +21,21 @@ jobs:
         with:
           channel: stable
           cache: true
+      - uses: actions/cache@v4
+        with:
+          path: apps/client/build/web
+          key: web-deploy-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/web/**') }}
+          restore-keys: |
+            web-deploy-${{ runner.os }}-
       - run: flutter pub get
       - run: flutter build web --release
       - uses: actions/upload-artifact@v4
         with:
           name: flutter-web
           path: apps/client/build/web
+      - name: Deploy to Cloudflare Pages
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        working-directory: apps/client
+        run: |
+          PROJECT="${CLOUDFLARE_PAGES_PROJECT_NAME:-mianshi-zhilian-app}"
+          npx wrangler@latest pages deploy build/web --project-name="$PROJECT" --branch="${GITHUB_REF_NAME}"
