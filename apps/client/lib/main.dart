@@ -16,6 +16,7 @@ import 'pages/learning/catalog_page.dart';
 import 'pages/learning/topic_detail_page.dart';
 import 'pages/practice/practice_page.dart';
 import 'pages/practice/recall_page.dart';
+import 'pages/practice/mock_interview_page.dart';
 import 'pages/mastery/mastery_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'widgets/navigation_rail_panel.dart';
@@ -261,7 +262,7 @@ class _LearningShellState extends State<LearningShell> {
           final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => RecallPage(topicIds: topicIds.take(10).toList()),
+              builder: (_) => MockInterviewPage(topicIds: topicIds.take(10).toList()),
             ),
           );
         },

@@ -6,6 +6,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
+import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class TopicDetailPage extends StatefulWidget {
@@ -2232,6 +2233,11 @@ class _AnswerPanel extends StatelessWidget {
                   hintText: '在这里输入你的复述答案...\n\n建议：先说定义 → 再拆机制 → 最后讲场景和误区',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: VoiceInputButton(
+                    onResult: (text) {
+                      answerController.text += text;
+                    },
                   ),
                 ),
               ),
