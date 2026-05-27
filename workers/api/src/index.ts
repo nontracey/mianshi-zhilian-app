@@ -170,4 +170,5 @@ interface Env {
   CONTENT_MANIFEST_URL: string;
   TEST_CONTENT_BASE_URL: string;
   PROD_CONTENT_BASE_URL: string;
+  DB: D1Database;
 }
