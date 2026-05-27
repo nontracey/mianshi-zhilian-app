@@ -21,6 +21,23 @@ class CatalogPage extends StatelessWidget {
   final ValueChanged<String> onTopicLearn;
   final ValueChanged<String> onTopicPractice;
 
+  /// 按分类下已加载 topic 的平均难度升序排列（由易到难）
+  List<Category> _sortedCategories(List<Category> categories, List<Topic> domainTopics) {
+    final sorted = List<Category>.from(categories);
+    sorted.sort((a, b) {
+      final avgA = _avgDifficulty(a.id, domainTopics);
+      final avgB = _avgDifficulty(b.id, domainTopics);
+      return avgA.compareTo(avgB);
+    });
+    return sorted;
+  }
+
+  double _avgDifficulty(String categoryId, List<Topic> domainTopics) {
+    final topics = domainTopics.where((t) => t.category == categoryId).toList();
+    if (topics.isEmpty) return 999; // 无数据的排最后
+    return topics.map((t) => t.difficulty).reduce((a, b) => a + b) / topics.length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final contentProvider = context.watch<ContentProvider>();
@@ -93,7 +110,7 @@ class CatalogPage extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 18),
-            ...currentDomain.categories.map((category) {
+            ..._sortedCategories(currentDomain.categories, domainTopics).map((category) {
               final categoryTopics = domainTopics
                   .where((t) => t.category == category.id)
                   .toList();
