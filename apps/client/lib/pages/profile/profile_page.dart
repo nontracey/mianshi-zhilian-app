@@ -55,8 +55,11 @@ class ProfilePage extends StatelessWidget {
             final contentProvider = context.read<ContentProvider>();
             await contentProvider.clearAllDomainCache();
 
-            // 重新加载内容
-            await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
+            // 重新加载内容，使用当前领域
+            await contentProvider.switchContentEnv(
+              settingsProvider.settings.contentBaseUrl,
+              currentDomainId: settingsProvider.settings.currentDomain,
+            );
 
             // 显示提示
             if (context.mounted) {

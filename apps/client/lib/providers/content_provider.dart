@@ -27,7 +27,7 @@ class ContentProvider extends ChangeNotifier {
   bool get isCheckingUpdate => _isCheckingUpdate;
   String? get error => _error;
 
-  Future<void> loadContent() async {
+  Future<void> loadContent({String? currentDomainId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -93,10 +93,10 @@ class ContentProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
 
-      // 6. 自动加载默认 domain 的 topics（后台加载，不阻塞 UI）
-      final defaultDomainId = _manifest?['defaultDomain'] as String? ?? 'java';
-      if (_topics.values.where((t) => t.domainId == defaultDomainId).isEmpty) {
-        loadDomainTopics(defaultDomainId);
+      // 6. 自动加载指定领域或默认领域的 topics（后台加载，不阻塞 UI）
+      final domainToLoad = currentDomainId ?? _manifest?['defaultDomain'] as String? ?? 'java';
+      if (_topics.values.where((t) => t.domainId == domainToLoad).isEmpty) {
+        loadDomainTopics(domainToLoad);
       }
     } catch (e) {
       _error = e.toString();
@@ -290,13 +290,13 @@ class ContentProvider extends ChangeNotifier {
   }
 
   /// 切换知识源环境：更新 baseUrl 并重载内容
-  Future<void> switchContentEnv(String newBaseUrl) async {
+  Future<void> switchContentEnv(String newBaseUrl, {String? currentDomainId}) async {
     _api.switchBaseUrl(newBaseUrl);
     _domains = [];
     _topics = {};
     _manifest = null;
     notifyListeners();
-    await loadContent();
+    await loadContent(currentDomainId: currentDomainId);
   }
 
   /// 清理已删除领域的缓存
