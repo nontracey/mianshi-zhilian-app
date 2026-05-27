@@ -14,6 +14,11 @@ class StorageService {
     return _prefs!;
   }
 
+  /// 获取 SharedPreferences 实例（用于遍历 key 等操作）
+  Future<SharedPreferences> getInstance() async {
+    return await _instance;
+  }
+
   Future<void> save(String key, dynamic data) async {
     try {
       final prefs = await _instance;

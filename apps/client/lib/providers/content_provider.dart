@@ -76,6 +76,9 @@ class ContentProvider extends ChangeNotifier {
         _cachedContentVersion = remoteVersion;
         // 记录需要刷新的版本，切换领域时会检查
         await _storage.save('content_version_pending', remoteVersion);
+        
+        // 清理已删除领域的缓存
+        await _cleanupDeletedDomains();
       } else {
         // 5. 从缓存加载 topics
         final cached = await _storage.load('topics_cache');
@@ -294,6 +297,36 @@ class ContentProvider extends ChangeNotifier {
     _manifest = null;
     notifyListeners();
     await loadContent();
+  }
+
+  /// 清理已删除领域的缓存
+  Future<void> _cleanupDeletedDomains() async {
+    try {
+      // 获取当前所有领域 ID
+      final currentDomainIds = _domains.map((d) => d.id).toSet();
+      
+      // 获取本地缓存的所有 key
+      final prefs = await _storage.getInstance();
+      final keys = prefs.getKeys();
+      
+      // 找出 domain_cache_ 开头的 key
+      final domainCacheKeys = keys.where((k) => k.startsWith('domain_cache_')).toList();
+      
+      for (final key in domainCacheKeys) {
+        final domainId = key.replaceFirst('domain_cache_', '');
+        if (!currentDomainIds.contains(domainId)) {
+          // 领域已删除，清除缓存
+          debugPrint('Cleaning up deleted domain cache: $domainId');
+          await _storage.save(key, null);
+          await _storage.save('domain_version_$domainId', null);
+          
+          // 从内存中移除该领域的 topics
+          _topics.removeWhere((_, topic) => topic.domainId == domainId);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to cleanup deleted domains: $e');
+    }
   }
 
   Set<String> _referencedTopicPaths() {
