@@ -28,13 +28,6 @@ jobs:
             web-deploy-${{ runner.os }}-
       - run: flutter pub get
       - run: flutter build web --release
-      - name: Create project if not exists
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create mianshi-zhilian-app --production-branch=main
-        continue-on-error: true
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
