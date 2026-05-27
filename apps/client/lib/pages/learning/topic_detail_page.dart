@@ -298,23 +298,76 @@ class _ExplainCard extends StatelessWidget {
   const _ExplainCard({required this.card});
   final LearningCard card;
 
+  String _formatContent(String content) {
+    // 处理内容格式，确保 Markdown 正确渲染
+    String formatted = content;
+
+    // 处理可能的转义换行符
+    formatted = formatted.replaceAll('\\n', '\n');
+
+    // 识别裸代码块（没有被 ``` 包裹的代码）
+    // 匹配以 Java 关键字开头的代码行
+    final lines = formatted.split('\n');
+    final buffer = StringBuffer();
+    bool inCodeBlock = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final trimmed = line.trim();
+
+      // 检测是否是代码行（以 Java 关键字开头或包含典型的代码模式）
+      final isCodeLine = RegExp(
+            r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set)\b',
+          ).hasMatch(trimmed) ||
+          RegExp(r'[{}();]\s*$').hasMatch(trimmed) ||
+          RegExp(r'^\s*(?://|/\*|\*)').hasMatch(trimmed);
+
+      // 检测是否是 Markdown 标题或列表
+      final isMarkdownLine = trimmed.startsWith('#') ||
+          trimmed.startsWith('- ') ||
+          trimmed.startsWith('* ') ||
+          trimmed.startsWith('> ') ||
+          RegExp(r'^\d+\.\s').hasMatch(trimmed);
+
+      if (isCodeLine && !inCodeBlock && !isMarkdownLine) {
+        // 开始代码块
+        buffer.writeln('```java');
+        inCodeBlock = true;
+      } else if (inCodeBlock && !isCodeLine && trimmed.isNotEmpty && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')) {
+        // 结束代码块
+        buffer.writeln('```');
+        buffer.writeln();
+        inCodeBlock = false;
+      }
+
+      buffer.writeln(line);
+    }
+
+    // 如果代码块未关闭，关闭它
+    if (inCodeBlock) {
+      buffer.writeln('```');
+    }
+
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final formattedContent = _formatContent(card.content);
+
     return WorkPanel(
       title: card.title,
       children: [
-        // 虚线框包裹核心概念
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.4),
-              style: BorderStyle.solid,
+              color: AppColors.accent.withValues(alpha: 0.3),
             ),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: _MarkdownContent(data: card.content),
+          child: _MarkdownContent(data: formattedContent),
         ),
       ],
     );
@@ -327,8 +380,41 @@ class _InterviewAnswerCard extends StatelessWidget {
   const _InterviewAnswerCard({required this.card});
   final LearningCard card;
 
+  String _formatInterviewContent(String content) {
+    // 处理面试回答内容格式
+    String formatted = content;
+
+    // 处理可能的转义换行符
+    formatted = formatted.replaceAll('\\n', '\n');
+
+    // 如果内容包含数字列表，确保格式正确
+    // 例如 "1. xxx\n2. xxx" 格式
+    final lines = formatted.split('\n');
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isNotEmpty) {
+        // 检测是否是列表项
+        if (RegExp(r'^\d+\.\s').hasMatch(line)) {
+          buffer.writeln(line);
+        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+          buffer.writeln(line);
+        } else {
+          buffer.writeln(line);
+        }
+      } else {
+        buffer.writeln();
+      }
+    }
+
+    return buffer.toString().trim();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final formattedContent = _formatInterviewContent(card.content);
+
     return WorkPanel(
       title: card.title,
       children: [
@@ -361,8 +447,8 @@ class _InterviewAnswerCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
-                card.content,
+              SelectableText(
+                formattedContent,
                 style: const TextStyle(
                   color: Color(0xFFE2E8F0),
                   fontSize: 14,
@@ -428,8 +514,27 @@ class _CodeCard extends StatelessWidget {
   const _CodeCard({required this.card});
   final LearningCard card;
 
+  String _cleanCodeContent(String content) {
+    // 移除开头和结尾的 ``` 标记
+    String cleaned = content.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.substring(3);
+      // 移除语言标识（如 ```java）
+      final firstNewline = cleaned.indexOf('\n');
+      if (firstNewline != -1) {
+        cleaned = cleaned.substring(firstNewline + 1);
+      }
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3);
+    }
+    return cleaned.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cleanedContent = _cleanCodeContent(card.content);
+
     return WorkPanel(
       title: card.title,
       children: [
@@ -438,8 +543,9 @@ class _CodeCard extends StatelessWidget {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 720),
+              constraints: const BoxConstraints(minWidth: 600),
               child: Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0B1220),
@@ -449,7 +555,7 @@ class _CodeCard extends StatelessWidget {
                   ),
                 ),
                 child: SelectableText(
-                  card.content,
+                  cleanedContent,
                   style: const TextStyle(
                     fontFamily: 'JetBrainsMono',
                     fontSize: 13,
@@ -478,8 +584,10 @@ class _DiagramCard extends StatelessWidget {
       title: card.title,
       children: [
         _FlowDiagram(card: card),
-        const SizedBox(height: 12),
-        Text(card.content, style: const TextStyle(height: 1.6)),
+        if (card.content.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(card.content, style: const TextStyle(height: 1.6)),
+        ],
       ],
     );
   }
@@ -495,6 +603,9 @@ class _FlowDiagram extends StatelessWidget {
         ? card.items
         : ['输入/触发', '核心机制', '状态变化', '输出/风险'];
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isNarrow = screenWidth < 600;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -506,44 +617,113 @@ class _FlowDiagram extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              for (var index = 0; index < steps.length; index += 1) ...[
-                _DiagramStep(index: index + 1, text: steps[index]),
-                if (index < steps.length - 1)
-                  const Icon(
-                    Icons.arrow_forward,
-                    color: AppColors.accent,
-                    size: 20,
-                  ),
-              ],
-            ],
-          ),
+          // 根据屏幕宽度选择布局方式
+          if (isNarrow)
+            _buildVerticalLayout(steps)
+          else
+            _buildHorizontalLayout(steps),
           if (card.fallback != null && card.fallback!.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(
-              card.fallback!,
-              style: const TextStyle(color: Color(0xFFBFD6EA), height: 1.5),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: AppColors.accent.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      card.fallback!,
+                      style: const TextStyle(
+                        color: Color(0xFFBFD6EA),
+                        height: 1.5,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
       ),
     );
   }
+
+  Widget _buildHorizontalLayout(List<String> steps) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var index = 0; index < steps.length; index += 1) ...[
+            _DiagramStep(index: index + 1, text: steps[index]),
+            if (index < steps.length - 1) ...[
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.arrow_forward,
+                color: AppColors.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalLayout(List<String> steps) {
+    return Column(
+      children: [
+        for (var index = 0; index < steps.length; index += 1) ...[
+          _DiagramStep(
+            index: index + 1,
+            text: steps[index],
+            isVertical: true,
+          ),
+          if (index < steps.length - 1) ...[
+            const SizedBox(height: 8),
+            const Icon(
+              Icons.arrow_downward,
+              color: AppColors.accent,
+              size: 20,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ],
+    );
+  }
 }
 
 class _DiagramStep extends StatelessWidget {
-  const _DiagramStep({required this.index, required this.text});
+  const _DiagramStep({
+    required this.index,
+    required this.text,
+    this.isVertical = false,
+  });
   final int index;
   final String text;
+  final bool isVertical;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 150, maxWidth: 260),
+      constraints: BoxConstraints(
+        minWidth: isVertical ? double.infinity : 150,
+        maxWidth: isVertical ? double.infinity : 260,
+      ),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.12),
@@ -584,16 +764,55 @@ class _TableCard extends StatelessWidget {
   const _TableCard({required this.card});
   final LearningCard card;
 
+  String _formatTableContent(String content) {
+    // 处理表格内容格式
+    String formatted = content;
+
+    // 处理可能的转义换行符
+    formatted = formatted.replaceAll('\\n', '\n');
+
+    // 确保表格格式正确
+    final lines = formatted.split('\n');
+    final buffer = StringBuffer();
+    bool isFirstLine = true;
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isNotEmpty) {
+        // 检测是否是表格行
+        if (line.startsWith('|') && line.endsWith('|')) {
+          buffer.writeln(line);
+
+          // 如果是第一行（表头），添加分隔行
+          if (isFirstLine && !line.contains('---')) {
+            // 计算列数
+            final columns = line.split('|').where((c) => c.trim().isNotEmpty).length;
+            buffer.writeln('| ${'--- | ' * (columns - 1)}--- |');
+            isFirstLine = false;
+          }
+        } else {
+          buffer.writeln(line);
+        }
+      } else {
+        buffer.writeln();
+      }
+    }
+
+    return buffer.toString().trim();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final formattedContent = _formatTableContent(card.content);
+
     return WorkPanel(
       title: card.title,
       children: [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 720),
-            child: _MarkdownContent(data: card.content),
+            constraints: const BoxConstraints(minWidth: 600),
+            child: _MarkdownContent(data: formattedContent),
           ),
         ),
       ],
@@ -607,17 +826,48 @@ class _GenericCard extends StatelessWidget {
   const _GenericCard({required this.card});
   final LearningCard card;
 
+  bool _shouldUseMarkdown(String content) {
+    // 检测是否应该使用 Markdown 渲染
+    final trimmed = content.trim();
+
+    // 包含 Markdown 语法
+    if (trimmed.contains('# ') ||
+        trimmed.contains('## ') ||
+        trimmed.contains('### ') ||
+        trimmed.contains('**') ||
+        trimmed.contains('```') ||
+        trimmed.contains('- ') ||
+        trimmed.contains('* ') ||
+        trimmed.contains('> ') ||
+        RegExp(r'^\d+\.\s').hasMatch(trimmed)) {
+      return true;
+    }
+
+    // 包含表格
+    if (trimmed.contains('| ') && trimmed.contains(' |')) {
+      return true;
+    }
+
+    // 包含链接
+    if (RegExp(r'\[.*\]\(.*\)').hasMatch(trimmed)) {
+      return true;
+    }
+
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
       title: card.title,
       children: [
-        if (card.content.contains('#') ||
-            card.content.contains('**') ||
-            card.content.contains('```'))
+        if (_shouldUseMarkdown(card.content))
           _MarkdownContent(data: card.content)
         else
-          Text(card.content, style: const TextStyle(height: 1.7)),
+          SelectableText(
+            card.content,
+            style: const TextStyle(height: 1.7),
+          ),
       ],
     );
   }
@@ -630,30 +880,46 @@ class _MarkdownContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final baseStyle = DefaultTextStyle.of(context).style;
+
     return MarkdownBody(
       data: data,
       selectable: true,
       styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
         p: baseStyle.copyWith(height: 1.7),
-        h1: Theme.of(
-          context,
-        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-        h2: Theme.of(
-          context,
-        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-        h3: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-        code: const TextStyle(
+        h1: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+        ),
+        h2: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w900,
+          fontSize: 18,
+        ),
+        h3: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w900,
+          fontSize: 16,
+        ),
+        code: TextStyle(
           fontFamily: 'JetBrainsMono',
-          color: Color(0xFFE7EEF8),
-          backgroundColor: Color(0xFF14263A),
+          fontSize: 13,
+          color: const Color(0xFFE7EEF8),
+          backgroundColor: const Color(0xFF14263A).withValues(alpha: 0.6),
         ),
         codeblockDecoration: BoxDecoration(
           color: const Color(0xFF0B1220),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
         ),
+        codeblockPadding: const EdgeInsets.all(16),
+        listBullet: baseStyle.copyWith(height: 1.7),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: AppColors.accent.withValues(alpha: 0.5),
+              width: 3,
+            ),
+          ),
+        ),
+        blockquotePadding: const EdgeInsets.only(left: 16),
       ),
     );
   }
