@@ -855,84 +855,80 @@ class _SmartDiagram extends StatelessWidget {
   const _SmartDiagram({required this.card});
   final LearningCard card;
 
-  // 识别图解类型
+  // 识别图解类型（基于内容结构特征，不依赖特定关键词）
   _DiagramType _detectType() {
     final items = card.items;
     if (items.isEmpty) return _DiagramType.flow;
 
-    final allText = items.join(' ').toLowerCase();
+    // 分析内容结构特征
+    final features = _analyzeFeatures(items);
 
-    // 检测是否是层级/结构类（包含关系、组成部分）
-    if (_isHierarchyType(items, allText)) {
-      return _DiagramType.hierarchy;
-    }
-
-    // 检测是否是对比类
-    if (_isCompareType(items, allText)) {
-      return _DiagramType.compare;
-    }
-
-    // 检测是否是循环类
-    if (_isCycleType(items, allText)) {
-      return _DiagramType.cycle;
-    }
-
-    // 默认使用流程图
+    // 根据特征权重选择布局类型
+    if (features.isCycle) return _DiagramType.cycle;
+    if (features.isHierarchy) return _DiagramType.hierarchy;
+    if (features.isCompare) return _DiagramType.compare;
     return _DiagramType.flow;
   }
 
-  bool _isHierarchyType(List<String> items, String allText) {
-    // 包含层级关键词
-    if (allText.contains('包含') || allText.contains('分为') ||
-        allText.contains('组成') || allText.contains('部分') ||
-        allText.contains('区域') || allText.contains('层级') ||
-        allText.contains('层次') || allText.contains('结构')) {
-      return true;
-    }
+  _ContentFeatures _analyzeFeatures(List<String> items) {
+    int colonCount = 0;        // 冒号分隔的键值对
+    int arrowCount = 0;        // 箭头符号
+    int sequentialCount = 0;   // 顺序词
+    int compareCount = 0;      // 对比词
+    bool hasCycleIndicator = false;
 
-    // items 中有明显的层级关系（如 "xxx：yyy" 格式表示分类）
-    int colonCount = items.where((item) => item.contains('：') || item.contains(':')).length;
-    if (colonCount >= items.length * 0.5) {
-      return true;
-    }
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      final lower = item.toLowerCase();
 
-    return false;
-  }
+      // 检测冒号分隔（键值对结构，表示分类/层级）
+      if (item.contains('：') || item.contains(':')) {
+        colonCount++;
+      }
 
-  bool _isCompareType(List<String> items, String allText) {
-    // 包含对比关键词
-    if (allText.contains('对比') || allText.contains('比较') ||
-        allText.contains('区别') || allText.contains('差异') ||
-        allText.contains('优缺点') || allText.contains('vs')) {
-      return true;
-    }
+      // 检测箭头（流程指示）
+      if (item.contains('→') || item.contains('->') || item.contains('=>')) {
+        arrowCount++;
+      }
 
-    // items 数量为偶数且有对称结构
-    if (items.length >= 2 && items.length % 2 == 0) {
-      return true;
-    }
+      // 检测顺序词
+      if (lower.contains('首先') || lower.contains('然后') || lower.contains('最后') ||
+          lower.contains('接着') || lower.contains('步骤') || lower.contains('第') ||
+          RegExp(r'^\d+[.、]').hasMatch(item)) {
+        sequentialCount++;
+      }
 
-    return false;
-  }
+      // 检测对比词
+      if (lower.contains('vs') || lower.contains('对比') || lower.contains('比较') ||
+          lower.contains('区别') || lower.contains('优缺') || lower.contains('利弊')) {
+        compareCount++;
+      }
 
-  bool _isCycleType(List<String> items, String allText) {
-    // 包含循环关键词
-    if (allText.contains('循环') || allText.contains('迭代') ||
-        allText.contains('重复') || allText.contains('轮询') ||
-        allText.contains('生命周期') || allText.contains('状态机')) {
-      return true;
-    }
-
-    // 首尾 items 有相似性
-    if (items.length >= 3) {
-      final first = items.first.toLowerCase();
-      final last = items.last.toLowerCase();
-      if (first.contains(last.split('：').last) || last.contains(first.split('：').last)) {
-        return true;
+      // 检测循环指示（首尾相关）
+      if (i == items.length - 1 && items.length >= 3) {
+        final firstParts = items.first.split(RegExp(r'[：:、]'));
+        final lastParts = item.split(RegExp(r'[：:、]'));
+        if (firstParts.isNotEmpty && lastParts.isNotEmpty) {
+          // 首尾有相似的关键词
+          if (firstParts.first.contains(lastParts.first) ||
+              lastParts.first.contains(firstParts.first)) {
+            hasCycleIndicator = true;
+          }
+        }
       }
     }
 
-    return false;
+    // 计算特征得分
+    final totalItems = items.length;
+    final colonRatio = colonCount / totalItems;
+    final arrowRatio = arrowCount / totalItems;
+
+    return _ContentFeatures(
+      isHierarchy: colonRatio >= 0.5,           // 超过一半是键值对 → 层级结构
+      isCompare: compareCount >= 1 || (totalItems >= 2 && totalItems % 2 == 0 && colonRatio >= 0.3),
+      isCycle: hasCycleIndicator,
+      isSequential: sequentialCount >= 2 || arrowRatio >= 0.3,
+    );
   }
 
   @override
@@ -1289,6 +1285,20 @@ class _SmartDiagram extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ContentFeatures {
+  final bool isHierarchy;
+  final bool isCompare;
+  final bool isCycle;
+  final bool isSequential;
+
+  _ContentFeatures({
+    required this.isHierarchy,
+    required this.isCompare,
+    required this.isCycle,
+    required this.isSequential,
+  });
 }
 
 enum _DiagramType { flow, hierarchy, compare, cycle }
