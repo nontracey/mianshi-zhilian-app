@@ -1,11 +1,11 @@
 {
-    "name": "mianshi_zhilian",
-    "short_name": "mianshi_zhilian",
+    "name": "面试智练",
+    "short_name": "面试智练",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0A2540",
+    "theme_color": "#0A2540",
+    "description": "AI 主动回忆学习工作台，帮你系统备战技术面试",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
