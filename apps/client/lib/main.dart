@@ -198,6 +198,10 @@ class _LearningShellState extends State<LearningShell> {
           ),
           onPractice: () => _setSection(AppSection.practice),
           onTopicTap: (topicId) => setState(() => _selectedTopicId = topicId),
+          onViewDomainCatalog: (domainId) {
+            settings.updateSettings(settings.settings.copyWith(currentDomain: domainId));
+            setState(() => _section = AppSection.catalog);
+          },
         ),
       AppSection.catalog => CatalogPage(
           currentDomainId: settings.settings.currentDomain,

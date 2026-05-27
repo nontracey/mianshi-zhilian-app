@@ -15,12 +15,14 @@ class DashboardPage extends StatelessWidget {
     required this.onDomainChanged,
     required this.onPractice,
     required this.onTopicTap,
+    required this.onViewDomainCatalog,
   });
 
   final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final VoidCallback onPractice;
   final ValueChanged<String> onTopicTap;
+  final ValueChanged<String> onViewDomainCatalog;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +119,13 @@ class DashboardPage extends StatelessWidget {
                       if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
                         contentProvider.loadDomainTopics(domain.id);
                       }
+                    },
+                    onViewDetail: () {
+                      onDomainChanged(domain.id);
+                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                        contentProvider.loadDomainTopics(domain.id);
+                      }
+                      onViewDomainCatalog(domain.id);
                     },
                   );
                 }).toList(),
@@ -350,6 +359,7 @@ class _DomainCardWrapper extends StatelessWidget {
     required this.loadingProgress,
     required this.isTopicLoading,
     required this.onTap,
+    required this.onViewDetail,
   });
 
   final Domain domain;
@@ -358,6 +368,7 @@ class _DomainCardWrapper extends StatelessWidget {
   final double loadingProgress;
   final bool isTopicLoading;
   final VoidCallback onTap;
+  final VoidCallback onViewDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -406,10 +417,26 @@ class _DomainCardWrapper extends StatelessWidget {
                 color: domainColor,
               ),
               const SizedBox(height: 8),
-              Text(
-                loadingProgress < 1.0 && loadingProgress > 0
-                    ? '加载中 ${domain.topicCount} 个知识点...'
-                    : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      loadingProgress < 1.0 && loadingProgress > 0
+                          ? '加载中 ${domain.topicCount} 个知识点...'
+                          : '$masteryPercent% 熟练 · ${domain.topicCount} 个知识点',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onViewDetail,
+                    style: TextButton.styleFrom(
+                      foregroundColor: domainColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('查看知识 →'),
+                  ),
+                ],
               ),
             ],
           ),

@@ -137,14 +137,23 @@ class ContentProvider extends ChangeNotifier {
     return _topics.values
         .where((t) => t.domainId == domainId)
         .toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+      ..sort((a, b) {
+        // 先按难度升序（由易到难），难度相同再按 order
+        final diff = a.difficulty.compareTo(b.difficulty);
+        if (diff != 0) return diff;
+        return a.order.compareTo(b.order);
+      });
   }
 
   List<Topic> getTopicsByCategory(String domainId, String categoryId) {
     return _topics.values
         .where((t) => t.domainId == domainId && t.categoryId == categoryId)
         .toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+      ..sort((a, b) {
+        final diff = a.difficulty.compareTo(b.difficulty);
+        if (diff != 0) return diff;
+        return a.order.compareTo(b.order);
+      });
   }
 
   Topic? getTopicById(String topicId) => _topics[topicId];

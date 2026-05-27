@@ -186,22 +186,67 @@ class _CategorySection extends StatelessWidget {
           ...topics.map((topic) {
             final progress = progressProvider.getTopicProgress(topic.id);
             final score = progress?.score ?? 0;
+            // 难度标签
+            final difficultyLabel = switch (topic.difficulty) {
+              1 => '入门',
+              2 => '基础',
+              3 => '中等',
+              4 => '较难',
+              5 => '困难',
+              _ => '',
+            };
             return Card(
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
                 leading: StatusDot(score: score),
-                title: Text(topic.title),
+                title: Row(
+                  children: [
+                    Expanded(child: Text(topic.title)),
+                    if (difficultyLabel.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _difficultyColor(topic.difficulty).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          difficultyLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _difficultyColor(topic.difficulty),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 subtitle: Text(topic.summary),
                 trailing: Wrap(
                   spacing: 8,
                   children: [
-                    OutlinedButton(
+                    // 知识查阅 — 使用 accent 高亮色
+                    FilledButton.tonal(
                       onPressed: () => onTopicLearn(topic.id),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF00CCF9).withValues(alpha: 0.15),
+                        foregroundColor: const Color(0xFF00A0C4),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                      ),
                       child: const Text('知识查阅'),
                     ),
+                    // 学习模式 — 使用 primary 强调色
                     FilledButton(
                       onPressed: () => onTopicPractice(topic.id),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A2540),
+                        foregroundColor: Colors.white,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        minimumSize: Size.zero,
+                      ),
                       child: const Text('学习模式'),
                     ),
                   ],
@@ -211,5 +256,16 @@ class _CategorySection extends StatelessWidget {
           }),
       ],
     );
+  }
+
+  Color _difficultyColor(int difficulty) {
+    return switch (difficulty) {
+      1 => const Color(0xFF10B981), // 绿
+      2 => const Color(0xFF00CCF9), // 青
+      3 => const Color(0xFFF59E0B), // 黄
+      4 => const Color(0xFFEF4444), // 红
+      5 => const Color(0xFF7C3AED), // 紫
+      _ => Colors.grey,
+    };
   }
 }
