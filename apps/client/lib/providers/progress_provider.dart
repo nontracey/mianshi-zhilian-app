@@ -139,4 +139,32 @@ class ProgressProvider extends ChangeNotifier {
       return !reviewDate.isAfter(today);
     }).toList();
   }
+
+  /// 导出所有进度数据
+  Map<String, dynamic> exportProgress() {
+    return _progressMap.map((k, v) => MapEntry(k, v.toJson()));
+  }
+
+  /// 从云端合并进度数据
+  Future<void> mergeFromCloud(Map<String, dynamic> cloudProgress) async {
+    for (final entry in cloudProgress.entries) {
+      final topicId = entry.key;
+      final cloudData = entry.value as Map<String, dynamic>;
+      final localProgress = _progressMap[topicId];
+
+      if (localProgress == null) {
+        // 本地没有，直接使用云端数据
+        _progressMap[topicId] = TopicProgress.fromJson(cloudData);
+      } else {
+        // 合并策略：保留分数更高的
+        final cloudScore = cloudData['score'] as int? ?? 0;
+        if (cloudScore > localProgress.score) {
+          _progressMap[topicId] = TopicProgress.fromJson(cloudData);
+        }
+      }
+    }
+
+    await _storage.saveProgressMap(_progressMap);
+    notifyListeners();
+  }
 }

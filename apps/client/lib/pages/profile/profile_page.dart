@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
+import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
@@ -14,10 +16,21 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final settingsProvider = context.watch<SettingsProvider>();
     final settings = settingsProvider.settings;
+    final authProvider = context.watch<AuthProvider>();
 
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        _AccountPanel(
+          authProvider: authProvider,
+          onLogin: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            );
+          },
+          onLogout: () => authProvider.logout(),
+        ),
+        const SizedBox(height: 16),
         _ContentEnvPanel(
           settings: settings,
           onEnvChanged: (env) async {
@@ -75,6 +88,86 @@ class ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         const _AboutPanel(),
+      ],
+    );
+  }
+}
+
+// ── 账号面板 ──────────────────────────────────────────────
+
+class _AccountPanel extends StatelessWidget {
+  const _AccountPanel({
+    required this.authProvider,
+    required this.onLogin,
+    required this.onLogout,
+  });
+
+  final AuthProvider authProvider;
+  final VoidCallback onLogin;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkPanel(
+      title: '账号',
+      children: [
+        if (authProvider.isLoggedIn) ...[
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: Text(
+                  authProvider.user!.nickname.isNotEmpty
+                      ? authProvider.user!.nickname[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authProvider.user!.nickname,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '@${authProvider.user!.username}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('退出登录'),
+              ),
+            ],
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Icon(
+                Icons.person_outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('登录后可同步学习进度到云端'),
+              ),
+              FilledButton.icon(
+                onPressed: onLogin,
+                icon: const Icon(Icons.login, size: 18),
+                label: const Text('登录'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

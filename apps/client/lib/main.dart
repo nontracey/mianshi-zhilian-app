@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'theme/app_theme.dart';
+import 'providers/auth_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/progress_provider.dart';
@@ -70,6 +71,9 @@ class MianshiZhilianApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => ProgressProvider(storage)..loadProgress(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(storage)..loadUser(),
         ),
       ],
       child: Consumer<SettingsProvider>(
