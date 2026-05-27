@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-enum AppSection { dashboard, catalog, practice, mastery, profile }
+import '../main.dart';
 
 IconData _sectionIcon(AppSection section) => switch (section) {
       AppSection.dashboard => Icons.dashboard_outlined,

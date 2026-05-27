@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
-import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
-import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 enum MasterySort { scoreAsc, scoreDesc }
 
 enum MasteryFilter { all, skilled, familiar, unfamiliar }
+
+enum TopicStatus { skilled, familiar, unfamiliar }
+
+extension TopicStatusX on TopicStatus {
+  static TopicStatus fromString(String status) => switch (status) {
+        'mastered' => TopicStatus.skilled,
+        'learning' => TopicStatus.familiar,
+        _ => TopicStatus.unfamiliar,
+      };
+}
 
 class MasteryPage extends StatefulWidget {
   const MasteryPage({
@@ -43,8 +50,8 @@ class _MasteryPageState extends State<MasteryPage> {
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
-    final domainProgress = progressProvider.getDomainProgress(widget.currentDomainId);
-    final masteryPercent = domainProgress.$1;
+    final domainProgress = progressProvider.getDomainProgress(widget.currentDomainId, contentProvider.topics.values.toList());
+    final masteryPercent = domainProgress.masteryPercent;
 
     final filteredTopics = _applyFilter(domainTopics, progressProvider);
     final sortedTopics = _applySort(filteredTopics, progressProvider);
@@ -73,7 +80,7 @@ class _MasteryPageState extends State<MasteryPage> {
           children: [
             Expanded(
               child: DropdownButtonFormField<MasterySort>(
-                value: _sort,
+                initialValue: _sort,
                 decoration: const InputDecoration(
                   labelText: '排序',
                   isDense: true,
@@ -90,7 +97,7 @@ class _MasteryPageState extends State<MasteryPage> {
             const SizedBox(width: 16),
             Expanded(
               child: DropdownButtonFormField<MasteryFilter>(
-                value: _filter,
+                initialValue: _filter,
                 decoration: const InputDecoration(
                   labelText: '筛选',
                   isDense: true,
@@ -113,10 +120,12 @@ class _MasteryPageState extends State<MasteryPage> {
           spacing: 12,
           runSpacing: 12,
           children: sortedTopics.map((topic) {
-            final progress = progressProvider.getTopicProgress(topic.id);
-            final score = progress?.score ?? 0;
-            final status = progress?.status ?? TopicStatus.unfamiliar;
-            return _MasteryCard(
+          final progress = progressProvider.getTopicProgress(topic.id);
+          final score = progress?.score ?? 0;
+          final status = progress != null
+              ? TopicStatusX.fromString(progress.status)
+              : TopicStatus.unfamiliar;
+          return _MasteryCard(
               title: topic.title,
               status: status,
               score: score,
@@ -132,15 +141,15 @@ class _MasteryPageState extends State<MasteryPage> {
       MasteryFilter.all => topics,
       MasteryFilter.skilled => topics.where((t) {
           final p = provider.getTopicProgress(t.id);
-          return p?.status == TopicStatus.skilled;
+          return p != null && TopicStatusX.fromString(p.status) == TopicStatus.skilled;
         }).toList(),
       MasteryFilter.familiar => topics.where((t) {
           final p = provider.getTopicProgress(t.id);
-          return p?.status == TopicStatus.familiar;
+          return p != null && TopicStatusX.fromString(p.status) == TopicStatus.familiar;
         }).toList(),
       MasteryFilter.unfamiliar => topics.where((t) {
           final p = provider.getTopicProgress(t.id);
-          return p?.status == TopicStatus.unfamiliar || p == null;
+          return p == null || TopicStatusX.fromString(p.status) == TopicStatus.unfamiliar;
         }).toList(),
     };
   }

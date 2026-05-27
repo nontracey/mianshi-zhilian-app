@@ -82,8 +82,13 @@ class Topic {
 
   String get topicPath {
     // id like "java.jvm.runtime-data-area" → "java/jvm-runtime-data-area"
-    return '${domain}/${id.replaceFirst('${domain}.', '')}';
+    return '$domain/${id.replaceFirst('$domain.', '')}';
   }
+
+  /// Alias getters for compatibility
+  String get domainId => domain;
+  String get categoryId => category;
+  bool get highFrequency => recommendWeight >= 80;
 }
 
 class LearningCard {

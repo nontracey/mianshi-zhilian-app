@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
-import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class PracticePage extends StatelessWidget {

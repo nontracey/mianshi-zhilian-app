@@ -6,10 +6,7 @@ import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
-import 'package:mianshi_zhilian/widgets/domain_card.dart';
-import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/status_dot.dart';
-import 'package:mianshi_zhilian/theme/colors.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
@@ -39,12 +36,12 @@ class DashboardPage extends StatelessWidget {
       });
     }
 
-    final domainProgress = progressProvider.getDomainProgress(currentDomainId);
-    final masteryPercent = domainProgress.$1;
-    final topicCount = domainProgress.$2;
+    final domainProgress = progressProvider.getDomainProgress(currentDomainId, contentProvider.topics.values.toList());
+    final masteryPercent = domainProgress.masteryPercent;
+    final topicCount = domainProgress.topicCount;
     final reviewCount = progressProvider.getReviewCount(currentDomainId);
 
-    final recommendedTopics = progressProvider.getRecommendedTopics(currentDomainId);
+    final recommendedTopics = progressProvider.getRecommendedTopics(currentDomainId, contentProvider.topics.values.toList(), 'low-score-first');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,10 +63,10 @@ class DashboardPage extends StatelessWidget {
           spacing: 14,
           runSpacing: 14,
           children: domains.map((domain) {
-            final dp = progressProvider.getDomainProgress(domain.id);
+            final dp = progressProvider.getDomainProgress(domain.id, contentProvider.topics.values.toList());
             return _DomainCardWrapper(
               domain: domain,
-              masteryPercent: dp.$1,
+              masteryPercent: dp.masteryPercent,
               selected: domain.id == currentDomainId,
               onTap: () => onDomainChanged(domain.id),
             );
@@ -228,7 +225,7 @@ class _DomainCardWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final domainColor = _parseDomainColor(domain.color);
+    final domainColor = domain.color;
     return SizedBox(
       width: 330,
       child: InkWell(
@@ -277,7 +274,6 @@ class _TopicTile extends StatelessWidget {
   final Topic topic;
   final TopicProgress? progress;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final score = progress?.score ?? 0;
@@ -340,13 +336,4 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _parseDomainColor(String? colorStr) {
-  if (colorStr == null) return AppColors.primary;
-  if (colorStr.startsWith('#') && colorStr.length == 7) {
-    final hex = colorStr.replaceFirst('#', '');
-    return Color(int.parse('FF$hex', radix: 16));
-  }
-  return AppColors.primary;
 }

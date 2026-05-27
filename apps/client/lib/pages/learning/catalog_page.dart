@@ -6,7 +6,6 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/status_dot.dart';
-import 'package:mianshi_zhilian/theme/colors.dart';
 
 class CatalogPage extends StatelessWidget {
   const CatalogPage({
@@ -34,8 +33,8 @@ class CatalogPage extends StatelessWidget {
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
-    final domainProgress = progressProvider.getDomainProgress(currentDomainId);
-    final masteryPercent = domainProgress.$1;
+    final domainProgress = progressProvider.getDomainProgress(currentDomainId, contentProvider.topics.values.toList());
+    final masteryPercent = domainProgress.masteryPercent;
 
     return WorkPanel(
       title: currentDomain.title,
@@ -105,10 +104,10 @@ class _CategorySection extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
         ),
-        if (category.description.isNotEmpty) ...[
+        if (category.description != null && category.description!.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
-            category.description,
+            category.description!,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

@@ -104,4 +104,6 @@ class ContentProvider extends ChangeNotifier {
         .toList()
       ..sort((a, b) => a.order.compareTo(b.order));
   }
+
+  Topic? getTopicById(String topicId) => _topics[topicId];
 }

@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'theme/app_theme.dart';
-import 'theme/colors.dart';
 import 'providers/content_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/progress_provider.dart';
@@ -21,14 +17,12 @@ import 'pages/practice/practice_page.dart';
 import 'pages/practice/recall_page.dart';
 import 'pages/mastery/mastery_page.dart';
 import 'pages/profile/profile_page.dart';
-import 'pages/profile/ai_config_page.dart';
 import 'widgets/navigation_rail_panel.dart';
 import 'widgets/header_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  final storage = StorageService(prefs);
+  final storage = StorageService();
   final contentApi = ContentApiService(
     baseUrl: 'https://mianshi-zhilian-content.pages.dev',
   );
@@ -70,7 +64,7 @@ class MianshiZhilianApp extends StatelessWidget {
           create: (_) => ContentProvider(contentApi, storage)..loadContent(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AiProvider(storage, aiService)..loadConfigs(),
+          create: (_) => AiProvider(aiService, storage)..loadConfigs(),
         ),
         ChangeNotifierProvider(
           create: (_) => ProgressProvider(storage)..loadProgress(),
@@ -117,7 +111,6 @@ class _LearningShellState extends State<LearningShell> {
     final wide = MediaQuery.sizeOf(context).width >= 860;
     final settings = context.watch<SettingsProvider>();
     final content = context.watch<ContentProvider>();
-    final progress = context.watch<ProgressProvider>();
 
     return Scaffold(
       body: Row(
@@ -202,30 +195,60 @@ class _LearningShellState extends State<LearningShell> {
 
     return switch (_section) {
       AppSection.dashboard => DashboardPage(
+          currentDomainId: settings.settings.currentDomain,
+          onDomainChanged: (id) => settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          ),
           onPractice: () => _setSection(AppSection.practice),
-          onTopicDetail: (topicId) => setState(() => _selectedTopicId = topicId),
+          onTopicTap: (topicId) => setState(() => _selectedTopicId = topicId),
         ),
       AppSection.catalog => CatalogPage(
-          onTopicDetail: (topicId) => setState(() => _selectedTopicId = topicId),
+          currentDomainId: settings.settings.currentDomain,
+          onDomainChanged: (id) => settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          ),
+          onTopicLearn: (topicId) => setState(() => _selectedTopicId = topicId),
+          onTopicPractice: (topicId) => setState(() => _selectedTopicId = topicId),
         ),
       AppSection.practice => PracticePage(
-          onStartRecall: (topicId) {
-            // Navigate to recall page with topic
+          currentDomainId: settings.settings.currentDomain,
+          onDailyReview: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => RecallPage(initialTopicId: topicId),
+                builder: (_) => RecallPage(
+                  topicIds: progress.getTodayReviewTopics(
+                    content.topics.values.toList(),
+                  ).map((t) => t.id).toList(),
+                ),
+              ),
+            );
+          },
+          onRandomQuiz: (domainId) {
+            final domainTopics = content.getTopicsByDomain(domainId);
+            final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
+              ),
+            );
+          },
+          onMockInterview: () {
+            final domainTopics = content.getTopicsByDomain(settings.settings.currentDomain);
+            final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RecallPage(topicIds: topicIds.take(10).toList()),
               ),
             );
           },
         ),
-      AppSection.mastery => const MasteryPage(),
-      AppSection.profile => ProfilePage(
-          onAiConfig: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AiConfigPage()),
-            );
-          },
+      AppSection.mastery => MasteryPage(
+          currentDomainId: settings.settings.currentDomain,
+          onDomainChanged: (id) => settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          ),
         ),
+      AppSection.profile => const ProfilePage(),
     };
   }
 

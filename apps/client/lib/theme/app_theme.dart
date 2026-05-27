@@ -19,8 +19,6 @@ ThemeData buildTheme(Color primary, Color accent, ThemeMode mode) {
     isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
   );
 
-  final codeStyle = GoogleFonts.jetBrainsMono();
-
   return ThemeData(
     colorScheme: colorScheme,
     textTheme: textTheme.copyWith(

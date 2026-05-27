@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
-import 'package:mianshi_zhilian/models/user_progress.dart';
-import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -250,7 +248,7 @@ class _LearningCardWidget extends StatelessWidget {
                   Image.asset(
                     card.asset!,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => _AnimationPlaceholder(),
+                    errorBuilder: (_, __, ___) => const _AnimationPlaceholder(),
                   )
                 else
                   _AnimationPlaceholder(),
@@ -266,6 +264,8 @@ class _LearningCardWidget extends StatelessWidget {
 }
 
 class _AnimationPlaceholder extends StatelessWidget {
+  const _AnimationPlaceholder();
+
   @override
   Widget build(BuildContext context) {
     return Container(

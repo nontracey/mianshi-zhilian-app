@@ -121,7 +121,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             setDialogState(() => isTesting = true);
                             try {
                               final aiProvider = context.read<AiProvider>();
-                              final success = await aiProvider.testConnection(
+                              final success = await aiProvider.testConnectionWithParams(
                                 baseUrl: baseUrlController.text.trim(),
                                 apiKey: apiKeyController.text.trim(),
                                 model: modelController.text.trim(),

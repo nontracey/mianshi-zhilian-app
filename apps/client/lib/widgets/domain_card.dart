@@ -6,11 +6,13 @@ class DomainCard extends StatelessWidget {
   const DomainCard({
     super.key,
     required this.domain,
+    required this.masteryPercent,
     required this.selected,
     required this.onTap,
   });
 
   final Domain domain;
+  final int masteryPercent;
   final bool selected;
   final VoidCallback onTap;
 
@@ -46,13 +48,13 @@ class DomainCard extends StatelessWidget {
               Text(domain.description),
               const SizedBox(height: 12),
               LinearProgressIndicator(
-                value: domain.progress / 100,
+                value: masteryPercent / 100,
                 color: selected
                     ? Theme.of(context).colorScheme.primary
                     : AppColors.accent,
               ),
               const SizedBox(height: 8),
-              Text('${domain.progress}% 熟练 · 点击切换领域'),
+              Text('$masteryPercent% 熟练 · 点击切换领域'),
             ],
           ),
         ),

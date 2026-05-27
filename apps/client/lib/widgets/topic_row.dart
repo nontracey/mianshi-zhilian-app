@@ -20,12 +20,6 @@ class TopicRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = progress?.score ?? 0;
-    final statusText = progress?.status ?? 'new';
-    final statusLabel = switch (statusText) {
-      'mastered' => '已掌握',
-      'learning' => '学习中',
-      _ => '未开始',
-    };
 
     return Card(
       elevation: 0,

@@ -57,4 +57,27 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.saveSettings(_settings);
     notifyListeners();
   }
+
+  // Convenience aliases used by profile page
+  Future<void> updateThemeMode(ThemeMode mode) async => setThemeMode(mode);
+  Future<void> updatePrimaryColor(Color color) async => setPrimaryColor(color);
+  Future<void> updateAccentColor(Color color) async => setAccentColor(color);
+  Future<void> updateLanguage(String lang) async => setLanguage(lang);
+  Future<void> updateRecommendStrategy(String strategy) async => setRecommendStrategy(strategy);
+
+  Future<void> updateFontScale(double scale) async {
+    // Font scale not yet in AppSettings model; no-op for now
+  }
+
+  Future<void> updateDensity(String density) async {
+    // Density not yet in AppSettings model; no-op for now
+  }
+
+  Future<void> syncData() async {
+    // Sync not yet implemented
+  }
+
+  Future<void> exportData() async {
+    // Export not yet implemented
+  }
 }

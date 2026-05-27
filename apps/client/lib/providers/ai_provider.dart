@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/ai_config.dart';
+import '../models/topic.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 
@@ -77,6 +78,9 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Alias for setDefault
+  Future<void> setDefaultConfig(String id) async => setDefault(id);
+
   Future<void> testConnection(String id) async {
     final config = _configs.where((c) => c.id == id).firstOrNull;
     if (config == null) return;
@@ -94,5 +98,41 @@ class AiProvider extends ChangeNotifier {
 
     _isTesting = false;
     notifyListeners();
+  }
+
+  /// Test connection with explicit baseUrl/apiKey/model
+  Future<bool> testConnectionWithParams({
+    required String baseUrl,
+    required String apiKey,
+    required String model,
+  }) async {
+    final tempConfig = AiConfig(
+      id: '_test',
+      name: '_test',
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      model: model,
+    );
+    return _aiService.testConnection(tempConfig);
+  }
+
+  /// Evaluate a user's answer using the default AI config
+  Future<Map<String, dynamic>> evaluateAnswer({
+    required String topicId,
+    required String question,
+    required String userAnswer,
+    Rubric? rubric,
+  }) async {
+    if (_defaultConfig == null) {
+      throw Exception('未配置 AI');
+    }
+    return _aiService.evaluateAnswer(
+      config: _defaultConfig!,
+      topicTitle: question,
+      mustHave: rubric?.mustHave ?? [],
+      commonMistakes: rubric?.commonMistakes ?? [],
+      userAnswer: userAnswer,
+      language: '中文',
+    );
   }
 }

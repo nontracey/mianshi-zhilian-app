@@ -34,6 +34,11 @@ class ProgressProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateTopicProgress(String topicId, {required int score}) async {
+    final status = score >= 85 ? 'mastered' : (score >= 60 ? 'learning' : 'new');
+    await updateProgress(topicId, score, status);
+  }
+
   DateTime _calculateNextReview(int score) {
     final now = DateTime.now();
     // Simple spaced repetition: higher score = longer interval
@@ -50,9 +55,13 @@ class ProgressProvider extends ChangeNotifier {
 
   TopicProgress? getProgress(String topicId) => _progressMap[topicId];
 
-  double getDomainProgress(String domainId, List<Topic> topics) {
+  /// Alias for getProgress
+  TopicProgress? getTopicProgress(String topicId) => getProgress(topicId);
+
+  /// Returns (masteryPercent, topicCount) for a domain
+  ({int masteryPercent, int topicCount}) getDomainProgress(String domainId, List<Topic> topics) {
     final domainTopics = topics.where((t) => t.domainId == domainId).toList();
-    if (domainTopics.isEmpty) return 0;
+    if (domainTopics.isEmpty) return (masteryPercent: 0, topicCount: 0);
 
     double totalScore = 0;
     int count = 0;
@@ -64,8 +73,22 @@ class ProgressProvider extends ChangeNotifier {
       }
     }
 
-    if (count == 0) return 0;
-    return totalScore / domainTopics.length;
+    if (count == 0) return (masteryPercent: 0, topicCount: domainTopics.length);
+    return (masteryPercent: (totalScore / domainTopics.length).round(), topicCount: domainTopics.length);
+  }
+
+  int getReviewCount(String domainId) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _progressMap.values.where((p) {
+      if (p.nextReviewAt == null) return false;
+      final reviewDate = DateTime(
+        p.nextReviewAt!.year,
+        p.nextReviewAt!.month,
+        p.nextReviewAt!.day,
+      );
+      return !reviewDate.isAfter(today);
+    }).length;
   }
 
   List<Topic> getRecommendedTopics(

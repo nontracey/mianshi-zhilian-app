@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
-import 'package:mianshi_zhilian/theme/colors.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -101,26 +102,20 @@ class _AppearancePanel extends StatelessWidget {
     required this.onDensityChanged,
   });
 
-  final dynamic settings;
-  final ValueChanged<String> onThemeModeChanged;
-  final ValueChanged<String> onPrimaryColorChanged;
-  final ValueChanged<String> onAccentColorChanged;
+  final AppSettings settings;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final ValueChanged<Color> onPrimaryColorChanged;
+  final ValueChanged<Color> onAccentColorChanged;
   final ValueChanged<double> onFontScaleChanged;
   final ValueChanged<String> onDensityChanged;
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = settings.themeMode as String;
-    final primaryColor = settings.primaryColor as String;
-    final accentColor = settings.accentColor as String;
-    final fontScale = settings.fontScale as double;
-    final density = settings.density as String;
-
-    final themeModeValue = switch (themeMode) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+    final themeMode = settings.themeMode;
+    final primaryColor = settings.primaryColor;
+    final accentColor = settings.accentColor;
+    final fontScale = 1.0; // Not yet in AppSettings
+    final density = 'comfortable'; // Not yet in AppSettings
 
     return WorkPanel(
       title: '外观与主题',
@@ -131,14 +126,9 @@ class _AppearancePanel extends StatelessWidget {
             ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
             ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
           ],
-          selected: {themeModeValue},
+          selected: {themeMode},
           onSelectionChanged: (value) {
-            final modeStr = switch (value.first) {
-              ThemeMode.light => 'light',
-              ThemeMode.dark => 'dark',
-              _ => 'system',
-            };
-            onThemeModeChanged(modeStr);
+            onThemeModeChanged(value.first);
           },
         ),
         const SizedBox(height: 16),
@@ -149,18 +139,18 @@ class _AppearancePanel extends StatelessWidget {
           children: [
             _ColorButton(
               color: const Color(0xFF0A2540),
-              selected: primaryColor == 'blue',
-              onTap: () => onPrimaryColorChanged('blue'),
+              selected: primaryColor == const Color(0xFF0A2540),
+              onTap: () => onPrimaryColorChanged(const Color(0xFF0A2540)),
             ),
             _ColorButton(
               color: const Color(0xFF12372A),
-              selected: primaryColor == 'green',
-              onTap: () => onPrimaryColorChanged('green'),
+              selected: primaryColor == const Color(0xFF12372A),
+              onTap: () => onPrimaryColorChanged(const Color(0xFF12372A)),
             ),
             _ColorButton(
               color: const Color(0xFF111827),
-              selected: primaryColor == 'gray',
-              onTap: () => onPrimaryColorChanged('gray'),
+              selected: primaryColor == const Color(0xFF111827),
+              onTap: () => onPrimaryColorChanged(const Color(0xFF111827)),
             ),
           ],
         ),
@@ -172,18 +162,18 @@ class _AppearancePanel extends StatelessWidget {
           children: [
             _ColorButton(
               color: const Color(0xFF00CCF9),
-              selected: accentColor == 'cyan',
-              onTap: () => onAccentColorChanged('cyan'),
+              selected: accentColor == const Color(0xFF00CCF9),
+              onTap: () => onAccentColorChanged(const Color(0xFF00CCF9)),
             ),
             _ColorButton(
               color: const Color(0xFF10B981),
-              selected: accentColor == 'emerald',
-              onTap: () => onAccentColorChanged('emerald'),
+              selected: accentColor == const Color(0xFF10B981),
+              onTap: () => onAccentColorChanged(const Color(0xFF10B981)),
             ),
             _ColorButton(
               color: const Color(0xFFF59E0B),
-              selected: accentColor == 'amber',
-              onTap: () => onAccentColorChanged('amber'),
+              selected: accentColor == const Color(0xFFF59E0B),
+              onTap: () => onAccentColorChanged(const Color(0xFFF59E0B)),
             ),
           ],
         ),
@@ -204,7 +194,7 @@ class _AppearancePanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: density,
+          initialValue: density,
           decoration: const InputDecoration(
             labelText: '卡片密度',
             isDense: true,
@@ -228,7 +218,7 @@ class _LearningSettingsPanel extends StatelessWidget {
     required this.onStrategyChanged,
   });
 
-  final dynamic settings;
+  final AppSettings settings;
   final ValueChanged<String> onStrategyChanged;
 
   @override
@@ -237,7 +227,7 @@ class _LearningSettingsPanel extends StatelessWidget {
       title: '学习设置',
       children: [
         DropdownButtonFormField<String>(
-          value: settings.recommendStrategy as String,
+          initialValue: settings.recommendStrategy,
           decoration: const InputDecoration(
             labelText: '推荐策略',
             isDense: true,
@@ -262,7 +252,7 @@ class _LanguagePanel extends StatelessWidget {
     required this.onLanguageChanged,
   });
 
-  final dynamic settings;
+  final AppSettings settings;
   final ValueChanged<String> onLanguageChanged;
 
   @override
@@ -275,7 +265,7 @@ class _LanguagePanel extends StatelessWidget {
             ButtonSegment(value: 'zh', label: Text('中文')),
             ButtonSegment(value: 'en', label: Text('English')),
           ],
-          selected: {settings.language as String},
+          selected: {settings.language},
           onSelectionChanged: (value) => onLanguageChanged(value.first),
         ),
       ],
@@ -290,22 +280,19 @@ class _DataManagementPanel extends StatelessWidget {
     required this.onExport,
   });
 
-  final dynamic settings;
+  final AppSettings settings;
   final VoidCallback onSync;
   final VoidCallback onExport;
 
   @override
   Widget build(BuildContext context) {
-    final lastSync = settings.lastSyncAt as DateTime?;
     return WorkPanel(
       title: '数据管理',
       children: [
-        InfoRow(
+        const InfoRow(
           icon: Icons.cloud_sync_outlined,
           title: '手动同步',
-          subtitle: lastSync != null
-              ? '上次同步：${_formatDateTime(lastSync)}'
-              : '尚未同步',
+          subtitle: '尚未同步',
         ),
         const SizedBox(height: 8),
         Row(
@@ -327,10 +314,6 @@ class _DataManagementPanel extends StatelessWidget {
     );
   }
 
-  String _formatDateTime(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
 }
 
 class _AboutPanel extends StatelessWidget {
