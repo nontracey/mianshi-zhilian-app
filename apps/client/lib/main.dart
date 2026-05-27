@@ -44,7 +44,7 @@ void main() async {
 
 enum AppSection { dashboard, catalog, practice, mastery, profile }
 
-class MianshiZhilianApp extends StatelessWidget {
+class MianshiZhilianApp extends StatefulWidget {
   final StorageService storage;
   final ContentApiService contentApi;
   final AiService aiService;
@@ -59,23 +59,30 @@ class MianshiZhilianApp extends StatelessWidget {
   });
 
   @override
+  State<MianshiZhilianApp> createState() => _MianshiZhilianAppState();
+}
+
+class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
+  bool _contentLoaded = false;
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(storage)..loadSettings(),
+          create: (_) => SettingsProvider(widget.storage)..loadSettings(),
         ),
         ChangeNotifierProvider(
-          create: (_) => ContentProvider(contentApi, storage)..loadContent(),
+          create: (_) => ContentProvider(widget.contentApi, widget.storage),
         ),
         ChangeNotifierProvider(
-          create: (_) => AiProvider(aiService, storage)..loadConfigs(),
+          create: (_) => AiProvider(widget.aiService, widget.storage)..loadConfigs(),
         ),
         ChangeNotifierProvider(
-          create: (_) => ProgressProvider(storage)..loadProgress(),
+          create: (_) => ProgressProvider(widget.storage)..loadProgress(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(storage)..loadUser(),
+          create: (_) => AuthProvider(widget.storage)..loadUser(),
         ),
         ChangeNotifierProvider(
           create: (_) => LocalizationProvider(),
@@ -83,6 +90,17 @@ class MianshiZhilianApp extends StatelessWidget {
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
+          // 设置加载完成后，再加载内容（使用当前领域）
+          if (!settings.isLoading && !_contentLoaded) {
+            _contentLoaded = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final contentProvider = context.read<ContentProvider>();
+              contentProvider.loadContent(
+                currentDomainId: settings.settings.currentDomain,
+              );
+            });
+          }
+
           final theme = buildTheme(
             settings.settings.primaryColor,
             settings.settings.accentColor,

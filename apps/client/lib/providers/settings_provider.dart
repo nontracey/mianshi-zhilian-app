@@ -14,11 +14,17 @@ class SettingsProvider extends ChangeNotifier {
   SettingsProvider(this._storage);
 
   AppSettings _settings = const AppSettings();
+  bool _isLoading = false;
 
   AppSettings get settings => _settings;
+  bool get isLoading => _isLoading;
 
   Future<void> loadSettings() async {
+    _isLoading = true;
+    notifyListeners();
+
     _settings = await _storage.loadSettings();
+    _isLoading = false;
     notifyListeners();
   }
 
