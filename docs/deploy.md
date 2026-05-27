@@ -1,12 +1,12 @@
 # 部署说明
 
-MVP 使用 GitHub Actions 构建 Flutter Web、Android APK、Windows zip、macOS zip，并把 tag 构建产物上传到 GitHub Releases。Cloudflare Pages、Workers 和签名密钥通过仓库 Secrets 配置。
+MVP 使用 GitHub Actions 构建 Flutter Web、Android APK、Windows installer exe/zip、macOS dmg/zip，并把 tag 构建产物上传到 GitHub Releases。Cloudflare Pages、Workers 和签名密钥通过仓库 Secrets 配置。
 
 ## 当前 Actions
 
 - `CI`：PR 和 `main` push 时运行 `flutter pub get`、`flutter analyze`、`flutter test`、`flutter build web --release`。
 - `Deploy web`：构建 Flutter Web，上传 `flutter-web` artifact；配置 Cloudflare secrets 后会直接执行 `wrangler pages deploy build/web`。
-- `Release`：推送 `v*` tag 后并行构建 Android、Windows、macOS、Web 包，生成带 sha256/size 的 `update.json`，并创建 GitHub Release。
+- `Release`：推送 `v*` tag 后并行构建 Android APK、Windows installer exe/zip、macOS dmg/zip、Web zip。每个平台构建完成后会立刻上传到同一个 GitHub Release；全部平台完成后再生成带 sha256/size 的完整 `update.json`。
 - `Deploy worker`：手动触发，执行 `wrangler deploy` 发布 Worker API。
 
 必需 Secrets：
