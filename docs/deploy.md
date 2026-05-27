@@ -100,6 +100,44 @@ npx wrangler d1 create mianshi-zhilian-db --location apac
 echo "your-secret-key" | npx wrangler secret put JWT_SECRET
 ```
 
+## 内容更新注意事项
+
+### ⚠️ 更新内容后必须更新版本号
+
+App 通过 `manifest.json` 中的 `contentVersion` 字段检测内容是否有更新。如果内容仓库更新了内容但没有更新版本号，App 会继续使用本地缓存的旧内容。
+
+### App 缓存机制
+
+```dart
+// App 启动时检查内容版本
+final remoteVersion = _manifest?['contentVersion'];
+final localVersion = await _storage.load('content_version');
+
+if (remoteVersion != localVersion) {
+  // 版本不同，清除缓存并重新加载
+  _topics = {};
+  await _storage.save('topics_cache', {});
+  await _storage.save('content_version', remoteVersion);
+}
+```
+
+### 内容更新流程
+
+1. 在内容仓库修改知识点、分类、领域等
+2. 更新 `manifest.json` 的 `contentVersion`（改为今天的日期）
+3. 验证内容：`npm run validate`
+4. 提交并推送
+
+### 版本号格式
+
+使用日期格式：`YYYY.MM.DD`
+
+```json
+{
+  "contentVersion": "2026.05.28"
+}
+```
+
 ## 内容缓存约定
 
 - 知识目录中的 `知识查阅` 会打开知识详情的学习 Tab，`学习模式` 会直接进入复述练习 Tab。
