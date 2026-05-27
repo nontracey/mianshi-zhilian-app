@@ -1,46 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="mianshi_zhilian">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>mianshi_zhilian</title>
+  <meta name="description" content="面试智练 - AI 主动回忆学习工作台，帮你系统备战技术面试">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A2540">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="面试智练">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>面试智练</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    body { background-color: #0A2540; }
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .loading-logo {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 24px;
+    }
+    .loading-text {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .loading-sub {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+    }
+    .loading-bar {
+      width: 200px;
+      height: 3px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      margin-top: 24px;
+      overflow: hidden;
+    }
+    .loading-bar-inner {
+      width: 40%;
+      height: 100%;
+      background: #00CCF9;
+      border-radius: 2px;
+      animation: loading-slide 1.5s ease-in-out infinite;
+    }
+    @keyframes loading-slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div class="loading">
+    <svg class="loading-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="20" fill="#0A2540"/>
+      <path d="M30 65L45 35L70 55L85 25" stroke="#00CCF9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="30" cy="65" r="4" fill="#10B981"/>
+      <circle cx="45" cy="35" r="4" fill="#00CCF9"/>
+      <circle cx="70" cy="55" r="4" fill="#10B981"/>
+      <circle cx="85" cy="25" r="4" fill="#00CCF9"/>
+    </svg>
+    <div class="loading-text">面试智练</div>
+    <div class="loading-sub">AI 主动回忆学习工作台</div>
+    <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
