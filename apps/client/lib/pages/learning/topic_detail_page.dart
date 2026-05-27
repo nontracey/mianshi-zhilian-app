@@ -314,21 +314,43 @@ class _ExplainCard extends StatelessWidget {
       final line = lines[i];
       final trimmed = line.trim();
 
+      // 空行直接保留
+      if (trimmed.isEmpty) {
+        buffer.writeln(line);
+        if (inCodeBlock) {
+          buffer.writeln('```');
+          buffer.writeln();
+          inCodeBlock = false;
+        }
+        continue;
+      }
+
+      // 检测是否是 Markdown 格式行（优先级最高）
+      final isMarkdownLine = _isMarkdownLine(trimmed);
+
+      // 如果是 Markdown 行，先关闭代码块，然后输出 Markdown
+      if (isMarkdownLine) {
+        if (inCodeBlock) {
+          buffer.writeln('```');
+          buffer.writeln();
+          inCodeBlock = false;
+        }
+        buffer.writeln(line);
+        continue;
+      }
+
       // 检测是否是代码行
       final isCodeLine = _isCodeLine(trimmed);
-
-      // 检测是否是 Markdown 格式行
-      final isMarkdownLine = _isMarkdownLine(trimmed);
 
       // 特殊处理：以 // 开头的注释行，如果前面是代码行，也视为代码
       final isCommentLine = trimmed.startsWith('//');
 
-      if (isCodeLine && !inCodeBlock && !isMarkdownLine) {
+      if (isCodeLine && !inCodeBlock) {
         // 开始代码块
         buffer.writeln('```java');
         inCodeBlock = true;
-      } else if (inCodeBlock && !isCodeLine && !isCommentLine && trimmed.isNotEmpty) {
-        // 结束代码块（非代码行、非注释行、非空行）
+      } else if (inCodeBlock && !isCodeLine && !isCommentLine) {
+        // 结束代码块（非代码行、非注释行）
         buffer.writeln('```');
         buffer.writeln();
         inCodeBlock = false;
@@ -358,8 +380,8 @@ class _ExplainCard extends StatelessWidget {
       return true;
     }
 
-    // 包含典型代码符号
-    if (RegExp(r'^[{}\[\]()];').hasMatch(trimmed) || RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
+    // 包含典型代码符号（行尾有分号或花括号）
+    if (RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
       return true;
     }
 
@@ -373,8 +395,8 @@ class _ExplainCard extends StatelessWidget {
       return true;
     }
 
-    // 包含方法调用
-    if (RegExp(r'\w+\.\w+\(').hasMatch(trimmed)) {
+    // 包含方法调用（有括号和分号）
+    if (RegExp(r'\w+\.\w+\([^)]*\)\s*;').hasMatch(trimmed)) {
       return true;
     }
 
@@ -384,8 +406,8 @@ class _ExplainCard extends StatelessWidget {
   bool _isMarkdownLine(String trimmed) {
     if (trimmed.isEmpty) return false;
 
-    // 标题
-    if (trimmed.startsWith('#')) return true;
+    // 标题（# ## ### 等）
+    if (RegExp(r'^#{1,6}\s').hasMatch(trimmed)) return true;
 
     // 列表
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
