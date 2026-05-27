@@ -5,6 +5,7 @@ import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/ai_provider.dart';
+import 'providers/localization_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/content_api_service.dart';
@@ -75,6 +76,9 @@ class MianshiZhilianApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(storage)..loadUser(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LocalizationProvider(),
         ),
       ],
       child: Consumer<SettingsProvider>(

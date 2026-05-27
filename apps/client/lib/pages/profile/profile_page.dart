@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
@@ -80,7 +81,10 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 16),
         _LanguagePanel(
           settings: settings,
-          onLanguageChanged: (lang) => settingsProvider.updateLanguage(lang),
+          onLanguageChanged: (lang) {
+            settingsProvider.updateLanguage(lang);
+            context.read<LocalizationProvider>().setLanguage(lang);
+          },
         ),
         const SizedBox(height: 16),
         _DataManagementPanel(

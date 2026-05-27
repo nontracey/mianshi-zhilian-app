@@ -24,13 +24,17 @@ class L10n {
 
     // 学习中心
     'dashboard_title': '学习中心',
-    'current_domain': '当前领域',
+    'current_domain': '领域选择',
     'mastery_percent': '领域掌握度',
     'topic_count': '知识点',
     'review_count': '待复习',
     'start_practice': '进入复述练习',
     'continue_learning': '继续学习',
     'learning_rhythm': '学习节奏',
+    'daily_review': '每日 3 个新知识 + 6 个复习',
+    'local_first_save': '本地优先保存，完成练习后批量同步。',
+    'user_ai_key': '用户自带 AI Key',
+    'ai_key_description': 'App 端优先直连，Web 端可走 Worker 代理。',
 
     // 知识目录
     'catalog_title': '领域知识目录',
@@ -64,7 +68,7 @@ class L10n {
 
     // 练习
     'practice_title': 'AI 主动复述',
-    'daily_review': '今日复习',
+    'daily_review_title': '今日复习',
     'random_quiz': '随机抽问',
     'mock_interview': '模拟面试',
     'error_review': '错题重练',
@@ -136,13 +140,17 @@ class L10n {
 
     // Dashboard
     'dashboard_title': 'Learning Center',
-    'current_domain': 'Current Domain',
+    'current_domain': 'Domain Selection',
     'mastery_percent': 'Mastery',
     'topic_count': 'Topics',
     'review_count': 'Review',
     'start_practice': 'Start Recall Practice',
     'continue_learning': 'Continue Learning',
     'learning_rhythm': 'Learning Rhythm',
+    'daily_review': '3 new topics + 6 reviews daily',
+    'local_first_save': 'Local-first, sync after practice.',
+    'user_ai_key': 'User AI Key',
+    'ai_key_description': 'App direct connection, Web via Worker proxy.',
 
     // Catalog
     'catalog_title': 'Domain Knowledge Catalog',
@@ -176,7 +184,7 @@ class L10n {
 
     // Practice
     'practice_title': 'AI Recall Practice',
-    'daily_review': 'Daily Review',
+    'daily_review_title': 'Daily Review',
     'random_quiz': 'Random Quiz',
     'mock_interview': 'Mock Interview',
     'error_review': 'Error Review',

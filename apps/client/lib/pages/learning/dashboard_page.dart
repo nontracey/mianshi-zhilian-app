@@ -4,6 +4,7 @@ import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -29,16 +30,17 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
+    final l10n = context.watch<LocalizationProvider>();
 
     // 内容加载中
     if (contentProvider.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在加载知识库...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(l10n.get('loading')),
           ],
         ),
       );
@@ -52,14 +54,14 @@ class DashboardPage extends StatelessWidget {
           children: [
             Icon(Icons.cloud_off, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('加载失败', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(l10n.get('error'), style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text(contentProvider.error!, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
               onPressed: () => contentProvider.loadContent(),
               icon: const Icon(Icons.refresh),
-              label: const Text('重试'),
+              label: Text(l10n.get('retry')),
             ),
           ],
         ),
@@ -102,7 +104,7 @@ class DashboardPage extends StatelessWidget {
           onPractice: onPractice,
         ),
         const SizedBox(height: 20),
-        Text('领域选择', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.get('current_domain'), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         // 领域卡片：加载中显示骨架屏，加载完显示卡片
         contentProvider.isLoading
@@ -168,7 +170,7 @@ class DashboardPage extends StatelessWidget {
             final wide = constraints.maxWidth > 900;
             final children = [
               WorkPanel(
-                title: '继续学习 ${currentDomain?.title ?? ''}',
+                title: '${l10n.get('continue_learning')} ${currentDomain?.title ?? ''}',
                 children: recommendedTopics.isEmpty
                     ? [_EmptyContinueLearning(onPractice: onPractice)]
                     : recommendedTopics.take(3).map((topic) {
@@ -183,17 +185,17 @@ class DashboardPage extends StatelessWidget {
                       }).toList(),
               ),
               WorkPanel(
-                title: '学习节奏',
-                children: const [
+                title: l10n.get('learning_rhythm'),
+                children: [
                   _InfoRow(
                     icon: Icons.today_outlined,
-                    title: '每日 3 个新知识 + 6 个复习',
-                    subtitle: '本地优先保存，完成练习后批量同步。',
+                    title: l10n.get('daily_review'),
+                    subtitle: l10n.get('local_first_save'),
                   ),
                   _InfoRow(
                     icon: Icons.key_outlined,
-                    title: '用户自带 AI Key',
-                    subtitle: 'App 端优先直连，Web 端可走 Worker 代理。',
+                    title: l10n.get('user_ai_key'),
+                    subtitle: l10n.get('ai_key_description'),
                   ),
                 ],
               ),
