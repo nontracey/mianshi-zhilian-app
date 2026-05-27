@@ -70,10 +70,16 @@ class ContentProvider extends ChangeNotifier {
       _cachedContentVersion = await _storage.load('content_version') as String?;
 
       if (remoteVersion != null && remoteVersion != _cachedContentVersion) {
-        // 内容有更新，清除缓存并重新加载
+        // 内容有更新，清除所有缓存并重新加载
         debugPrint('Content version changed: $_cachedContentVersion -> $remoteVersion');
         _topics = {};
         await _storage.save('topics_cache', {});
+        
+        // 清除所有领域的缓存
+        for (final domain in _domains) {
+          await _storage.save('domain_cache_${domain.id}', null);
+        }
+        
         await _storage.save('content_version', remoteVersion);
         _cachedContentVersion = remoteVersion;
       } else {
