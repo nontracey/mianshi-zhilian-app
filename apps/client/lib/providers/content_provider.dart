@@ -165,6 +165,20 @@ class ContentProvider extends ChangeNotifier {
         return;
       }
 
+      // 检查该领域是否已缓存
+      final cachedDomain = await _storage.load('domain_cache_$domainId');
+      if (cachedDomain != null && cachedDomain is Map<String, dynamic>) {
+        // 从缓存加载该领域的 topics
+        final cachedTopics = cachedDomain.map(
+          (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
+        );
+        _topics.addAll(cachedTopics);
+        _isLoadingTopics = false;
+        notifyListeners();
+        return;
+      }
+
+      // 缓存中没有，从网络加载
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
           // topicPath 格式: "topics/java/topic-001-xxx.json"
@@ -184,10 +198,13 @@ class ContentProvider extends ChangeNotifier {
         }
       }
 
-      // 缓存 topics
+      // 只缓存当前领域的 topics
+      final domainTopics = Map.fromEntries(
+        _topics.entries.where((e) => e.value.domainId == domainId),
+      );
       await _storage.save(
-        'topics_cache',
-        _topics.map((k, v) => MapEntry(k, v.toJson())),
+        'domain_cache_$domainId',
+        domainTopics.map((k, v) => MapEntry(k, v.toJson())),
       );
 
       _isLoadingTopics = false;
@@ -197,6 +214,22 @@ class ContentProvider extends ChangeNotifier {
       _isLoadingTopics = false;
       notifyListeners();
     }
+  }
+
+  /// 清除指定领域的缓存
+  Future<void> clearDomainCache(String domainId) async {
+    await _storage.save('domain_cache_$domainId', null);
+    _topics.removeWhere((key, topic) => topic.domainId == domainId);
+    notifyListeners();
+  }
+
+  /// 清除所有缓存
+  Future<void> clearAllCache() async {
+    for (final domain in _domains) {
+      await _storage.save('domain_cache_${domain.id}', null);
+    }
+    _topics = {};
+    notifyListeners();
   }
 
   /// 获取指定 domain 下已加载的 topic 数量
