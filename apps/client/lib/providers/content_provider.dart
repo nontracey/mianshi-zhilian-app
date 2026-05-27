@@ -15,13 +15,16 @@ class ContentProvider extends ChangeNotifier {
   Map<String, dynamic>? _manifest;
   bool _isLoading = false;
   bool _isLoadingTopics = false;
+  bool _isCheckingUpdate = false;
   String? _error;
+  String? _cachedContentVersion;
 
   List<Domain> get domains => _domains;
   Map<String, Topic> get topics => _topics;
   Map<String, dynamic>? get manifest => _manifest;
   bool get isLoading => _isLoading;
   bool get isLoadingTopics => _isLoadingTopics;
+  bool get isCheckingUpdate => _isCheckingUpdate;
   String? get error => _error;
 
   Future<void> loadContent() async {
@@ -62,23 +65,86 @@ class ContentProvider extends ChangeNotifier {
       }
       _domains = fullDomains;
 
-      // 4. 尝试从缓存加载 topics
-      final cached = await _storage.load('topics_cache');
-      if (cached != null && cached is Map<String, dynamic>) {
-        _topics = cached.map(
-          (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
-        );
-        await _pruneCachedTopics();
+      // 4. 检查内容版本是否有更新
+      final remoteVersion = _manifest?['contentVersion'] as String?;
+      _cachedContentVersion = await _storage.load('content_version') as String?;
+
+      if (remoteVersion != null && remoteVersion != _cachedContentVersion) {
+        // 内容有更新，清除缓存并重新加载
+        debugPrint('Content version changed: $_cachedContentVersion -> $remoteVersion');
+        _topics = {};
+        await _storage.save('topics_cache', {});
+        await _storage.save('content_version', remoteVersion);
+        _cachedContentVersion = remoteVersion;
+      } else {
+        // 5. 从缓存加载 topics
+        final cached = await _storage.load('topics_cache');
+        if (cached != null && cached is Map<String, dynamic>) {
+          _topics = cached.map(
+            (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
+          );
+          await _pruneCachedTopics();
+        }
       }
 
       _isLoading = false;
       notifyListeners();
 
-      // 5. 自动加载默认 domain 的 topics（后台加载，不阻塞 UI）
+      // 6. 自动加载默认 domain 的 topics（后台加载，不阻塞 UI）
       final defaultDomainId = _manifest?['defaultDomain'] as String? ?? 'java';
       if (_topics.values.where((t) => t.domainId == defaultDomainId).isEmpty) {
         loadDomainTopics(defaultDomainId);
       }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 检查并更新内容（可手动触发或定时触发）
+  Future<bool> checkForUpdates() async {
+    if (_isCheckingUpdate) return false;
+
+    _isCheckingUpdate = true;
+    notifyListeners();
+
+    try {
+      final remoteManifest = await _api.fetchManifest();
+      final remoteVersion = remoteManifest['contentVersion'] as String?;
+      final localVersion = _cachedContentVersion ?? await _storage.load('content_version') as String?;
+
+      if (remoteVersion != null && remoteVersion != localVersion) {
+        debugPrint('Content update available: $localVersion -> $remoteVersion');
+        _isCheckingUpdate = false;
+        notifyListeners();
+        return true; // 有更新
+      }
+
+      _isCheckingUpdate = false;
+      notifyListeners();
+      return false; // 无更新
+    } catch (e) {
+      debugPrint('Failed to check for updates: $e');
+      _isCheckingUpdate = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 执行内容更新
+  Future<void> performUpdate() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // 清除缓存
+      _topics = {};
+      await _storage.save('topics_cache', {});
+
+      // 重新加载内容
+      await loadContent();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
