@@ -308,121 +308,166 @@ class _ExplainCard extends StatelessWidget {
     // 识别裸代码块（没有被 ``` 包裹的代码）
     final lines = formatted.split('\n');
     final buffer = StringBuffer();
-    bool inCodeBlock = false;
+    bool inFencedCodeBlock = false; // 已有 ``` 包裹的代码块
+    bool inBareCodeBlock = false;   // 自动识别的裸代码块
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final trimmed = line.trim();
 
-      // 空行直接保留
-      if (trimmed.isEmpty) {
-        buffer.writeln(line);
-        if (inCodeBlock) {
-          buffer.writeln('```');
-          buffer.writeln();
-          inCodeBlock = false;
+      // 处理已有的 ``` 代码块
+      if (trimmed.startsWith('```')) {
+        if (inFencedCodeBlock) {
+          // 结束代码块
+          buffer.writeln(line);
+          inFencedCodeBlock = false;
+        } else {
+          // 如果正在裸代码块中，先关闭
+          if (inBareCodeBlock) {
+            buffer.writeln('```');
+            inBareCodeBlock = false;
+          }
+          // 开始代码块
+          buffer.writeln(line);
+          inFencedCodeBlock = true;
         }
         continue;
       }
 
-      // 检测是否是 Markdown 格式行（优先级最高）
-      final isMarkdownLine = _isMarkdownLine(trimmed);
+      // 在已有的代码块中，直接保留内容
+      if (inFencedCodeBlock) {
+        buffer.writeln(line);
+        continue;
+      }
 
-      // 如果是 Markdown 行，先关闭代码块，然后输出 Markdown
-      if (isMarkdownLine) {
-        if (inCodeBlock) {
+      // 空行处理
+      if (trimmed.isEmpty) {
+        // 空行关闭裸代码块
+        if (inBareCodeBlock) {
           buffer.writeln('```');
           buffer.writeln();
-          inCodeBlock = false;
+          inBareCodeBlock = false;
+        }
+        buffer.writeln(line);
+        continue;
+      }
+
+      // 检测是否是 Markdown 格式行（优先级最高）
+      if (_isMarkdownLine(trimmed)) {
+        // 如果正在裸代码块中，先关闭
+        if (inBareCodeBlock) {
+          buffer.writeln('```');
+          buffer.writeln();
+          inBareCodeBlock = false;
         }
         buffer.writeln(line);
         continue;
       }
 
       // 检测是否是代码行
-      final isCodeLine = _isCodeLine(trimmed);
-
-      // 特殊处理：以 // 开头的注释行，如果前面是代码行，也视为代码
-      final isCommentLine = trimmed.startsWith('//');
-
-      if (isCodeLine && !inCodeBlock) {
-        // 开始代码块
-        buffer.writeln('```java');
-        inCodeBlock = true;
-      } else if (inCodeBlock && !isCodeLine && !isCommentLine) {
-        // 结束代码块（非代码行、非注释行）
-        buffer.writeln('```');
-        buffer.writeln();
-        inCodeBlock = false;
+      if (_isCodeLine(trimmed)) {
+        // 开始裸代码块
+        if (!inBareCodeBlock) {
+          buffer.writeln('```java');
+          inBareCodeBlock = true;
+        }
+        buffer.writeln(line);
+        continue;
       }
 
+      // 其他情况（普通文本）
+      if (inBareCodeBlock) {
+        buffer.writeln('```');
+        buffer.writeln();
+        inBareCodeBlock = false;
+      }
       buffer.writeln(line);
     }
 
-    // 如果代码块未关闭，关闭它
-    if (inCodeBlock) {
+    // 关闭未关闭的代码块
+    if (inBareCodeBlock) {
       buffer.writeln('```');
     }
 
     return buffer.toString();
   }
 
-  bool _isCodeLine(String trimmed) {
+  /// 检测是否是 Markdown 格式行（这些一定不是代码）
+  bool _isMarkdownLine(String trimmed) {
     if (trimmed.isEmpty) return false;
 
-    // 注释行视为代码行
-    if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-      return true;
-    }
+    // 标题：# ## ### #### ##### ######
+    if (RegExp(r'^#{1,6}\s').hasMatch(trimmed)) return true;
 
-    // Java 关键字开头
-    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package|if|else|for|while|try|catch|return|new|throw|throws|void|int|long|double|float|boolean|String|List|Map|Set|super|this|extends|implements|synchronized|volatile|transient|native)\b').hasMatch(trimmed)) {
-      return true;
-    }
+    // 无序列表：- item 或 * item
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
 
-    // 包含典型代码符号（行尾有分号或花括号）
-    if (RegExp(r'[{}();]\s*$').hasMatch(trimmed)) {
-      return true;
-    }
+    // 有序列表：1. item
+    if (RegExp(r'^\d+\.\s').hasMatch(trimmed)) return true;
 
-    // 赋值语句（如 Object obj1 = new Object();）
-    if (RegExp(r'^(?:Object|String|List|Map|Set|int|long|double|float|boolean|var)\s+\w+\s*=').hasMatch(trimmed)) {
-      return true;
-    }
+    // 引用：> quote
+    if (trimmed.startsWith('>')) return true;
 
-    // 包含 new 关键字
-    if (trimmed.contains('new ') && trimmed.contains('(')) {
-      return true;
-    }
+    // 表格行：| col1 | col2 |
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) return true;
 
-    // 包含方法调用（有括号和分号）
-    if (RegExp(r'\w+\.\w+\([^)]*\)\s*;').hasMatch(trimmed)) {
-      return true;
-    }
+    // 表格分隔行：| --- | --- |
+    if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) return true;
+
+    // 分隔线：--- 或 *** 或 ___
+    if (RegExp(r'^[-*_]{3,}\s*$').hasMatch(trimmed)) return true;
+
+    // 粗体开头：**text**
+    if (trimmed.startsWith('**') && trimmed.contains('**')) return true;
+
+    // 斜体开头：*text*（但不是列表）
+    if (trimmed.startsWith('*') && !trimmed.startsWith('* ') && trimmed.endsWith('*') && trimmed.length > 2) return true;
+
+    // 链接：[text](url)
+    if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) return true;
+
+    // 图片：![alt](url)
+    if (trimmed.startsWith('![')) return true;
 
     return false;
   }
 
-  bool _isMarkdownLine(String trimmed) {
+  /// 检测是否是代码行（这些可能是裸代码）
+  bool _isCodeLine(String trimmed) {
     if (trimmed.isEmpty) return false;
 
-    // 标题（# ## ### 等）
-    if (RegExp(r'^#{1,6}\s').hasMatch(trimmed)) return true;
+    // 单行注释
+    if (trimmed.startsWith('//')) return true;
 
-    // 列表
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
+    // 多行注释开始或结束
+    if (trimmed.startsWith('/*') || trimmed.startsWith('*') && trimmed.endsWith('*/')) return true;
 
-    // 引用
-    if (trimmed.startsWith('> ')) return true;
+    // Java 关键字开头（严格匹配）
+    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package)\s').hasMatch(trimmed)) return true;
 
-    // 有序列表
-    if (RegExp(r'^\d+\.\s').hasMatch(trimmed)) return true;
+    // 控制流关键字
+    if (RegExp(r'^(?:if|else|for|while|try|catch|finally|switch|case|default|return|throw|throws|new|assert)\b').hasMatch(trimmed)) return true;
 
-    // 表格
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) return true;
+    // 类型声明
+    if (RegExp(r'^(?:void|int|long|double|float|boolean|char|byte|short|String|Object|List|Map|Set)\s+\w+').hasMatch(trimmed)) return true;
 
-    // 粗体或斜体开头
-    if (trimmed.startsWith('**') || trimmed.startsWith('__')) return true;
+    // 行尾有分号（代码特征）
+    if (trimmed.endsWith(';') && !trimmed.startsWith('|')) return true;
+
+    // 花括号单独成行
+    if (trimmed == '{' || trimmed == '}' || trimmed == '};') return true;
+
+    // 赋值语句：Type var = value;
+    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';')) return true;
+
+    // 方法调用：object.method();
+    if (RegExp(r'^\w+[\.\[]\w+.*\)\s*;?\s*$').hasMatch(trimmed) && !trimmed.startsWith('|')) return true;
+
+    // new 关键字
+    if (RegExp(r'^\w+\s+\w+\s*=\s*new\s').hasMatch(trimmed)) return true;
+
+    // 注解：@Override, @Autowired 等
+    if (trimmed.startsWith('@')) return true;
 
     return false;
   }
