@@ -70,18 +70,12 @@ class ContentProvider extends ChangeNotifier {
       _cachedContentVersion = await _storage.load('content_version') as String?;
 
       if (remoteVersion != null && remoteVersion != _cachedContentVersion) {
-        // 内容有更新，清除所有缓存并重新加载
+        // 内容有更新，标记需要刷新（不清除缓存，切换领域时按需刷新）
         debugPrint('Content version changed: $_cachedContentVersion -> $remoteVersion');
-        _topics = {};
-        await _storage.save('topics_cache', {});
-        
-        // 清除所有领域的缓存
-        for (final domain in _domains) {
-          await _storage.save('domain_cache_${domain.id}', null);
-        }
-        
         await _storage.save('content_version', remoteVersion);
         _cachedContentVersion = remoteVersion;
+        // 记录需要刷新的版本，切换领域时会检查
+        await _storage.save('content_version_pending', remoteVersion);
       } else {
         // 5. 从缓存加载 topics
         final cached = await _storage.load('topics_cache');
@@ -171,9 +165,14 @@ class ContentProvider extends ChangeNotifier {
         return;
       }
 
-      // 检查该领域是否已缓存
+      // 检查是否有待刷新的版本
+      final pendingVersion = await _storage.load('content_version_pending') as String?;
+      final cachedDomainVersion = await _storage.load('domain_version_$domainId') as String?;
+      final needsRefresh = pendingVersion != null && pendingVersion != cachedDomainVersion;
+
+      // 检查该领域是否已缓存且不需要刷新
       final cachedDomain = await _storage.load('domain_cache_$domainId');
-      if (cachedDomain != null && cachedDomain is Map<String, dynamic>) {
+      if (cachedDomain != null && cachedDomain is Map<String, dynamic> && !needsRefresh) {
         // 从缓存加载该领域的 topics
         final cachedTopics = cachedDomain.map(
           (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
@@ -184,14 +183,15 @@ class ContentProvider extends ChangeNotifier {
         return;
       }
 
-      // 缓存中没有，从网络加载
+      // 缓存中没有或需要刷新，从网络加载
+      debugPrint('Loading domain $domainId from network (needsRefresh: $needsRefresh)');
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
           // topicPath 格式: "topics/java/topic-001-xxx.json"
           final cleanPath = topicPath
               .replaceAll('topics/', '')
               .replaceAll('.json', '');
-          if (!_topics.containsKey(cleanPath)) {
+          if (!_topics.containsKey(cleanPath) || needsRefresh) {
             try {
               final topic = await _api.fetchTopic(cleanPath);
               _topics[cleanPath] = topic;
@@ -212,6 +212,11 @@ class ContentProvider extends ChangeNotifier {
         'domain_cache_$domainId',
         domainTopics.map((k, v) => MapEntry(k, v.toJson())),
       );
+
+      // 记录该领域的版本
+      if (pendingVersion != null) {
+        await _storage.save('domain_version_$domainId', pendingVersion);
+      }
 
       _isLoadingTopics = false;
       notifyListeners();
