@@ -40,5 +40,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy build/web --project-name=mianshi-zhilian-app --commit-dirty=true
+          command: pages deploy build/web --project-name=mianshi-zhilian-app --commit-dirty=true --commit-message="deploy ${{ github.sha }}"
           workingDirectory: apps/client
