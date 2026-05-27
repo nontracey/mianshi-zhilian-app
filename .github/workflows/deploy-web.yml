@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "apps/client/**"
+      - ".github/workflows/deploy-web.yml"
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
     defaults:
       run:
         working-directory: apps/client
@@ -29,7 +28,10 @@ jobs:
             web-deploy-${{ runner.os }}-
       - run: flutter pub get
       - run: flutter build web --release
-      - uses: actions/upload-artifact@v4
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          name: flutter-web
-          path: apps/client/build/web
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=mianshi-zhilian-app
+          workingDirectory: apps/client
