@@ -241,3 +241,34 @@ git push origin vx.x.x
 2. 在 Cloudflare Workers 配置 D1 数据库绑定和 JWT Secret。
 3. 正式分发前补 Android keystore、Windows 代码签名、macOS Developer ID 签名和 notarization。
 4. 如需稳定更新地址，把 release 生成的 `update.json` 同步到 Cloudflare Pages/R2 的 `latest.json`。
+
+## 免费额度与用户量估算
+
+### 免费的部分
+
+| 模块 | 免费条件 |
+| --- | --- |
+| GitHub 公共内容仓库 | 公共仓库免费 |
+| GitHub Actions | 公共仓库标准 runner 免费 |
+| Flutter Web 静态站点 | Cloudflare Pages 免费额度可用 |
+| 内容 JSON 静态分发 | Cloudflare Pages 免费额度可用 |
+| Cloudflare Worker API | Free 计划每天 100,000 次请求 |
+| Cloudflare D1 | Free 计划每天 5,000,000 行读取、100,000 行写入、总存储 5GB |
+| AI 模型调用 | 用户自带 API Key，平台不承担费用 |
+
+### 免费额度下的粗略用户量
+
+| 场景 | 每活跃用户每天 Worker 请求 | 免费额度可支撑 DAU |
+| --- | --- | --- |
+| 轻度使用（只学习，偶尔同步） | 2-5 | ~20,000-50,000 |
+| 正常使用（登录、同步、练习） | 5-10 | ~6,000-10,000 |
+| 高频使用（大量练习、多次同步） | 10-20 | ~3,000-5,000 |
+| Web 端 AI 全走 Worker 代理 | 取决于练习次数 | ~1,000-3,000 |
+
+### 降低成本策略
+
+1. 内容、动画、安装包全部静态化，不进数据库
+2. 进度本地优先，批量同步，不每答一题写云数据库
+3. D1 表必须加索引，避免全表扫描
+4. 用户默认自带 API Key
+5. `latest.json`、`manifest.json` 使用短缓存，具体 topic 使用长缓存
