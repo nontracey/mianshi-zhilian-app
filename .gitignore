@@ -19,3 +19,4 @@ apps/client/android/app/profile
 apps/client/android/app/release
 apps/client/macos/Flutter/ephemeral/
 apps/client/windows/flutter/ephemeral/
+.workbuddy/
