@@ -706,16 +706,17 @@ class _CodeCard extends StatelessWidget {
 
   ({String language, String code, bool isDiagram}) _parseCodeContent(String content) {
     String cleaned = content.trim();
-    String language = 'java'; // 默认语言
+    // 优先使用数据中显式指定的 language 字段
+    String language = card.language ?? 'java';
 
     // 检测并移除 ``` 标记
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.substring(3);
-      // 提取语言标识
+      // 提取语言标识（仅当没有显式指定 language 时才覆盖）
       final firstNewline = cleaned.indexOf('\n');
       if (firstNewline != -1) {
         final langCandidate = cleaned.substring(0, firstNewline).trim();
-        if (langCandidate.isNotEmpty && !langCandidate.contains(' ')) {
+        if (langCandidate.isNotEmpty && !langCandidate.contains(' ') && card.language == null) {
           language = langCandidate;
         }
         cleaned = cleaned.substring(firstNewline + 1);
@@ -730,8 +731,8 @@ class _CodeCard extends StatelessWidget {
     // 检测是否是文字图形（ASCII 艺术、结构图等）
     final isDiagram = _isAsciiDiagram(cleaned);
 
-    // 自动检测语言（如果不是图形）
-    if (!isDiagram && language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
+    // 自动检测语言（仅当没有显式指定且默认为 java 时尝试检测）
+    if (!isDiagram && card.language == null && language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
       if (cleaned.contains('def ') || (cleaned.contains('import ') && cleaned.contains('self'))) {
         language = 'python';
       } else if (cleaned.contains('function ') || cleaned.contains('const ') || cleaned.contains('let ')) {
@@ -1058,10 +1059,50 @@ class _DiagramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 优先使用 SVG 资源：svgPath > asset > 智能图解
+    final svgUrl = card.svgPath ?? card.asset;
+
     return WorkPanel(
       title: card.title,
       children: [
-        _SmartDiagram(card: card),
+        if (svgUrl != null && svgUrl.isNotEmpty)
+          // 有 SVG/图片资源时直接展示
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF07182A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.32),
+              ),
+            ),
+            child: svgUrl.endsWith('.svg')
+                ? SvgPicture.network(
+                    svgUrl,
+                    width: double.infinity,
+                    placeholderBuilder: (_) => Container(
+                      height: 120,
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    errorBuilder: (ctx, err, stack) => Text(
+                      card.fallback ?? 'SVG 加载失败',
+                      style: TextStyle(color: AppColors.warning, fontSize: 13),
+                    ),
+                  )
+                : Image.network(
+                    svgUrl,
+                    width: double.infinity,
+                    errorBuilder: (ctx, err, stack) => Text(
+                      card.fallback ?? '图片加载失败',
+                      style: TextStyle(color: AppColors.warning, fontSize: 13),
+                    ),
+                  ),
+          )
+        else
+          // 无资源时使用智能图解
+          _SmartDiagram(card: card),
         if (card.content.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(card.content, style: const TextStyle(height: 1.6)),
@@ -1955,9 +1996,26 @@ class _TableCard extends StatelessWidget {
     return buffer.toString().trim();
   }
 
+  /// 将 columns/rows 结构化数据转换为 Markdown 表格
+  String _buildMarkdownFromStructured() {
+    if (card.columns.isEmpty) return '';
+    final buffer = StringBuffer();
+    // 表头
+    buffer.writeln('| ${card.columns.join(' | ')} |');
+    buffer.writeln('| ${card.columns.map((_) => '---').join(' | ')} |');
+    // 数据行
+    for (final row in card.rows) {
+      buffer.writeln('| ${row.join(' | ')} |');
+    }
+    return buffer.toString().trim();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final formattedContent = _formatTableContent(card.content);
+    // 优先使用结构化的 columns/rows 数据，兜底用 content (Markdown)
+    final formattedContent = card.columns.isNotEmpty
+        ? _buildMarkdownFromStructured()
+        : _formatTableContent(card.content);
 
     return WorkPanel(
       title: card.title,

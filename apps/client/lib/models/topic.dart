@@ -53,6 +53,7 @@ class Topic {
   final String? interviewerFocus;
   final String? phase;
   final String? updatedAt;
+  final String? leetcodeUrl;
 
   const Topic({
     required this.id,
@@ -76,6 +77,7 @@ class Topic {
     this.interviewerFocus,
     this.phase,
     this.updatedAt,
+    this.leetcodeUrl,
   });
 
   factory Topic.fromJson(Map<String, dynamic> json) => Topic(
@@ -101,13 +103,7 @@ class Topic {
     rubric: json['rubric'] != null
         ? Rubric.fromJson(json['rubric'] as Map<String, dynamic>)
         : null,
-    followUps:
-        (json['followUps'] as List<dynamic>?)
-            ?.map(
-              (e) => FollowUpQuestion.fromJson(e as Map<String, dynamic>),
-            )
-            .toList() ??
-        [],
+    followUps: _parseFollowUps(json),
     prerequisites:
         (json['prerequisites'] as List<dynamic>?)
             ?.map((e) => e as String)
@@ -118,7 +114,32 @@ class Topic {
     interviewerFocus: json['interviewerFocus'] as String?,
     phase: json['phase'] as String?,
     updatedAt: json['updatedAt'] as String?,
+    leetcodeUrl: json['leetcodeUrl'] as String?,
   );
+
+  /// 解析追问列表：优先取顶层 followUps，否则从 interviewAnswer 卡片中提取 followUpQuestions
+  static List<FollowUpQuestion> _parseFollowUps(Map<String, dynamic> json) {
+    // 优先取顶层 followUps
+    final top = json['followUps'] as List<dynamic>?;
+    if (top != null && top.isNotEmpty) {
+      return top
+          .map((e) => FollowUpQuestion.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    // 兜底：从 interviewAnswer 类型的 learningCard 中提取 followUpQuestions
+    final cards = json['learningCards'] as List<dynamic>?;
+    if (cards == null) return [];
+    for (final card in cards) {
+      if (card is Map<String, dynamic> &&
+          card['type'] == 'interviewAnswer' &&
+          card['followUpQuestions'] is List) {
+        return (card['followUpQuestions'] as List<dynamic>)
+            .map((e) => FollowUpQuestion.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    }
+    return [];
+  }
 
   /// 兼容处理：recallPrompts 可能是 String[] 或 Object[]
   static List<RecallPrompt> _parseRecallPrompts(dynamic raw) {
@@ -158,6 +179,7 @@ class Topic {
     if (interviewerFocus != null) 'interviewerFocus': interviewerFocus,
     if (phase != null) 'phase': phase,
     'updatedAt': updatedAt,
+    if (leetcodeUrl != null) 'leetcodeUrl': leetcodeUrl,
   };
 
   String get topicPath {
@@ -217,13 +239,20 @@ class RecallPrompt {
 
 class LearningCard {
   final String
-  type; // explain, code, animation, diagram, svg, table, interview, checklist, interviewAnswer
+  type; // explain, code, animation, diagram, svg, table, interview, checklist, interviewAnswer, compareTable
   final String title;
   final String content;
   final String? asset;
   final String? fallback;
   final String? svg; // 内联 SVG 字符串
-  final List<String> items; // for checklist type
+  final String? svgPath; // SVG 资源路径
+  final String? format; // 图表格式（如 mermaid）
+  final String? caption; // 图片/动画说明
+  final String? language; // 代码语言
+  final List<String> items; // for checklist / diagram type
+  final List<Map<String, dynamic>> highlights; // 代码行高亮
+  final List<String> columns; // compareTable 表头
+  final List<List<String>> rows; // compareTable 行数据
 
   const LearningCard({
     required this.type,
@@ -232,7 +261,14 @@ class LearningCard {
     this.asset,
     this.fallback,
     this.svg,
+    this.svgPath,
+    this.format,
+    this.caption,
+    this.language,
     this.items = const [],
+    this.highlights = const [],
+    this.columns = const [],
+    this.rows = const [],
   });
 
   factory LearningCard.fromJson(Map<String, dynamic> json) => LearningCard(
@@ -242,8 +278,26 @@ class LearningCard {
     asset: json['asset'] as String?,
     fallback: json['fallback'] as String?,
     svg: json['svg'] as String?,
+    svgPath: json['svgPath'] as String?,
+    format: json['format'] as String?,
+    caption: json['caption'] as String?,
+    language: json['language'] as String?,
     items:
         (json['items'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+        [],
+    highlights: (json['highlights'] as List<dynamic>?)
+            ?.map((e) => (e as Map<String, dynamic>))
+            .toList() ??
+        [],
+    columns: (json['columns'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        [],
+    rows: (json['rows'] as List<dynamic>?)
+            ?.map(
+              (row) => (row as List<dynamic>).map((e) => e as String).toList(),
+            )
+            .toList() ??
         [],
   );
 
@@ -254,7 +308,14 @@ class LearningCard {
     if (asset != null) 'asset': asset,
     if (fallback != null) 'fallback': fallback,
     if (svg != null) 'svg': svg,
+    if (svgPath != null) 'svgPath': svgPath,
+    if (format != null) 'format': format,
+    if (caption != null) 'caption': caption,
+    if (language != null) 'language': language,
     if (items.isNotEmpty) 'items': items,
+    if (highlights.isNotEmpty) 'highlights': highlights,
+    if (columns.isNotEmpty) 'columns': columns,
+    if (rows.isNotEmpty) 'rows': rows,
   };
 }
 

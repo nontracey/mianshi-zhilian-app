@@ -730,21 +730,51 @@ manifest 示例：
 {
   "id": "java",
   "title": "Java 核心与中间件",
+  "description": "面向后端技术面试的 Java 知识体系。",
+  "icon": "code",
+  "themeColor": "#0A2540",
+  "accentColor": "#00CCF9",
   "categories": [
     {
       "id": "jvm",
       "title": "JVM",
       "description": "运行时内存、GC、类加载、调优",
+      "order": 10,
       "topics": [
         "topics/java/topic-001-ebcc71cb.json",
         "topics/java/topic-002-3bee1565.json"
-      ]
+      ],
+      "prerequisites": ["java-fundamentals"]
     },
     {
       "id": "concurrency",
       "title": "并发编程",
       "description": "线程、锁、线程池、并发容器",
-      "topics": []
+      "order": 30,
+      "topics": [],
+      "prerequisites": ["jvm"]
+    }
+  ],
+  "learningPaths": [
+    {
+      "id": "java-backend",
+      "title": "Java 后端面试路线",
+      "description": "从 JVM 基础到中间件，按依赖关系逐步深入",
+      "steps": [
+        {
+          "title": "JVM 基础",
+          "description": "理解内存区域、GC 机制、类加载",
+          "categoryIds": ["jvm"],
+          "estimatedHours": 4
+        },
+        {
+          "title": "并发编程",
+          "description": "线程、锁、线程池、并发容器",
+          "categoryIds": ["concurrency"],
+          "estimatedHours": 5,
+          "prerequisiteSteps": ["JVM 基础"]
+        }
+      ]
     }
   ]
 }
@@ -801,6 +831,32 @@ manifest 示例：
         "堆和栈的区别",
         "方法区和元空间的关系"
       ]
+    },
+    {
+      "type": "compareTable",
+      "title": "堆和栈的区别",
+      "columns": ["维度", "堆", "栈"],
+      "rows": [
+        ["线程关系", "线程共享", "线程私有"],
+        ["存储内容", "对象实例", "栈帧、局部变量"]
+      ]
+    },
+    {
+      "type": "code",
+      "title": "线程池创建示例",
+      "language": "java",
+      "content": "ThreadPoolExecutor executor = new ThreadPoolExecutor(...);",
+      "highlights": [
+        { "line": 1, "note": "不要直接使用 Executors 创建无限队列线程池。" }
+      ]
+    },
+    {
+      "type": "diagram",
+      "title": "RAG 全流程",
+      "content": "RAG 流程示意",
+      "items": ["文档切分", "向量化", "向量库存储", "召回", "重排", "生成"],
+      "svgPath": "https://cdn.example.com/rag-pipeline.svg",
+      "fallback": "RAG 流程：文档 → 切分 → Embedding → 向量库 → 召回 → 重排 → 生成"
     }
   ],
   "recallPrompts": [
@@ -853,6 +909,7 @@ manifest 示例：
 | `prerequisites` | 否 | 前置依赖知识点 ID 数组，例如 `["java.jvm.runtime-data-area"]`。 |
 | `interviewFrequency` | 否 | 面试频率，`high`（高频）/ `medium`（中频）/ `low`（低频）。 |
 | `interviewerFocus` | 否 | 面试官关注点，说明面试官问这个知识点时真正想考察什么。 |
+| `leetcodeUrl` | 否 | 关联 LeetCode 题目链接。 |
 | `learningCards` | 是 | 学习内容卡片。 |
 | `recallPrompts` | 是 | 主动复述题。 |
 | `rubric` | 是 | AI 评估标准。 |
@@ -862,10 +919,10 @@ App 渲染约定：
 
 | 内容字段 | App 行为 |
 | --- | --- |
-| `domains` | 自动生成学习中心领域卡片和领域切换 |
-| `categories` | 自动生成领域知识目录分组 |
+| `domains` | 自动生成学习中心领域卡片和领域切换，`themeColor` 用于领域主题色 |
+| `categories` | 自动生成领域知识目录分组，`order` 控制排序 |
 | `topics` | 自动生成知识点列表 |
-| `learningCards` | 按 `type` 渲染解释、代码、表格、图片、动画、面试话术、检查清单 |
+| `learningCards` | 按 `type` 渲染：explain（Markdown）、code（语法高亮，优先用 `language` 字段）、compareTable（优先用 `columns`/`rows` 结构化表格）、diagram（优先用 `svgPath`/`asset` 渲染 SVG/图片，兜底用 items 智能图解）、animation（图片/动画）、interviewAnswer（面试回答 + 追问）、checklist（检查清单） |
 | `recallPrompts` | 生成主动复述题，支持 text/code/voice 模式 |
 | `rubric` | 生成 AI 评估 Prompt，包含 mustHave、goodToHave、commonMistakes、scoreWeights |
 | `order` | 控制默认学习路径 |
@@ -874,6 +931,7 @@ App 渲染约定：
 | `prerequisites` | 构建学习路径图，显示前置依赖关系 |
 | `interviewFrequency` | 参与推荐算法，高频知识点优先推荐 |
 | `interviewerFocus` | 展示面试官关注点，帮助理解考察方向 |
+| `leetcodeUrl` | 展示关联 LeetCode 题目链接 |
 
 内容扩充流程：
 
