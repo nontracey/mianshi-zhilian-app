@@ -232,14 +232,25 @@ class _TopicHeader extends StatelessWidget {
           ),
           if (topic.highFrequency)
             Chip(
-              label: const Text(
-                '高频',
-                style: TextStyle(fontSize: 12, color: AppColors.danger),
+              label: Text(
+                topic.interviewFrequencyLabel ?? '高频',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: topic.interviewFrequency == 'medium'
+                      ? AppColors.warning
+                      : topic.interviewFrequency == 'low'
+                          ? Colors.grey
+                          : AppColors.danger,
+                ),
               ),
-              avatar: const Icon(
+              avatar: Icon(
                 Icons.local_fire_department,
                 size: 14,
-                color: AppColors.danger,
+                color: topic.interviewFrequency == 'medium'
+                    ? AppColors.warning
+                    : topic.interviewFrequency == 'low'
+                        ? Colors.grey
+                        : AppColors.danger,
               ),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
@@ -262,6 +273,55 @@ class _KnowledgeTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
+        // 面试官关注点
+        if (topic.interviewerFocus != null &&
+            topic.interviewerFocus!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.visibility_outlined,
+                  size: 18,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '面试官关注点',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        topic.interviewerFocus!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         // 知识卡片：按类型分别渲染
         ...topic.learningCards.map(
           (card) => Padding(

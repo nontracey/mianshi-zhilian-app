@@ -48,6 +48,9 @@ class Topic {
   final Rubric? rubric;
   final List<FollowUpQuestion> followUps;
   final List<String> prerequisites;
+  final String? status; // production / draft
+  final String? interviewFrequency; // high / medium / low
+  final String? interviewerFocus;
   final String? phase;
   final String? updatedAt;
 
@@ -68,6 +71,9 @@ class Topic {
     this.rubric,
     this.followUps = const [],
     this.prerequisites = const [],
+    this.status,
+    this.interviewFrequency,
+    this.interviewerFocus,
     this.phase,
     this.updatedAt,
   });
@@ -107,6 +113,9 @@ class Topic {
             ?.map((e) => e as String)
             .toList() ??
         [],
+    status: json['status'] as String?,
+    interviewFrequency: json['interviewFrequency'] as String?,
+    interviewerFocus: json['interviewerFocus'] as String?,
     phase: json['phase'] as String?,
     updatedAt: json['updatedAt'] as String?,
   );
@@ -144,6 +153,9 @@ class Topic {
     if (followUps.isNotEmpty)
       'followUps': followUps.map((e) => e.toJson()).toList(),
     if (prerequisites.isNotEmpty) 'prerequisites': prerequisites,
+    if (status != null) 'status': status,
+    if (interviewFrequency != null) 'interviewFrequency': interviewFrequency,
+    if (interviewerFocus != null) 'interviewerFocus': interviewerFocus,
     if (phase != null) 'phase': phase,
     'updatedAt': updatedAt,
   };
@@ -156,7 +168,19 @@ class Topic {
   /// Alias getters for compatibility
   String get domainId => domain;
   String get categoryId => category;
-  bool get highFrequency => recommendWeight >= 80;
+
+  /// 面试频率：优先使用 interviewFrequency 字段，回退到 recommendWeight 判断
+  bool get highFrequency =>
+      interviewFrequency == 'high' || recommendWeight >= 80;
+
+  /// 面试频率标签文本
+  String? get interviewFrequencyLabel {
+    if (interviewFrequency == 'high') return '高频';
+    if (interviewFrequency == 'medium') return '中频';
+    if (interviewFrequency == 'low') return '低频';
+    if (recommendWeight >= 80) return '高频';
+    return null;
+  }
 }
 
 class RecallPrompt {
