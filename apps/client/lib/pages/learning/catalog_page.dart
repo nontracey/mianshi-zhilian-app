@@ -697,40 +697,6 @@ class _RoadmapView extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    // 前置依赖
-                    if (topic.prerequisites.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: [
-                          Icon(
-                            Icons.link,
-                            size: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                          ...topic.prerequisites.map(
-                            (dep) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                dep,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                     const SizedBox(height: 10),
                     // 操作按钮
                     Row(
