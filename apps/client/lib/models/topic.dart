@@ -1,3 +1,36 @@
+class FollowUpQuestion {
+  final String question;
+  final String answer;
+  final int difficulty;
+  final List<String> hints;
+
+  const FollowUpQuestion({
+    required this.question,
+    required this.answer,
+    this.difficulty = 2,
+    this.hints = const [],
+  });
+
+  factory FollowUpQuestion.fromJson(Map<String, dynamic> json) =>
+      FollowUpQuestion(
+        question: json['question'] as String? ?? '',
+        answer: json['answer'] as String? ?? '',
+        difficulty: (json['difficulty'] as num?)?.toInt() ?? 2,
+        hints:
+            (json['hints'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+      );
+
+  Map<String, dynamic> toJson() => {
+    'question': question,
+    'answer': answer,
+    'difficulty': difficulty,
+    if (hints.isNotEmpty) 'hints': hints,
+  };
+}
+
 class Topic {
   final String id;
   final String domain;
@@ -13,6 +46,9 @@ class Topic {
   final List<LearningCard> learningCards;
   final List<RecallPrompt> recallPrompts;
   final Rubric? rubric;
+  final List<FollowUpQuestion> followUps;
+  final List<String> prerequisites;
+  final String? phase;
   final String? updatedAt;
 
   const Topic({
@@ -30,6 +66,9 @@ class Topic {
     this.learningCards = const [],
     this.recallPrompts = const [],
     this.rubric,
+    this.followUps = const [],
+    this.prerequisites = const [],
+    this.phase,
     this.updatedAt,
   });
 
@@ -56,6 +95,19 @@ class Topic {
     rubric: json['rubric'] != null
         ? Rubric.fromJson(json['rubric'] as Map<String, dynamic>)
         : null,
+    followUps:
+        (json['followUps'] as List<dynamic>?)
+            ?.map(
+              (e) => FollowUpQuestion.fromJson(e as Map<String, dynamic>),
+            )
+            .toList() ??
+        [],
+    prerequisites:
+        (json['prerequisites'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        [],
+    phase: json['phase'] as String?,
     updatedAt: json['updatedAt'] as String?,
   );
 
@@ -89,6 +141,10 @@ class Topic {
     'learningCards': learningCards.map((e) => e.toJson()).toList(),
     'recallPrompts': recallPrompts.map((e) => e.toJson()).toList(),
     if (rubric != null) 'rubric': rubric!.toJson(),
+    if (followUps.isNotEmpty)
+      'followUps': followUps.map((e) => e.toJson()).toList(),
+    if (prerequisites.isNotEmpty) 'prerequisites': prerequisites,
+    if (phase != null) 'phase': phase,
     'updatedAt': updatedAt,
   };
 
@@ -137,11 +193,12 @@ class RecallPrompt {
 
 class LearningCard {
   final String
-  type; // explain, code, animation, diagram, table, interview, checklist, interviewAnswer
+  type; // explain, code, animation, diagram, svg, table, interview, checklist, interviewAnswer
   final String title;
   final String content;
   final String? asset;
   final String? fallback;
+  final String? svg; // 内联 SVG 字符串
   final List<String> items; // for checklist type
 
   const LearningCard({
@@ -150,6 +207,7 @@ class LearningCard {
     required this.content,
     this.asset,
     this.fallback,
+    this.svg,
     this.items = const [],
   });
 
@@ -159,6 +217,7 @@ class LearningCard {
     content: json['content'] as String? ?? '',
     asset: json['asset'] as String?,
     fallback: json['fallback'] as String?,
+    svg: json['svg'] as String?,
     items:
         (json['items'] as List<dynamic>?)?.map((e) => e as String).toList() ??
         [],
@@ -170,6 +229,7 @@ class LearningCard {
     'content': content,
     if (asset != null) 'asset': asset,
     if (fallback != null) 'fallback': fallback,
+    if (svg != null) 'svg': svg,
     if (items.isNotEmpty) 'items': items,
   };
 }

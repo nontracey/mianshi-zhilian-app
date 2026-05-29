@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
@@ -272,6 +274,11 @@ class _KnowledgeTab extends StatelessWidget {
           const SizedBox(height: 8),
           _RubricSection(rubric: topic.rubric!),
         ],
+        // 常见追问（FollowUp）
+        if (topic.followUps.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _FollowUpSection(followUps: topic.followUps),
+        ],
         const SizedBox(height: 24),
       ],
     );
@@ -286,6 +293,7 @@ class _KnowledgeTab extends StatelessWidget {
       'code' => _CodeCard(card: card),
       'animation' => _DiagramCard(card: card),
       'diagram' => _DiagramCard(card: card),
+      'svg' => _SvgDiagramCard(card: card),
       'table' => _TableCard(card: card),
       'compareTable' => _TableCard(card: card),
       _ => _GenericCard(card: card),
@@ -1461,6 +1469,387 @@ class _HierarchyItem {
   final int level;
   final String text;
   _HierarchyItem({required this.level, required this.text});
+}
+
+// ── SVG 图解卡片 ─────────────────────────────────────────────
+
+class _SvgDiagramCard extends StatelessWidget {
+  const _SvgDiagramCard({required this.card});
+  final LearningCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    // 优先使用内联 svg 字段，其次用 asset 字段
+    final svgData = card.svg;
+    final svgAsset = card.asset;
+
+    return WorkPanel(
+      title: card.title,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF07182A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.accent.withValues(alpha: 0.32),
+            ),
+          ),
+          child: Column(
+            children: [
+              if (svgData != null && svgData.isNotEmpty)
+                // 内联 SVG 字符串
+                SvgPicture.string(
+                  svgData,
+                  width: double.infinity,
+                  placeholderBuilder: (_) => Container(
+                    height: 120,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (svgAsset != null && svgAsset.isNotEmpty)
+                // 远程 SVG URL 或本地 asset 路径
+                SvgPicture.network(
+                  svgAsset,
+                  width: double.infinity,
+                  placeholderBuilder: (_) => Container(
+                    height: 120,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  errorBuilder: (ctx, err, stack) => Container(
+                    height: 120,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          card.fallback ?? 'SVG 加载失败',
+                          style: TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                // 降级：fallback 文本
+                Container(
+                  height: 120,
+                  alignment: Alignment.center,
+                  child: Text(
+                    card.fallback ?? '暂无图解内容',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // 补充说明文字
+        if (card.content.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(card.content, style: const TextStyle(height: 1.6)),
+        ],
+      ],
+    );
+  }
+}
+
+// ── 追问区域（可折叠）────────────────────────────────────────
+
+class _FollowUpSection extends StatelessWidget {
+  const _FollowUpSection({required this.followUps});
+  final List<FollowUpQuestion> followUps;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkPanel(
+      title: '常见追问',
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '${followUps.length} 题',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF8B5CF6),
+          ),
+        ),
+      ),
+      children: [
+        ...followUps.asMap().entries.map(
+          (entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _FollowUpCard(
+              index: entry.key + 1,
+              question: entry.value,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FollowUpCard extends StatefulWidget {
+  const _FollowUpCard({required this.index, required this.question});
+  final int index;
+  final FollowUpQuestion question;
+
+  @override
+  State<_FollowUpCard> createState() => _FollowUpCardState();
+}
+
+class _FollowUpCardState extends State<_FollowUpCard> {
+  bool _expanded = false;
+
+  Color get _difficultyColor {
+    return switch (widget.question.difficulty) {
+      1 => AppColors.success,
+      2 => AppColors.accent,
+      3 => AppColors.warning,
+      4 || 5 => AppColors.danger,
+      _ => Colors.grey,
+    };
+  }
+
+  String get _difficultyLabel {
+    return switch (widget.question.difficulty) {
+      1 => '入门',
+      2 => '基础',
+      3 => '中等',
+      4 => '较难',
+      5 => '困难',
+      _ => '',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: _expanded
+            ? const Color(0xFF8B5CF6).withValues(alpha: 0.06)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _expanded
+              ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
+              : Theme.of(context).dividerColor.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 问题行（可点击展开）
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // 序号
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${widget.index}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8B5CF6),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // 问题文本
+                  Expanded(
+                    child: Text(
+                      widget.question.question,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  // 难度标签
+                  if (_difficultyLabel.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _difficultyColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _difficultyLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _difficultyColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  // 展开/收起图标
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.expand_more,
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // 展开的答案区域
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  // 提示要点
+                  if (widget.question.hints.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: widget.question.hints
+                          .map(
+                            (hint) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                hint,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  // 答案内容
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF07182A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.auto_awesome,
+                              size: 14,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '参考答案',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF8B5CF6),
+                              ),
+                            ),
+                            const Spacer(),
+                            InkWell(
+                              onTap: () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text: widget.question.answer,
+                                  ),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('已复制到剪贴板'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              child: Icon(
+                                Icons.copy,
+                                size: 14,
+                                color: Colors.white.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          widget.question.answer,
+                          style: const TextStyle(
+                            color: Color(0xFFE2E8F0),
+                            fontSize: 13,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: _expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── 表格卡片 ─────────────────────────────────────────────────
