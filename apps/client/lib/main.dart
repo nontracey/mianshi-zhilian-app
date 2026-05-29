@@ -18,6 +18,8 @@ import 'pages/learning/topic_detail_page.dart';
 import 'pages/practice/practice_page.dart';
 import 'pages/practice/recall_page.dart';
 import 'pages/practice/mock_interview_page.dart';
+import 'pages/practice/today_review_page.dart';
+import 'pages/prep/interview_prep_page.dart';
 import 'pages/mastery/mastery_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'widgets/navigation_rail_panel.dart';
@@ -42,7 +44,7 @@ void main() async {
   );
 }
 
-enum AppSection { dashboard, catalog, practice, mastery, profile }
+enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 
 class MianshiZhilianApp extends StatefulWidget {
   final StorageService storage;
@@ -76,7 +78,8 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           create: (_) => ContentProvider(widget.contentApi, widget.storage),
         ),
         ChangeNotifierProvider(
-          create: (_) => AiProvider(widget.aiService, widget.storage)..loadConfigs(),
+          create: (_) =>
+              AiProvider(widget.aiService, widget.storage)..loadConfigs(),
         ),
         ChangeNotifierProvider(
           create: (_) => ProgressProvider(widget.storage)..loadProgress(),
@@ -84,9 +87,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(widget.storage)..loadUser(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => LocalizationProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => LocalizationProvider()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -105,6 +106,8 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             settings.settings.primaryColor,
             settings.settings.accentColor,
             settings.settings.themeMode,
+            fontScale: settings.settings.fontScale,
+            cardDensity: settings.settings.cardDensity,
           );
           return MaterialApp(
             title: '面试智练',
@@ -115,6 +118,8 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               settings.settings.primaryColor,
               settings.settings.accentColor,
               ThemeMode.dark,
+              fontScale: settings.settings.fontScale,
+              cardDensity: settings.settings.cardDensity,
             ),
             home: const LearningShell(),
           );
@@ -141,6 +146,7 @@ class _LearningShellState extends State<LearningShell> {
     final wide = MediaQuery.sizeOf(context).width >= 860;
     final settings = context.watch<SettingsProvider>();
     final content = context.watch<ContentProvider>();
+    final progress = context.watch<ProgressProvider>();
 
     return Scaffold(
       body: Row(
@@ -151,6 +157,9 @@ class _LearningShellState extends State<LearningShell> {
               onSelect: _setSection,
               currentDomain: settings.settings.currentDomain,
               topicCount: content.topics.length,
+              streakDays: progress.streakDays,
+              totalHours: progress.totalHours,
+              todayHoursGrowth: progress.todayHoursGrowth,
             ),
           Expanded(
             child: Column(
@@ -188,6 +197,10 @@ class _LearningShellState extends State<LearningShell> {
                   label: '练习',
                 ),
                 NavigationDestination(
+                  icon: Icon(Icons.flag_outlined),
+                  label: '面试',
+                ),
+                NavigationDestination(
                   icon: Icon(Icons.bar_chart_outlined),
                   label: '掌握',
                 ),
@@ -219,7 +232,6 @@ class _LearningShellState extends State<LearningShell> {
 
   Widget _currentPage() {
     final content = context.read<ContentProvider>();
-    final progress = context.read<ProgressProvider>();
     final settings = context.read<SettingsProvider>();
 
     return switch (_section) {
@@ -239,6 +251,8 @@ class _LearningShellState extends State<LearningShell> {
           );
           setState(() => _section = AppSection.catalog);
         },
+        onReview: () => _setSection(AppSection.practice),
+        onMockInterview: () => _setSection(AppSection.practice),
       ),
       AppSection.catalog => CatalogPage(
         currentDomainId: settings.settings.currentDomain,
@@ -259,11 +273,8 @@ class _LearningShellState extends State<LearningShell> {
         onDailyReview: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => RecallPage(
-                topicIds: progress
-                    .getTodayReviewTopics(content.topics.values.toList())
-                    .map((t) => t.id)
-                    .toList(),
+              builder: (_) => TodayReviewPage(
+                currentDomainId: settings.settings.currentDomain,
               ),
             ),
           );
@@ -284,7 +295,24 @@ class _LearningShellState extends State<LearningShell> {
           final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => MockInterviewPage(topicIds: topicIds.take(10).toList()),
+              builder: (_) =>
+                  MockInterviewPage(topicIds: topicIds.take(10).toList()),
+            ),
+          );
+        },
+      ),
+      AppSection.prep => InterviewPrepPage(
+        currentDomainId: settings.settings.currentDomain,
+        onStartPractice: () => _setSection(AppSection.practice),
+        onStartMock: () {
+          final domainTopics = content.getTopicsByDomain(
+            settings.settings.currentDomain,
+          );
+          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  MockInterviewPage(topicIds: topicIds.take(10).toList()),
             ),
           );
         },
@@ -310,6 +338,7 @@ class _LearningShellState extends State<LearningShell> {
     AppSection.dashboard => '学习中心',
     AppSection.catalog => '领域知识目录',
     AppSection.practice => 'AI 主动复述',
+    AppSection.prep => '面试准备',
     AppSection.mastery => '掌握度看板',
     AppSection.profile => '个人中心',
   };

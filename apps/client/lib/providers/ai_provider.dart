@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/ai_config.dart';
 import '../models/topic.dart';
@@ -14,11 +16,22 @@ class AiProvider extends ChangeNotifier {
   AiConfig? _defaultConfig;
   bool _isTesting = false;
   String? _testResult;
+  
+  // 流式评估的订阅，用于取消
+  StreamSubscription<String>? _currentStreamSubscription;
 
   List<AiConfig> get configs => _configs;
   AiConfig? get defaultConfig => _defaultConfig;
+  List<AiConfig> get enabledConfigs =>
+      _configs.where((c) => c.enabled).toList(growable: false);
   bool get isTesting => _isTesting;
   String? get testResult => _testResult;
+
+  @override
+  void dispose() {
+    _currentStreamSubscription?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadConfigs() async {
     _configs = await _storage.loadAiConfigs();
@@ -43,7 +56,9 @@ class AiProvider extends ChangeNotifier {
     if (index >= 0) {
       if (config.isDefault) {
         _configs = _configs
-            .map((c) => c.id == config.id ? config : c.copyWith(isDefault: false))
+            .map(
+              (c) => c.id == config.id ? config : c.copyWith(isDefault: false),
+            )
             .toList();
         _defaultConfig = config;
       } else {
@@ -116,23 +131,130 @@ class AiProvider extends ChangeNotifier {
     return _aiService.testConnection(tempConfig);
   }
 
-  /// Evaluate a user's answer using the default AI config
+  AiConfig? configById(String? id) {
+    if (id == null || id.isEmpty) return _defaultConfig;
+    return _configs.where((c) => c.id == id).firstOrNull;
+  }
+
+  /// Evaluate a user's answer using a user-provided AI config.
   Future<Map<String, dynamic>> evaluateAnswer({
+    String? aiConfigId,
     required String topicId,
     required String question,
     required String userAnswer,
     Rubric? rubric,
   }) async {
-    if (_defaultConfig == null) {
-      throw Exception('未配置 AI');
+    final config = configById(aiConfigId);
+    if (config == null || !config.enabled) {
+      return {
+        'score': null,
+        'level': 'local',
+        'summary': '还没有配置可用的 AI 模型。本次回答已按本地练习保存，配置 AI 后可以重新评估。',
+        'missedPoints': <String>[],
+        'wrongPoints': <String>[],
+        'errorPoints': <String>[],
+        'improvedAnswer': '',
+        'nextAction': '前往个人中心配置 AI，或继续本地练习',
+        'aiUnavailable': true,
+      };
     }
     return _aiService.evaluateAnswer(
-      config: _defaultConfig!,
+      config: config,
       topicTitle: question,
       mustHave: rubric?.mustHave ?? [],
       commonMistakes: rubric?.commonMistakes ?? [],
       userAnswer: userAnswer,
       language: '中文',
     );
+  }
+
+  /// Evaluate a user's answer with streaming support
+  /// Returns a stream of content chunks, and a future with the final parsed result
+  ({Stream<String> stream, Future<Map<String, dynamic>> result}) evaluateAnswerStream({
+    String? aiConfigId,
+    required String topicId,
+    required String question,
+    required String userAnswer,
+    Rubric? rubric,
+  }) {
+    final config = configById(aiConfigId);
+    if (config == null || !config.enabled) {
+      final result = Future.value({
+        'score': null,
+        'level': 'local',
+        'summary': '还没有配置可用的 AI 模型。本次回答已按本地练习保存，配置 AI 后可以重新评估。',
+        'missedPoints': <String>[],
+        'wrongPoints': <String>[],
+        'errorPoints': <String>[],
+        'improvedAnswer': '',
+        'nextAction': '前往个人中心配置 AI，或继续本地练习',
+        'aiUnavailable': true,
+      });
+      return (stream: const Stream.empty(), result: result);
+    }
+
+    // 取消之前的流
+    _currentStreamSubscription?.cancel();
+    
+    final streamController = StreamController<String>();
+    final completer = Completer<Map<String, dynamic>>();
+    
+    String fullContent = '';
+    
+    _currentStreamSubscription = _aiService.evaluateAnswerStream(
+      config: config,
+      topicTitle: question,
+      mustHave: rubric?.mustHave ?? [],
+      commonMistakes: rubric?.commonMistakes ?? [],
+      userAnswer: userAnswer,
+      language: '中文',
+    ).listen(
+      (chunk) {
+        fullContent += chunk;
+        streamController.add(chunk);
+      },
+      onDone: () {
+        streamController.close();
+        _currentStreamSubscription = null;
+        // 解析完整内容
+        final result = _parseStreamResult(fullContent);
+        completer.complete(result);
+      },
+      onError: (error) {
+        streamController.close();
+        _currentStreamSubscription = null;
+        completer.completeError(error);
+      },
+      cancelOnError: true,
+    );
+    
+    return (stream: streamController.stream, result: completer.future);
+  }
+
+  /// 取消当前流式评估
+  void cancelStreamEvaluation() {
+    _currentStreamSubscription?.cancel();
+    _currentStreamSubscription = null;
+  }
+
+  Map<String, dynamic> _parseStreamResult(String content) {
+    // 尝试从回复中提取 JSON
+    final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
+    if (jsonMatch != null) {
+      try {
+        return json.decode(jsonMatch.group(0)!) as Map<String, dynamic>;
+      } catch (_) {
+        // JSON 解析失败，返回原始内容
+      }
+    }
+    return {
+      'score': 0,
+      'level': 'unfamiliar',
+      'summary': content,
+      'missedPoints': <String>[],
+      'wrongPoints': <String>[],
+      'improvedAnswer': '',
+      'nextAction': '重试',
+    };
   }
 }

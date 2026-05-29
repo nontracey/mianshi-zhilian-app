@@ -7,6 +7,8 @@ import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
@@ -20,16 +22,22 @@ class ProfilePage extends StatelessWidget {
     final settingsProvider = context.watch<SettingsProvider>();
     final settings = settingsProvider.settings;
     final authProvider = context.watch<AuthProvider>();
+    final progressProvider = context.watch<ProgressProvider>();
 
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         _AccountPanel(
           authProvider: authProvider,
+          profile: progressProvider.localProfile,
+          syncSettings: progressProvider.syncSettings,
+          attemptsCount: progressProvider.attempts.length,
+          streakDays: progressProvider.practiceStreakDays,
+          onProfileChanged: progressProvider.updateLocalProfile,
           onLogin: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LoginPage()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const LoginPage()));
           },
           onLogout: () => authProvider.logout(),
         ),
@@ -41,7 +49,9 @@ class ProfilePage extends StatelessWidget {
             // 切换环境后，自动重载内容
             if (context.mounted) {
               final contentProvider = context.read<ContentProvider>();
-              await contentProvider.switchContentEnv(settingsProvider.settings.contentBaseUrl);
+              await contentProvider.switchContentEnv(
+                settingsProvider.settings.contentBaseUrl,
+              );
             }
           },
           onTestUrlChanged: (url) async {
@@ -75,24 +85,28 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 16),
         _AiConfigPanel(
           onNavigateToConfig: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AiConfigPage()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AiConfigPage()));
           },
         ),
         const SizedBox(height: 16),
         _AppearancePanel(
           settings: settings,
           onThemeModeChanged: (mode) => settingsProvider.updateThemeMode(mode),
-          onPrimaryColorChanged: (color) => settingsProvider.updatePrimaryColor(color),
-          onAccentColorChanged: (color) => settingsProvider.updateAccentColor(color),
-          onFontScaleChanged: (scale) => settingsProvider.updateFontScale(scale),
-          onDensityChanged: (density) => settingsProvider.updateDensity(density),
+          onPrimaryColorChanged: (color) =>
+              settingsProvider.updatePrimaryColor(color),
+          onAccentColorChanged: (color) =>
+              settingsProvider.updateAccentColor(color),
+          onFontScaleChanged: (scale) =>
+              settingsProvider.updateFontScale(scale),
+          onDensityChanged: (density) =>
+              settingsProvider.updateDensity(density),
         ),
         const SizedBox(height: 16),
         _LearningSettingsPanel(
           settings: settings,
-          onStrategyChanged: (strategy) => settingsProvider.updateRecommendStrategy(strategy),
+          onSettingsChanged: (next) => settingsProvider.updateSettings(next),
         ),
         const SizedBox(height: 16),
         _LanguagePanel(
@@ -105,7 +119,28 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 16),
         _DataManagementPanel(
           settings: settings,
-          onSync: () => settingsProvider.syncData(),
+          syncSettings: progressProvider.syncSettings,
+          onSyncSettingsChanged: progressProvider.updateSyncSettings,
+          onSync: () async {
+            final message = await settingsProvider.syncData(
+              progressProvider.syncSettings,
+            );
+            await progressProvider.updateSyncSettings(
+              SyncSettings(
+                method: progressProvider.syncSettings.method,
+                webDavUrl: progressProvider.syncSettings.webDavUrl,
+                webDavUsername: progressProvider.syncSettings.webDavUsername,
+                webDavPassword: progressProvider.syncSettings.webDavPassword,
+                lastSyncAt: DateTime.now(),
+                lastSyncStatus: message,
+              ),
+            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(message)));
+            }
+          },
           onExport: () => settingsProvider.exportData(),
         ),
         const SizedBox(height: 16),
@@ -120,77 +155,241 @@ class ProfilePage extends StatelessWidget {
 class _AccountPanel extends StatelessWidget {
   const _AccountPanel({
     required this.authProvider,
+    required this.profile,
+    required this.syncSettings,
+    required this.attemptsCount,
+    required this.streakDays,
+    required this.onProfileChanged,
     required this.onLogin,
     required this.onLogout,
   });
 
   final AuthProvider authProvider;
+  final LocalProfile profile;
+  final SyncSettings syncSettings;
+  final int attemptsCount;
+  final int streakDays;
+  final ValueChanged<LocalProfile> onProfileChanged;
   final VoidCallback onLogin;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
-      title: '账号',
+      title: '账户管理',
       children: [
-        if (authProvider.isLoggedIn) ...[
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: Text(
-                  authProvider.user!.nickname.isNotEmpty
-                      ? authProvider.user!.nickname[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(color: Colors.white),
-                ),
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: Text(
+                _displayName.isNotEmpty ? _displayName[0].toUpperCase() : '本',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      authProvider.user!.nickname,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
                     ),
-                    Text(
-                      '@${authProvider.user!.username}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  ),
+                  Text(
+                    authProvider.isLoggedIn
+                        ? '@${authProvider.user!.username}'
+                        : '本地游客模式 · 数据保存在本机',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+            if (authProvider.isLoggedIn)
               FilledButton.tonalIcon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout, size: 18),
-                label: const Text('退出登录'),
-              ),
-            ],
-          ),
-        ] else ...[
-          Row(
-            children: [
-              Icon(
-                Icons.person_outline,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('登录后可同步学习进度到云端'),
-              ),
+                label: const Text('退出'),
+              )
+            else
               FilledButton.icon(
                 onPressed: onLogin,
                 icon: const Icon(Icons.login, size: 18),
                 label: const Text('登录'),
               ),
-            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _MiniStat(label: '练习记录', value: '$attemptsCount'),
+            _MiniStat(label: '连续天数', value: '$streakDays'),
+            _MiniStat(label: '同步方式', value: _syncLabel(syncSettings.method)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _showEditProfileDialog(context),
+              icon: const Icon(Icons.badge_outlined, size: 18),
+              label: const Text('修改资料'),
+            ),
+            _BindingButton(
+              icon: Icons.mail_outline,
+              label: profile.emailBound ? '邮箱已绑定' : '绑定邮箱',
+              status: profile.emailBound ? '已绑定' : '待开通',
+              onTap: () => _showUnavailable(context, '邮箱绑定'),
+            ),
+            _BindingButton(
+              icon: Icons.wechat,
+              label: profile.wechatBound ? '微信已绑定' : '绑定微信',
+              status: profile.wechatBound ? '已绑定' : '待开通',
+              onTap: () => _showUnavailable(context, '微信绑定'),
+            ),
+            _BindingButton(
+              icon: Icons.link_outlined,
+              label: '绑定其他账号',
+              status: '待开通',
+              onTap: () => _showUnavailable(context, '第三方账号绑定'),
+            ),
+          ],
+        ),
+        if (!authProvider.isLoggedIn) ...[
+          const SizedBox(height: 12),
+          Text(
+            '不登录也可以完整学习和练习。登录只用于云端备份和跨设备恢复，登录后会提示合并本地数据。',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],
+    );
+  }
+
+  String get _displayName =>
+      authProvider.isLoggedIn ? authProvider.user!.nickname : profile.nickname;
+
+  String _syncLabel(String method) => switch (method) {
+    'webdav' => 'WebDAV',
+    'cloud' => '云同步',
+    'file' => '文件',
+    _ => '本地',
+  };
+
+  void _showUnavailable(BuildContext context, String name) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$name 功能待开通，可先使用本地数据和 WebDAV 备份')));
+  }
+
+  void _showEditProfileDialog(BuildContext context) {
+    final nicknameController = TextEditingController(text: profile.nickname);
+    final emailController = TextEditingController(text: profile.email);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('修改本地资料'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nicknameController,
+              decoration: const InputDecoration(labelText: '昵称'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(labelText: '邮箱展示'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              onProfileChanged(
+                LocalProfile(
+                  nickname: nicknameController.text.trim().isEmpty
+                      ? '本地用户'
+                      : nicknameController.text.trim(),
+                  email: emailController.text.trim(),
+                  avatarSeed: profile.avatarSeed,
+                  emailBound: profile.emailBound,
+                  wechatBound: profile.wechatBound,
+                ),
+              );
+              Navigator.pop(ctx);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(label, style: const TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+class _BindingButton extends StatelessWidget {
+  const _BindingButton({
+    required this.icon,
+    required this.label,
+    required this.status,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String status;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text('$label · $status'),
     );
   }
 }
@@ -232,8 +431,13 @@ class _ContentEnvPanel extends StatelessWidget {
         // 环境切换
         SegmentedButton<ContentEnv>(
           segments: const [
-            ButtonSegment(value: ContentEnv.test, label: Text('测试版')),
             ButtonSegment(value: ContentEnv.production, label: Text('发布版')),
+            ButtonSegment(value: ContentEnv.test, label: Text('测试版')),
+            ButtonSegment(
+              value: ContentEnv.draft,
+              label: Text('草稿版'),
+              enabled: false,
+            ),
           ],
           selected: {settings.contentEnv},
           onSelectionChanged: (value) => onEnvChanged(value.first),
@@ -353,7 +557,8 @@ class _AiConfigPanel extends StatelessWidget {
           InfoRow(
             icon: Icons.hub_outlined,
             title: defaultConfig.name,
-            subtitle: '模型：${defaultConfig.model} · ${defaultConfig.enabled ? '已启用' : '已禁用'}',
+            subtitle:
+                '模型：${defaultConfig.model} · ${defaultConfig.enabled ? '已启用' : '已禁用'}',
           ),
         ] else ...[
           const InfoRow(
@@ -391,8 +596,8 @@ class _AppearancePanel extends StatelessWidget {
     final themeMode = settings.themeMode;
     final primaryColor = settings.primaryColor;
     final accentColor = settings.accentColor;
-    final fontScale = 1.0; // Not yet in AppSettings
-    final density = 'comfortable'; // Not yet in AppSettings
+    final fontScale = settings.fontScale;
+    final density = settings.cardDensity;
 
     return WorkPanel(
       title: '外观与主题',
@@ -472,10 +677,7 @@ class _AppearancePanel extends StatelessWidget {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: density,
-          decoration: const InputDecoration(
-            labelText: '卡片密度',
-            isDense: true,
-          ),
+          decoration: const InputDecoration(labelText: '卡片密度', isDense: true),
           items: const [
             DropdownMenuItem(value: 'comfortable', child: Text('舒适')),
             DropdownMenuItem(value: 'compact', child: Text('紧凑')),
@@ -492,11 +694,11 @@ class _AppearancePanel extends StatelessWidget {
 class _LearningSettingsPanel extends StatelessWidget {
   const _LearningSettingsPanel({
     required this.settings,
-    required this.onStrategyChanged,
+    required this.onSettingsChanged,
   });
 
   final AppSettings settings;
-  final ValueChanged<String> onStrategyChanged;
+  final ValueChanged<AppSettings> onSettingsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -505,20 +707,118 @@ class _LearningSettingsPanel extends StatelessWidget {
       children: [
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
+          decoration: const InputDecoration(labelText: '推荐策略', isDense: true),
+          items: const [
+            DropdownMenuItem(value: 'smart', child: Text('智能推荐')),
+            DropdownMenuItem(value: 'low-score-first', child: Text('低分优先')),
+            DropdownMenuItem(value: 'path-order', child: Text('路径顺序')),
+            DropdownMenuItem(value: 'high-frequency', child: Text('高频优先')),
+            DropdownMenuItem(value: 'review-first', child: Text('复习优先')),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              onSettingsChanged(settings.copyWith(recommendStrategy: value));
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _NumberSetting(
+                label: '每日新学',
+                value: settings.dailyNewCount,
+                onChanged: (value) =>
+                    onSettingsChanged(settings.copyWith(dailyNewCount: value)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _NumberSetting(
+                label: '每日复习',
+                value: settings.dailyReviewCount,
+                onChanged: (value) => onSettingsChanged(
+                  settings.copyWith(dailyReviewCount: value),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          value: settings.prioritizePrerequisites,
+          title: const Text('优先补前置知识'),
+          onChanged: (value) => onSettingsChanged(
+            settings.copyWith(prioritizePrerequisites: value),
+          ),
+        ),
+        SwitchListTile(
+          value: settings.allowSkipLowFrequency,
+          title: const Text('允许跳过低频知识'),
+          onChanged: (value) => onSettingsChanged(
+            settings.copyWith(allowSkipLowFrequency: value),
+          ),
+        ),
+        DropdownButtonFormField<String>(
+          initialValue: settings.mockInterviewPreference,
           decoration: const InputDecoration(
-            labelText: '推荐策略',
+            labelText: '模拟面试组卷偏好',
             isDense: true,
           ),
           items: const [
-            DropdownMenuItem(value: 'weighted', child: Text('加权推荐（综合考虑熟练度与复习时间）')),
-            DropdownMenuItem(value: 'random', child: Text('随机推荐')),
-            DropdownMenuItem(value: 'sequential', child: Text('顺序推荐')),
+            DropdownMenuItem(value: 'mixed', child: Text('混合')),
+            DropdownMenuItem(value: 'foundation', child: Text('基础知识')),
+            DropdownMenuItem(value: 'systemDesign', child: Text('系统设计')),
+            DropdownMenuItem(value: 'code', child: Text('代码题')),
+            DropdownMenuItem(value: 'project', child: Text('项目深挖')),
           ],
           onChanged: (value) {
-            if (value != null) onStrategyChanged(value);
+            if (value != null) {
+              onSettingsChanged(
+                settings.copyWith(mockInterviewPreference: value),
+              );
+            }
           },
         ),
       ],
+    );
+  }
+}
+
+class _NumberSetting extends StatelessWidget {
+  const _NumberSetting({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: InputDecoration(labelText: label, isDense: true),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: value > 0 ? () => onChanged(value - 1) : null,
+            icon: const Icon(Icons.remove),
+          ),
+          Expanded(
+            child: Text(
+              '$value',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          IconButton(
+            onPressed: () => onChanged(value + 1),
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -553,24 +853,113 @@ class _LanguagePanel extends StatelessWidget {
 class _DataManagementPanel extends StatelessWidget {
   const _DataManagementPanel({
     required this.settings,
+    required this.syncSettings,
+    required this.onSyncSettingsChanged,
     required this.onSync,
     required this.onExport,
   });
 
   final AppSettings settings;
+  final SyncSettings syncSettings;
+  final ValueChanged<SyncSettings> onSyncSettingsChanged;
   final VoidCallback onSync;
   final VoidCallback onExport;
 
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
-      title: '数据管理',
+      title: '同步与备份',
       children: [
-        const InfoRow(
+        InfoRow(
           icon: Icons.cloud_sync_outlined,
-          title: '手动同步',
-          subtitle: '尚未同步',
+          title: '当前方式：${_methodLabel(syncSettings.method)}',
+          subtitle: syncSettings.lastSyncAt == null
+              ? syncSettings.lastSyncStatus
+              : '${syncSettings.lastSyncStatus} · ${syncSettings.lastSyncAt}',
         ),
+        DropdownButtonFormField<String>(
+          initialValue: syncSettings.method,
+          decoration: const InputDecoration(labelText: '同步方式', isDense: true),
+          items: const [
+            DropdownMenuItem(value: 'local', child: Text('本地模式')),
+            DropdownMenuItem(value: 'file', child: Text('文件导入/导出')),
+            DropdownMenuItem(value: 'webdav', child: Text('自定义 WebDAV')),
+            DropdownMenuItem(value: 'cloud', child: Text('账号云同步')),
+            DropdownMenuItem(value: 'baidu', child: Text('百度网盘（待开通）')),
+            DropdownMenuItem(value: 'quark', child: Text('夸克网盘（待开通）')),
+            DropdownMenuItem(value: 'aliyun', child: Text('阿里云盘（待开通）')),
+            DropdownMenuItem(value: 'onedrive', child: Text('OneDrive（待开通）')),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(value)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${_methodLabel(value)} 功能待开通')),
+              );
+            }
+            onSyncSettingsChanged(
+              SyncSettings(
+                method: value,
+                webDavUrl: syncSettings.webDavUrl,
+                webDavUsername: syncSettings.webDavUsername,
+                webDavPassword: syncSettings.webDavPassword,
+                lastSyncAt: syncSettings.lastSyncAt,
+                lastSyncStatus: value == 'local' ? '本地模式' : '待配置',
+              ),
+            );
+          },
+        ),
+        if (syncSettings.method == 'webdav') ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            initialValue: syncSettings.webDavUrl,
+            decoration: const InputDecoration(
+              labelText: 'WebDAV 地址',
+              hintText: 'https://dav.example.com/remote.php/dav/files/me',
+            ),
+            onChanged: (value) => onSyncSettingsChanged(
+              SyncSettings(
+                method: syncSettings.method,
+                webDavUrl: value,
+                webDavUsername: syncSettings.webDavUsername,
+                webDavPassword: syncSettings.webDavPassword,
+                lastSyncAt: syncSettings.lastSyncAt,
+                lastSyncStatus: syncSettings.lastSyncStatus,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: syncSettings.webDavUsername,
+            decoration: const InputDecoration(labelText: '用户名'),
+            onChanged: (value) => onSyncSettingsChanged(
+              SyncSettings(
+                method: syncSettings.method,
+                webDavUrl: syncSettings.webDavUrl,
+                webDavUsername: value,
+                webDavPassword: syncSettings.webDavPassword,
+                lastSyncAt: syncSettings.lastSyncAt,
+                lastSyncStatus: syncSettings.lastSyncStatus,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: syncSettings.webDavPassword,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: '应用密码'),
+            onChanged: (value) => onSyncSettingsChanged(
+              SyncSettings(
+                method: syncSettings.method,
+                webDavUrl: syncSettings.webDavUrl,
+                webDavUsername: syncSettings.webDavUsername,
+                webDavPassword: value,
+                lastSyncAt: syncSettings.lastSyncAt,
+                lastSyncStatus: syncSettings.lastSyncStatus,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Row(
           children: [
@@ -590,6 +979,17 @@ class _DataManagementPanel extends StatelessWidget {
       ],
     );
   }
+
+  String _methodLabel(String method) => switch (method) {
+    'file' => '文件导入/导出',
+    'webdav' => 'WebDAV',
+    'cloud' => '账号云同步',
+    'baidu' => '百度网盘',
+    'quark' => '夸克网盘',
+    'aliyun' => '阿里云盘',
+    'onedrive' => 'OneDrive',
+    _ => '本地模式',
+  };
 }
 
 class _AboutPanel extends StatefulWidget {
@@ -646,10 +1046,12 @@ class _AboutPanelState extends State<_AboutPanel> {
             Text('发布日期：${updateInfo.releaseDate}'),
             const SizedBox(height: 12),
             const Text('更新内容：', style: TextStyle(fontWeight: FontWeight.w700)),
-            ...updateInfo.notes.map((note) => Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('• $note'),
-            )),
+            ...updateInfo.notes.map(
+              (note) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('• $note'),
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
               '平台：${UpdateService.formatSize(updateInfo.platforms.values.first.size)}',
@@ -679,17 +1081,17 @@ class _AboutPanelState extends State<_AboutPanel> {
     final platformUpdate = updateService.getPlatformUpdate(updateInfo);
 
     if (platformUpdate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前平台暂无更新包')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('当前平台暂无更新包')));
       return;
     }
 
     // Web 端提示刷新
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Web 端请刷新页面获取最新版本')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Web 端请刷新页面获取最新版本')));
       return;
     }
 
@@ -725,9 +1127,9 @@ class _AboutPanelState extends State<_AboutPanel> {
 
     if (mounted) {
       Navigator.pop(context); // 关闭下载对话框
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('下载完成，请手动安装更新包')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('下载完成，请手动安装更新包')));
     }
   }
 
@@ -777,21 +1179,21 @@ class _ColorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              width: selected ? 4 : 1,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-          ),
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(24),
+    child: Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          width: selected ? 4 : 1,
+          color: Theme.of(context).colorScheme.outline,
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class InfoRow extends StatelessWidget {
@@ -819,7 +1221,10 @@ class InfoRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 Text(subtitle),
               ],
             ),

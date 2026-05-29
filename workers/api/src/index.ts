@@ -96,18 +96,66 @@ async function proxyFetch(targetUrl: string, originalRequest: Request): Promise<
       },
     });
   } catch (e) {
-    return json({ error: 'Upstream fetch failed', detail: String(e) }, 502);
+    console.error('ProxyFetch error:', e);
+    return json({ error: '上游请求失败' }, 502);
   }
 }
 
-// 简单的密码哈希（生产环境应使用 bcrypt）
-async function hashPassword(password: string): Promise<string> {
+// PBKDF2 密码哈希（100K 迭代 + 16 字节随机 salt）
+const PBKDF2_ITERATIONS = 100_000;
+const SALT_BYTES = 16;
+const HASH_BYTES = 32;
+
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function fromHex(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+async function hashPassword(password: string, existingSalt?: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const salt = existingSalt ? fromHex(existingSalt) : crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const derivedBits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    key,
+    HASH_BYTES * 8,
+  );
+  const saltHex = toHex(salt.buffer);
+  const hashHex = toHex(derivedBits);
+  return `${saltHex}:${hashHex}`;
+}
+
+// 兼容旧格式（无 salt 的纯 SHA-256）和新格式（salt:hash）
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (storedHash.includes(':')) {
+    // 新格式: salt:pbkdf2hash
+    const [salt] = storedHash.split(':');
+    const recomputed = await hashPassword(password, salt);
+    return recomputed === storedHash;
+  }
+  // 旧格式: 纯 SHA-256（无 salt），验证后会自动升级
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const legacyHash = toHex(hash);
+  return legacyHash === storedHash;
+}
+
+// 旧版 SHA-256 哈希（仅用于识别旧格式，不用于新密码）
+async function legacyHash(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return toHex(hash);
 }
 
 // 生成简单的 JWT token
@@ -224,7 +272,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       return json({ error: '用户名已存在' }, 409);
     }
 
-    // 创建用户（统一转小写存储）
+    // 创建用户（统一转小写存储，PBKDF2 哈希密码）
     const userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
     const finalNickname = nickname || username;
@@ -245,7 +293,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       token,
     });
   } catch (e) {
-    return json({ error: '注册失败', detail: String(e) }, 500);
+    console.error('Register error:', e);
+    return json({ error: '注册失败' }, 500);
   }
 }
 
@@ -273,10 +322,18 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       return json({ error: '用户名或密码错误' }, 401);
     }
 
-    // 验证密码
-    const passwordHash = await hashPassword(password);
-    if (passwordHash !== user.password_hash) {
+    // 验证密码（兼容旧 SHA-256 和新 PBKDF2 格式）
+    const passwordValid = await verifyPassword(password, user.password_hash);
+    if (!passwordValid) {
       return json({ error: '用户名或密码错误' }, 401);
+    }
+
+    // 如果是旧格式哈希，自动升级为 PBKDF2
+    if (!user.password_hash.includes(':')) {
+      const newHash = await hashPassword(password);
+      await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+        .bind(newHash, user.id)
+        .run();
     }
 
     // 更新最后登录时间
@@ -293,7 +350,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       token,
     });
   } catch (e) {
-    return json({ error: '登录失败', detail: String(e) }, 500);
+    console.error('Login error:', e);
+    return json({ error: '登录失败' }, 500);
   }
 }
 
@@ -320,7 +378,8 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
 
     return json({ success: true, user });
   } catch (e) {
-    return json({ error: '获取用户信息失败', detail: String(e) }, 500);
+    console.error('GetMe error:', e);
+    return json({ error: '获取用户信息失败' }, 500);
   }
 }
 
@@ -381,10 +440,9 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
+      console.error('AI upstream error:', aiResponse.status, errorText);
       return json({
-        error: 'AI service error',
-        status: aiResponse.status,
-        detail: errorText,
+        error: 'AI 服务请求失败',
       }, aiResponse.status);
     }
 
@@ -411,7 +469,8 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。`;
       nextAction: '重试',
     });
   } catch (e) {
-    return json({ error: 'AI proxy error', detail: String(e) }, 500);
+    console.error('AI proxy error:', e);
+    return json({ error: 'AI 代理请求失败' }, 500);
   }
 }
 
@@ -496,7 +555,8 @@ async function handleSyncProgress(request: Request, env: Env): Promise<Response>
 
     return json({ success: true, syncedAt: new Date().toISOString() });
   } catch (e) {
-    return json({ error: '同步失败', detail: String(e) }, 500);
+    console.error('SyncProgress error:', e);
+    return json({ error: '同步失败' }, 500);
   }
 }
 
@@ -547,7 +607,8 @@ async function handleGetProgress(request: Request, env: Env): Promise<Response> 
       } : null,
     });
   } catch (e) {
-    return json({ error: '获取进度失败', detail: String(e) }, 500);
+    console.error('GetProgress error:', e);
+    return json({ error: '获取进度失败' }, 500);
   }
 }
 

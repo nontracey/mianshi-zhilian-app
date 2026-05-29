@@ -76,6 +76,65 @@ class StorageService {
         .toList();
   }
 
+  Future<void> savePracticeAttempts(List<PracticeAttempt> attempts) async {
+    await save('practice_attempts', attempts.map((a) => a.toJson()).toList());
+  }
+
+  Future<List<PracticeAttempt>> loadPracticeAttempts() async {
+    final data = await load('practice_attempts');
+    if (data == null) return [];
+    return (data as List)
+        .map((e) => PracticeAttempt.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> saveMockInterviewSessions(
+    List<MockInterviewSession> sessions,
+  ) async {
+    await save(
+      'mock_interview_sessions',
+      sessions.map((s) => s.toJson()).toList(),
+    );
+  }
+
+  Future<List<MockInterviewSession>> loadMockInterviewSessions() async {
+    final data = await load('mock_interview_sessions');
+    if (data == null) return [];
+    return (data as List)
+        .map((e) => MockInterviewSession.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> savePrepPlan(PrepPlan plan) async {
+    await save('prep_plan', plan.toJson());
+  }
+
+  Future<PrepPlan> loadPrepPlan() async {
+    final data = await load('prep_plan');
+    if (data == null) return PrepPlan.empty();
+    return PrepPlan.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> saveLocalProfile(LocalProfile profile) async {
+    await save('local_profile', profile.toJson());
+  }
+
+  Future<LocalProfile> loadLocalProfile() async {
+    final data = await load('local_profile');
+    if (data == null) return const LocalProfile();
+    return LocalProfile.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> saveSyncSettings(SyncSettings settings) async {
+    await save('sync_settings', settings.toJson());
+  }
+
+  Future<SyncSettings> loadSyncSettings() async {
+    final data = await load('sync_settings');
+    if (data == null) return const SyncSettings();
+    return SyncSettings.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<void> saveSettings(AppSettings settings) async {
     await save('settings', settings.toJson());
   }
@@ -102,6 +161,23 @@ class StorageService {
       if (value != null) {
         try {
           exportData['data'][key] = json.decode(value);
+          if (key == 'ai_configs' && exportData['data'][key] is List) {
+            exportData['data'][key] = (exportData['data'][key] as List).map((
+              item,
+            ) {
+              if (item is Map<String, dynamic>) {
+                return {...item, 'apiKey': '[redacted]'};
+              }
+              return item;
+            }).toList();
+          }
+          if (key == 'sync_settings' &&
+              exportData['data'][key] is Map<String, dynamic>) {
+            exportData['data'][key] = {
+              ...(exportData['data'][key] as Map<String, dynamic>),
+              'webDavPassword': '[redacted]',
+            };
+          }
         } catch (_) {
           exportData['data'][key] = value;
         }

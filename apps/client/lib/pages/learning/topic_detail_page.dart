@@ -54,7 +54,79 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   @override
   Widget build(BuildContext context) {
     final topic = widget.topic;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1100;
 
+    // 桌面端：三栏布局（左侧目录 + 中间知识 + 右侧复述）
+    if (isDesktop) {
+      return _buildDesktopLayout(context, topic);
+    }
+    // 移动端/平板：原有 TabBar 布局
+    return _buildMobileLayout(context, topic);
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, Topic topic) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 顶部导航
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Expanded(
+                child: Text(
+                  topic.title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _TopicHeader(topic: topic),
+        const SizedBox(height: 8),
+        // 三栏内容
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 左侧：目录与前置知识
+              SizedBox(
+                width: 240,
+                child: _LeftSidebar(topic: topic),
+              ),
+              const VerticalDivider(width: 1),
+              // 中间：知识卡片流
+              Expanded(
+                flex: 3,
+                child: _KnowledgeTab(topic: topic),
+              ),
+              const VerticalDivider(width: 1),
+              // 右侧：复述与 AI 评估
+              SizedBox(
+                width: 380,
+                child: _RecallTab(
+                  topic: topic,
+                  answerController: _answerController,
+                  isEvaluating: _isEvaluating,
+                  evaluationResult: _evaluationResult,
+                  onEvaluate: _handleEvaluate,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, Topic topic) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,6 +241,139 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   }
 }
 
+// ── 桌面端左侧目录栏 ─────────────────────────────────────────
+
+class _LeftSidebar extends StatelessWidget {
+  const _LeftSidebar({required this.topic});
+  final Topic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 面试官关注点（突出显示）
+        if (topic.interviewerFocus != null &&
+            topic.interviewerFocus!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.visibility_outlined, size: 14, color: AppColors.accent),
+                    SizedBox(width: 6),
+                    Text(
+                      '面试官关注点',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  topic.interviewerFocus!,
+                  style: const TextStyle(fontSize: 12, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        // 知识卡片目录
+        Text(
+          '知识目录',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...topic.learningCards.asMap().entries.map((entry) {
+          final card = entry.value;
+          final typeIcons = {
+            'explain': Icons.article_outlined,
+            'interviewAnswer': Icons.auto_awesome,
+            'interview': Icons.auto_awesome,
+            'checklist': Icons.checklist,
+            'code': Icons.code,
+            'animation': Icons.animation,
+            'diagram': Icons.schema_outlined,
+            'svg': Icons.draw_outlined,
+            'table': Icons.table_chart_outlined,
+            'compareTable': Icons.compare_arrows,
+          };
+          final icon = typeIcons[card.type] ?? Icons.description_outlined;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: Icon(icon, size: 16, color: AppColors.accent),
+              title: Text(
+                card.title,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              minLeadingWidth: 24,
+            ),
+          );
+        }),
+        // 前置知识
+        if (topic.prerequisites.isNotEmpty) ...[
+          const Divider(height: 24),
+          Text(
+            '前置知识',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...topic.prerequisites.map((prereq) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_right, size: 16, color: AppColors.warning),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    prereq,
+                    style: const TextStyle(fontSize: 12, color: AppColors.warning),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+        // LeetCode 链接
+        if (topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty) ...[
+          const Divider(height: 24),
+          ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            leading: const Icon(Icons.code, size: 16, color: AppColors.success),
+            title: const Text('LeetCode 练习', style: TextStyle(fontSize: 13)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            minLeadingWidth: 24,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 // ── 顶部标签信息 ──────────────────────────────────────────────
 
 class _TopicHeader extends StatelessWidget {
@@ -239,8 +444,8 @@ class _TopicHeader extends StatelessWidget {
                   color: topic.interviewFrequency == 'medium'
                       ? AppColors.warning
                       : topic.interviewFrequency == 'low'
-                          ? Colors.grey
-                          : AppColors.danger,
+                      ? Colors.grey
+                      : AppColors.danger,
                 ),
               ),
               avatar: Icon(
@@ -249,8 +454,8 @@ class _TopicHeader extends StatelessWidget {
                 color: topic.interviewFrequency == 'medium'
                     ? AppColors.warning
                     : topic.interviewFrequency == 'low'
-                        ? Colors.grey
-                        : AppColors.danger,
+                    ? Colors.grey
+                    : AppColors.danger,
               ),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
@@ -309,10 +514,7 @@ class _KnowledgeTab extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         topic.interviewerFocus!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
+                        style: const TextStyle(fontSize: 13, height: 1.5),
                       ),
                     ],
                   ),
@@ -378,7 +580,7 @@ class _ExplainCard extends StatelessWidget {
     final lines = formatted.split('\n');
     final buffer = StringBuffer();
     bool inFencedCodeBlock = false; // 已有 ``` 包裹的代码块
-    bool inBareCodeBlock = false;   // 自动识别的裸代码块
+    bool inBareCodeBlock = false; // 自动识别的裸代码块
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -478,7 +680,8 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed.startsWith('>')) return true;
 
     // 表格行：| col1 | col2 |
-    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) return true;
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2)
+      return true;
 
     // 表格分隔行：| --- | --- |
     if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) return true;
@@ -490,7 +693,11 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed.startsWith('**') && trimmed.contains('**')) return true;
 
     // 斜体开头：*text*（但不是列表）
-    if (trimmed.startsWith('*') && !trimmed.startsWith('* ') && trimmed.endsWith('*') && trimmed.length > 2) return true;
+    if (trimmed.startsWith('*') &&
+        !trimmed.startsWith('* ') &&
+        trimmed.endsWith('*') &&
+        trimmed.length > 2)
+      return true;
 
     // 链接：[text](url)
     if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) return true;
@@ -509,16 +716,27 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed.startsWith('//')) return true;
 
     // 多行注释开始或结束
-    if (trimmed.startsWith('/*') || trimmed.startsWith('*') && trimmed.endsWith('*/')) return true;
+    if (trimmed.startsWith('/*') ||
+        trimmed.startsWith('*') && trimmed.endsWith('*/'))
+      return true;
 
     // Java 关键字开头（严格匹配）
-    if (RegExp(r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package)\s').hasMatch(trimmed)) return true;
+    if (RegExp(
+      r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package)\s',
+    ).hasMatch(trimmed))
+      return true;
 
     // 控制流关键字
-    if (RegExp(r'^(?:if|else|for|while|try|catch|finally|switch|case|default|return|throw|throws|new|assert)\b').hasMatch(trimmed)) return true;
+    if (RegExp(
+      r'^(?:if|else|for|while|try|catch|finally|switch|case|default|return|throw|throws|new|assert)\b',
+    ).hasMatch(trimmed))
+      return true;
 
     // 类型声明
-    if (RegExp(r'^(?:void|int|long|double|float|boolean|char|byte|short|String|Object|List|Map|Set)\s+\w+').hasMatch(trimmed)) return true;
+    if (RegExp(
+      r'^(?:void|int|long|double|float|boolean|char|byte|short|String|Object|List|Map|Set)\s+\w+',
+    ).hasMatch(trimmed))
+      return true;
 
     // 行尾有分号（代码特征）
     if (trimmed.endsWith(';') && !trimmed.startsWith('|')) return true;
@@ -527,10 +745,13 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed == '{' || trimmed == '}' || trimmed == '};') return true;
 
     // 赋值语句：Type var = value;
-    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';')) return true;
+    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';'))
+      return true;
 
     // 方法调用：object.method();
-    if (RegExp(r'^\w+[\.\[]\w+.*\)\s*;?\s*$').hasMatch(trimmed) && !trimmed.startsWith('|')) return true;
+    if (RegExp(r'^\w+[\.\[]\w+.*\)\s*;?\s*$').hasMatch(trimmed) &&
+        !trimmed.startsWith('|'))
+      return true;
 
     // new 关键字
     if (RegExp(r'^\w+\s+\w+\s*=\s*new\s').hasMatch(trimmed)) return true;
@@ -552,9 +773,7 @@ class _ExplainCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: _MarkdownContent(data: formattedContent),
@@ -704,7 +923,9 @@ class _CodeCard extends StatelessWidget {
   const _CodeCard({required this.card});
   final LearningCard card;
 
-  ({String language, String code, bool isDiagram}) _parseCodeContent(String content) {
+  ({String language, String code, bool isDiagram}) _parseCodeContent(
+    String content,
+  ) {
     String cleaned = content.trim();
     // 优先使用数据中显式指定的 language 字段
     String language = card.language ?? 'java';
@@ -716,7 +937,9 @@ class _CodeCard extends StatelessWidget {
       final firstNewline = cleaned.indexOf('\n');
       if (firstNewline != -1) {
         final langCandidate = cleaned.substring(0, firstNewline).trim();
-        if (langCandidate.isNotEmpty && !langCandidate.contains(' ') && card.language == null) {
+        if (langCandidate.isNotEmpty &&
+            !langCandidate.contains(' ') &&
+            card.language == null) {
           language = langCandidate;
         }
         cleaned = cleaned.substring(firstNewline + 1);
@@ -732,10 +955,17 @@ class _CodeCard extends StatelessWidget {
     final isDiagram = _isAsciiDiagram(cleaned);
 
     // 自动检测语言（仅当没有显式指定且默认为 java 时尝试检测）
-    if (!isDiagram && card.language == null && language == 'java' && !cleaned.contains('class ') && !cleaned.contains('public ')) {
-      if (cleaned.contains('def ') || (cleaned.contains('import ') && cleaned.contains('self'))) {
+    if (!isDiagram &&
+        card.language == null &&
+        language == 'java' &&
+        !cleaned.contains('class ') &&
+        !cleaned.contains('public ')) {
+      if (cleaned.contains('def ') ||
+          (cleaned.contains('import ') && cleaned.contains('self'))) {
         language = 'python';
-      } else if (cleaned.contains('function ') || cleaned.contains('const ') || cleaned.contains('let ')) {
+      } else if (cleaned.contains('function ') ||
+          cleaned.contains('const ') ||
+          cleaned.contains('let ')) {
         language = 'javascript';
       } else if (cleaned.contains('fn ') || cleaned.contains('let mut ')) {
         language = 'rust';
@@ -753,10 +983,22 @@ class _CodeCard extends StatelessWidget {
 
     for (final line in lines) {
       // 检测箭头符号（流程指示）
-      if (line.contains('→') || line.contains('←') || line.contains('↑') || line.contains('↓') ||
-          line.contains('->') || line.contains('<-') || line.contains('=>') || line.contains('<=') ||
-          line.contains('┌') || line.contains('┐') || line.contains('└') || line.contains('┘') ||
-          line.contains('│') || line.contains('─') || line.contains('├') || line.contains('┤')) {
+      if (line.contains('→') ||
+          line.contains('←') ||
+          line.contains('↑') ||
+          line.contains('↓') ||
+          line.contains('->') ||
+          line.contains('<-') ||
+          line.contains('=>') ||
+          line.contains('<=') ||
+          line.contains('┌') ||
+          line.contains('┐') ||
+          line.contains('└') ||
+          line.contains('┘') ||
+          line.contains('│') ||
+          line.contains('─') ||
+          line.contains('├') ||
+          line.contains('┤')) {
         diagramScore += 2;
       }
 
@@ -772,8 +1014,12 @@ class _CodeCard extends StatelessWidget {
       }
 
       // 检测简单的 ASCII 图形字符
-      if (line.contains('+--') || line.contains('| ') || line.contains('+-+') ||
-          line.contains('[->') || line.contains(']--') || line.contains('-->')) {
+      if (line.contains('+--') ||
+          line.contains('| ') ||
+          line.contains('+-+') ||
+          line.contains('[->') ||
+          line.contains(']--') ||
+          line.contains('-->')) {
         diagramScore += 2;
       }
     }
@@ -790,9 +1036,7 @@ class _CodeCard extends StatelessWidget {
     if (parsed.isDiagram) {
       return WorkPanel(
         title: card.title,
-        children: [
-          _AsciiDiagramView(content: parsed.code),
-        ],
+        children: [_AsciiDiagramView(content: parsed.code)],
       );
     }
 
@@ -800,10 +1044,7 @@ class _CodeCard extends StatelessWidget {
     return WorkPanel(
       title: card.title,
       children: [
-        _HighlightedCode(
-          code: parsed.code,
-          language: parsed.language,
-        ),
+        _HighlightedCode(code: parsed.code, language: parsed.language),
       ],
     );
   }
@@ -845,43 +1086,119 @@ class _AsciiDiagramView extends StatelessWidget {
 // ── 语法高亮代码组件 ─────────────────────────────────────────
 
 class _HighlightedCode extends StatelessWidget {
-  const _HighlightedCode({
-    required this.code,
-    this.language = 'java',
-  });
+  const _HighlightedCode({required this.code, this.language = 'java'});
 
   final String code;
   final String language;
 
   // 颜色方案：关键字、字符串、注释、数字等
-  static const _keywordColor = Color(0xFFC792EA);   // 紫色
-  static const _stringColor = Color(0xFFC3E88D);    // 绿色
-  static const _commentColor = Color(0xFF546E7A);   // 灰色
-  static const _numberColor = Color(0xFFF78C6C);    // 橙色
-  static const _typeColor = Color(0xFF82AAFF);      // 蓝色
-  static const _functionColor = Color(0xFFEEFFFF);  // 白色
-  static const _defaultColor = Color(0xFFE7EEF8);   // 默认色
+  static const _keywordColor = Color(0xFFC792EA); // 紫色
+  static const _stringColor = Color(0xFFC3E88D); // 绿色
+  static const _commentColor = Color(0xFF546E7A); // 灰色
+  static const _numberColor = Color(0xFFF78C6C); // 橙色
+  static const _typeColor = Color(0xFF82AAFF); // 蓝色
+  static const _functionColor = Color(0xFFEEFFFF); // 白色
+  static const _defaultColor = Color(0xFFE7EEF8); // 默认色
 
   List<_CodeToken> _tokenize(String code) {
     final tokens = <_CodeToken>[];
     final keywords = {
-      'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
-      'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
-      'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
-      'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
-      'package', 'private', 'protected', 'public', 'return', 'short', 'static',
-      'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
-      'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
-      'var', 'record', 'sealed', 'permits', 'yield', 'with',
+      'abstract',
+      'assert',
+      'boolean',
+      'break',
+      'byte',
+      'case',
+      'catch',
+      'char',
+      'class',
+      'const',
+      'continue',
+      'default',
+      'do',
+      'double',
+      'else',
+      'enum',
+      'extends',
+      'final',
+      'finally',
+      'float',
+      'for',
+      'goto',
+      'if',
+      'implements',
+      'import',
+      'instanceof',
+      'int',
+      'interface',
+      'long',
+      'native',
+      'new',
+      'package',
+      'private',
+      'protected',
+      'public',
+      'return',
+      'short',
+      'static',
+      'strictfp',
+      'super',
+      'switch',
+      'synchronized',
+      'this',
+      'throw',
+      'throws',
+      'transient',
+      'try',
+      'void',
+      'volatile',
+      'while',
+      'true',
+      'false',
+      'null',
+      'var',
+      'record',
+      'sealed',
+      'permits',
+      'yield',
+      'with',
     };
 
     final typeKeywords = {
-      'String', 'Object', 'List', 'Map', 'Set', 'Collection', 'Iterator',
-      'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character', 'Byte',
-      'Short', 'Number', 'Comparable', 'Iterable', 'Stream', 'Optional',
-      'ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
-      'ConcurrentHashMap', 'CopyOnWriteArrayList', 'ThreadPoolExecutor',
-      'ExecutorService', 'Future', 'CompletableFuture', 'Thread', 'Runnable',
+      'String',
+      'Object',
+      'List',
+      'Map',
+      'Set',
+      'Collection',
+      'Iterator',
+      'Integer',
+      'Long',
+      'Double',
+      'Float',
+      'Boolean',
+      'Character',
+      'Byte',
+      'Short',
+      'Number',
+      'Comparable',
+      'Iterable',
+      'Stream',
+      'Optional',
+      'ArrayList',
+      'HashMap',
+      'HashSet',
+      'LinkedList',
+      'TreeMap',
+      'TreeSet',
+      'ConcurrentHashMap',
+      'CopyOnWriteArrayList',
+      'ThreadPoolExecutor',
+      'ExecutorService',
+      'Future',
+      'CompletableFuture',
+      'Thread',
+      'Runnable',
     };
 
     final buffer = StringBuffer();
@@ -997,9 +1314,7 @@ class _HighlightedCode extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0B1220),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.28),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,15 +1342,19 @@ class _HighlightedCode extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: SelectableText.rich(
               TextSpan(
-                children: tokens.map((token) => TextSpan(
-                  text: token.text,
-                  style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontSize: 13,
-                    height: 1.6,
-                    color: token.color,
-                  ),
-                )).toList(),
+                children: tokens
+                    .map(
+                      (token) => TextSpan(
+                        text: token.text,
+                        style: TextStyle(
+                          fontFamily: 'JetBrainsMono',
+                          fontSize: 13,
+                          height: 1.6,
+                          color: token.color,
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           ),
@@ -1134,10 +1453,10 @@ class _SmartDiagram extends StatelessWidget {
   }
 
   _ContentFeatures _analyzeFeatures(List<String> items) {
-    int colonCount = 0;        // 冒号分隔的键值对
-    int arrowCount = 0;        // 箭头符号
-    int sequentialCount = 0;   // 顺序词
-    int compareCount = 0;      // 对比词
+    int colonCount = 0; // 冒号分隔的键值对
+    int arrowCount = 0; // 箭头符号
+    int sequentialCount = 0; // 顺序词
+    int compareCount = 0; // 对比词
     bool hasCycleIndicator = false;
 
     for (var i = 0; i < items.length; i++) {
@@ -1155,15 +1474,23 @@ class _SmartDiagram extends StatelessWidget {
       }
 
       // 检测顺序词
-      if (lower.contains('首先') || lower.contains('然后') || lower.contains('最后') ||
-          lower.contains('接着') || lower.contains('步骤') || lower.contains('第') ||
+      if (lower.contains('首先') ||
+          lower.contains('然后') ||
+          lower.contains('最后') ||
+          lower.contains('接着') ||
+          lower.contains('步骤') ||
+          lower.contains('第') ||
           RegExp(r'^\d+[.、]').hasMatch(item)) {
         sequentialCount++;
       }
 
       // 检测对比词
-      if (lower.contains('vs') || lower.contains('对比') || lower.contains('比较') ||
-          lower.contains('区别') || lower.contains('优缺') || lower.contains('利弊')) {
+      if (lower.contains('vs') ||
+          lower.contains('对比') ||
+          lower.contains('比较') ||
+          lower.contains('区别') ||
+          lower.contains('优缺') ||
+          lower.contains('利弊')) {
         compareCount++;
       }
 
@@ -1187,8 +1514,10 @@ class _SmartDiagram extends StatelessWidget {
     final arrowRatio = arrowCount / totalItems;
 
     return _ContentFeatures(
-      isHierarchy: colonRatio >= 0.5,           // 超过一半是键值对 → 层级结构
-      isCompare: compareCount >= 1 || (totalItems >= 2 && totalItems % 2 == 0 && colonRatio >= 0.3),
+      isHierarchy: colonRatio >= 0.5, // 超过一半是键值对 → 层级结构
+      isCompare:
+          compareCount >= 1 ||
+          (totalItems >= 2 && totalItems % 2 == 0 && colonRatio >= 0.3),
       isCycle: hasCycleIndicator,
       isSequential: sequentialCount >= 2 || arrowRatio >= 0.3,
     );
@@ -1270,7 +1599,11 @@ class _SmartDiagram extends StatelessWidget {
           _buildFlowStep(i + 1, items[i]),
           if (i < items.length - 1) ...[
             const SizedBox(height: 8),
-            Icon(Icons.arrow_downward, size: 20, color: AppColors.accent.withValues(alpha: 0.6)),
+            Icon(
+              Icons.arrow_downward,
+              size: 20,
+              color: AppColors.accent.withValues(alpha: 0.6),
+            ),
             const SizedBox(height: 8),
           ],
         ],
@@ -1339,13 +1672,19 @@ class _SmartDiagram extends StatelessWidget {
       String text = item;
 
       // 检测是否有层级标记（如 "定位：" 表示顶层，"输入：" 表示下一层）
-      if (item.startsWith('定位') || item.startsWith('概述') || item.startsWith('总体')) {
+      if (item.startsWith('定位') ||
+          item.startsWith('概述') ||
+          item.startsWith('总体')) {
         level = 0;
-      } else if (item.startsWith('输入') || item.startsWith('输出') ||
-          item.startsWith('机制') || item.startsWith('特点') ||
-          item.startsWith('优点') || item.startsWith('缺点')) {
+      } else if (item.startsWith('输入') ||
+          item.startsWith('输出') ||
+          item.startsWith('机制') ||
+          item.startsWith('特点') ||
+          item.startsWith('优点') ||
+          item.startsWith('缺点')) {
         level = 1;
-      } else if (item.startsWith('包含') || item.startsWith('分为') ||
+      } else if (item.startsWith('包含') ||
+          item.startsWith('分为') ||
           item.startsWith('组成')) {
         level = 1;
       }
@@ -1357,7 +1696,12 @@ class _SmartDiagram extends StatelessWidget {
   }
 
   Widget _buildHierarchyNode(_HierarchyItem item) {
-    final colors = [AppColors.accent, AppColors.success, AppColors.warning, const Color(0xFF8B5CF6)];
+    final colors = [
+      AppColors.accent,
+      AppColors.success,
+      AppColors.warning,
+      const Color(0xFF8B5CF6),
+    ];
     final color = colors[item.level % colors.length];
 
     return Container(
@@ -1366,22 +1710,26 @@ class _SmartDiagram extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: color, width: 3),
-        ),
+        border: Border(left: BorderSide(color: color, width: 3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (item.level > 0) ...[
-            Icon(Icons.subdirectory_arrow_right, size: 16, color: color.withValues(alpha: 0.6)),
+            Icon(
+              Icons.subdirectory_arrow_right,
+              size: 16,
+              color: color.withValues(alpha: 0.6),
+            ),
             const SizedBox(width: 8),
           ],
           Expanded(
             child: Text(
               item.text,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: item.level == 0 ? 1.0 : 0.85),
+                color: Colors.white.withValues(
+                  alpha: item.level == 0 ? 1.0 : 0.85,
+                ),
                 fontWeight: item.level == 0 ? FontWeight.w700 : FontWeight.w500,
                 fontSize: item.level == 0 ? 14 : 13,
                 height: 1.5,
@@ -1426,7 +1774,11 @@ class _SmartDiagram extends StatelessWidget {
           ),
           child: Text(
             title,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -1436,12 +1788,20 @@ class _SmartDiagram extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.circle, size: 8, color: color.withValues(alpha: 0.6)),
+                Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: color.withValues(alpha: 0.6),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     item,
-                    style: const TextStyle(color: Colors.white, height: 1.5, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      height: 1.5,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -1459,7 +1819,11 @@ class _SmartDiagram extends StatelessWidget {
           _buildCycleStep(i + 1, items[i]),
           if (i < items.length - 1) ...[
             const SizedBox(height: 4),
-            Icon(Icons.arrow_downward, size: 18, color: const Color(0xFF8B5CF6).withValues(alpha: 0.6)),
+            Icon(
+              Icons.arrow_downward,
+              size: 18,
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.6),
+            ),
             const SizedBox(height: 4),
           ],
         ],
@@ -1509,7 +1873,11 @@ class _SmartDiagram extends StatelessWidget {
             child: Center(
               child: Text(
                 '$index',
-                style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -1536,12 +1904,20 @@ class _SmartDiagram extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 16, color: AppColors.accent.withValues(alpha: 0.7)),
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: AppColors.accent.withValues(alpha: 0.7),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               card.fallback!,
-              style: const TextStyle(color: Color(0xFFBFD6EA), height: 1.5, fontSize: 13),
+              style: const TextStyle(
+                color: Color(0xFFBFD6EA),
+                height: 1.5,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -1593,9 +1969,7 @@ class _SvgDiagramCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF07182A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.32),
-            ),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
           ),
           child: Column(
             children: [
@@ -1697,10 +2071,7 @@ class _FollowUpSection extends StatelessWidget {
         ...followUps.asMap().entries.map(
           (entry) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _FollowUpCard(
-              index: entry.key + 1,
-              question: entry.value,
-            ),
+            child: _FollowUpCard(index: entry.key + 1, question: entry.value),
           ),
         ),
       ],
@@ -1908,9 +2279,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                             InkWell(
                               onTap: () {
                                 Clipboard.setData(
-                                  ClipboardData(
-                                    text: widget.question.answer,
-                                  ),
+                                  ClipboardData(text: widget.question.answer),
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -1981,7 +2350,10 @@ class _TableCard extends StatelessWidget {
           // 如果是第一行（表头），添加分隔行
           if (isFirstLine && !line.contains('---')) {
             // 计算列数
-            final columns = line.split('|').where((c) => c.trim().isNotEmpty).length;
+            final columns = line
+                .split('|')
+                .where((c) => c.trim().isNotEmpty)
+                .length;
             buffer.writeln('| ${'--- | ' * (columns - 1)}--- |');
             isFirstLine = false;
           }
@@ -2076,10 +2448,7 @@ class _GenericCard extends StatelessWidget {
         if (_shouldUseMarkdown(card.content))
           _MarkdownContent(data: card.content)
         else
-          SelectableText(
-            card.content,
-            style: const TextStyle(height: 1.7),
-          ),
+          SelectableText(card.content, style: const TextStyle(height: 1.7)),
       ],
     );
   }
@@ -2151,22 +2520,99 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
   static const _defaultColor = Color(0xFFE7EEF8);
 
   static const _keywords = {
-    'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
-    'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
-    'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
-    'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
-    'package', 'private', 'protected', 'public', 'return', 'short', 'static',
-    'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
-    'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
-    'var', 'record', 'sealed', 'permits', 'yield', 'with',
-    'def', 'fn', 'let', 'async', 'await',
+    'abstract',
+    'assert',
+    'boolean',
+    'break',
+    'byte',
+    'case',
+    'catch',
+    'char',
+    'class',
+    'const',
+    'continue',
+    'default',
+    'do',
+    'double',
+    'else',
+    'enum',
+    'extends',
+    'final',
+    'finally',
+    'float',
+    'for',
+    'goto',
+    'if',
+    'implements',
+    'import',
+    'instanceof',
+    'int',
+    'interface',
+    'long',
+    'native',
+    'new',
+    'package',
+    'private',
+    'protected',
+    'public',
+    'return',
+    'short',
+    'static',
+    'strictfp',
+    'super',
+    'switch',
+    'synchronized',
+    'this',
+    'throw',
+    'throws',
+    'transient',
+    'try',
+    'void',
+    'volatile',
+    'while',
+    'true',
+    'false',
+    'null',
+    'var',
+    'record',
+    'sealed',
+    'permits',
+    'yield',
+    'with',
+    'def',
+    'fn',
+    'let',
+    'async',
+    'await',
   };
 
   static const _typeKeywords = {
-    'String', 'Object', 'List', 'Map', 'Set', 'Collection', 'Iterator',
-    'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character', 'Byte',
-    'Short', 'Number', 'Comparable', 'Iterable', 'Stream', 'Optional',
-    'ArrayList', 'HashMap', 'HashSet', 'LinkedList', 'TreeMap', 'TreeSet',
+    'String',
+    'Object',
+    'List',
+    'Map',
+    'Set',
+    'Collection',
+    'Iterator',
+    'Integer',
+    'Long',
+    'Double',
+    'Float',
+    'Boolean',
+    'Character',
+    'Byte',
+    'Short',
+    'Number',
+    'Comparable',
+    'Iterable',
+    'Stream',
+    'Optional',
+    'ArrayList',
+    'HashMap',
+    'HashSet',
+    'LinkedList',
+    'TreeMap',
+    'TreeSet',
   };
 
   @override
@@ -2184,30 +2630,51 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
       // 单行注释
       if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '/') {
         if (buffer.isNotEmpty) {
-          tokens.add(TextSpan(
-            text: buffer.toString(),
-            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-          ));
+          tokens.add(
+            TextSpan(
+              text: buffer.toString(),
+              style: TextStyle(
+                color: _defaultColor,
+                fontFamily: 'JetBrainsMono',
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          );
           buffer.clear();
         }
         final start = i;
         while (i < code.length && code[i] != '\n') {
           i++;
         }
-        tokens.add(TextSpan(
-          text: code.substring(start, i),
-          style: TextStyle(color: _commentColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-        ));
+        tokens.add(
+          TextSpan(
+            text: code.substring(start, i),
+            style: TextStyle(
+              color: _commentColor,
+              fontFamily: 'JetBrainsMono',
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+        );
         continue;
       }
 
       // 多行注释
       if (i + 1 < code.length && code[i] == '/' && code[i + 1] == '*') {
         if (buffer.isNotEmpty) {
-          tokens.add(TextSpan(
-            text: buffer.toString(),
-            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-          ));
+          tokens.add(
+            TextSpan(
+              text: buffer.toString(),
+              style: TextStyle(
+                color: _defaultColor,
+                fontFamily: 'JetBrainsMono',
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          );
           buffer.clear();
         }
         final start = i;
@@ -2216,20 +2683,34 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
           i++;
         }
         i += 2;
-        tokens.add(TextSpan(
-          text: code.substring(start, i),
-          style: TextStyle(color: _commentColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-        ));
+        tokens.add(
+          TextSpan(
+            text: code.substring(start, i),
+            style: TextStyle(
+              color: _commentColor,
+              fontFamily: 'JetBrainsMono',
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+        );
         continue;
       }
 
       // 字符串
       if (code[i] == '"' || code[i] == '\'') {
         if (buffer.isNotEmpty) {
-          tokens.add(TextSpan(
-            text: buffer.toString(),
-            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-          ));
+          tokens.add(
+            TextSpan(
+              text: buffer.toString(),
+              style: TextStyle(
+                color: _defaultColor,
+                fontFamily: 'JetBrainsMono',
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          );
           buffer.clear();
         }
         final quote = code[i];
@@ -2240,40 +2721,68 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
           i++;
         }
         i++;
-        tokens.add(TextSpan(
-          text: code.substring(start, i),
-          style: TextStyle(color: _stringColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-        ));
+        tokens.add(
+          TextSpan(
+            text: code.substring(start, i),
+            style: TextStyle(
+              color: _stringColor,
+              fontFamily: 'JetBrainsMono',
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+        );
         continue;
       }
 
       // 数字
       if (RegExp(r'[0-9]').hasMatch(code[i])) {
         if (buffer.isNotEmpty) {
-          tokens.add(TextSpan(
-            text: buffer.toString(),
-            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-          ));
+          tokens.add(
+            TextSpan(
+              text: buffer.toString(),
+              style: TextStyle(
+                color: _defaultColor,
+                fontFamily: 'JetBrainsMono',
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          );
           buffer.clear();
         }
         final start = i;
         while (i < code.length && RegExp(r'[0-9.xXa-fA-F]').hasMatch(code[i])) {
           i++;
         }
-        tokens.add(TextSpan(
-          text: code.substring(start, i),
-          style: TextStyle(color: _numberColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-        ));
+        tokens.add(
+          TextSpan(
+            text: code.substring(start, i),
+            style: TextStyle(
+              color: _numberColor,
+              fontFamily: 'JetBrainsMono',
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+        );
         continue;
       }
 
       // 标识符或关键字
       if (RegExp(r'[a-zA-Z_$]').hasMatch(code[i])) {
         if (buffer.isNotEmpty) {
-          tokens.add(TextSpan(
-            text: buffer.toString(),
-            style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-          ));
+          tokens.add(
+            TextSpan(
+              text: buffer.toString(),
+              style: TextStyle(
+                color: _defaultColor,
+                fontFamily: 'JetBrainsMono',
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          );
           buffer.clear();
         }
         final start = i;
@@ -2291,10 +2800,17 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
         } else {
           color = _defaultColor;
         }
-        tokens.add(TextSpan(
-          text: word,
-          style: TextStyle(color: color, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-        ));
+        tokens.add(
+          TextSpan(
+            text: word,
+            style: TextStyle(
+              color: color,
+              fontFamily: 'JetBrainsMono',
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+        );
         continue;
       }
 
@@ -2304,10 +2820,17 @@ class _CodeSyntaxHighlighter extends SyntaxHighlighter {
     }
 
     if (buffer.isNotEmpty) {
-      tokens.add(TextSpan(
-        text: buffer.toString(),
-        style: TextStyle(color: _defaultColor, fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.6),
-      ));
+      tokens.add(
+        TextSpan(
+          text: buffer.toString(),
+          style: TextStyle(
+            color: _defaultColor,
+            fontFamily: 'JetBrainsMono',
+            fontSize: 13,
+            height: 1.6,
+          ),
+        ),
+      );
     }
 
     return tokens;

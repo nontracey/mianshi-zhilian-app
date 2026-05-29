@@ -21,14 +21,18 @@ class UpdateInfo {
     final platforms = <String, PlatformUpdate>{};
     final platformsJson = json['platforms'] as Map<String, dynamic>? ?? {};
     for (final entry in platformsJson.entries) {
-      platforms[entry.key] = PlatformUpdate.fromJson(entry.value as Map<String, dynamic>);
+      platforms[entry.key] = PlatformUpdate.fromJson(
+        entry.value as Map<String, dynamic>,
+      );
     }
 
     return UpdateInfo(
       version: json['version'] as String? ?? '',
       buildNumber: json['buildNumber'] as int? ?? 0,
       releaseDate: json['releaseDate'] as String? ?? '',
-      notes: (json['notes'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      notes: (json['notes'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
       platforms: platforms,
     );
   }
@@ -58,7 +62,8 @@ class UpdateService {
   final String updateManifestUrl;
 
   UpdateService({
-    this.updateManifestUrl = 'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
+    this.updateManifestUrl =
+        'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
   });
 
   /// 检查是否有新版本
@@ -111,8 +116,16 @@ class UpdateService {
 
   /// 比较版本号
   bool _isNewerVersion(String remote, String local) {
-    final remoteParts = remote.replaceAll('v', '').split('.').map(int.tryParse).toList();
-    final localParts = local.replaceAll('v', '').split('.').map(int.tryParse).toList();
+    final remoteParts = remote
+        .replaceAll('v', '')
+        .split('.')
+        .map(int.tryParse)
+        .toList();
+    final localParts = local
+        .replaceAll('v', '')
+        .split('.')
+        .map(int.tryParse)
+        .toList();
 
     for (var i = 0; i < 3; i++) {
       final r = i < remoteParts.length ? (remoteParts[i] ?? 0) : 0;

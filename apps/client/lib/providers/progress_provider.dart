@@ -10,13 +10,28 @@ class ProgressProvider extends ChangeNotifier {
 
   Map<String, TopicProgress> _progressMap = {};
   List<PracticeSession> _sessions = [];
+  List<PracticeAttempt> _attempts = [];
+  List<MockInterviewSession> _mockSessions = [];
+  PrepPlan _prepPlan = PrepPlan.empty();
+  LocalProfile _localProfile = const LocalProfile();
+  SyncSettings _syncSettings = const SyncSettings();
 
   Map<String, TopicProgress> get progressMap => _progressMap;
   List<PracticeSession> get sessions => _sessions;
+  List<PracticeAttempt> get attempts => _attempts;
+  List<MockInterviewSession> get mockSessions => _mockSessions;
+  PrepPlan get prepPlan => _prepPlan;
+  LocalProfile get localProfile => _localProfile;
+  SyncSettings get syncSettings => _syncSettings;
 
   Future<void> loadProgress() async {
     _progressMap = await _storage.loadProgressMap();
     _sessions = await _storage.loadSessions();
+    _attempts = await _storage.loadPracticeAttempts();
+    _mockSessions = await _storage.loadMockInterviewSessions();
+    _prepPlan = await _storage.loadPrepPlan();
+    _localProfile = await _storage.loadLocalProfile();
+    _syncSettings = await _storage.loadSyncSettings();
     notifyListeners();
   }
 
@@ -35,7 +50,9 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   Future<void> updateTopicProgress(String topicId, {required int score}) async {
-    final status = score >= 85 ? 'mastered' : (score >= 60 ? 'learning' : 'new');
+    final status = score >= 85
+        ? 'mastered'
+        : (score >= 60 ? 'learning' : 'new');
     await updateProgress(topicId, score, status);
   }
 
@@ -53,13 +70,46 @@ class ProgressProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addAttempt(PracticeAttempt attempt) async {
+    _attempts.insert(0, attempt);
+    await _storage.savePracticeAttempts(_attempts);
+    notifyListeners();
+  }
+
+  Future<void> addMockSession(MockInterviewSession session) async {
+    _mockSessions.insert(0, session);
+    await _storage.saveMockInterviewSessions(_mockSessions);
+    notifyListeners();
+  }
+
+  Future<void> updatePrepPlan(PrepPlan plan) async {
+    _prepPlan = plan;
+    await _storage.savePrepPlan(plan);
+    notifyListeners();
+  }
+
+  Future<void> updateLocalProfile(LocalProfile profile) async {
+    _localProfile = profile;
+    await _storage.saveLocalProfile(profile);
+    notifyListeners();
+  }
+
+  Future<void> updateSyncSettings(SyncSettings settings) async {
+    _syncSettings = settings;
+    await _storage.saveSyncSettings(settings);
+    notifyListeners();
+  }
+
   TopicProgress? getProgress(String topicId) => _progressMap[topicId];
 
   /// Alias for getProgress
   TopicProgress? getTopicProgress(String topicId) => getProgress(topicId);
 
   /// Returns (masteryPercent, topicCount) for a domain
-  ({int masteryPercent, int topicCount}) getDomainProgress(String domainId, List<Topic> topics) {
+  ({int masteryPercent, int topicCount}) getDomainProgress(
+    String domainId,
+    List<Topic> topics,
+  ) {
     final domainTopics = topics.where((t) => t.domainId == domainId).toList();
     if (domainTopics.isEmpty) return (masteryPercent: 0, topicCount: 0);
 
@@ -74,7 +124,10 @@ class ProgressProvider extends ChangeNotifier {
     }
 
     if (count == 0) return (masteryPercent: 0, topicCount: domainTopics.length);
-    return (masteryPercent: (totalScore / domainTopics.length).round(), topicCount: domainTopics.length);
+    return (
+      masteryPercent: (totalScore / domainTopics.length).round(),
+      topicCount: domainTopics.length,
+    );
   }
 
   int getReviewCount(String domainId) {
@@ -94,12 +147,44 @@ class ProgressProvider extends ChangeNotifier {
   List<Topic> getRecommendedTopics(
     String domainId,
     List<Topic> topics,
-    String strategy,
-  ) {
+    String strategy, {
+    int lowScoreWeight = 35,
+    int overdueWeight = 25,
+    int highFrequencyWeight = 25,
+    int pathOrderWeight = 10,
+    int notPracticedWeight = 5,
+    bool prioritizePrerequisites = true,
+    bool allowSkipLowFrequency = false,
+  }) {
     final domainTopics = topics.where((t) => t.domainId == domainId).toList();
     final result = List<Topic>.from(domainTopics);
 
     switch (strategy) {
+      case 'smart':
+        result.sort((a, b) {
+          final scoreA = _recommendationScore(
+            a,
+            lowScoreWeight: lowScoreWeight,
+            overdueWeight: overdueWeight,
+            highFrequencyWeight: highFrequencyWeight,
+            pathOrderWeight: pathOrderWeight,
+            notPracticedWeight: notPracticedWeight,
+            prioritizePrerequisites: prioritizePrerequisites,
+            allowSkipLowFrequency: allowSkipLowFrequency,
+          );
+          final scoreB = _recommendationScore(
+            b,
+            lowScoreWeight: lowScoreWeight,
+            overdueWeight: overdueWeight,
+            highFrequencyWeight: highFrequencyWeight,
+            pathOrderWeight: pathOrderWeight,
+            notPracticedWeight: notPracticedWeight,
+            prioritizePrerequisites: prioritizePrerequisites,
+            allowSkipLowFrequency: allowSkipLowFrequency,
+          );
+          return scoreB.compareTo(scoreA);
+        });
+        break;
       case 'low-score-first':
         result.sort((a, b) {
           final scoreA = _progressMap[a.id]?.score ?? 0;
@@ -119,9 +204,58 @@ class ProgressProvider extends ChangeNotifier {
           return scoreA.compareTo(scoreB);
         });
         break;
+      case 'review-first':
+        result.sort((a, b) {
+          final dueA = _isReviewDue(_progressMap[a.id]) ? 1 : 0;
+          final dueB = _isReviewDue(_progressMap[b.id]) ? 1 : 0;
+          if (dueA != dueB) return dueB.compareTo(dueA);
+          final scoreA = _progressMap[a.id]?.score ?? 0;
+          final scoreB = _progressMap[b.id]?.score ?? 0;
+          return scoreA.compareTo(scoreB);
+        });
+        break;
     }
 
     return result;
+  }
+
+  int _recommendationScore(
+    Topic topic, {
+    required int lowScoreWeight,
+    required int overdueWeight,
+    required int highFrequencyWeight,
+    required int pathOrderWeight,
+    required int notPracticedWeight,
+    required bool prioritizePrerequisites,
+    required bool allowSkipLowFrequency,
+  }) {
+    final progress = _progressMap[topic.id];
+    final score = progress?.score ?? 0;
+    final lowScorePart = (100 - score).clamp(0, 100) * lowScoreWeight;
+    final overduePart = _isReviewDue(progress) ? 100 * overdueWeight : 0;
+    final highFrequencyPart =
+        (topic.highFrequency ? 100 : topic.recommendWeight) *
+        highFrequencyWeight;
+    final pathPart =
+        (10000 - topic.order).clamp(0, 10000) * pathOrderWeight ~/ 100;
+    final notPracticedPart = progress == null ? 100 * notPracticedWeight : 0;
+    final lowFrequencyPenalty =
+        !allowSkipLowFrequency && topic.interviewFrequency == 'low' ? 500 : 0;
+    return lowScorePart +
+        overduePart +
+        highFrequencyPart +
+        pathPart +
+        notPracticedPart -
+        lowFrequencyPenalty;
+  }
+
+  bool _isReviewDue(TopicProgress? progress) {
+    if (progress?.nextReviewAt == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final review = progress!.nextReviewAt!;
+    final reviewDate = DateTime(review.year, review.month, review.day);
+    return !reviewDate.isAfter(today);
   }
 
   List<Topic> getTodayReviewTopics(List<Topic> topics) {
@@ -138,6 +272,120 @@ class ProgressProvider extends ChangeNotifier {
       );
       return !reviewDate.isAfter(today);
     }).toList();
+  }
+
+  List<PracticeAttempt> getAttemptsForTopic(String topicId) =>
+      _attempts.where((a) => a.topicId == topicId).toList();
+
+  List<PracticeAttempt> get lowScoreAttempts =>
+      _attempts.where((a) => (a.score ?? 100) < 60).toList();
+
+  int get practiceStreakDays {
+    final dates = _attempts
+        .map(
+          (a) => DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day),
+        )
+        .toSet();
+    var streak = 0;
+    var cursor = DateTime.now();
+    while (dates.contains(DateTime(cursor.year, cursor.month, cursor.day))) {
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  int readinessScore(List<Topic> topics) {
+    if (topics.isEmpty) return 0;
+    final domainAverage =
+        topics
+            .map((t) => _progressMap[t.id]?.score ?? 0)
+            .fold<int>(0, (sum, score) => sum + score) ~/
+        topics.length;
+    final reviewPenalty = getTodayReviewTopics(topics).length.clamp(0, 10) * 2;
+    final mockAverage = _mockSessions.isEmpty
+        ? domainAverage
+        : _mockSessions
+                  .take(3)
+                  .map((s) => s.averageScore)
+                  .fold<int>(0, (a, b) => a + b) ~/
+              _mockSessions.take(3).length;
+    return ((domainAverage * 0.55 +
+                mockAverage * 0.35 +
+                practiceStreakDays * 2) -
+            reviewPenalty)
+        .round()
+        .clamp(0, 100);
+  }
+
+  /// 连续学习天数（别名）
+  int get streakDays => practiceStreakDays;
+
+  /// 获取薄弱知识点 Top N（按分数升序）
+  List<Topic> getWeakTopics(List<Topic> topics, {int limit = 5}) {
+    final scored = topics
+        .where((t) => (_progressMap[t.id]?.score ?? 0) > 0)
+        .toList();
+    scored.sort(
+      (a, b) =>
+          (_progressMap[a.id]?.score ?? 0).compareTo(
+            _progressMap[b.id]?.score ?? 0,
+          ),
+    );
+    return scored.take(limit).toList();
+  }
+
+  /// 最近练习记录（按时间降序）
+  List<PracticeAttempt> get recentAttempts {
+    final sorted = List<PracticeAttempt>.from(_attempts)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return sorted;
+  }
+
+  /// 总练习次数
+  int get totalPracticeCount {
+    return _progressMap.values.fold<int>(0, (sum, p) => sum + p.practiceCount);
+  }
+
+  /// 总学习时长（小时），基于练习次数估算（每次约10分钟）
+  double get totalHours {
+    return totalPracticeCount * 10 / 60;
+  }
+
+  /// 今日学习时长增长（小时）
+  double get todayHoursGrowth {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayAttempts = _attempts.where((a) => a.createdAt.isAfter(todayStart)).length;
+    return todayAttempts * 10 / 60;
+  }
+
+  /// 获取掌握度趋势数据（最近7天的平均分）
+  List<double> getMasteryTrend() {
+    final now = DateTime.now();
+    final trend = <double>[];
+    
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final dayStart = DateTime(date.year, date.month, date.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      
+      final dayAttempts = _attempts.where((a) => 
+        a.createdAt.isAfter(dayStart) && 
+        a.createdAt.isBefore(dayEnd) &&
+        a.score != null
+      ).toList();
+      
+      if (dayAttempts.isNotEmpty) {
+        final avgScore = dayAttempts.fold<double>(0, (sum, a) => sum + (a.score ?? 0)) / dayAttempts.length;
+        trend.add(avgScore);
+      } else {
+        // 如果当天没有数据，使用前一天的数据或默认值
+        trend.add(trend.isNotEmpty ? trend.last : 50.0);
+      }
+    }
+    
+    return trend;
   }
 
   /// 导出所有进度数据

@@ -48,12 +48,14 @@ class _AiConfigPageState extends State<AiConfigPage> {
               ),
             )
           else
-            ...configs.map((config) => _ConfigCard(
-                  config: config,
-                  onEdit: () => _showEditDialog(context, config: config),
-                  onDelete: () => _handleDelete(context, config),
-                  onSetDefault: () => _handleSetDefault(context, config),
-                )),
+            ...configs.map(
+              (config) => _ConfigCard(
+                config: config,
+                onEdit: () => _showEditDialog(context, config: config),
+                onDelete: () => _handleDelete(context, config),
+                onSetDefault: () => _handleSetDefault(context, config),
+              ),
+            ),
         ],
       ),
     );
@@ -62,11 +64,21 @@ class _AiConfigPageState extends State<AiConfigPage> {
   void _showEditDialog(BuildContext context, {AiConfig? config}) {
     final isEditing = config != null;
     final nameController = TextEditingController(text: config?.name ?? '');
-    final baseUrlController = TextEditingController(text: config?.baseUrl ?? '');
+    final baseUrlController = TextEditingController(
+      text: config?.baseUrl ?? '',
+    );
     final apiKeyController = TextEditingController(text: config?.apiKey ?? '');
     final modelController = TextEditingController(text: config?.model ?? '');
     bool isDefault = config?.isDefault ?? false;
     bool enabled = config?.enabled ?? true;
+    bool supportsTextInput = config?.supportsTextInput ?? true;
+    bool supportsImageInput = config?.supportsImageInput ?? false;
+    bool supportsAudioInput = config?.supportsAudioInput ?? false;
+    bool supportsMultimodal = config?.supportsMultimodal ?? false;
+    bool supportsStreaming = config?.supportsStreaming ?? false;
+    final usageTags = <String>{
+      ...config?.usageTags ?? const ['recall'],
+    };
     String? testResult;
     bool isTesting = false;
 
@@ -121,11 +133,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             setDialogState(() => isTesting = true);
                             try {
                               final aiProvider = context.read<AiProvider>();
-                              final success = await aiProvider.testConnectionWithParams(
-                                baseUrl: baseUrlController.text.trim(),
-                                apiKey: apiKeyController.text.trim(),
-                                model: modelController.text.trim(),
-                              );
+                              final success = await aiProvider
+                                  .testConnectionWithParams(
+                                    baseUrl: baseUrlController.text.trim(),
+                                    apiKey: apiKeyController.text.trim(),
+                                    model: modelController.text.trim(),
+                                  );
                               setDialogState(() {
                                 testResult = success ? '连接成功' : '连接失败';
                                 isTesting = false;
@@ -161,12 +174,108 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   SwitchListTile(
                     value: isDefault,
                     title: const Text('设为默认'),
-                    onChanged: (value) => setDialogState(() => isDefault = value),
+                    onChanged: (value) =>
+                        setDialogState(() => isDefault = value),
                   ),
                   SwitchListTile(
                     value: enabled,
                     title: const Text('启用'),
                     onChanged: (value) => setDialogState(() => enabled = value),
+                  ),
+                  const Divider(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '模型能力声明',
+                      style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    value: supportsTextInput,
+                    title: const Text('支持文本'),
+                    subtitle: const Text('关闭后不会用于文本评分'),
+                    onChanged: (value) =>
+                        setDialogState(() => supportsTextInput = value),
+                  ),
+                  SwitchListTile(
+                    value: supportsImageInput,
+                    title: const Text('支持图片理解'),
+                    onChanged: (value) => setDialogState(() {
+                      supportsImageInput = value;
+                      supportsMultimodal =
+                          supportsImageInput || supportsAudioInput;
+                    }),
+                  ),
+                  SwitchListTile(
+                    value: supportsAudioInput,
+                    title: const Text('支持原始音频理解'),
+                    subtitle: const Text('未开启时仍可先转写成文字再评分'),
+                    onChanged: (value) => setDialogState(() {
+                      supportsAudioInput = value;
+                      supportsMultimodal =
+                          supportsImageInput || supportsAudioInput;
+                    }),
+                  ),
+                  SwitchListTile(
+                    value: supportsStreaming,
+                    title: const Text('支持流式响应'),
+                    onChanged: (value) =>
+                        setDialogState(() => supportsStreaming = value),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '用途标签',
+                      style: Theme.of(ctx).textTheme.labelLarge,
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _UsageChip(
+                        label: '复述评分',
+                        value: 'recall',
+                        selected: usageTags.contains('recall'),
+                        onSelected: (value) => setDialogState(
+                          () => value
+                              ? usageTags.add('recall')
+                              : usageTags.remove('recall'),
+                        ),
+                      ),
+                      _UsageChip(
+                        label: '模拟面试',
+                        value: 'mockInterview',
+                        selected: usageTags.contains('mockInterview'),
+                        onSelected: (value) => setDialogState(
+                          () => value
+                              ? usageTags.add('mockInterview')
+                              : usageTags.remove('mockInterview'),
+                        ),
+                      ),
+                      _UsageChip(
+                        label: '图片理解',
+                        value: 'imageReview',
+                        selected: usageTags.contains('imageReview'),
+                        onSelected: (value) => setDialogState(
+                          () => value
+                              ? usageTags.add('imageReview')
+                              : usageTags.remove('imageReview'),
+                        ),
+                      ),
+                      _UsageChip(
+                        label: '语音识别',
+                        value: 'stt',
+                        selected: usageTags.contains('stt'),
+                        onSelected: (value) => setDialogState(
+                          () => value
+                              ? usageTags.add('stt')
+                              : usageTags.remove('stt'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -184,7 +293,10 @@ class _AiConfigPageState extends State<AiConfigPage> {
                 final apiKey = apiKeyController.text.trim();
                 final model = modelController.text.trim();
 
-                if (name.isEmpty || baseUrl.isEmpty || apiKey.isEmpty || model.isEmpty) {
+                if (name.isEmpty ||
+                    baseUrl.isEmpty ||
+                    apiKey.isEmpty ||
+                    model.isEmpty) {
                   return;
                 }
 
@@ -197,6 +309,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     model: model,
                     isDefault: isDefault,
                     enabled: enabled,
+                    supportsTextInput: supportsTextInput,
+                    supportsImageInput: supportsImageInput,
+                    supportsAudioInput: supportsAudioInput,
+                    supportsMultimodal: supportsMultimodal,
+                    supportsStreaming: supportsStreaming,
+                    usageTags: usageTags.toList(),
                   );
                   aiProvider.updateConfig(updated);
                 } else {
@@ -209,6 +327,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     model: model,
                     isDefault: isDefault,
                     enabled: enabled,
+                    supportsTextInput: supportsTextInput,
+                    supportsImageInput: supportsImageInput,
+                    supportsAudioInput: supportsAudioInput,
+                    supportsMultimodal: supportsMultimodal,
+                    supportsStreaming: supportsStreaming,
+                    usageTags: usageTags.toList(),
                   );
                   aiProvider.addConfig(newConfig);
                 }
@@ -311,6 +435,10 @@ class _ConfigCard extends StatelessWidget {
         const SizedBox(height: 4),
         Text('Base URL：${config.baseUrl}'),
         const SizedBox(height: 4),
+        Text('能力：${config.capabilityLabel}'),
+        const SizedBox(height: 4),
+        Text('用途：${config.usageTags.join('、')}'),
+        const SizedBox(height: 4),
         Text('状态：${config.enabled ? '已启用' : '已禁用'}'),
         const SizedBox(height: 12),
         Wrap(
@@ -331,11 +459,36 @@ class _ConfigCard extends StatelessWidget {
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline, size: 18),
               label: const Text('删除'),
-              style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.danger,
+              ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _UsageChip extends StatelessWidget {
+  const _UsageChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final String value;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
     );
   }
 }

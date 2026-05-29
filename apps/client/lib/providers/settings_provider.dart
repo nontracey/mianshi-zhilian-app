@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../models/app_settings.dart';
+import '../models/user_progress.dart';
 import '../services/storage_service.dart';
 
 // Web 端下载（条件导入）
@@ -100,25 +102,69 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> updatePrimaryColor(Color color) async => setPrimaryColor(color);
   Future<void> updateAccentColor(Color color) async => setAccentColor(color);
   Future<void> updateLanguage(String lang) async => setLanguage(lang);
-  Future<void> updateRecommendStrategy(String strategy) async => setRecommendStrategy(strategy);
+  Future<void> updateRecommendStrategy(String strategy) async =>
+      setRecommendStrategy(strategy);
 
   Future<void> updateFontScale(double scale) async {
-    // Font scale not yet in AppSettings model; no-op for now
+    _settings = _settings.copyWith(fontScale: scale);
+    await _storage.saveSettings(_settings);
+    notifyListeners();
   }
 
   Future<void> updateDensity(String density) async {
-    // Density not yet in AppSettings model; no-op for now
+    _settings = _settings.copyWith(cardDensity: density);
+    await _storage.saveSettings(_settings);
+    notifyListeners();
   }
 
-  Future<void> syncData() async {
-    // Sync not yet implemented
+  Future<String> syncData([SyncSettings? syncSettings]) async {
+    final settings = syncSettings ?? const SyncSettings();
+    if (settings.method == 'local') {
+      return '当前为本地模式，数据已保存在本机。';
+    }
+    if (settings.method == 'file') {
+      await exportData();
+      return '已生成本地导出文件。';
+    }
+    if (settings.method == 'webdav') {
+      if (settings.webDavUrl.isEmpty ||
+          settings.webDavUsername.isEmpty ||
+          settings.webDavPassword.isEmpty) {
+        return '请先填写 WebDAV 地址、用户名和应用密码。';
+      }
+      final data = await _storage.exportAllData();
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
+      final base = settings.webDavUrl.replaceAll(RegExp(r'/+$'), '');
+      final fileName = 'mianshi-zhilian-backup.json';
+      final uri = Uri.parse('$base/$fileName');
+      final basic = base64Encode(
+        utf8.encode('${settings.webDavUsername}:${settings.webDavPassword}'),
+      );
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Basic $basic',
+          'Content-Type': 'application/json',
+        },
+        body: jsonStr,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return 'WebDAV 备份完成。';
+      }
+      return 'WebDAV 备份失败：${response.statusCode}';
+    }
+    if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(settings.method)) {
+      return '该第三方同步方式待开通，可先使用文件导出或 WebDAV。';
+    }
+    return '云同步暂不可用，本地数据不受影响。';
   }
 
   Future<void> exportData() async {
     try {
       final data = await _storage.exportAllData();
       final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-      final fileName = 'mianshi-zhilian-export-${DateTime.now().millisecondsSinceEpoch}.json';
+      final fileName =
+          'mianshi-zhilian-export-${DateTime.now().millisecondsSinceEpoch}.json';
 
       if (kIsWeb) {
         downloadFile(fileName, jsonStr);

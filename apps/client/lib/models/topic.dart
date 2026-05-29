@@ -285,15 +285,16 @@ class LearningCard {
     items:
         (json['items'] as List<dynamic>?)?.map((e) => e as String).toList() ??
         [],
-    highlights: (json['highlights'] as List<dynamic>?)
+    highlights:
+        (json['highlights'] as List<dynamic>?)
             ?.map((e) => (e as Map<String, dynamic>))
             .toList() ??
         [],
-    columns: (json['columns'] as List<dynamic>?)
-            ?.map((e) => e as String)
-            .toList() ??
+    columns:
+        (json['columns'] as List<dynamic>?)?.map((e) => e as String).toList() ??
         [],
-    rows: (json['rows'] as List<dynamic>?)
+    rows:
+        (json['rows'] as List<dynamic>?)
             ?.map(
               (row) => (row as List<dynamic>).map((e) => e as String).toList(),
             )

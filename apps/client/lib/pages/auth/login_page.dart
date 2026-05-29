@@ -84,16 +84,16 @@ class _LoginPageState extends State<LoginPage> {
     // 获取云端数据并合并
     final cloudData = await authProvider.getCloudProgress();
     if (cloudData != null && cloudData['progressMap'] != null) {
-      await progressProvider.mergeFromCloud(cloudData['progressMap'] as Map<String, dynamic>);
+      await progressProvider.mergeFromCloud(
+        cloudData['progressMap'] as Map<String, dynamic>,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isRegister ? '注册账号' : '登录'),
-      ),
+      appBar: AppBar(title: Text(_isRegister ? '注册账号' : '登录')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -176,7 +176,9 @@ class _LoginPageState extends State<LoginPage> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Text(_isRegister ? '注册' : '登录'),
                       ),
@@ -185,12 +187,10 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: _isLoading
                             ? null
                             : () => setState(() {
-                                  _isRegister = !_isRegister;
-                                  _error = null;
-                                }),
-                        child: Text(
-                          _isRegister ? '已有账号？去登录' : '没有账号？去注册',
-                        ),
+                                _isRegister = !_isRegister;
+                                _error = null;
+                              }),
+                        child: Text(_isRegister ? '已有账号？去登录' : '没有账号？去注册'),
                       ),
                     ],
                   ),

@@ -74,12 +74,14 @@ class ContentProvider extends ChangeNotifier {
 
       if (remoteVersion != null && remoteVersion != _cachedContentVersion) {
         // 内容有更新，标记需要刷新（不清除缓存，切换领域时按需刷新）
-        debugPrint('Content version changed: $_cachedContentVersion -> $remoteVersion');
+        debugPrint(
+          'Content version changed: $_cachedContentVersion -> $remoteVersion',
+        );
         await _storage.save('content_version', remoteVersion);
         _cachedContentVersion = remoteVersion;
         // 记录需要刷新的版本，切换领域时会检查
         await _storage.save('content_version_pending', remoteVersion);
-        
+
         // 清理已删除领域的缓存
         await _cleanupDeletedDomains();
       } else {
@@ -97,7 +99,8 @@ class ContentProvider extends ChangeNotifier {
       notifyListeners();
 
       // 6. 自动加载指定领域或默认领域的 topics（后台加载，不阻塞 UI）
-      final domainToLoad = currentDomainId ?? _manifest?['defaultDomain'] as String? ?? 'java';
+      final domainToLoad =
+          currentDomainId ?? _manifest?['defaultDomain'] as String? ?? 'java';
       if (_topics.values.where((t) => t.domainId == domainToLoad).isEmpty) {
         loadDomainTopics(domainToLoad);
       }
@@ -118,7 +121,9 @@ class ContentProvider extends ChangeNotifier {
     try {
       final remoteManifest = await _api.fetchManifest();
       final remoteVersion = remoteManifest['contentVersion'] as String?;
-      final localVersion = _cachedContentVersion ?? await _storage.load('content_version') as String?;
+      final localVersion =
+          _cachedContentVersion ??
+          await _storage.load('content_version') as String?;
 
       if (remoteVersion != null && remoteVersion != localVersion) {
         debugPrint('Content update available: $localVersion -> $remoteVersion');
@@ -172,13 +177,18 @@ class ContentProvider extends ChangeNotifier {
       }
 
       // 检查是否有待刷新的版本
-      final pendingVersion = await _storage.load('content_version_pending') as String?;
-      final cachedDomainVersion = await _storage.load('domain_version_$domainId') as String?;
-      final needsRefresh = pendingVersion != null && pendingVersion != cachedDomainVersion;
+      final pendingVersion =
+          await _storage.load('content_version_pending') as String?;
+      final cachedDomainVersion =
+          await _storage.load('domain_version_$domainId') as String?;
+      final needsRefresh =
+          pendingVersion != null && pendingVersion != cachedDomainVersion;
 
       // 检查该领域是否已缓存且不需要刷新
       final cachedDomain = await _storage.load('domain_cache_$domainId');
-      if (cachedDomain != null && cachedDomain is Map<String, dynamic> && !needsRefresh) {
+      if (cachedDomain != null &&
+          cachedDomain is Map<String, dynamic> &&
+          !needsRefresh) {
         // 从缓存加载该领域的 topics
         final cachedTopics = cachedDomain.map(
           (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
@@ -190,7 +200,9 @@ class ContentProvider extends ChangeNotifier {
       }
 
       // 缓存中没有或需要刷新，从网络加载
-      debugPrint('Loading domain $domainId from network (needsRefresh: $needsRefresh)');
+      debugPrint(
+        'Loading domain $domainId from network (needsRefresh: $needsRefresh)',
+      );
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
           // topicPath 格式: "topics/java/topic-001-xxx.json"
@@ -293,7 +305,10 @@ class ContentProvider extends ChangeNotifier {
   }
 
   /// 切换知识源环境：更新 baseUrl 并重载内容
-  Future<void> switchContentEnv(String newBaseUrl, {String? currentDomainId}) async {
+  Future<void> switchContentEnv(
+    String newBaseUrl, {
+    String? currentDomainId,
+  }) async {
     _api.switchBaseUrl(newBaseUrl);
     _domains = [];
     _topics = {};
@@ -307,14 +322,16 @@ class ContentProvider extends ChangeNotifier {
     try {
       // 获取当前所有领域 ID
       final currentDomainIds = _domains.map((d) => d.id).toSet();
-      
+
       // 获取本地缓存的所有 key
       final prefs = await _storage.getInstance();
       final keys = prefs.getKeys();
-      
+
       // 找出 domain_cache_ 开头的 key
-      final domainCacheKeys = keys.where((k) => k.startsWith('domain_cache_')).toList();
-      
+      final domainCacheKeys = keys
+          .where((k) => k.startsWith('domain_cache_'))
+          .toList();
+
       for (final key in domainCacheKeys) {
         final domainId = key.replaceFirst('domain_cache_', '');
         if (!currentDomainIds.contains(domainId)) {
@@ -322,7 +339,7 @@ class ContentProvider extends ChangeNotifier {
           debugPrint('Cleaning up deleted domain cache: $domainId');
           await _storage.save(key, null);
           await _storage.save('domain_version_$domainId', null);
-          
+
           // 从内存中移除该领域的 topics
           _topics.removeWhere((_, topic) => topic.domainId == domainId);
         }
@@ -336,19 +353,19 @@ class ContentProvider extends ChangeNotifier {
   Future<void> clearAllDomainCache() async {
     try {
       _topics = {};
-      
+
       // 清除所有领域的缓存
       for (final domain in _domains) {
         await _storage.save('domain_cache_${domain.id}', null);
         await _storage.save('domain_version_${domain.id}', null);
       }
-      
+
       // 清除 topics_cache
       await _storage.save('topics_cache', {});
-      
+
       // 清除 pending version
       await _storage.save('content_version_pending', null);
-      
+
       notifyListeners();
       debugPrint('All domain caches cleared');
     } catch (e) {

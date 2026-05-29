@@ -173,7 +173,8 @@ class L10n {
     // Recall
     'recall_question': 'Recall Question',
     'your_answer': 'Your Answer',
-    'answer_hint': 'Enter your recall answer here...\n\nTip: Start with definition → Explain mechanism → Discuss scenarios',
+    'answer_hint':
+        'Enter your recall answer here...\n\nTip: Start with definition → Explain mechanism → Discuss scenarios',
     'get_ai_evaluation': 'Get AI Evaluation',
     'ai_evaluating': 'AI Evaluating...',
     'ai_result': 'AI Evaluation Result',

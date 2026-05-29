@@ -8,7 +8,10 @@ class AuthProvider extends ChangeNotifier {
   final StorageService _storage;
   final String apiBaseUrl;
 
-  AuthProvider(this._storage, {this.apiBaseUrl = 'https://mianshi-zhilian-api.nontracey.workers.dev'});
+  AuthProvider(
+    this._storage, {
+    this.apiBaseUrl = 'https://mianshi-zhilian-api.nontracey.workers.dev',
+  });
 
   User? _user;
   String? _token;
@@ -36,7 +39,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// 注册
-  Future<bool> register(String username, String password, {String? nickname}) async {
+  Future<bool> register(
+    String username,
+    String password, {
+    String? nickname,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -85,10 +92,7 @@ class AuthProvider extends ChangeNotifier {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'username': username,
-          'password': password,
-        }),
+        body: json.encode({'username': username, 'password': password}),
       );
 
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -134,7 +138,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// 上传学习进度到云端
-  Future<bool> syncToCloud(Map<String, dynamic> progressMap, Map<String, dynamic> settings) async {
+  Future<bool> syncToCloud(
+    Map<String, dynamic> progressMap,
+    Map<String, dynamic> settings,
+  ) async {
     if (!isLoggedIn) return false;
 
     try {
@@ -144,10 +151,7 @@ class AuthProvider extends ChangeNotifier {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_token',
         },
-        body: json.encode({
-          'progressMap': progressMap,
-          'settings': settings,
-        }),
+        body: json.encode({'progressMap': progressMap, 'settings': settings}),
       );
 
       return response.statusCode == 200;
@@ -164,9 +168,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.get(
         Uri.parse('$apiBaseUrl/sync/progress'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-        },
+        headers: {'Authorization': 'Bearer $_token'},
       );
 
       if (response.statusCode == 200) {

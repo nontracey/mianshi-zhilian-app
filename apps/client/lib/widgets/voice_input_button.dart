@@ -45,9 +45,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   Future<void> _toggleListening() async {
     if (!_isAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('语音识别不可用，请检查麦克风权限')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('语音识别不可用，请检查麦克风权限')));
       return;
     }
 

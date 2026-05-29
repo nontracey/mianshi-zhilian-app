@@ -35,7 +35,8 @@ class Domain {
       icon: json['icon'] as String?,
       themeColor: json['themeColor'] as String?,
       accentColor: json['accentColor'] as String?,
-      categories: (json['categories'] as List<dynamic>?)
+      categories:
+          (json['categories'] as List<dynamic>?)
               ?.map((e) => Category.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -80,17 +81,17 @@ class Category {
   });
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        description: json['description'] as String?,
-        order: (json['order'] as num?)?.toInt() ?? 0,
-        topics: (json['topics'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            [],
-        prerequisites: (json['prerequisites'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            [],
-      );
+    id: json['id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String?,
+    order: (json['order'] as num?)?.toInt() ?? 0,
+    topics:
+        (json['topics'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+        [],
+    prerequisites:
+        (json['prerequisites'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        [],
+  );
 }
