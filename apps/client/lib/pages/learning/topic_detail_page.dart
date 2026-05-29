@@ -637,13 +637,13 @@ class _InterviewAnswerCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              SelectableText(
-                formattedContent,
+              DefaultTextStyle(
                 style: const TextStyle(
                   color: Color(0xFFE2E8F0),
                   fontSize: 14,
                   height: 1.7,
                 ),
+                child: _MarkdownContent(data: formattedContent),
               ),
             ],
           ),
@@ -1887,13 +1887,13 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        SelectableText(
-                          widget.question.answer,
+                        DefaultTextStyle(
                           style: const TextStyle(
                             color: Color(0xFFE2E8F0),
                             fontSize: 13,
                             height: 1.6,
                           ),
+                          child: _MarkdownContent(data: widget.question.answer),
                         ),
                       ],
                     ),
