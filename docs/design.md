@@ -758,37 +758,105 @@ manifest 示例：
   "domain": "java",
   "category": "jvm",
   "group": "memory-management",
-  "title": "JVM运行时数据区",
+  "title": "JVM 运行时数据区",
   "summary": "理解程序计数器、虚拟机栈、本地方法栈、堆、方法区的职责和生命周期。",
   "tags": ["JVM", "Heap", "Stack", "Metaspace"],
   "difficulty": 2,
   "estimatedMinutes": 20,
   "order": 10,
   "recommendWeight": 90,
+  "status": "production",
+  "prerequisites": [],
+  "interviewFrequency": "high",
+  "interviewerFocus": "考察对 JVM 内存管理的理解深度，能否区分线程私有和共享区域",
   "learningCards": [
     {
       "type": "explain",
-      "title": "线程私有区域",
-      "content": "程序计数器、虚拟机栈、本地方法栈随线程创建和销毁。"
+      "title": "核心概念",
+      "content": "JVM 在执行 Java 程序时，会把内存划分为不同运行时数据区。程序计数器、虚拟机栈、本地方法栈属于线程私有；堆和方法区属于线程共享。"
+    },
+    {
+      "type": "interviewAnswer",
+      "title": "面试回答模板",
+      "content": "面试时我会先按线程私有和线程共享来讲……",
+      "followUpQuestions": [
+        {
+          "question": "能结合实际项目说说 JVM 调优经验吗？",
+          "answer": "GC 调优的核心是理解对象的生命周期。新生代用复制算法，老年代用标记-清除……"
+        }
+      ]
     },
     {
       "type": "animation",
-      "title": "一次方法调用中的内存流转",
+      "title": "一次方法调用中的 JVM 内存流转",
       "asset": "assets/java/jvm-memory-flow.webp",
-      "fallback": "用流程图展示栈帧创建、对象进入堆、类信息在元空间共享。"
+      "fallback": "如果动画加载失败，用流程图展示栈帧创建、对象进入堆、类信息在元空间共享。",
+      "caption": "左侧线程创建栈帧，右侧堆保存对象实例，元空间保存类信息。"
+    },
+    {
+      "type": "checklist",
+      "title": "学完后应能说清楚",
+      "items": [
+        "程序计数器为什么线程私有",
+        "堆和栈的区别",
+        "方法区和元空间的关系"
+      ]
     }
   ],
   "recallPrompts": [
-    "请用自己的话解释 JVM 运行时数据区的划分。",
-    "堆和栈有什么区别？面试时应该如何回答？"
+    {
+      "id": "java.jvm.runtime-data-area.recall.1",
+      "prompt": "请用自己的话解释 JVM 运行时数据区的划分。",
+      "mode": "text",
+      "expectedMinutes": 3,
+      "difficulty": 2
+    },
+    {
+      "id": "java.jvm.runtime-data-area.recall.2",
+      "prompt": "如果面试官问堆和栈有什么区别，你会怎么回答？",
+      "mode": "text",
+      "expectedMinutes": 2,
+      "difficulty": 1
+    }
   ],
   "rubric": {
     "mustHave": ["线程私有区域", "线程共享区域", "堆", "虚拟机栈", "方法区"],
-    "commonMistakes": ["把方法区等同于永久代", "忽略程序计数器线程私有"]
+    "goodToHave": ["程序计数器不会 OOM", "JDK 8 后元空间替代永久代"],
+    "commonMistakes": ["把方法区直接等同于永久代", "忽略程序计数器线程私有"],
+    "scoreWeights": {
+      "coverage": 40,
+      "accuracy": 25,
+      "interviewExpression": 20,
+      "depth": 15
+    }
   },
   "sourceRef": "运行时数据区概述.md"
 }
 ```
+
+知识点字段说明：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `id` | 是 | 全局唯一，推荐格式：`domain.category.topic`。 |
+| `domain` | 是 | 所属领域 ID。 |
+| `category` | 是 | 所属分类 ID。 |
+| `group` | 否 | 更细分的组，例如 `memory-management`。 |
+| `title` | 是 | 知识点标题。 |
+| `summary` | 是 | 一句话摘要。 |
+| `tags` | 是 | 标签，用于搜索和展示。 |
+| `difficulty` | 是 | 难度，建议 1-5。 |
+| `estimatedMinutes` | 是 | 建议学习时长。 |
+| `order` | 是 | 领域内默认学习顺序。 |
+| `recommendWeight` | 是 | 推荐权重，0-100。 |
+| `status` | 否 | 生产状态，`production`（正式）或 `draft`（草稿），默认 `draft`。 |
+| `prerequisites` | 否 | 前置依赖知识点 ID 数组，例如 `["java.jvm.runtime-data-area"]`。 |
+| `interviewFrequency` | 否 | 面试频率，`high`（高频）/ `medium`（中频）/ `low`（低频）。 |
+| `interviewerFocus` | 否 | 面试官关注点，说明面试官问这个知识点时真正想考察什么。 |
+| `learningCards` | 是 | 学习内容卡片。 |
+| `recallPrompts` | 是 | 主动复述题。 |
+| `rubric` | 是 | AI 评估标准。 |
+| `sourceRef` | 否 | 内部溯源，不给用户展示。 |
 
 App 渲染约定：
 
@@ -797,11 +865,15 @@ App 渲染约定：
 | `domains` | 自动生成学习中心领域卡片和领域切换 |
 | `categories` | 自动生成领域知识目录分组 |
 | `topics` | 自动生成知识点列表 |
-| `learningCards` | 按 `type` 渲染解释、代码、表格、图片、动画、面试话术 |
-| `recallPrompts` | 生成主动复述题 |
-| `rubric` | 生成 AI 评估 Prompt |
+| `learningCards` | 按 `type` 渲染解释、代码、表格、图片、动画、面试话术、检查清单 |
+| `recallPrompts` | 生成主动复述题，支持 text/code/voice 模式 |
+| `rubric` | 生成 AI 评估 Prompt，包含 mustHave、goodToHave、commonMistakes、scoreWeights |
 | `order` | 控制默认学习路径 |
 | `recommendWeight` | 参与推荐策略计算 |
+| `status` | 控制是否显示给正式用户（仅显示 `production` 状态） |
+| `prerequisites` | 构建学习路径图，显示前置依赖关系 |
+| `interviewFrequency` | 参与推荐算法，高频知识点优先推荐 |
+| `interviewerFocus` | 展示面试官关注点，帮助理解考察方向 |
 
 内容扩充流程：
 
