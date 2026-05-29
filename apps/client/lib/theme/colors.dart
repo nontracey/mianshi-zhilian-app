@@ -3,15 +3,45 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
+  // 主色调
   static const Color primary = Color(0xFF1A2B4A);
   static const Color accent = Color(0xFF3078F0);
+  
+  // 状态颜色
   static const Color success = Color(0xFF00A860);
   static const Color warning = Color(0xFFF5A623);
   static const Color danger = Color(0xFFE5484D);
-  static const Color bgLight = Color(0xFFF5F5F5);
-  static const Color bgDark = Color(0xFF111111);
+  
+  // 浅色主题背景
+  static const Color bgLight = Color(0xFFFAFBFC);
   static const Color surfaceLight = Color(0xFFFFFFFF);
+  
+  // 质感黑主题（默认深色）- 偏纯黑，有质感
+  static const Color bgDark = Color(0xFF0A0A0A);        // 主背景：质感黑
+  static const Color surfaceDark = Color(0xFF111111);    // 表面：稍浅黑
+  static const Color surfaceDarkHigh = Color(0xFF1A1A1A); // 高级表面：卡片背景
+  static const Color surfaceDarkHighest = Color(0xFF222222); // 最高级表面：弹窗
+  static const Color borderDark = Color(0xFF2A2A2A);     // 主边框
+  static const Color borderDarkSubtle = Color(0xFF1E1E1E); // 次要边框
+  
+  // 午夜蓝主题 - 偏蓝色调
+  static const Color bgMidnight = Color(0xFF0D1117);     // 主背景：深蓝黑
+  static const Color surfaceMidnight = Color(0xFF161B22); // 表面
+  static const Color surfaceMidnightHigh = Color(0xFF1C2333); // 高级表面
+  static const Color surfaceMidnightHighest = Color(0xFF21283B); // 最高级表面
+  static const Color borderMidnight = Color(0xFF30363D);  // 主边框
+  static const Color borderMidnightSubtle = Color(0xFF21262D); // 次要边框
+  
+  // 文字颜色
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF666666);
-  static const Color borderLight = Color(0xFFE0E0E0);
+  static const Color textTertiary = Color(0xFF999999);
+  
+  // 浅色边框
+  static const Color borderLight = Color(0xFFE8E8E8);
+  static const Color borderLighter = Color(0xFFF0F0F0);
+  
+  // 卡片阴影
+  static const Color cardShadow = Color(0x0A000000);
+  static const Color cardShadowDark = Color(0x1A000000);
 }

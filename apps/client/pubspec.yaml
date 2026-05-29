@@ -25,6 +25,7 @@ dependencies:
   highlight: ^0.7.0
   flutter_highlight: ^0.7.0
   speech_to_text: ^6.6.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

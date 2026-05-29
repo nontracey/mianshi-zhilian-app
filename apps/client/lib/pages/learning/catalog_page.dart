@@ -32,7 +32,8 @@ class _CatalogPageState extends State<CatalogPage> {
   bool _hasCodeOnly = false;
   bool _hasLeetcodeOnly = false;
   final Set<String> _statusFilters = {};
-  String _sortBy = 'order'; // order, difficulty, score, reviewTime
+  String _sortBy = 'order';
+  bool _showFilters = false;
 
   List<Topic> _applyFilters(List<Topic> topics, ProgressProvider progress) {
     var result = topics;
@@ -129,7 +130,7 @@ class _CatalogPageState extends State<CatalogPage> {
     );
     final masteryPercent = domainProgress.masteryPercent;
     final loaded = contentProvider.getLoadedTopicCount(widget.currentDomainId);
-    final total = currentDomain.topicCount;
+    final totalTopics = currentDomain.topicCount;
     
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
@@ -139,29 +140,15 @@ class _CatalogPageState extends State<CatalogPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 顶部：领域信息 + 视图切换
-          _buildHeader(context, currentDomain, masteryPercent, domains, contentProvider, isDark),
-          const SizedBox(height: 16),
-          
-          // 搜索和筛选栏
-          _buildFilterBar(context, isDark),
-          
-          // 筛选结果统计
-          if (_hasActiveFilters) ...[
-            const SizedBox(height: 8),
-            Text(
-              '筛选结果：${sortedTopics.length} / ${domainTopics.length} 个知识点',
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF999999)),
-            ),
-          ],
-          
-          // 加载状态
-          if (contentProvider.isLoadingTopics && loaded < total) ...[
-            const SizedBox(height: 12),
-            _buildLoadingBar(context, loaded, total),
-          ],
-          
+          // 顶部：紧凑的领域选择和搜索
+          _buildCompactHeader(context, currentDomain, masteryPercent, totalTopics, domains, contentProvider, isDark),
           const SizedBox(height: 12),
+          
+          // 筛选栏（可折叠）
+          if (_showFilters) ...[
+            _buildFilterBar(context, isDark),
+            const SizedBox(height: 12),
+          ],
           
           // 知识点列表
           Expanded(
@@ -174,99 +161,145 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Domain domain, int masteryPercent, 
-      List<Domain> domains, ContentProvider contentProvider, bool isDark) {
+  Widget _buildCompactHeader(BuildContext context, Domain domain, int masteryPercent, 
+      int totalTopics, List<Domain> domains, ContentProvider contentProvider, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF15202E) : Colors.white,
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          // 领域信息
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  domain.title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+          // 第一行：领域下拉 + 搜索 + 筛选按钮 + 视图切换
+          Row(
+            children: [
+              // 领域下拉选择
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: widget.currentDomainId,
+                    isDense: true,
+                    items: domains.map((d) => DropdownMenuItem(
+                      value: d.id,
+                      child: Text(d.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    )).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        widget.onDomainChanged(value);
+                        if (contentProvider.getLoadedTopicCount(value) == 0) {
+                          contentProvider.loadDomainTopics(value);
+                        }
+                      }
+                    },
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  domain.description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white54 : const Color(0xFF666666),
+              ),
+              const SizedBox(width: 12),
+              
+              // 搜索框
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: '搜索当前领域...',
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              onPressed: () => setState(() => _searchQuery = ''),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (v) => setState(() => _searchQuery = v),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                // 掌握度进度条
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: masteryPercent / 100,
-                          backgroundColor: const Color(0xFF3078F0).withValues(alpha: 0.1),
-                          color: const Color(0xFF3078F0),
-                          minHeight: 6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$masteryPercent%',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF3078F0),
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              
+              // 筛选按钮
+              IconButton(
+                icon: Icon(
+                  _showFilters ? Icons.filter_list_off : Icons.filter_list,
+                  size: 20,
+                  color: _hasActiveFilters ? Theme.of(context).colorScheme.primary : null,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 24),
-          
-          // 领域切换
-          SegmentedButton<String>(
-            segments: domains.map((d) => ButtonSegment(
-              value: d.id,
-              label: Text(d.id.toUpperCase()),
-            )).toList(),
-            selected: {widget.currentDomainId},
-            onSelectionChanged: (next) {
-              widget.onDomainChanged(next.first);
-              if (contentProvider.getLoadedTopicCount(next.first) == 0) {
-                contentProvider.loadDomainTopics(next.first);
-              }
-            },
-          ),
-          const SizedBox(width: 16),
-          
-          // 视图切换
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Icon(Icons.view_list, size: 18)),
-              ButtonSegment(value: true, label: Icon(Icons.account_tree, size: 18)),
+                onPressed: () => setState(() => _showFilters = !_showFilters),
+                tooltip: _showFilters ? '隐藏筛选' : '显示筛选',
+                style: IconButton.styleFrom(
+                  backgroundColor: _hasActiveFilters 
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 4),
+              
+              // 视图切换
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16)),
+                  ButtonSegment(value: true, icon: Icon(Icons.account_tree, size: 16)),
+                ],
+                selected: {_roadmapView},
+                onSelectionChanged: (next) => setState(() => _roadmapView = next.first),
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
             ],
-            selected: {_roadmapView},
-            onSelectionChanged: (next) {
-              setState(() => _roadmapView = next.first);
-            },
+          ),
+          
+          // 第二行：掌握度进度条
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                '$totalTopics 个知识点',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: masteryPercent / 100,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary,
+                    minHeight: 4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$masteryPercent%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -277,36 +310,16 @@ class _CatalogPageState extends State<CatalogPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A2332) : const Color(0xFFF5F5F5),
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 搜索框
-          TextField(
-            decoration: InputDecoration(
-              hintText: '搜索知识点、标签...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () => setState(() => _searchQuery = ''),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: isDark ? const Color(0xFF15202E) : Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              isDense: true,
-            ),
-            onChanged: (v) => setState(() => _searchQuery = v),
-          ),
-          const SizedBox(height: 10),
-          
-          // 筛选器行
+          // 筛选标签
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -401,7 +414,7 @@ class _CatalogPageState extends State<CatalogPage> {
               // 清除筛选
               if (_hasActiveFilters)
                 ActionChip(
-                  label: const Text('清除筛选', style: TextStyle(fontSize: 11)),
+                  label: const Text('清除', style: TextStyle(fontSize: 11)),
                   avatar: const Icon(Icons.filter_alt_off, size: 14),
                   onPressed: _clearFilters,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -411,16 +424,10 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
           
           // 排序选项
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Text(
-                '排序：',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white54 : const Color(0xFF666666),
-                ),
-              ),
+              Text('排序：', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
               const SizedBox(width: 8),
               _buildSortChip('默认', 'order', isDark),
               _buildSortChip('难度', 'difficulty', isDark),
@@ -435,52 +442,27 @@ class _CatalogPageState extends State<CatalogPage> {
 
   Widget _buildSortChip(String label, String value, bool isDark) {
     final isSelected = _sortBy == value;
-    return GestureDetector(
-      onTap: () => setState(() => _sortBy = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF3078F0)
-              : (isDark ? const Color(0xFF15202E) : Colors.white),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _sortBy = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF3078F0)
-                : (isDark ? const Color(0xFF263238) : const Color(0xFFE0E0E0)),
+                ? Theme.of(context).colorScheme.primary
+                : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+            ),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? Colors.white70 : const Color(0xFF666666)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingBar(BuildContext context, int loaded, int total) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF3078F0).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-          Text('正在加载知识点 $loaded/$total ...', style: const TextStyle(fontSize: 13)),
-        ],
       ),
     );
   }
@@ -492,10 +474,7 @@ class _CatalogPageState extends State<CatalogPage> {
         children: [
           Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
-          Text(
-            '没有找到匹配的知识点',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
+          Text('没有找到匹配的知识点', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
           const SizedBox(height: 8),
           if (_hasActiveFilters)
             TextButton(
@@ -516,8 +495,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return ListView.builder(
       itemCount: topics.length,
       itemBuilder: (context, index) {
-        final topic = topics[index];
-        return _buildTopicCard(context, topic, progressProvider, isDark);
+        return _buildTopicCard(context, topics[index], progressProvider, isDark);
       },
     );
   }
@@ -528,7 +506,6 @@ class _CatalogPageState extends State<CatalogPage> {
     final score = progress?.score ?? 0;
     final nextReview = progress?.nextReviewAt;
     
-    // 难度标签
     final difficultyLabel = switch (topic.difficulty) {
       1 => '入门',
       2 => '基础',
@@ -546,25 +523,22 @@ class _CatalogPageState extends State<CatalogPage> {
       _ => Colors.grey,
     };
     
-    // 状态颜色
     final statusColor = score >= 85
         ? AppColors.success
         : score > 0
         ? AppColors.warning
         : Colors.grey;
     
-    // 是否含代码题
     final hasCode = topic.recallPrompts.any((p) => p.mode == 'code');
-    // 是否含LeetCode
     final hasLeetcode = topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF15202E) : Colors.white,
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
         ),
       ),
       child: InkWell(
@@ -605,7 +579,6 @@ class _CatalogPageState extends State<CatalogPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // 高频标签
                         if (topic.highFrequency)
                           Container(
                             margin: const EdgeInsets.only(left: 8),
@@ -614,10 +587,7 @@ class _CatalogPageState extends State<CatalogPage> {
                               color: AppColors.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              '高频',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger),
-                            ),
+                            child: const Text('高频', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger)),
                           ),
                       ],
                     ),
@@ -628,33 +598,17 @@ class _CatalogPageState extends State<CatalogPage> {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        // 难度
-                        _buildMiniTag(difficultyLabel, difficultyColor, isDark),
-                        // 面试频率
+                        if (difficultyLabel.isNotEmpty)
+                          _buildMiniTag(difficultyLabel, difficultyColor, isDark),
                         if (topic.interviewFrequencyLabel != null && !topic.highFrequency)
                           _buildMiniTag(topic.interviewFrequencyLabel!, AppColors.warning, isDark),
-                        // 预计时间
                         if (topic.estimatedMinutes > 0)
                           _buildMiniTag('${topic.estimatedMinutes}分钟', Colors.grey, isDark),
-                        // 代码题
                         if (hasCode)
                           _buildMiniTag('代码', const Color(0xFF8B5CF6), isDark),
-                        // LeetCode
                         if (hasLeetcode)
                           _buildMiniTag('LeetCode', const Color(0xFF10B981), isDark),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    
-                    // 摘要
-                    Text(
-                      topic.summary,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white54 : const Color(0xFF666666),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -666,44 +620,28 @@ class _CatalogPageState extends State<CatalogPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // 分数
                   if (score > 0)
                     Text(
-                      '$score 分',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
-                      ),
+                      '$score分',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: statusColor),
                     ),
-                  const SizedBox(height: 4),
-                  // 下次复习时间
-                  if (nextReview != null)
+                  if (nextReview != null) ...[
+                    const SizedBox(height: 4),
                     Text(
                       _formatReviewTime(nextReview),
                       style: TextStyle(
                         fontSize: 11,
-                        color: nextReview.isBefore(DateTime.now())
-                            ? AppColors.danger
-                            : (isDark ? Colors.white38 : const Color(0xFF999999)),
+                        color: nextReview.isBefore(DateTime.now()) ? AppColors.danger : (isDark ? Colors.white38 : const Color(0xFF999999)),
                       ),
                     ),
+                  ],
                   const SizedBox(height: 8),
-                  // 操作按钮
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildActionButton(
-                        '查阅',
-                        const Color(0xFF00CCF9),
-                        () => widget.onTopicLearn(topic.id),
-                      ),
+                      _buildActionButton('查阅', const Color(0xFF00CCF9), () => widget.onTopicLearn(topic.id)),
                       const SizedBox(width: 6),
-                      _buildActionButton(
-                        '练习',
-                        const Color(0xFF3078F0),
-                        () => widget.onTopicPractice(topic.id),
-                      ),
+                      _buildActionButton('练习', const Color(0xFF3078F0), () => widget.onTopicPractice(topic.id)),
                     ],
                   ),
                 ],
@@ -722,14 +660,7 @@ class _CatalogPageState extends State<CatalogPage> {
         color: color.withValues(alpha: isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
     );
   }
 
@@ -742,14 +673,7 @@ class _CatalogPageState extends State<CatalogPage> {
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
+        child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
       ),
     );
   }
@@ -772,49 +696,64 @@ class _CatalogPageState extends State<CatalogPage> {
 
   Widget _buildRoadmapView(BuildContext context, List<Topic> topics, 
       ProgressProvider progressProvider, bool isDark) {
-    // 按 phase 分组
-    final phases = <String, List<Topic>>{};
-    for (final topic in topics) {
-      final phase = topic.phase ?? '未分类';
-      phases.putIfAbsent(phase, () => []).add(topic);
+    // 检查是否有 phase 数据
+    final hasPhaseData = topics.any((t) => t.phase != null && t.phase!.isNotEmpty);
+    
+    final Map<String, List<Topic>> groups = {};
+    
+    if (hasPhaseData) {
+      // 按 phase 分组
+      for (final topic in topics) {
+        final phase = topic.phase ?? '未分类';
+        groups.putIfAbsent(phase, () => []).add(topic);
+      }
+    } else {
+      // 按 category 分组（用 domain 作为分类）
+      for (final topic in topics) {
+        final category = topic.domain.isNotEmpty ? topic.domain : '未分类';
+        groups.putIfAbsent(category, () => []).add(topic);
+      }
     }
 
+    // 排序
     const phaseOrder = ['基础', '入门', '进阶', '中级', '高级', '困难'];
-    final sortedPhases = phases.keys.toList()
+    final sortedKeys = groups.keys.toList()
       ..sort((a, b) {
         final ia = phaseOrder.indexOf(a);
         final ib = phaseOrder.indexOf(b);
-        return (ia == -1 ? 999 : ia).compareTo(ib == -1 ? 999 : ib);
+        final va = ia == -1 ? 999 : ia;
+        final vb = ib == -1 ? 999 : ib;
+        if (va != vb) return va.compareTo(vb);
+        return a.compareTo(b);
       });
 
+    if (topics.isEmpty) {
+      return Center(
+        child: Text('暂无知识点', style: TextStyle(color: Colors.grey.shade500)),
+      );
+    }
+
     return ListView.builder(
-      itemCount: sortedPhases.length,
+      itemCount: sortedKeys.length,
       itemBuilder: (context, index) {
-        final phase = sortedPhases[index];
-        final phaseTopics = phases[phase]!;
+        final key = sortedKeys[index];
+        final groupTopics = groups[key]!;
         
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 阶段标题
-            _buildPhaseHeader(context, phase, index, isDark),
+            _buildPhaseHeader(context, key, index, isDark, groupTopics.length),
             const SizedBox(height: 8),
-            // 阶段内的知识点
-            ...phaseTopics.map((topic) => _buildTopicCard(context, topic, progressProvider, isDark)),
-            if (index < sortedPhases.length - 1) const SizedBox(height: 16),
+            ...groupTopics.map((topic) => _buildTopicCard(context, topic, progressProvider, isDark)),
+            if (index < sortedKeys.length - 1) const SizedBox(height: 16),
           ],
         );
       },
     );
   }
 
-  Widget _buildPhaseHeader(BuildContext context, String label, int index, bool isDark) {
-    const colors = [
-      Color(0xFF10B981),
-      Color(0xFF3078F0),
-      Color(0xFFF59E0B),
-      Color(0xFF8B5CF6),
-    ];
+  Widget _buildPhaseHeader(BuildContext context, String label, int index, bool isDark, int count) {
+    const colors = [Color(0xFF10B981), Color(0xFF3078F0), Color(0xFFF59E0B), Color(0xFF8B5CF6), Color(0xFFEF4444)];
     final color = colors[index % colors.length];
 
     return Container(
@@ -829,11 +768,19 @@ class _CatalogPageState extends State<CatalogPage> {
           Icon(Icons.flag, size: 16, color: color),
           const SizedBox(width: 8),
           Text(
-            '阶段 ${index + 1}：$label',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$count 题',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
             ),
           ),
         ],

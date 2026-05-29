@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="面试智练 - AI 主动回忆学习工作台，帮你系统备战技术面试">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0A2540">
+  <meta name="theme-color" content="#0A0A0A">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="面试智练">
@@ -14,42 +14,52 @@
   <title>面试智练</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    body { background-color: #0A2540; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body { 
+      background-color: #0A0A0A; 
+      overflow: hidden;
+    }
     .loading {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #E6EDF3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
     }
     .loading-logo {
       width: 64px;
       height: 64px;
       margin-bottom: 24px;
+      opacity: 0.9;
     }
     .loading-text {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 700;
       margin-bottom: 8px;
+      letter-spacing: 0.5px;
     }
     .loading-sub {
       font-size: 14px;
-      color: rgba(255,255,255,0.6);
+      color: #8B949E;
+      margin-bottom: 32px;
     }
     .loading-bar {
       width: 200px;
       height: 3px;
-      background: rgba(255,255,255,0.15);
+      background: #2A2A2A;
       border-radius: 2px;
-      margin-top: 24px;
       overflow: hidden;
     }
     .loading-bar-inner {
       width: 40%;
       height: 100%;
-      background: #00CCF9;
+      background: linear-gradient(90deg, #3078F0, #5B9CF0);
       border-radius: 2px;
       animation: loading-slide 1.5s ease-in-out infinite;
     }
@@ -57,15 +67,37 @@
       0% { transform: translateX(-100%); }
       100% { transform: translateX(350%); }
     }
+    /* 隐藏 Flutter 加载过程中的闪烁 */
+    .flutter-loader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0A0A0A;
+    }
   </style>
 </head>
 <body>
-  <div class="loading">
+  <div class="loading" id="loading">
     <img class="loading-logo" src="favicon.svg" alt="面试智练">
     <div class="loading-text">面试智练</div>
     <div class="loading-sub">AI 主动回忆学习工作台</div>
     <div class="loading-bar"><div class="loading-bar-inner"></div></div>
   </div>
+  <script>
+    // 当 Flutter 准备好时隐藏加载页面
+    window.addEventListener('flutter-first-frame', function() {
+      var loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.transition = 'opacity 0.3s';
+        loading.style.opacity = '0';
+        setTimeout(function() {
+          loading.style.display = 'none';
+        }, 300);
+      }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -1,14 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
-import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
@@ -46,7 +47,6 @@ class ProfilePage extends StatelessWidget {
           settings: settings,
           onEnvChanged: (env) async {
             await settingsProvider.setContentEnv(env);
-            // 切换环境后，自动重载内容
             if (context.mounted) {
               final contentProvider = context.read<ContentProvider>();
               await contentProvider.switchContentEnv(
@@ -61,17 +61,12 @@ class ProfilePage extends StatelessWidget {
             await settingsProvider.setCustomProdContentUrl(url);
           },
           onApplyChanged: () async {
-            // 清空本地知识缓存
             final contentProvider = context.read<ContentProvider>();
             await contentProvider.clearAllDomainCache();
-
-            // 重新加载内容，使用当前领域
             await contentProvider.switchContentEnv(
               settingsProvider.settings.contentBaseUrl,
               currentDomainId: settingsProvider.settings.currentDomain,
             );
-
-            // 显示提示
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -93,7 +88,7 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 16),
         _AppearancePanel(
           settings: settings,
-          onThemeModeChanged: (mode) => settingsProvider.updateThemeMode(mode),
+          onThemeTypeChanged: (type) => settingsProvider.setThemeType(type),
           onPrimaryColorChanged: (color) =>
               settingsProvider.updatePrimaryColor(color),
           onAccentColorChanged: (color) =>
@@ -175,19 +170,16 @@ class _AccountPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return WorkPanel(
       title: '账户管理',
+      icon: Icons.person_outline,
       children: [
         Row(
           children: [
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              child: Text(
-                _displayName.isNotEmpty ? _displayName[0].toUpperCase() : '本',
-                style: const TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ),
+            // 头像
+            _buildAvatar(context, isDark),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -195,18 +187,20 @@ class _AccountPanel extends StatelessWidget {
                 children: [
                   Text(
                     _displayName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     authProvider.isLoggedIn
                         ? '@${authProvider.user!.username}'
                         : '本地游客模式 · 数据保存在本机',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: isDark ? Colors.white54 : Colors.grey,
                     ),
                   ),
                 ],
@@ -283,6 +277,233 @@ class _AccountPanel extends StatelessWidget {
   String get _displayName =>
       authProvider.isLoggedIn ? authProvider.user!.nickname : profile.nickname;
 
+  Widget _buildAvatar(BuildContext context, bool isDark) {
+    return GestureDetector(
+      onTap: () => _showAvatarPicker(context),
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+                ? NetworkImage(profile.avatarUrl!)
+                : null,
+            child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
+                ? Text(
+                    _displayName.isNotEmpty ? _displayName[0].toUpperCase() : '本',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : null,
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAvatarPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '更换头像',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 拍照（移动端支持）
+                if (!kIsWeb)
+                  _buildAvatarOption(
+                    context,
+                    icon: Icons.camera_alt,
+                    label: '拍照',
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _pickImageFromCamera(context);
+                    },
+                  ),
+                // 相册选择
+                _buildAvatarOption(
+                  context,
+                  icon: Icons.photo_library,
+                  label: '相册',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _pickImageFromGallery(context);
+                  },
+                ),
+                // URL 输入
+                _buildAvatarOption(
+                  context,
+                  icon: Icons.link,
+                  label: 'URL',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showAvatarUrlDialog(context);
+                  },
+                ),
+                // 随机生成
+                _buildAvatarOption(
+                  context,
+                  icon: Icons.shuffle,
+                  label: '随机',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    final newSeed = DateTime.now().millisecondsSinceEpoch.toString();
+                    onProfileChanged(profile.copyWith(avatarSeed: newSeed, avatarUrl: null));
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  onProfileChanged(profile.copyWith(avatarUrl: null));
+                },
+                child: const Text('恢复默认头像', style: TextStyle(color: Colors.red)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        // 在移动端，直接使用文件路径
+        onProfileChanged(profile.copyWith(avatarUrl: image.path));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('拍照失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickImageFromGallery(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        if (kIsWeb) {
+          // Web 端需要读取为 base64 或 data URL
+          final bytes = await image.readAsBytes();
+          final base64 = Uri.dataFromBytes(bytes, mimeType: 'image/jpeg').toString();
+          onProfileChanged(profile.copyWith(avatarUrl: base64));
+        } else {
+          // 移动端直接使用文件路径
+          onProfileChanged(profile.copyWith(avatarUrl: image.path));
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择图片失败: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildAvatarOption(BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  void _showAvatarUrlDialog(BuildContext context) {
+    final urlController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('输入头像 URL'),
+        content: TextField(
+          controller: urlController,
+          decoration: const InputDecoration(
+            hintText: 'https://example.com/avatar.jpg',
+            labelText: '头像链接',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final url = urlController.text.trim();
+              if (url.isNotEmpty) {
+                onProfileChanged(profile.copyWith(avatarUrl: url));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _syncLabel(String method) => switch (method) {
     'webdav' => 'WebDAV',
     'cloud' => '云同步',
@@ -299,47 +520,148 @@ class _AccountPanel extends StatelessWidget {
   void _showEditProfileDialog(BuildContext context) {
     final nicknameController = TextEditingController(text: profile.nickname);
     final emailController = TextEditingController(text: profile.email);
-    showDialog(
+    
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('修改本地资料'),
-        content: Column(
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 标题
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '编辑个人资料',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 24),
+            
+            // 头像预览
+            Center(
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+                        ? NetworkImage(profile.avatarUrl!)
+                        : null,
+                    child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
+                        ? Text(
+                            nicknameController.text.isNotEmpty 
+                                ? nicknameController.text[0].toUpperCase() 
+                                : '用',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showAvatarPicker(context);
+                    },
+                    icon: const Icon(Icons.camera_alt, size: 16),
+                    label: const Text('更换头像'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // 昵称输入
             TextField(
               controller: nicknameController,
-              decoration: const InputDecoration(labelText: '昵称'),
+              decoration: InputDecoration(
+                labelText: '昵称',
+                hintText: '输入你的昵称',
+                prefixIcon: const Icon(Icons.person_outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            
+            // 邮箱输入
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: '邮箱展示'),
+              decoration: InputDecoration(
+                labelText: '邮箱（展示用）',
+                hintText: 'your@email.com',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 8),
+            
+            // 提示
+            Text(
+              '邮箱仅用于展示，不影响数据同步',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+            const SizedBox(height: 24),
+            
+            // 保存按钮
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  onProfileChanged(
+                    LocalProfile(
+                      nickname: nicknameController.text.trim().isEmpty
+                          ? '本地用户'
+                          : nicknameController.text.trim(),
+                      email: emailController.text.trim(),
+                      avatarSeed: profile.avatarSeed,
+                      avatarUrl: profile.avatarUrl,
+                      emailBound: profile.emailBound,
+                      wechatBound: profile.wechatBound,
+                    ),
+                  );
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('资料已更新')),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('保存'),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              onProfileChanged(
-                LocalProfile(
-                  nickname: nicknameController.text.trim().isEmpty
-                      ? '本地用户'
-                      : nicknameController.text.trim(),
-                  email: emailController.text.trim(),
-                  avatarSeed: profile.avatarSeed,
-                  emailBound: profile.emailBound,
-                  wechatBound: profile.wechatBound,
-                ),
-              );
-              Navigator.pop(ctx);
-            },
-            child: const Text('保存'),
-          ),
-        ],
       ),
     );
   }
@@ -422,6 +744,7 @@ class _ContentEnvPanel extends StatelessWidget {
 
     return WorkPanel(
       title: '知识源配置',
+      icon: Icons.cloud_outlined,
       trailing: FilledButton.tonalIcon(
         onPressed: onApplyChanged,
         icon: const Icon(Icons.refresh),
@@ -547,6 +870,7 @@ class _AiConfigPanel extends StatelessWidget {
 
     return WorkPanel(
       title: 'AI 配置',
+      icon: Icons.smart_toy_outlined,
       trailing: FilledButton.tonalIcon(
         onPressed: onNavigateToConfig,
         icon: const Icon(Icons.settings_outlined),
@@ -577,7 +901,7 @@ class _AiConfigPanel extends StatelessWidget {
 class _AppearancePanel extends StatelessWidget {
   const _AppearancePanel({
     required this.settings,
-    required this.onThemeModeChanged,
+    required this.onThemeTypeChanged,
     required this.onPrimaryColorChanged,
     required this.onAccentColorChanged,
     required this.onFontScaleChanged,
@@ -585,7 +909,7 @@ class _AppearancePanel extends StatelessWidget {
   });
 
   final AppSettings settings;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final ValueChanged<AppThemeType> onThemeTypeChanged;
   final ValueChanged<Color> onPrimaryColorChanged;
   final ValueChanged<Color> onAccentColorChanged;
   final ValueChanged<double> onFontScaleChanged;
@@ -593,7 +917,7 @@ class _AppearancePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = settings.themeMode;
+    final themeType = settings.themeType;
     final primaryColor = settings.primaryColor;
     final accentColor = settings.accentColor;
     final fontScale = settings.fontScale;
@@ -601,17 +925,23 @@ class _AppearancePanel extends StatelessWidget {
 
     return WorkPanel(
       title: '外观与主题',
+      icon: Icons.palette_outlined,
       children: [
-        SegmentedButton<ThemeMode>(
-          segments: const [
-            ButtonSegment(value: ThemeMode.system, label: Text('跟随系统')),
-            ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
-            ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
-          ],
-          selected: {themeMode},
-          onSelectionChanged: (value) {
-            onThemeModeChanged(value.first);
-          },
+        // 主题选择
+        const Text('主题风格', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: AppThemeType.values.map((type) {
+            final isSelected = themeType == type;
+            return ChoiceChip(
+              label: Text(type.label),
+              selected: isSelected,
+              onSelected: (_) => onThemeTypeChanged(type),
+              avatar: _getThemeIcon(type),
+            );
+          }).toList(),
         ),
         const SizedBox(height: 16),
         const Text('主色选择', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -619,6 +949,11 @@ class _AppearancePanel extends StatelessWidget {
         Wrap(
           spacing: 10,
           children: [
+            _ColorButton(
+              color: const Color(0xFF1A2B4A),
+              selected: primaryColor == const Color(0xFF1A2B4A),
+              onTap: () => onPrimaryColorChanged(const Color(0xFF1A2B4A)),
+            ),
             _ColorButton(
               color: const Color(0xFF0A2540),
               selected: primaryColor == const Color(0xFF0A2540),
@@ -642,6 +977,11 @@ class _AppearancePanel extends StatelessWidget {
         Wrap(
           spacing: 10,
           children: [
+            _ColorButton(
+              color: const Color(0xFF3078F0),
+              selected: accentColor == const Color(0xFF3078F0),
+              onTap: () => onAccentColorChanged(const Color(0xFF3078F0)),
+            ),
             _ColorButton(
               color: const Color(0xFF00CCF9),
               selected: accentColor == const Color(0xFF00CCF9),
@@ -689,6 +1029,19 @@ class _AppearancePanel extends StatelessWidget {
       ],
     );
   }
+
+  Widget? _getThemeIcon(AppThemeType type) {
+    switch (type) {
+      case AppThemeType.system:
+        return const Icon(Icons.brightness_auto, size: 16);
+      case AppThemeType.elegantWhite:
+        return const Icon(Icons.light_mode, size: 16);
+      case AppThemeType.qualityBlack:
+        return const Icon(Icons.dark_mode, size: 16);
+      case AppThemeType.midnightBlue:
+        return const Icon(Icons.nights_stay, size: 16);
+    }
+  }
 }
 
 class _LearningSettingsPanel extends StatelessWidget {
@@ -704,6 +1057,7 @@ class _LearningSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkPanel(
       title: '学习设置',
+      icon: Icons.school_outlined,
       children: [
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
@@ -835,7 +1189,8 @@ class _LanguagePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WorkPanel(
-      title: '语言设置',
+      title: '关于',
+      icon: Icons.info_outline,
       children: [
         SegmentedButton<String>(
           segments: const [

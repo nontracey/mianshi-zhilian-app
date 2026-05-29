@@ -37,7 +37,27 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    _settings = _settings.copyWith(themeMode: mode);
+    // 兼容旧代码，转换为 AppThemeType
+    AppThemeType themeType;
+    switch (mode) {
+      case ThemeMode.light:
+        themeType = AppThemeType.elegantWhite;
+        break;
+      case ThemeMode.dark:
+        themeType = AppThemeType.qualityBlack;
+        break;
+      case ThemeMode.system:
+        themeType = AppThemeType.system;
+        break;
+    }
+    _settings = _settings.copyWith(themeType: themeType);
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// 设置主题类型
+  Future<void> setThemeType(AppThemeType themeType) async {
+    _settings = _settings.copyWith(themeType: themeType);
     await _storage.saveSettings(_settings);
     notifyListeners();
   }

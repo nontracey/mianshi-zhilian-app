@@ -16,8 +16,32 @@ enum ContentEnv {
   );
 }
 
+/// 主题类型
+enum AppThemeType {
+  system('system', '跟随系统'),
+  elegantWhite('elegantWhite', '典雅白'),
+  qualityBlack('qualityBlack', '气质黑'),
+  midnightBlue('midnightBlue', '午夜蓝');
+
+  const AppThemeType(this.key, this.label);
+  final String key;
+  final String label;
+
+  static AppThemeType fromKey(String key) => AppThemeType.values.firstWhere(
+    (e) => e.key == key,
+    orElse: () => AppThemeType.system,
+  );
+  
+  /// 获取实际的亮度（用于跟随系统）
+  Brightness get resolvedBrightness {
+    if (this == AppThemeType.elegantWhite) return Brightness.light;
+    if (this == AppThemeType.qualityBlack || this == AppThemeType.midnightBlue) return Brightness.dark;
+    return Brightness.light; // system 默认，实际由系统决定
+  }
+}
+
 class AppSettings {
-  final ThemeMode themeMode;
+  final AppThemeType themeType;
   final Color primaryColor;
   final Color accentColor;
   final String language;
@@ -43,9 +67,9 @@ class AppSettings {
   final String? customProdContentUrl;
 
   const AppSettings({
-    this.themeMode = ThemeMode.system,
-    this.primaryColor = const Color(0xFF0A2540),
-    this.accentColor = const Color(0xFF00CCF9),
+    this.themeType = AppThemeType.system,
+    this.primaryColor = const Color(0xFF1A2B4A),
+    this.accentColor = const Color(0xFF3078F0),
     this.language = 'zh',
     this.recommendStrategy = 'low-score-first',
     this.currentDomain = 'java',
@@ -99,7 +123,7 @@ class AppSettings {
       : '$defaultWorkerApiUrl/content/production';
 
   AppSettings copyWith({
-    ThemeMode? themeMode,
+    AppThemeType? themeType,
     Color? primaryColor,
     Color? accentColor,
     String? language,
@@ -122,7 +146,7 @@ class AppSettings {
     String? customTestContentUrl,
     String? customProdContentUrl,
   }) => AppSettings(
-    themeMode: themeMode ?? this.themeMode,
+    themeType: themeType ?? this.themeType,
     primaryColor: primaryColor ?? this.primaryColor,
     accentColor: accentColor ?? this.accentColor,
     language: language ?? this.language,
@@ -148,17 +172,44 @@ class AppSettings {
     customProdContentUrl: customProdContentUrl ?? this.customProdContentUrl,
   );
 
+  /// 获取 ThemeMode（兼容旧代码）
+  ThemeMode get themeMode {
+    if (themeType == AppThemeType.system) return ThemeMode.system;
+    if (themeType == AppThemeType.elegantWhite) return ThemeMode.light;
+    return ThemeMode.dark;
+  }
+
+  /// 从旧的 themeMode 字符串转换为 AppThemeType
+  static AppThemeType _parseThemeType(dynamic themeTypeJson, dynamic themeModeJson) {
+    // 优先使用新的 themeType 字段
+    if (themeTypeJson != null) {
+      return AppThemeType.fromKey(themeTypeJson as String);
+    }
+    
+    // 兼容旧的 themeMode 字段
+    if (themeModeJson != null) {
+      final themeModeStr = themeModeJson as String;
+      // 处理 'ThemeMode.xxx' 格式
+      if (themeModeStr.contains('dark')) return AppThemeType.qualityBlack;
+      if (themeModeStr.contains('light')) return AppThemeType.elegantWhite;
+      if (themeModeStr.contains('system')) return AppThemeType.system;
+      // 处理 'xxx' 格式
+      if (themeModeStr == 'dark') return AppThemeType.qualityBlack;
+      if (themeModeStr == 'light') return AppThemeType.elegantWhite;
+      if (themeModeStr == 'system') return AppThemeType.system;
+    }
+    
+    return AppThemeType.system;
+  }
+
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-    themeMode: ThemeMode.values.firstWhere(
-      (e) => e.name == json['themeMode'],
-      orElse: () => ThemeMode.system,
-    ),
+    themeType: _parseThemeType(json['themeType'], json['themeMode']),
     primaryColor: json['primaryColor'] != null
         ? Color(json['primaryColor'] as int)
-        : const Color(0xFF0A2540),
+        : const Color(0xFF1A2B4A),
     accentColor: json['accentColor'] != null
         ? Color(json['accentColor'] as int)
-        : const Color(0xFF00CCF9),
+        : const Color(0xFF3078F0),
     language: json['language'] as String? ?? 'zh',
     recommendStrategy:
         json['recommendStrategy'] as String? ?? 'low-score-first',
@@ -185,7 +236,7 @@ class AppSettings {
   );
 
   Map<String, dynamic> toJson() => {
-    'themeMode': themeMode.name,
+    'themeType': themeType.key,
     'primaryColor': primaryColor.toARGB32(),
     'accentColor': accentColor.toARGB32(),
     'language': language,

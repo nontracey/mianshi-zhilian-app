@@ -318,6 +318,7 @@ class PrepPlan {
 class LocalProfile {
   final String nickname;
   final String avatarSeed;
+  final String? avatarUrl;
   final String email;
   final bool emailBound;
   final bool wechatBound;
@@ -325,6 +326,7 @@ class LocalProfile {
   const LocalProfile({
     this.nickname = '本地用户',
     this.avatarSeed = 'local',
+    this.avatarUrl,
     this.email = '',
     this.emailBound = false,
     this.wechatBound = false,
@@ -333,6 +335,7 @@ class LocalProfile {
   factory LocalProfile.fromJson(Map<String, dynamic> json) => LocalProfile(
     nickname: json['nickname'] as String? ?? '本地用户',
     avatarSeed: json['avatarSeed'] as String? ?? 'local',
+    avatarUrl: json['avatarUrl'] as String?,
     email: json['email'] as String? ?? '',
     emailBound: json['emailBound'] as bool? ?? false,
     wechatBound: json['wechatBound'] as bool? ?? false,
@@ -341,10 +344,27 @@ class LocalProfile {
   Map<String, dynamic> toJson() => {
     'nickname': nickname,
     'avatarSeed': avatarSeed,
+    if (avatarUrl != null) 'avatarUrl': avatarUrl,
     'email': email,
     'emailBound': emailBound,
     'wechatBound': wechatBound,
   };
+
+  LocalProfile copyWith({
+    String? nickname,
+    String? avatarSeed,
+    String? avatarUrl,
+    String? email,
+    bool? emailBound,
+    bool? wechatBound,
+  }) => LocalProfile(
+    nickname: nickname ?? this.nickname,
+    avatarSeed: avatarSeed ?? this.avatarSeed,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+    email: email ?? this.email,
+    emailBound: emailBound ?? this.emailBound,
+    wechatBound: wechatBound ?? this.wechatBound,
+  );
 }
 
 class SyncSettings {

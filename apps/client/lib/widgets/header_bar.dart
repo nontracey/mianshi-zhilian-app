@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/auth_provider.dart';
+import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 
 class HeaderBar extends StatefulWidget {
   const HeaderBar({
@@ -151,21 +153,25 @@ class _HeaderBarState extends State<HeaderBar> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final aiProvider = context.watch<AiProvider>();
+    final authProvider = context.watch<AuthProvider>();
     
     // 获取当前使用的AI模型名称
     final currentModelName = aiProvider.configs.isNotEmpty
         ? aiProvider.configs.first.name
         : '未配置 AI 模型';
 
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final borderColor = Theme.of(context).colorScheme.outline;
+
     return SafeArea(
       bottom: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF15202E) : Colors.white,
+          color: surfaceColor,
           border: Border(
             bottom: BorderSide(
-              color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+              color: borderColor,
               width: 1,
             ),
           ),
@@ -173,13 +179,16 @@ class _HeaderBarState extends State<HeaderBar> {
         child: Row(
           children: [
             // 内容阶段切换
-            _ContentStageSelector(isDark: isDark),
+            _ContentStageSelector(
+              isDark: isDark,
+              isLoggedIn: authProvider.isLoggedIn,
+            ),
             const SizedBox(width: 24),
 
             // AI 模型选择
             _AiModelSelector(
               modelName: currentModelName,
-              capabilities: const ['文本', '图片', '语音'],
+              hasConfig: aiProvider.configs.isNotEmpty,
               isDark: isDark,
             ),
             const SizedBox(width: 24),
@@ -192,7 +201,7 @@ class _HeaderBarState extends State<HeaderBar> {
                   controller: _searchController,
                   focusNode: _searchFocusNode,
                   hintText: '搜索知识点、题目、路线',
-                  leading: const Icon(Icons.search, size: 20),
+                  leading: Icon(Icons.search, size: 20, color: isDark ? Colors.white54 : Colors.grey),
                   trailing: _isSearching
                       ? [
                           IconButton(
@@ -211,7 +220,7 @@ class _HeaderBarState extends State<HeaderBar> {
                   onChanged: _onSearchChanged,
                   elevation: WidgetStateProperty.all(0),
                   backgroundColor: WidgetStateProperty.all(
-                    isDark ? const Color(0xFF1A2332) : const Color(0xFFF5F5F5),
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   padding: WidgetStateProperty.all(
                     const EdgeInsets.symmetric(horizontal: 12),
@@ -221,31 +230,23 @@ class _HeaderBarState extends State<HeaderBar> {
             ),
             const SizedBox(width: 12),
             
-            // 通知图标
-            IconButton(
-              icon: Badge(
-                label: const Text('3', style: TextStyle(fontSize: 10)),
-                child: Icon(
-                  Icons.notifications_outlined,
-                  color: isDark ? Colors.white70 : const Color(0xFF666666),
-                ),
-              ),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 8),
-            
             // 用户头像
-            IconButton.filledTonal(
-              onPressed: widget.onProfile,
-              icon: const Icon(Icons.person_outline, size: 20),
-              style: IconButton.styleFrom(
-                backgroundColor: isDark 
-                    ? const Color(0xFF1A2332) 
-                    : const Color(0xFFF0F2F5),
-              ),
-            ),
+            _buildUserAvatar(context, isDark),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildUserAvatar(BuildContext context, bool isDark) {
+    // 这里可以后续接入用户头像
+    return IconButton.filledTonal(
+      onPressed: widget.onProfile,
+      icon: Icon(Icons.person_outline, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
+      style: IconButton.styleFrom(
+        backgroundColor: isDark 
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.black.withValues(alpha: 0.05),
       ),
     );
   }
@@ -255,98 +256,72 @@ class _HeaderBarState extends State<HeaderBar> {
 class _AiModelSelector extends StatelessWidget {
   const _AiModelSelector({
     required this.modelName,
-    required this.capabilities,
+    required this.hasConfig,
     required this.isDark,
   });
 
   final String modelName;
-  final List<String> capabilities;
+  final bool hasConfig;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiConfigPage()),
+        );
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '当前 AI 模型',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? Colors.white38 : const Color(0xFF999999),
-              ),
+            Icon(
+              Icons.smart_toy_outlined,
+              size: 16,
+              color: hasConfig 
+                  ? const Color(0xFF3078F0)
+                  : (isDark ? Colors.white38 : Colors.grey),
             ),
-            Row(
-              children: [
-                Icon(
-                  Icons.smart_toy_outlined,
-                  size: 14,
-                  color: const Color(0xFF3078F0),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  modelName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: isDark ? Colors.white54 : const Color(0xFF999999),
-                ),
-              ],
+            const SizedBox(width: 6),
+            Text(
+              hasConfig ? modelName : '未配置 AI',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: hasConfig
+                    ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
+                    : (isDark ? Colors.white38 : Colors.grey),
+              ),
             ),
           ],
         ),
-        const SizedBox(width: 12),
-        // 能力标签
-        ...capabilities.map((cap) => Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3078F0).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              cap,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF3078F0),
-              ),
-            ),
-          ),
-        )),
-      ],
+      ),
     );
   }
 }
 
 // 内容阶段选择器
 class _ContentStageSelector extends StatelessWidget {
-  const _ContentStageSelector({required this.isDark});
+  const _ContentStageSelector({required this.isDark, this.isLoggedIn = false});
 
   final bool isDark;
+  final bool isLoggedIn;
 
   @override
   Widget build(BuildContext context) {
     final stages = [
-      ('published', '发布'),
-      ('testing', '测试'),
-      ('draft', '草稿'),
+      ('published', '发布', true),   // 所有用户可用
+      ('testing', '测试', isLoggedIn), // 仅登录用户
+      ('draft', '草稿', isLoggedIn),   // 仅登录用户
     ];
 
     return Row(
       children: [
         Text(
-          '内容阶段',
+          '内容',
           style: TextStyle(
             fontSize: 12,
             color: isDark ? Colors.white54 : const Color(0xFF666666),
@@ -355,35 +330,60 @@ class _ContentStageSelector extends StatelessWidget {
         const SizedBox(width: 8),
         Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A2332) : const Color(0xFFF5F5F5),
+            color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
             borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.all(2),
           child: Row(
             children: stages.map((stage) {
-              // 默认选中第一个（发布）
               final isSelected = stage.$1 == 'published';
+              final isEnabled = stage.$3;
+              
               return GestureDetector(
-                onTap: () {
-                  // TODO: 实现阶段切换逻辑
-                },
+                onTap: isEnabled
+                    ? () {
+                        // TODO: 实现阶段切换逻辑
+                      }
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('登录后可查看测试版和草稿内容'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF3078F0)
+                        ? Theme.of(context).colorScheme.primary
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(
-                    stage.$2,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? Colors.white70 : const Color(0xFF666666)),
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        stage.$2,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : isEnabled
+                                  ? (isDark ? Colors.white70 : const Color(0xFF666666))
+                                  : (isDark ? Colors.white30 : Colors.grey.shade400),
+                        ),
+                      ),
+                      if (!isEnabled) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.lock_outline,
+                          size: 10,
+                          color: isDark ? Colors.white30 : Colors.grey.shade400,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               );

@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
-import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 enum MasterySort { scoreAsc, scoreDesc }
 
 enum MasteryFilter { all, skilled, familiar, unfamiliar }
-
-enum TopicStatus { skilled, familiar, unfamiliar }
-
-extension TopicStatusX on TopicStatus {
-  static TopicStatus fromString(String status) => switch (status) {
-    'mastered' => TopicStatus.skilled,
-    'learning' => TopicStatus.familiar,
-    _ => TopicStatus.unfamiliar,
-  };
-}
 
 class MasteryPage extends StatefulWidget {
   const MasteryPage({
@@ -42,6 +32,7 @@ class _MasteryPageState extends State<MasteryPage> {
   Widget build(BuildContext context) {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final domains = contentProvider.domains;
     final currentDomain = domains
@@ -51,9 +42,7 @@ class _MasteryPageState extends State<MasteryPage> {
       return const Center(child: Text('请选择一个领域'));
     }
 
-    final domainTopics = contentProvider.getTopicsByDomain(
-      widget.currentDomainId,
-    );
+    final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
     final domainProgress = progressProvider.getDomainProgress(
       widget.currentDomainId,
       contentProvider.topics.values.toList(),
@@ -70,567 +59,351 @@ class _MasteryPageState extends State<MasteryPage> {
     final filteredTopics = _applyFilter(domainTopics, progressProvider);
     final sortedTopics = _applySort(filteredTopics, progressProvider);
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        WorkPanel(
-          title: '${currentDomain.title} · $masteryPercent%',
-          trailing: SegmentedButton<String>(
-            segments: domains
-                .map((d) => ButtonSegment(value: d.id, label: Text(d.id)))
-                .toList(),
-            selected: {widget.currentDomainId},
-            onSelectionChanged: (next) {
-              widget.onDomainChanged(next.first);
-              if (contentProvider.getLoadedTopicCount(next.first) == 0) {
-                contentProvider.loadDomainTopics(next.first);
-              }
-            },
-          ),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: LinearProgressIndicator(value: masteryPercent / 100),
-                ),
-                const SizedBox(width: 12),
-                Text('$masteryPercent%'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _DiagnosticPill(
-                  icon: Icons.flag_outlined,
-                  label: '就绪度',
-                  value: '$readiness',
-                  color: readiness >= 80
-                      ? AppColors.success
-                      : AppColors.warning,
-                ),
-                _DiagnosticPill(
-                  icon: Icons.today_outlined,
-                  label: '待复习',
-                  value: '$dueCount',
-                  color: AppColors.warning,
-                ),
-                _DiagnosticPill(
-                  icon: Icons.local_fire_department_outlined,
-                  label: '高频未稳',
-                  value: '$highFrequencyWeak',
-                  color: AppColors.accent,
-                ),
-                _DiagnosticPill(
-                  icon: Icons.report_problem_outlined,
-                  label: '低分回流',
-                  value: '$lowScoreCount',
-                  color: AppColors.danger,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 分类掌握度分布图
-            _buildCategoryChart(context, currentDomain, domainTopics, progressProvider),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<MasterySort>(
-                    initialValue: _sort,
-                    decoration: const InputDecoration(
-                      labelText: '排序',
-                      isDense: true,
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: MasterySort.scoreAsc,
-                        child: Text('熟练度 低→高'),
-                      ),
-                      DropdownMenuItem(
-                        value: MasterySort.scoreDesc,
-                        child: Text('熟练度 高→低'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => _sort = value);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: DropdownButtonFormField<MasteryFilter>(
-                    initialValue: _filter,
-                    decoration: const InputDecoration(
-                      labelText: '筛选',
-                      isDense: true,
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: MasteryFilter.all,
-                        child: Text('全部'),
-                      ),
-                      DropdownMenuItem(
-                        value: MasteryFilter.skilled,
-                        child: Text('熟练'),
-                      ),
-                      DropdownMenuItem(
-                        value: MasteryFilter.familiar,
-                        child: Text('不熟练'),
-                      ),
-                      DropdownMenuItem(
-                        value: MasteryFilter.unfamiliar,
-                        child: Text('未掌握'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => _filter = value);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            if (domainTopics.isEmpty && contentProvider.isLoadingTopics)
-              // 正在加载知识点
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 12),
-                      Text(
-                        '正在加载知识点...',
-                        style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (sortedTopics.isEmpty)
-              // 没有匹配的知识点
-              _EmptyMasteryState()
-            else
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: sortedTopics.map((topic) {
-                  final progress = progressProvider.getTopicProgress(topic.id);
-                  final score = progress?.score ?? 0;
-                  final status = progress != null
-                      ? TopicStatusX.fromString(progress.status)
-                      : TopicStatus.unfamiliar;
-                  return _MasteryCard(
-                    title: topic.title,
-                    tags: topic.tags,
-                    status: status,
-                    score: score,
-                  );
-                }).toList(),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  List<Topic> _applyFilter(List<Topic> topics, ProgressProvider provider) {
-    return switch (_filter) {
-      MasteryFilter.all => topics,
-      MasteryFilter.skilled => topics.where((t) {
-        final p = provider.getTopicProgress(t.id);
-        return p != null &&
-            TopicStatusX.fromString(p.status) == TopicStatus.skilled;
-      }).toList(),
-      MasteryFilter.familiar => topics.where((t) {
-        final p = provider.getTopicProgress(t.id);
-        return p != null &&
-            TopicStatusX.fromString(p.status) == TopicStatus.familiar;
-      }).toList(),
-      MasteryFilter.unfamiliar => topics.where((t) {
-        final p = provider.getTopicProgress(t.id);
-        return p == null ||
-            TopicStatusX.fromString(p.status) == TopicStatus.unfamiliar;
-      }).toList(),
-    };
-  }
-
-  List<Topic> _applySort(List<Topic> topics, ProgressProvider provider) {
-    final sorted = List<Topic>.from(topics);
-    sorted.sort((a, b) {
-      final scoreA = provider.getTopicProgress(a.id)?.score ?? 0;
-      final scoreB = provider.getTopicProgress(b.id)?.score ?? 0;
-      return switch (_sort) {
-        MasterySort.scoreAsc => scoreA.compareTo(scoreB),
-        MasterySort.scoreDesc => scoreB.compareTo(scoreA),
-      };
-    });
-    return sorted;
-  }
-
-  Widget _buildCategoryChart(
-    BuildContext context,
-    dynamic currentDomain,
-    List<Topic> domainTopics,
-    ProgressProvider progressProvider,
-  ) {
-    // 按分类计算平均掌握度
-    final categories = currentDomain.categories as List;
-    if (categories.isEmpty) return const SizedBox.shrink();
-
-    final catData = <Map<String, dynamic>>[];
-    for (final cat in categories) {
-      final catTopics = domainTopics.where((t) => t.category == cat.id).toList();
-      if (catTopics.isEmpty) continue;
-      final scores = catTopics.map((t) => progressProvider.getTopicProgress(t.id)?.score ?? 0).toList();
-      final avg = scores.isEmpty ? 0 : scores.reduce((a, b) => a + b) / scores.length;
-      final skilled = scores.where((s) => s >= 85).length;
-      final familiar = scores.where((s) => s > 0 && s < 85).length;
-      final unfamiliar = scores.where((s) => s == 0).length;
-      catData.add({
-        'title': cat.title as String,
-        'avg': avg.round(),
-        'total': catTopics.length,
-        'skilled': skilled,
-        'familiar': familiar,
-        'unfamiliar': unfamiliar,
-      });
-    }
-
-    if (catData.isEmpty) return const SizedBox.shrink();
-
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('分类掌握度', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          // 顶部：紧凑的领域选择和统计
+          _buildCompactHeader(context, currentDomain, masteryPercent, domains, contentProvider, isDark),
           const SizedBox(height: 12),
-          ...catData.map((cat) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+          
+          // 诊断指标
+          _buildDiagnosticCards(context, readiness, dueCount, highFrequencyWeak, lowScoreCount, isDark),
+          const SizedBox(height: 12),
+          
+          // 筛选和排序
+          _buildFilterSortBar(context, isDark),
+          const SizedBox(height: 12),
+          
+          // 知识点列表
+          Expanded(
+            child: sortedTopics.isEmpty
+                ? Center(child: Text('暂无数据', style: TextStyle(color: Colors.grey.shade500)))
+                : ListView.builder(
+                    itemCount: sortedTopics.length,
+                    itemBuilder: (context, index) {
+                      return _buildTopicItem(context, sortedTopics[index], progressProvider, isDark);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactHeader(BuildContext context, Domain domain, int masteryPercent, 
+      List<Domain> domains, ContentProvider contentProvider, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Row(
+        children: [
+          // 领域下拉选择
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: widget.currentDomainId,
+                isDense: true,
+                items: domains.map((d) => DropdownMenuItem(
+                  value: d.id,
+                  child: Text(d.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                )).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    widget.onDomainChanged(value);
+                    if (contentProvider.getLoadedTopicCount(value) == 0) {
+                      contentProvider.loadDomainTopics(value);
+                    }
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          
+          // 掌握度信息
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        cat['title'] as String,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Text(
-                      '${cat['avg']}%',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: (cat['avg'] as int) >= 80
-                            ? AppColors.success
-                            : (cat['avg'] as int) >= 50
-                                ? AppColors.warning
-                                : AppColors.danger,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${cat['skilled']}/${cat['familiar']}/${cat['unfamiliar']}',
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                    ),
-                  ],
+                Text(
+                  '$masteryPercent%',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                // 堆叠进度条
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: SizedBox(
-                    height: 8,
-                    child: Row(
-                      children: [
-                        if (cat['skilled'] as int > 0)
-                          Expanded(
-                            flex: cat['skilled'] as int,
-                            child: Container(color: AppColors.success),
-                          ),
-                        if (cat['familiar'] as int > 0)
-                          Expanded(
-                            flex: cat['familiar'] as int,
-                            child: Container(color: AppColors.warning),
-                          ),
-                        if (cat['unfamiliar'] as int > 0)
-                          Expanded(
-                            flex: cat['unfamiliar'] as int,
-                            child: Container(color: Colors.grey.shade300),
-                          ),
-                      ],
-                    ),
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: masteryPercent / 100,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary,
+                    minHeight: 6,
                   ),
                 ),
               ],
             ),
-          )),
-          // 图例
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildLegendDot(AppColors.success, '熟练'),
-              const SizedBox(width: 16),
-              _buildLegendDot(AppColors.warning, '不熟练'),
-              const SizedBox(width: 16),
-              _buildLegendDot(Colors.grey.shade300, '未掌握'),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLegendDot(Color color, String label) {
+  Widget _buildDiagnosticCards(BuildContext context, int readiness, int dueCount, 
+      int highFrequencyWeak, int lowScoreCount, bool isDark) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+        Expanded(child: _buildDiagnosticCard('就绪度', '$readiness', AppColors.accent, isDark)),
+        const SizedBox(width: 8),
+        Expanded(child: _buildDiagnosticCard('待复习', '$dueCount', AppColors.warning, isDark)),
+        const SizedBox(width: 8),
+        Expanded(child: _buildDiagnosticCard('高频未稳', '$highFrequencyWeak', AppColors.accent, isDark)),
+        const SizedBox(width: 8),
+        Expanded(child: _buildDiagnosticCard('低分回流', '$lowScoreCount', AppColors.danger, isDark)),
       ],
     );
   }
-}
 
-// ── 空掌握度状态 ──────────────────────────────────────────────
-
-class _EmptyMasteryState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          children: [
-            Icon(
-              Icons.bar_chart_outlined,
-              size: 40,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '暂无匹配的知识点',
-              style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '尝试切换筛选条件或领域',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MasteryCard extends StatelessWidget {
-  const _MasteryCard({
-    required this.title,
-    required this.tags,
-    required this.status,
-    required this.score,
-  });
-
-  final String title;
-  final List<String> tags;
-  final TopicStatus status;
-  final int score;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusLabel = switch (status) {
-      TopicStatus.skilled => '熟练',
-      TopicStatus.familiar => '不熟练',
-      TopicStatus.unfamiliar => '未掌握',
-    };
-
-    final statusColor = switch (status) {
-      TopicStatus.skilled => AppColors.success,
-      TopicStatus.familiar => AppColors.warning,
-      TopicStatus.unfamiliar => Colors.grey,
-    };
-
-    // 左侧彩色边条
-    final borderColor = switch (status) {
-      TopicStatus.skilled => AppColors.success,
-      TopicStatus.familiar => AppColors.warning,
-      TopicStatus.unfamiliar => Colors.grey.shade300,
-    };
-
-    return SizedBox(
-      width: 260,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 左侧彩色边条 + 标题
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 3,
-                    decoration: BoxDecoration(
-                      color: borderColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Tag 列表
-            if (tags.isNotEmpty)
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: tags
-                    .take(3)
-                    .map(
-                      (tag) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            if (tags.isNotEmpty) const SizedBox(height: 10),
-            // 状态标签 + 分数
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '$score 分',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: _scoreColor(score),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: score / 100,
-              color: _scoreColor(score),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _scoreColor(int score) {
-    if (score >= 85) return AppColors.success;
-    if (score >= 60) return AppColors.warning;
-    return Colors.grey;
-  }
-}
-
-class _DiagnosticPill extends StatelessWidget {
-  const _DiagnosticPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDiagnosticCard(String label, String value, Color color, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
         children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 8),
-          Text(label),
-          const SizedBox(width: 8),
           Text(
             value,
-            style: TextStyle(color: color, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildFilterSortBar(BuildContext context, bool isDark) {
+    return Row(
+      children: [
+        // 筛选
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip('全部', MasteryFilter.all, isDark),
+                _buildFilterChip('熟练', MasteryFilter.skilled, isDark),
+                _buildFilterChip('不熟练', MasteryFilter.familiar, isDark),
+                _buildFilterChip('未掌握', MasteryFilter.unfamiliar, isDark),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        // 排序
+        _buildSortChip('低→高', MasterySort.scoreAsc, isDark),
+        const SizedBox(width: 8),
+        _buildSortChip('高→低', MasterySort.scoreDesc, isDark),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip(String label, MasteryFilter filter, bool isDark) {
+    final isSelected = _filter == filter;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _filter = filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? Theme.of(context).colorScheme.primary
+                : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String label, MasterySort sort, bool isDark) {
+    final isSelected = _sort == sort;
+    return GestureDetector(
+      onTap: () => setState(() => _sort = sort),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primary
+              : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopicItem(BuildContext context, Topic topic, ProgressProvider progressProvider, bool isDark) {
+    final progress = progressProvider.getTopicProgress(topic.id);
+    final score = progress?.score ?? 0;
+    final scoreColor = score >= 85 ? AppColors.success : score >= 60 ? AppColors.warning : AppColors.danger;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Row(
+        children: [
+          // 分数
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: scoreColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '$score',
+                style: TextStyle(fontWeight: FontWeight.w700, color: scoreColor),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          // 信息
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  topic.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (topic.highFrequency)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text('高频', style: TextStyle(fontSize: 10, color: AppColors.danger)),
+                      ),
+                    Text(
+                      '${topic.domain} · ${topic.difficultyLabel}',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // 操作
+          TextButton(
+            onPressed: () {},
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: const Text('开始练习', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Topic> _applyFilter(List<Topic> topics, ProgressProvider progress) {
+    switch (_filter) {
+      case MasteryFilter.skilled:
+        return topics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) >= 85).toList();
+      case MasteryFilter.familiar:
+        return topics.where((t) {
+          final score = progress.getTopicProgress(t.id)?.score ?? 0;
+          return score >= 60 && score < 85;
+        }).toList();
+      case MasteryFilter.unfamiliar:
+        return topics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) < 60).toList();
+      case MasteryFilter.all:
+        return topics;
+    }
+  }
+
+  List<Topic> _applySort(List<Topic> topics, ProgressProvider progress) {
+    final sorted = List<Topic>.from(topics);
+    switch (_sort) {
+      case MasterySort.scoreAsc:
+        sorted.sort((a, b) => 
+          (progress.getTopicProgress(a.id)?.score ?? 0).compareTo(progress.getTopicProgress(b.id)?.score ?? 0));
+      case MasterySort.scoreDesc:
+        sorted.sort((a, b) => 
+          (progress.getTopicProgress(b.id)?.score ?? 0).compareTo(progress.getTopicProgress(a.id)?.score ?? 0));
+    }
+    return sorted;
+  }
+}
+
+extension on Topic {
+  String get difficultyLabel => switch (difficulty) {
+    1 => '入门',
+    2 => '基础',
+    3 => '中等',
+    4 => '较难',
+    5 => '困难',
+    _ => '',
+  };
 }

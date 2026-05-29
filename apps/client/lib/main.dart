@@ -102,25 +102,25 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             });
           }
 
+          // 获取系统亮度
+          final systemBrightness = MediaQuery.platformBrightnessOf(context);
+          final systemIsDark = systemBrightness == Brightness.dark;
+          
+          // 构建主题
           final theme = buildTheme(
             settings.settings.primaryColor,
             settings.settings.accentColor,
-            settings.settings.themeMode,
+            settings.settings.themeType.key,
             fontScale: settings.settings.fontScale,
             cardDensity: settings.settings.cardDensity,
+            systemIsDark: systemIsDark,
           );
+          
           return MaterialApp(
             title: '面试智练',
             debugShowCheckedModeBanner: false,
             themeMode: settings.settings.themeMode,
             theme: theme,
-            darkTheme: buildTheme(
-              settings.settings.primaryColor,
-              settings.settings.accentColor,
-              ThemeMode.dark,
-              fontScale: settings.settings.fontScale,
-              cardDensity: settings.settings.cardDensity,
-            ),
             home: const LearningShell(),
           );
         },
@@ -140,6 +140,7 @@ class _LearningShellState extends State<LearningShell> {
   AppSection _section = AppSection.dashboard;
   String? _selectedTopicId;
   int _selectedTopicInitialTab = 0;
+  bool _isSidebarCollapsed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +161,8 @@ class _LearningShellState extends State<LearningShell> {
               streakDays: progress.streakDays,
               totalHours: progress.totalHours,
               todayHoursGrowth: progress.todayHoursGrowth,
+              isCollapsed: _isSidebarCollapsed,
+              onToggleCollapse: () => setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
             ),
           Expanded(
             child: Column(

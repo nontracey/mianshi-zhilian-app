@@ -816,22 +816,22 @@ class _DomainKnowledgeCard extends StatelessWidget {
   final int masteryPercent;
   final VoidCallback onTap;
 
-  // 根据领域名称返回特定图标
   IconData _getDomainIcon(String domainId) {
     final id = domainId.toLowerCase();
-    if (id.contains('java')) return Icons.coffee; // Java 咖啡杯
-    if (id.contains('agent') || id.contains('ai')) return Icons.smart_toy; // Agent 机器人
-    if (id.contains('algorithm') || id.contains('算法')) return Icons.functions; // 算法 Σ
-    if (id.contains('frontend') || id.contains('前端')) return Icons.code; // 前端 代码
-    if (id.contains('network') || id.contains('网络')) return Icons.language; // 网络 地球
-    if (id.contains('database') || id.contains('数据库')) return Icons.storage; // 数据库
-    if (id.contains('system') || id.contains('系统')) return Icons.computer; // 系统
-    if (id.contains('security') || id.contains('安全')) return Icons.security; // 安全
-    return Icons.book_outlined; // 默认
+    if (id.contains('java')) return Icons.coffee;
+    if (id.contains('agent') || id.contains('ai')) return Icons.smart_toy;
+    if (id.contains('algorithm') || id.contains('算法')) return Icons.functions;
+    if (id.contains('frontend') || id.contains('前端')) return Icons.code;
+    if (id.contains('network') || id.contains('网络')) return Icons.language;
+    if (id.contains('database') || id.contains('数据库')) return Icons.storage;
+    if (id.contains('system') || id.contains('系统')) return Icons.computer;
+    if (id.contains('security') || id.contains('安全')) return Icons.security;
+    return Icons.book_outlined;
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final domainColor = domain.color;
     final status = masteryPercent >= 80
         ? '掌握'
@@ -852,147 +852,118 @@ class _DomainKnowledgeCard extends StatelessWidget {
         ? AppColors.danger
         : Colors.grey;
     
-    // 模拟练习题数（实际应从数据中获取）
     final practiceCount = domain.topicCount * 3;
     final domainIcon = _getDomainIcon(domain.id);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 180,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+        splashColor: domainColor.withValues(alpha: 0.08),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08),
+              width: 1,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: domainColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      domainIcon,
-                      size: 16,
-                      color: domainColor,
+                // 头部：图标 + 标题
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: domainColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(domainIcon, size: 16, color: domainColor),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        domain.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1A1A1A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, size: 16, color: isDark ? Colors.white24 : Colors.grey.shade400),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    domain.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                const SizedBox(height: 12),
+                // 掌握度行
+                Row(
+                  children: [
+                    Text(
+                      '$masteryPercent%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: domainColor,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: masteryPercent / 100,
+                          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200,
+                          color: domainColor,
+                          minHeight: 4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: isDark ? 0.15 : 0.1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor),
+                      ),
+                    ),
+                  ],
                 ),
-                // 状态标签
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
+                const SizedBox(height: 10),
+                // 底部统计
+                Row(
+                  children: [
+                    Text(
+                      '${domain.topicCount} 考点',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '$practiceCount 练习',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  '掌握度',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '$masteryPercent%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                    color: domainColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: masteryPercent / 100,
-              backgroundColor: domainColor.withValues(alpha: 0.1),
-              color: domainColor,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            const SizedBox(height: 12),
-            // 考点和练习题数
-            Row(
-              children: [
-                Text(
-                  '考点 ${domain.topicCount}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '练习 $practiceCount 题',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 继续学习按钮
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onTap,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  side: BorderSide(color: domainColor.withValues(alpha: 0.3)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                child: Text(
-                  '继续学习',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: domainColor,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1001,48 +972,16 @@ class _DomainKnowledgeCard extends StatelessWidget {
 
 // ── 统计数据块组件 ──────────────────────────────────────────────
 
-class _StatBlock extends StatelessWidget {
-  const _StatBlock({
-    required this.value,
-    required this.label,
-    this.color = Colors.white,
-  });
-
-  final String value;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(right: 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w900,
-            fontSize: 28,
-            height: 1.1,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-      ],
-    ),
-  );
-}
-
 // ── 学习路径项目组件 ──────────────────────────────────────────────
 
-class _LearningPathItem extends StatelessWidget {
+class _LearningPathItem extends StatefulWidget {
   const _LearningPathItem({
     required this.domain,
     required this.index,
     required this.masteryPercent,
     required this.isSelected,
     required this.onTap,
+    this.onViewCatalog,
   });
 
   final Domain domain;
@@ -1050,303 +989,271 @@ class _LearningPathItem extends StatelessWidget {
   final int masteryPercent;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onViewCatalog;
+
+  @override
+  State<_LearningPathItem> createState() => _LearningPathItemState();
+}
+
+class _LearningPathItemState extends State<_LearningPathItem> {
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final status = masteryPercent >= 80
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status = widget.masteryPercent >= 80
         ? '已完成'
-        : masteryPercent > 0
+        : widget.masteryPercent > 0
         ? '进行中'
         : '未开始';
-    final statusColor = masteryPercent >= 80
+    final statusColor = widget.masteryPercent >= 80
         ? AppColors.success
-        : masteryPercent > 0
+        : widget.masteryPercent > 0
         ? AppColors.accent
         : Colors.grey;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.accent
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  '${index + 1}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: widget.isSelected
+            ? AppColors.accent.withValues(alpha: 0.05)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: widget.isSelected
+              ? AppColors.accent.withValues(alpha: 0.3)
+              : (isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+        ),
+      ),
+      child: Column(
+        children: [
+          // 主行
+          InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        domain.title,
-                        style: const TextStyle(
+                  // 序号
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: widget.isSelected
+                          ? AppColors.accent
+                          : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${widget.index + 1}',
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
+                          color: widget.isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '进度 $masteryPercent%',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  const SizedBox(width: 12),
+                  // 标题和状态
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.domain.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '考点 ${domain.topicCount}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              '进度 ${widget.masteryPercent}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '考点 ${widget.domain.topicCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
+                      ],
+                    ),
+                  ),
+                  // 展开/折叠按钮
+                  GestureDetector(
+                    onTap: () => setState(() => _isExpanded = !_isExpanded),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: isDark ? Colors.white54 : Colors.grey,
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── 工作台头部组件 ──────────────────────────────────────────────
-
-class _WorkbenchHeader extends StatelessWidget {
-  const _WorkbenchHeader({
-    required this.domainTitle,
-    required this.masteryPercent,
-    required this.topicCount,
-    required this.readiness,
-    required this.streakDays,
-    required this.onPractice,
-    this.onReview,
-    this.onMockInterview,
-  });
-
-  final String domainTitle;
-  final int masteryPercent;
-  final int topicCount;
-  final int readiness;
-  final int streakDays;
-  final VoidCallback onPractice;
-  final VoidCallback? onReview;
-  final VoidCallback? onMockInterview;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            const Color(0xFF0F3460),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 顶部标签行
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Text(
-                  '当前领域：$domainTitle',
-                  style: const TextStyle(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              if (streakDays > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.local_fire_department,
-                        size: 14,
-                        color: AppColors.warning,
+          // 展开的详情
+          if (_isExpanded)
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  // 描述
+                  if (widget.domain.description.isNotEmpty) ...[
+                    Text(
+                      widget.domain.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
+                        height: 1.5,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '连续 $streakDays 天',
-                        style: const TextStyle(
-                          color: AppColors.warning,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  // 统计信息
+                  Row(
+                    children: [
+                      _buildStatItem(
+                        context,
+                        icon: Icons.menu_book_outlined,
+                        label: '知识点',
+                        value: '${widget.domain.topicCount}',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatItem(
+                        context,
+                        icon: Icons.trending_up,
+                        label: '掌握度',
+                        value: '${widget.masteryPercent}%',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatItem(
+                        context,
+                        icon: Icons.category_outlined,
+                        label: '分类',
+                        value: '${widget.domain.categories.length}',
+                        isDark: isDark,
                       ),
                     ],
                   ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '把面试知识练成可以讲出来的答案',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '先充分学习知识解释，再进入复述训练，由 AI 按 rubric 评分、纠错和补充。',
-            style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
-          ),
-          const SizedBox(height: 16),
-          // 统计数据行
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 600;
-              final stats = [
-                _StatBlock(
-                  value: '$masteryPercent%',
-                  label: '掌握度',
-                  color: AppColors.success,
-                ),
-                _StatBlock(
-                  value: '$readiness',
-                  label: '就绪度',
-                  color: AppColors.accent,
-                ),
-                _StatBlock(
-                  value: '$topicCount',
-                  label: '知识点',
-                  color: Colors.white,
-                ),
-              ];
-              if (isNarrow) {
-                return Wrap(spacing: 20, runSpacing: 12, children: stats);
-              }
-              return Row(children: stats);
-            },
-          ),
-          const SizedBox(height: 16),
-          // 操作按钮行
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.icon(
-                onPressed: onPractice,
-                icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text('开始复述'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.bgDark,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                ),
+                  const SizedBox(height: 12),
+                  // 进度条
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: widget.masteryPercent / 100,
+                      backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                      color: AppColors.accent,
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 查看详情按钮
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onViewCatalog ?? widget.onTap,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('查看知识目录'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              if (onReview != null)
-                OutlinedButton.icon(
-                  onPressed: onReview,
-                  icon: const Icon(Icons.replay_outlined, size: 18),
-                  label: const Text('今日复习'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  ),
-                ),
-              if (onMockInterview != null)
-                OutlinedButton.icon(
-                  onPressed: onMockInterview,
-                  icon: const Icon(Icons.psychology_outlined, size: 18),
-                  label: const Text('模拟面试'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  ),
-                ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
+
+  Widget _buildStatItem(BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: isDark ? Colors.white54 : Colors.grey),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white38 : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
-// ── 薄弱知识点组件 ──────────────────────────────────────────────
+// ── 复习项目组件 ──────────────────────────────────────────────
 
 class _WeakTopicItem extends StatelessWidget {
   const _WeakTopicItem({
@@ -1564,38 +1471,58 @@ class _PanelCard extends StatelessWidget {
     required this.child,
     this.trailing,
     this.headerTrailing,
+    this.icon,
   });
 
   final String title;
   final Widget child;
   final String? trailing;
   final Widget? headerTrailing;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final borderColor = Theme.of(context).colorScheme.outline;
     
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF15202E) : Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+          color: borderColor,
+          width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? AppColors.cardShadowDark : AppColors.cardShadow,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 18,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     fontSize: 14,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -1607,15 +1534,15 @@ class _PanelCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3078F0).withValues(alpha: 0.1),
+                    color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     trailing!,
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF3078F0),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
                     ),
                   ),
                 ),
@@ -1680,6 +1607,7 @@ class _LeftPanel extends StatelessWidget {
         // 今日复习队列
         _PanelCard(
           title: '今日复习队列',
+          icon: Icons.replay_outlined,
           trailing: '${dueTopics.length}',
           headerTrailing: Text(
             '到期时间',
@@ -1714,6 +1642,7 @@ class _LeftPanel extends StatelessWidget {
         // 薄弱知识点TOP5
         _PanelCard(
           title: '薄弱知识点 TOP 5',
+          icon: Icons.trending_down_outlined,
           trailing: '${weakTopics.length}',
           child: Column(
             children: [
@@ -1783,21 +1712,10 @@ class _CenterPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 顶部工作台
-        _WorkbenchHeader(
-          domainTitle: currentDomain?.title ?? '',
-          masteryPercent: masteryPercent,
-          topicCount: topicCount,
-          readiness: readiness,
-          streakDays: streakDays,
-          onPractice: onPractice,
-          onReview: onReview,
-          onMockInterview: onMockInterview,
-        ),
-        const SizedBox(height: 16),
         // 当前学习路线
         _PanelCard(
           title: '当前学习路线',
+          icon: Icons.route_outlined,
           trailing: '切换路线',
           child: Column(
             children: [
@@ -1822,6 +1740,13 @@ class _CenterPanel extends StatelessWidget {
                         contentProvider.loadDomainTopics(domain.id);
                       }
                     },
+                    onViewCatalog: () {
+                      onDomainChanged(domain.id);
+                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                        contentProvider.loadDomainTopics(domain.id);
+                      }
+                      onViewDomainCatalog(domain.id);
+                    },
                   );
                 }),
             ],
@@ -1831,32 +1756,47 @@ class _CenterPanel extends StatelessWidget {
         // 领域知识卡片
         _PanelCard(
           title: '领域知识卡片',
+          icon: Icons.school_outlined,
           trailing: '管理领域',
           child: Column(
             children: [
               if (domains.isEmpty)
                 const _EmptyState(message: '暂无领域数据')
               else
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: domains.take(6).map((domain) {
-                    final dp = progressProvider.getDomainProgress(
-                      domain.id,
-                      contentProvider.topics.values.toList(),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // 根据宽度决定每行几个卡片
+                    final cardWidth = constraints.maxWidth > 900 
+                        ? (constraints.maxWidth - 36) / 4  // 一行4个
+                        : constraints.maxWidth > 600 
+                            ? (constraints.maxWidth - 24) / 3  // 一行3个
+                            : (constraints.maxWidth - 12) / 2;  // 一行2个
+                    
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: domains.take(8).map((domain) {
+                        final dp = progressProvider.getDomainProgress(
+                          domain.id,
+                          contentProvider.topics.values.toList(),
+                        );
+                        return SizedBox(
+                          width: cardWidth,
+                          child: _DomainKnowledgeCard(
+                            domain: domain,
+                            masteryPercent: dp.masteryPercent,
+                            onTap: () {
+                              onDomainChanged(domain.id);
+                              if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                                contentProvider.loadDomainTopics(domain.id);
+                              }
+                              onViewDomainCatalog(domain.id);
+                            },
+                          ),
+                        );
+                      }).toList(),
                     );
-                    return _DomainKnowledgeCard(
-                      domain: domain,
-                      masteryPercent: dp.masteryPercent,
-                      onTap: () {
-                        onDomainChanged(domain.id);
-                        if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                          contentProvider.loadDomainTopics(domain.id);
-                        }
-                        onViewDomainCatalog(domain.id);
-                      },
-                    );
-                  }).toList(),
+                  },
                 ),
             ],
           ),
@@ -1896,6 +1836,7 @@ class _RightPanel extends StatelessWidget {
         // 掌握度概览
         _PanelCard(
           title: '掌握度概览',
+          icon: Icons.pie_chart_outline,
           child: Column(
             children: [
               _MasteryOverview(
@@ -1913,12 +1854,14 @@ class _RightPanel extends StatelessWidget {
         // 掌握度趋势
         _PanelCard(
           title: '掌握度趋势（近 7 天）',
+          icon: Icons.trending_up_outlined,
           child: _MasteryTrendChart(trendData: trendData),
         ),
         const SizedBox(height: 16),
         // 下一步最佳行动
         _PanelCard(
           title: '下一步最佳行动',
+          icon: Icons.lightbulb_outline,
           child: _NextBestAction(
             weakTopics: weakTopics,
             onTopicTap: onTopicTap,
@@ -1928,6 +1871,7 @@ class _RightPanel extends StatelessWidget {
         // 备选行动
         _PanelCard(
           title: '备选行动',
+          icon: Icons.list_alt_outlined,
           child: _AlternativeActions(
             weakTopics: weakTopics,
             onTopicTap: onTopicTap,
@@ -1937,6 +1881,7 @@ class _RightPanel extends StatelessWidget {
         // 最近AI反馈
         _PanelCard(
           title: '最近 AI 反馈',
+          icon: Icons.auto_awesome_outlined,
           trailing: '查看全部',
           child: Column(
             children: [
