@@ -152,7 +152,7 @@ class DashboardPage extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _CenterPanel(
                       currentDomain: currentDomain,
-                      domains: domains,
+                      allDomains: domains,
                       currentDomainId: currentDomainId,
                       recommendedTopics: recommendedTopics,
                       masteryPercent: masteryPercent,
@@ -216,7 +216,7 @@ class DashboardPage extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _CenterPanel(
                       currentDomain: currentDomain,
-                      domains: domains,
+                      allDomains: domains,
                       currentDomainId: currentDomainId,
                       recommendedTopics: recommendedTopics,
                       masteryPercent: masteryPercent,
@@ -252,7 +252,7 @@ class DashboardPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   _CenterPanel(
                     currentDomain: currentDomain,
-                    domains: domains,
+                    allDomains: domains,
                     currentDomainId: currentDomainId,
                     recommendedTopics: recommendedTopics,
                     masteryPercent: masteryPercent,
@@ -1685,10 +1685,10 @@ class _LeftPanel extends StatelessWidget {
 
 // ── 中间面板：当前学习路线、领域知识卡片 ──────────────────────────────────────────────
 
-class _CenterPanel extends StatelessWidget {
+class _CenterPanel extends StatefulWidget {
   const _CenterPanel({
     required this.currentDomain,
-    required this.domains,
+    required this.allDomains,
     required this.currentDomainId,
     required this.recommendedTopics,
     required this.masteryPercent,
@@ -1707,7 +1707,7 @@ class _CenterPanel extends StatelessWidget {
   });
 
   final Domain? currentDomain;
-  final List<Domain> domains;
+  final List<Domain> allDomains;
   final String currentDomainId;
   final List<Topic> recommendedTopics;
   final int masteryPercent;
@@ -1725,7 +1725,31 @@ class _CenterPanel extends StatelessWidget {
   final SettingsProvider settingsProvider;
 
   @override
+  State<_CenterPanel> createState() => _CenterPanelState();
+}
+
+class _CenterPanelState extends State<_CenterPanel> {
+  final _storage = StorageService();
+  List<String> _disabledIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisabled();
+  }
+
+  Future<void> _loadDisabled() async {
+    final ids = await _storage.loadDisabledDomains();
+    if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  List<Domain> get _domains =>
+      widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+
+  @override
   Widget build(BuildContext context) {
+    final domains = _domains;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1743,27 +1767,27 @@ class _CenterPanel extends StatelessWidget {
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
                   final domain = entry.value;
-                  final dp = progressProvider.getDomainProgress(
+                  final dp = widget.progressProvider.getDomainProgress(
                     domain.id,
-                    contentProvider.topics.values.toList(),
+                    widget.contentProvider.topics.values.toList(),
                   );
                   return _LearningPathItem(
                     domain: domain,
                     index: index,
                     masteryPercent: dp.masteryPercent,
-                    isSelected: domain.id == currentDomainId,
+                    isSelected: domain.id == widget.currentDomainId,
                     onTap: () {
-                      onDomainChanged(domain.id);
-                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                        contentProvider.loadDomainTopics(domain.id);
+                      widget.onDomainChanged(domain.id);
+                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                        widget.contentProvider.loadDomainTopics(domain.id);
                       }
                     },
                     onViewCatalog: () {
-                      onDomainChanged(domain.id);
-                      if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                        contentProvider.loadDomainTopics(domain.id);
+                      widget.onDomainChanged(domain.id);
+                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                        widget.contentProvider.loadDomainTopics(domain.id);
                       }
-                      onViewDomainCatalog(domain.id);
+                      widget.onViewDomainCatalog(domain.id);
                     },
                   );
                 }),
@@ -1795,9 +1819,9 @@ class _CenterPanel extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 12,
                       children: domains.take(8).map((domain) {
-                        final dp = progressProvider.getDomainProgress(
+                        final dp = widget.progressProvider.getDomainProgress(
                           domain.id,
-                          contentProvider.topics.values.toList(),
+                          widget.contentProvider.topics.values.toList(),
                         );
                         return SizedBox(
                           width: cardWidth,
@@ -1805,11 +1829,11 @@ class _CenterPanel extends StatelessWidget {
                             domain: domain,
                             masteryPercent: dp.masteryPercent,
                             onTap: () {
-                              onDomainChanged(domain.id);
-                              if (contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                                contentProvider.loadDomainTopics(domain.id);
+                              widget.onDomainChanged(domain.id);
+                              if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                                widget.contentProvider.loadDomainTopics(domain.id);
                               }
-                              onViewDomainCatalog(domain.id);
+                              widget.onViewDomainCatalog(domain.id);
                             },
                           ),
                         );
@@ -1830,21 +1854,21 @@ class _CenterPanel extends StatelessWidget {
         id: 'java',
         name: 'Java 后端开发',
         description: 'Java 核心、Spring、数据库、微服务',
-        domainIds: domains.take(5).map((d) => d.id).toList(),
+        domainIds: widget.allDomains.take(5).map((d) => d.id).toList(),
         isDefault: true,
       ),
       LearningRoute(
         id: 'frontend',
         name: '前端开发',
         description: 'JavaScript、React、Vue、性能优化',
-        domainIds: domains.take(4).map((d) => d.id).toList(),
+        domainIds: widget.allDomains.take(4).map((d) => d.id).toList(),
         isDefault: true,
       ),
       LearningRoute(
         id: 'agent',
         name: 'Agent 开发',
         description: 'AI Agent、RAG、Prompt Engineering',
-        domainIds: domains.take(3).map((d) => d.id).toList(),
+        domainIds: widget.allDomains.take(3).map((d) => d.id).toList(),
         isDefault: true,
       ),
     ];
@@ -1853,11 +1877,11 @@ class _CenterPanel extends StatelessWidget {
       context: context,
       builder: (ctx) => _RouteSelectorDialog(
         routes: routes,
-        currentRouteId: currentDomainId,
-        availableDomains: domains,
+        currentRouteId: widget.currentDomainId,
+        availableDomains: widget.allDomains,
         onRouteSelected: (route) {
           if (route.domainIds.isNotEmpty) {
-            onDomainChanged(route.domainIds.first);
+            widget.onDomainChanged(route.domainIds.first);
           }
         },
       ),
@@ -1865,25 +1889,23 @@ class _CenterPanel extends StatelessWidget {
   }
 
   void _showManageDomains(BuildContext context) {
-    final storage = StorageService();
-    storage.loadDisabledDomains().then((disabledIds) {
-      showDialog(
-        context: context,
-        builder: (ctx) => _ManageDomainsDialog(
-          domains: domains,
-          disabledDomainIds: disabledIds.toSet(),
-          onToggleDomain: (domainId) async {
-            final currentDisabled = await storage.loadDisabledDomains();
-            if (currentDisabled.contains(domainId)) {
-              currentDisabled.remove(domainId);
+    showDialog(
+      context: context,
+      builder: (ctx) => _ManageDomainsDialog(
+        domains: widget.allDomains,
+        disabledDomainIds: _disabledIds.toSet(),
+        onToggleDomain: (domainId) async {
+          setState(() {
+            if (_disabledIds.contains(domainId)) {
+              _disabledIds.remove(domainId);
             } else {
-              currentDisabled.add(domainId);
+              _disabledIds.add(domainId);
             }
-            await storage.saveDisabledDomains(currentDisabled);
-          },
-        ),
-      );
-    });
+          });
+          await _storage.saveDisabledDomains(_disabledIds);
+        },
+      ),
+    );
   }
 }
 
