@@ -1943,6 +1943,7 @@ class _CenterPanelState extends State<_CenterPanel> {
         routes: routes,
         currentRouteId: _selectedRoute?.id,
         availableDomains: widget.allDomains,
+        disabledDomainIds: _disabledIds,
         onRouteSelected: (route) {
           _saveSelectedRoute(route);
           if (route.domainIds.isNotEmpty) {
@@ -1982,12 +1983,14 @@ class _RouteSelectorDialog extends StatefulWidget {
     required this.currentRouteId,
     required this.onRouteSelected,
     required this.availableDomains,
+    this.disabledDomainIds = const [],
   });
 
   final List<LearningRoute> routes;
   final String? currentRouteId;
   final ValueChanged<LearningRoute> onRouteSelected;
   final List<Domain> availableDomains;
+  final List<String> disabledDomainIds;
 
   @override
   State<_RouteSelectorDialog> createState() => _RouteSelectorDialogState();
@@ -2124,16 +2127,18 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                 color: isDark ? Colors.white54 : Colors.grey,
                                 onPressed: () {
                                   Navigator.pop(context);
+                                  final enabledDomains = widget.availableDomains
+                                      .where((d) => !widget.disabledDomainIds.contains(d.id))
+                                      .toList();
                                   showDialog(
                                     context: context,
                                     builder: (ctx) => RouteEditorDialog(
-                                      availableDomains: widget.availableDomains
+                                      availableDomains: enabledDomains
                                           .map((d) => DomainItem(id: d.id, title: d.title))
                                           .toList(),
                                       existingRoute: route,
                                       onSave: (updatedRoute) {
                                         _updateRoute(index, updatedRoute);
-                                        // 如果是当前选中的路线，通知更新
                                         if (route.id == widget.currentRouteId) {
                                           widget.onRouteSelected(updatedRoute);
                                         }
@@ -2167,10 +2172,13 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
+                  final enabledDomains = widget.availableDomains
+                      .where((d) => !widget.disabledDomainIds.contains(d.id))
+                      .toList();
                   showDialog(
                     context: context,
                     builder: (ctx) => RouteEditorDialog(
-                      availableDomains: widget.availableDomains
+                      availableDomains: enabledDomains
                           .map((d) => DomainItem(id: d.id, title: d.title))
                           .toList(),
                       onSave: _addCustomRoute,
