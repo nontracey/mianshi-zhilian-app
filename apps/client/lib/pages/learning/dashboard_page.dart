@@ -1928,19 +1928,45 @@ class _RouteSelectorDialog extends StatefulWidget {
 
 class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
   late List<LearningRoute> _routes;
+  final _storage = StorageService();
 
   @override
   void initState() {
     super.initState();
-    _routes = List.from(widget.routes);
+    _loadRoutes();
+  }
+
+  Future<void> _loadRoutes() async {
+    // 加载自定义路线
+    final customData = await _storage.loadJsonList('custom_routes');
+    final customRoutes = customData.map((e) => LearningRoute.fromJson(e)).toList();
+    
+    setState(() {
+      _routes = [...widget.routes, ...customRoutes];
+    });
+  }
+
+  Future<void> _saveCustomRoutes() async {
+    final customRoutes = _routes.where((r) => !r.isDefault).toList();
+    await _storage.saveJsonList(
+      'custom_routes',
+      customRoutes.map((r) => r.toJson()).toList(),
+    );
   }
 
   void _addCustomRoute(LearningRoute route) {
     setState(() => _routes.add(route));
+    _saveCustomRoutes();
+  }
+
+  void _updateRoute(int index, LearningRoute route) {
+    setState(() => _routes[index] = route);
+    _saveCustomRoutes();
   }
 
   void _deleteRoute(String routeId) {
     setState(() => _routes.removeWhere((r) => r.id == routeId));
+    _saveCustomRoutes();
   }
 
   @override
@@ -1972,7 +1998,9 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               height: 300,
               child: SingleChildScrollView(
                 child: Column(
-                  children: _routes.map((route) {
+                  children: _routes.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final route = entry.value;
                     final isSelected = route.id == widget.currentRouteId;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -2023,6 +2051,31 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                   ],
                                 ),
                               ),
+                              // 编辑按钮
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                color: isDark ? Colors.white54 : Colors.grey,
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => RouteEditorDialog(
+                                      availableDomains: widget.availableDomains
+                                          .map((d) => DomainItem(id: d.id, title: d.title))
+                                          .toList(),
+                                      existingRoute: route,
+                                      onSave: (updatedRoute) {
+                                        _updateRoute(index, updatedRoute);
+                                        // 如果是当前选中的路线，通知更新
+                                        if (route.id == widget.currentRouteId) {
+                                          widget.onRouteSelected(updatedRoute);
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                              // 删除按钮（仅自定义路线）
                               if (!route.isDefault)
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline, size: 18),
