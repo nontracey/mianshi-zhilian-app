@@ -731,26 +731,31 @@ class _MasteryStats extends StatelessWidget {
       );
     }
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: categories.take(4).map((cat) {
-        final color = cat.masteryPercent >= 80
-            ? AppColors.success
-            : cat.masteryPercent >= 60
-                ? AppColors.accent
-                : cat.masteryPercent > 0
-                    ? AppColors.warning
-                    : Colors.grey;
-        return         SizedBox(
-          width: (MediaQuery.of(context).size.width - 64) / 2,
-          child: _MasteryStatCard(
-            title: cat.name,
-            value: '${cat.masteryPercent}%',
-            color: color,
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 12) / 2;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: categories.take(4).map((cat) {
+            final color = cat.masteryPercent >= 80
+                ? AppColors.success
+                : cat.masteryPercent >= 60
+                    ? AppColors.accent
+                    : cat.masteryPercent > 0
+                        ? AppColors.warning
+                        : Colors.grey;
+            return SizedBox(
+              width: cardWidth,
+              child: _MasteryStatCard(
+                title: cat.name,
+                value: '${cat.masteryPercent}%',
+                color: color,
+              ),
+            );
+          }).toList(),
         );
-      }).toList(),
+      },
     );
   }
 }
