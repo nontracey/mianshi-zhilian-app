@@ -446,16 +446,19 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
               color: isSelected ? AppColors.accent : (isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0)),
             ),
           ),
-          child: RadioListTile<String>(
-            value: level.$1,
-            groupValue: _currentLevel,
-            onChanged: (value) {
-              if (value != null) setState(() => _currentLevel = value);
-            },
+          child: ListTile(
+            leading: Radio<String>(  // ignore: deprecated_member_use
+              value: level.$1,
+              groupValue: _currentLevel,  // ignore: deprecated_member_use
+              onChanged: (value) {
+                if (value != null) setState(() => _currentLevel = value);
+              },
+              activeColor: AppColors.accent,
+            ),
             title: Text(level.$2, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
             subtitle: Text(level.$3, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF666666))),
-            activeColor: AppColors.accent,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            onTap: () => setState(() => _currentLevel = level.$1),
           ),
         );
       }).toList(),

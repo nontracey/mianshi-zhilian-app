@@ -179,7 +179,7 @@ class _LearningShellState extends State<LearningShell> {
                     // 切换内容环境
                     final contentEnv = ContentEnv.fromKey(stage);
                     await settings.setContentEnv(contentEnv);
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     final contentProvider = context.read<ContentProvider>();
                     await contentProvider.switchContentEnv(
                       settings.settings.contentBaseUrl,
