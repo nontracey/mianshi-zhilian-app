@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 
@@ -11,6 +12,8 @@ class ProjectLibraryPage extends StatefulWidget {
 
 class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   final List<Map<String, dynamic>> _projects = [];
+  final _storage = StorageService();
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -18,33 +21,29 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     _loadProjects();
   }
 
-  void _loadProjects() {
-    // TODO: 从本地存储加载项目
-    // 示例数据
-    _projects.addAll([
-      {
-        'name': '电商秒杀系统',
-        'role': '技术负责人',
-        'scale': '大型（10人以上）',
-        'techStack': 'Java, Spring Boot, Redis, Kafka, MySQL',
-        'background': '支撑双11大促，峰值QPS 10万+',
-        'task': '设计高并发秒杀系统，保证数据一致性',
-        'action': '采用Redis预扣库存+异步下单方案',
-        'result': '成功支撑大促，零超卖，RT<100ms',
-        'updatedAt': '2026-05-28',
-      },
-      {
-        'name': '分布式缓存方案',
-        'role': '架构师',
-        'scale': '中型（4-10人）',
-        'techStack': 'Redis, Java, Kubernetes',
-        'background': '解决数据库热点查询问题',
-        'task': '设计多级缓存架构',
-        'action': '本地缓存+Redis集群+数据库',
-        'result': '缓存命中率95%，DB负载降低80%',
-        'updatedAt': '2026-05-25',
-      },
-    ]);
+  Future<void> _loadProjects() async {
+    final data = await _storage.loadJsonList('project_library');
+    setState(() {
+      _projects.clear();
+      _projects.addAll(data);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveProjects() async {
+    await _storage.saveJsonList('project_library', _projects);
+  }
+
+  Future<void> _addProject(Map<String, dynamic> project) async {
+    project['id'] = DateTime.now().millisecondsSinceEpoch.toString();
+    project['createdAt'] = DateTime.now().toIso8601String();
+    setState(() => _projects.add(project));
+    await _saveProjects();
+  }
+
+  Future<void> _deleteProject(int index) async {
+    setState(() => _projects.removeAt(index));
+    await _saveProjects();
   }
 
   @override
@@ -332,9 +331,10 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
       MaterialPageRoute(
         builder: (_) => const ProjectDigPage(),
       ),
-    ).then((_) {
-      // 刷新列表
-      setState(() {});
+    ).then((result) {
+      if (result != null && result is Map<String, dynamic>) {
+        _addProject(result);
+      }
     });
   }
 
@@ -347,9 +347,13 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
       MaterialPageRoute(
         builder: (_) => const ProjectDigPage(),
       ),
-    ).then((_) {
-      // 刷新列表
-      setState(() {});
+    ).then((result) {
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          _projects[index] = {..._projects[index], ...result};
+        });
+        _saveProjects();
+      }
     });
   }
 
@@ -503,7 +507,15 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   }
 
   void _startProjectDig(BuildContext context, Map<String, dynamic> project) {
-    // TODO: 启动项目深挖练习
+    final questions = [
+      '这个项目的核心技术难点是什么？',
+      '为什么选择 ${project['techStack'] ?? '这个'} 技术栈？',
+      '遇到过什么线上问题？如何解决的？',
+      '如果重新设计，你会怎么改进？',
+      '你在项目中的最大贡献是什么？',
+      '这个项目的性能指标是多少？如何优化的？',
+    ];
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -513,15 +525,15 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('项目：${project['name']}'),
+              Text('项目：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              if (project['techStack'] != null) ...[
+                const SizedBox(height: 4),
+                Text('技术栈：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              ],
               const SizedBox(height: 16),
               const Text('面试官可能会问：', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              _buildDigQuestion('这个项目的核心技术难点是什么？'),
-              _buildDigQuestion('为什么选择这个技术栈？'),
-              _buildDigQuestion('遇到过什么线上问题？如何解决的？'),
-              _buildDigQuestion('如果重新设计，你会怎么改进？'),
-              _buildDigQuestion('你在项目中的最大贡献是什么？'),
+              ...questions.map((q) => _buildDigQuestion(q)),
             ],
           ),
         ),
@@ -533,9 +545,12 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // TODO: 进入AI对话练习
+              // 显示提示，让用户自己练习
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('AI 深挖练习功能开发中...')),
+                const SnackBar(
+                  content: Text('请对着这些问题进行口头练习，记录你的回答'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
             child: const Text('开始练习'),
@@ -553,35 +568,6 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         children: [
           const Text('• ', style: TextStyle(fontWeight: FontWeight.w600)),
           Expanded(child: Text(question)),
-        ],
-      ),
-    );
-  }
-
-  void _deleteProject(int index) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这个项目吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              setState(() {
-                _projects.removeAt(index);
-              });
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('项目已删除')),
-              );
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('删除'),
-          ),
         ],
       ),
     );

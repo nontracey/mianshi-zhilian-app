@@ -186,4 +186,34 @@ class StorageService {
 
     return exportData;
   }
+
+  /// 清除所有本地数据
+  Future<void> clearAllData() async {
+    final prefs = await _instance;
+    await prefs.clear();
+  }
+
+  /// 保存 JSON 列表
+  Future<void> saveJsonList(String key, List<Map<String, dynamic>> data) async {
+    await save(key, data);
+  }
+
+  /// 加载 JSON 列表
+  Future<List<Map<String, dynamic>>> loadJsonList(String key) async {
+    final data = await load(key);
+    if (data == null) return [];
+    return (data as List).map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// 保存 JSON 对象
+  Future<void> saveJsonObject(String key, Map<String, dynamic> data) async {
+    await save(key, data);
+  }
+
+  /// 加载 JSON 对象
+  Future<Map<String, dynamic>?> loadJsonObject(String key) async {
+    final data = await load(key);
+    if (data == null) return null;
+    return data as Map<String, dynamic>;
+  }
 }

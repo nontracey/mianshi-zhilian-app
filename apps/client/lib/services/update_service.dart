@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class UpdateInfo {
   final String version;
@@ -58,6 +61,9 @@ class PlatformUpdate {
   }
 }
 
+/// 下载进度回调
+typedef DownloadProgressCallback = void Function(int received, int total);
+
 class UpdateService {
   final String updateManifestUrl;
 
@@ -112,6 +118,90 @@ class UpdateService {
     }
 
     return null;
+  }
+
+  /// 下载更新文件
+  /// 返回下载文件的路径，失败返回 null
+  Future<String?> downloadUpdate({
+    required PlatformUpdate platformUpdate,
+    required String version,
+    DownloadProgressCallback? onProgress,
+  }) async {
+    try {
+      // 获取临时目录
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
+      final filePath = '${tempDir.path}/$fileName';
+
+      // 下载文件
+      final request = http.Request('GET', Uri.parse(platformUpdate.url));
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        debugPrint('Download failed: ${response.statusCode}');
+        return null;
+      }
+
+      final file = File(filePath);
+      final sink = file.openWrite();
+      int received = 0;
+      final total = platformUpdate.size;
+
+      await response.stream.forEach((chunk) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      });
+
+      await sink.close();
+
+      // 校验 sha256
+      final isValid = await verifySha256(filePath, platformUpdate.sha256);
+      if (!isValid) {
+        debugPrint('SHA256 verification failed');
+        await file.delete();
+        return null;
+      }
+
+      return filePath;
+    } catch (e) {
+      debugPrint('Download error: $e');
+      return null;
+    }
+  }
+
+  /// 校验文件的 SHA256
+  Future<bool> verifySha256(String filePath, String expectedSha256) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return false;
+
+      final bytes = await file.readAsBytes();
+      final digest = sha256.convert(bytes);
+      final actualSha256 = digest.toString();
+
+      debugPrint('Expected SHA256: $expectedSha256');
+      debugPrint('Actual SHA256: $actualSha256');
+
+      return actualSha256.toLowerCase() == expectedSha256.toLowerCase();
+    } catch (e) {
+      debugPrint('SHA256 verification error: $e');
+      return false;
+    }
+  }
+
+  /// 获取文件扩展名
+  String _getFileExtension() {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'apk';
+    }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return 'exe';
+    }
+    if (defaultTargetPlatform == TargetPlatform.linux) {
+      return 'AppImage';
+    }
+    return 'dmg'; // macOS / iOS
   }
 
   /// 比较版本号

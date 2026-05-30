@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class PrivacyConfirmDialog extends StatelessWidget {
@@ -354,12 +357,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
             title: '导出本地数据',
             subtitle: '将所有本地数据导出为 JSON 文件',
             icon: Icons.file_download_outlined,
-            onTap: () {
-              // TODO: 导出数据
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('导出功能开发中...')),
-              );
-            },
+            onTap: () => _exportData(context),
             isDark: isDark,
           ),
           _buildActionButton(
@@ -459,6 +457,32 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     );
   }
 
+  Future<void> _exportData(BuildContext context) async {
+    try {
+      final storage = StorageService();
+      final data = await storage.exportAllData();
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
+      
+      // 复制到剪贴板
+      await Clipboard.setData(ClipboardData(text: jsonStr));
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('数据已复制到剪贴板，可粘贴保存'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e')),
+        );
+      }
+    }
+  }
+
   void _showClearDataDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -471,12 +495,23 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              // TODO: 清除数据
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('数据已清除')),
-              );
+              try {
+                final storage = StorageService();
+                await storage.clearAllData();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('数据已清除')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('清除失败: $e')),
+                  );
+                }
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('清除'),

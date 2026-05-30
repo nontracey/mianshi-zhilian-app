@@ -1451,40 +1451,72 @@ class _AboutPanelState extends State<_AboutPanel> {
     }
 
     // 显示下载进度
+    int received = 0;
+    int total = platformUpdate.size;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('下载更新'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text('正在下载 v${updateInfo.version}...'),
-            const SizedBox(height: 8),
-            Text(
-              '大小：${UpdateService.formatSize(platformUpdate.size)}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('下载更新'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                value: total > 0 ? received / total : null,
+              ),
+              const SizedBox(height: 16),
+              Text('正在下载 v${updateInfo.version}...'),
+              const SizedBox(height: 8),
+              Text(
+                '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              if (total > 0)
+                Text(
+                  '${(received / total * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
 
-    // TODO: 实际下载和校验 sha256
-    // 1. 下载文件到临时目录
-    // 2. 计算 sha256 并与 platformUpdate.sha256 比对
-    // 3. 校验通过后引导安装
-
-    // 模拟下载完成
-    await Future.delayed(const Duration(seconds: 2));
+    // 实际下载和校验
+    final filePath = await updateService.downloadUpdate(
+      platformUpdate: platformUpdate,
+      version: updateInfo.version,
+      onProgress: (r, t) {
+        received = r;
+        total = t;
+        // 更新对话框（通过 rebuild）
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
 
     if (mounted) {
       Navigator.pop(context); // 关闭下载对话框
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('下载完成，请手动安装更新包')));
+
+      if (filePath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('下载完成：$filePath'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('下载失败或校验不通过，请重试')),
+        );
+      }
     }
   }
 

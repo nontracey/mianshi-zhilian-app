@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class AnswerVersionsPage extends StatefulWidget {
@@ -21,7 +22,11 @@ class AnswerVersionsPage extends StatefulWidget {
 class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
   final List<Map<String, dynamic>> _versions = [];
   final _answerController = TextEditingController();
+  final _storage = StorageService();
   String _selectedVersionType = 'draft';
+  bool _isLoading = true;
+
+  String get _storageKey => 'answer_versions_${widget.topicId}';
 
   @override
   void initState() {
@@ -29,8 +34,17 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     _loadVersions();
   }
 
-  void _loadVersions() {
-    // TODO: 从本地存储加载已保存的版本
+  Future<void> _loadVersions() async {
+    final data = await _storage.loadJsonList(_storageKey);
+    setState(() {
+      _versions.clear();
+      _versions.addAll(data);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveVersions() async {
+    await _storage.saveJsonList(_storageKey, _versions);
   }
 
   @override
@@ -407,7 +421,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     );
   }
 
-  void _saveVersion() {
+  Future<void> _saveVersion() async {
     if (_answerController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入回答内容')),
@@ -423,14 +437,16 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       });
     });
 
-    // TODO: 保存到本地存储
+    await _saveVersions();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('版本已保存')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('版本已保存')),
+      );
+    }
   }
 
-  void _deleteVersion(int index) {
+  Future<void> _deleteVersion(int index) async {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -442,14 +458,17 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               setState(() {
                 _versions.removeAt(index);
               });
+              await _saveVersions();
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('版本已删除')),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('版本已删除')),
+                );
+              }
             },
             child: const Text('删除'),
           ),
@@ -522,7 +541,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
               child: const Text('取消'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 setState(() {
                   _versions[index] = {
                     'type': _selectedVersionType,
@@ -531,10 +550,13 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                     'updatedAt': DateTime.now().toString().substring(0, 16),
                   };
                 });
+                await _saveVersions();
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('版本已更新')),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('版本已更新')),
+                  );
+                }
               },
               child: const Text('保存'),
             ),
@@ -544,19 +566,39 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     );
   }
 
-  void _askAIForImprovement(Map<String, dynamic> version) {
-    // TODO: 调用AI改进回答
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('AI 改进功能开发中...')),
-    );
+  Future<void> _askAIForImprovement(Map<String, dynamic> version) async {
+    final content = version['content'] as String? ?? '';
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先填写回答内容')),
+      );
+      return;
+    }
+
+    // 复制内容到剪贴板，提示用户粘贴到AI对话
+    await Clipboard.setData(ClipboardData(
+      text: '请帮我改进以下面试回答：\n\n$content',
+    ));
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已复制到剪贴板，可粘贴到 AI 对话中获取改进建议'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
-  void _setAsInterviewVersion(int index) {
+  Future<void> _setAsInterviewVersion(int index) async {
     setState(() {
       _versions[index]['type'] = 'interview';
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已设为面试版')),
-    );
+    await _saveVersions();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已设为面试版')),
+      );
+    }
   }
 }

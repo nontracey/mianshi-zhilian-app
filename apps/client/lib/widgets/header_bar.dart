@@ -12,11 +12,13 @@ class HeaderBar extends StatefulWidget {
     required this.title,
     required this.onProfile,
     this.onTopicTap,
+    this.onContentStageChanged,
   });
 
   final String title;
   final VoidCallback onProfile;
   final ValueChanged<String>? onTopicTap;
+  final ValueChanged<String>? onContentStageChanged;
 
   @override
   State<HeaderBar> createState() => _HeaderBarState();
@@ -182,6 +184,7 @@ class _HeaderBarState extends State<HeaderBar> {
             _ContentStageSelector(
               isDark: isDark,
               isLoggedIn: authProvider.isLoggedIn,
+              onStageChanged: widget.onContentStageChanged,
             ),
             const SizedBox(width: 24),
 
@@ -304,18 +307,30 @@ class _AiModelSelector extends StatelessWidget {
 }
 
 // 内容阶段选择器
-class _ContentStageSelector extends StatelessWidget {
-  const _ContentStageSelector({required this.isDark, this.isLoggedIn = false});
+class _ContentStageSelector extends StatefulWidget {
+  const _ContentStageSelector({
+    required this.isDark,
+    this.isLoggedIn = false,
+    this.onStageChanged,
+  });
 
   final bool isDark;
   final bool isLoggedIn;
+  final ValueChanged<String>? onStageChanged;
+
+  @override
+  State<_ContentStageSelector> createState() => _ContentStageSelectorState();
+}
+
+class _ContentStageSelectorState extends State<_ContentStageSelector> {
+  String _currentStage = 'published';
 
   @override
   Widget build(BuildContext context) {
     final stages = [
       ('published', '发布', true),   // 所有用户可用
-      ('testing', '测试', isLoggedIn), // 仅登录用户
-      ('draft', '草稿', isLoggedIn),   // 仅登录用户
+      ('testing', '测试', widget.isLoggedIn), // 仅登录用户
+      ('draft', '草稿', widget.isLoggedIn),   // 仅登录用户
     ];
 
     return Row(
@@ -324,25 +339,26 @@ class _ContentStageSelector extends StatelessWidget {
           '内容',
           style: TextStyle(
             fontSize: 12,
-            color: isDark ? Colors.white54 : const Color(0xFF666666),
+            color: widget.isDark ? Colors.white54 : const Color(0xFF666666),
           ),
         ),
         const SizedBox(width: 8),
         Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+            color: widget.isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
             borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.all(2),
           child: Row(
             children: stages.map((stage) {
-              final isSelected = stage.$1 == 'published';
+              final isSelected = stage.$1 == _currentStage;
               final isEnabled = stage.$3;
               
               return GestureDetector(
                 onTap: isEnabled
                     ? () {
-                        // TODO: 实现阶段切换逻辑
+                        setState(() => _currentStage = stage.$1);
+                        widget.onStageChanged?.call(stage.$1);
                       }
                     : () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -371,8 +387,8 @@ class _ContentStageSelector extends StatelessWidget {
                           color: isSelected
                               ? Colors.white
                               : isEnabled
-                                  ? (isDark ? Colors.white70 : const Color(0xFF666666))
-                                  : (isDark ? Colors.white30 : Colors.grey.shade400),
+                                  ? (widget.isDark ? Colors.white70 : const Color(0xFF666666))
+                                  : (widget.isDark ? Colors.white30 : Colors.grey.shade400),
                         ),
                       ),
                       if (!isEnabled) ...[
@@ -380,7 +396,7 @@ class _ContentStageSelector extends StatelessWidget {
                         Icon(
                           Icons.lock_outline,
                           size: 10,
-                          color: isDark ? Colors.white30 : Colors.grey.shade400,
+                          color: widget.isDark ? Colors.white30 : Colors.grey.shade400,
                         ),
                       ],
                     ],

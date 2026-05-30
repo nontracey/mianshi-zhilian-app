@@ -462,10 +462,8 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 child: FilledButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    // TODO: 进入AI对话练习
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('开始练习：${topic['title']}')),
-                    );
+                    // 显示练习提示
+                    _showPracticeGuide(context, topic);
                   },
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('开始练习'),
@@ -556,6 +554,76 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPracticeGuide(BuildContext context, Map<String, dynamic> topic) {
+    final keyPoints = topic['keyPoints'] as List<String>? ?? [];
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('练习：${topic['title']}'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(topic['description'] ?? '', style: TextStyle(color: Colors.grey.shade600)),
+              const SizedBox(height: 16),
+              const Text('关键知识点：', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...keyPoints.map((point) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• '),
+                    Expanded(child: Text(point)),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('练习建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    SizedBox(height: 4),
+                    Text('1. 按照需求澄清 → 容量估算 → 架构设计 → 核心设计 → 扩展优化的顺序进行', style: TextStyle(fontSize: 12)),
+                    Text('2. 用纸笔画出架构图', style: TextStyle(fontSize: 12)),
+                    Text('3. 记录关键决策和 trade-off', style: TextStyle(fontSize: 12)),
+                    Text('4. 控制时间在 30-45 分钟内', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('开始计时，按步骤完成系统设计'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+            child: const Text('开始练习'),
           ),
         ],
       ),

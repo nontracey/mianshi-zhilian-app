@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class ProjectDigPage extends StatefulWidget {
@@ -15,11 +16,13 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   final _techDecisionController = TextEditingController();
   final _resultController = TextEditingController();
   final _difficultyController = TextEditingController();
+  final _storage = StorageService();
   
   String _selectedRole = 'developer';
   String _selectedScale = 'medium';
   final List<String> _selectedTechStack = [];
   final List<Map<String, dynamic>> _savedProjects = [];
+  bool _isLoading = true;
   
   final List<String> _techStackOptions = [
     'Java', 'Python', 'Go', 'JavaScript', 'TypeScript',
@@ -42,8 +45,17 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     _loadSavedProjects();
   }
 
-  void _loadSavedProjects() {
-    // TODO: 从本地存储加载已保存的项目
+  Future<void> _loadSavedProjects() async {
+    final data = await _storage.loadJsonList('project_dig_projects');
+    setState(() {
+      _savedProjects.clear();
+      _savedProjects.addAll(data);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveProjects() async {
+    await _storage.saveJsonList('project_dig_projects', _savedProjects);
   }
 
   @override
@@ -514,9 +526,10 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     );
   }
 
-  void _saveAndPractice() {
+  Future<void> _saveAndPractice() async {
     if (_formKey.currentState?.validate() ?? false) {
       final project = {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'name': _projectNameController.text,
         'role': _selectedRole,
         'scale': _selectedScale,
@@ -525,20 +538,32 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         'task': _techDecisionController.text,
         'action': _difficultyController.text,
         'result': _resultController.text,
+        'createdAt': DateTime.now().toIso8601String(),
       };
       
       setState(() {
         _savedProjects.add(project);
       });
       
-      // TODO: 保存到本地存储
+      await _saveProjects();
       
-      _startDigPractice(project);
+      // 返回项目数据给调用方
+      if (mounted) {
+        Navigator.of(context).pop(project);
+      }
     }
   }
 
   void _startDigPractice(Map<String, dynamic> project) {
-    // TODO: 启动AI深挖练习
+    final questions = [
+      '这个项目的核心技术难点是什么？',
+      '为什么选择 ${project['techStack']} 技术栈？',
+      '遇到过什么线上问题？如何解决的？',
+      '如果重新设计，你会怎么改进？',
+      '你在项目中的最大贡献是什么？',
+      '这个项目的性能指标是多少？如何优化的？',
+    ];
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -548,14 +573,11 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('项目：${project['name']}'),
+              Text('项目：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               const Text('面试官可能会问：', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              _buildDigQuestion('这个项目的核心技术难点是什么？'),
-              _buildDigQuestion('为什么选择 ${project['techStack']} 技术栈？'),
-              _buildDigQuestion('遇到过什么线上问题？如何解决的？'),
-              _buildDigQuestion('如果重新设计，你会怎么改进？'),
+              ...questions.map((q) => _buildDigQuestion(q)),
             ],
           ),
         ),
@@ -567,7 +589,8 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // TODO: 进入AI对话练习
+              // 返回项目数据
+              Navigator.of(context).pop(project);
             },
             child: const Text('开始练习'),
           ),
@@ -590,9 +613,21 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   }
 
   void _startRandomDig(BuildContext context) {
-    // TODO: 随机生成项目深挖问题
+    if (_savedProjects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先添加项目')),
+      );
+      return;
+    }
+
+    // 随机选择一个项目
+    final random = _savedProjects.toList()..shuffle();
+    final project = random.first;
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('随机深挖练习功能开发中...')),
+      SnackBar(content: Text('已选择项目：${project['name']}')),
     );
+    
+    _startDigPractice(project);
   }
 }

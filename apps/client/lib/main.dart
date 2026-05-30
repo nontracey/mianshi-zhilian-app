@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'models/app_settings.dart';
 import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/content_provider.dart';
@@ -174,6 +175,18 @@ class _LearningShellState extends State<LearningShell> {
                     _selectedTopicId = topicId;
                     _selectedTopicInitialTab = 0;
                   }),
+                  onContentStageChanged: (stage) async {
+                    // 切换内容环境
+                    final contentEnv = ContentEnv.fromKey(stage);
+                    await settings.setContentEnv(contentEnv);
+                    if (mounted) {
+                      final contentProvider = context.read<ContentProvider>();
+                      await contentProvider.switchContentEnv(
+                        settings.settings.contentBaseUrl,
+                        currentDomainId: settings.settings.currentDomain,
+                      );
+                    }
+                  },
                 ),
                 Expanded(child: _buildCurrentPage(wide)),
               ],
