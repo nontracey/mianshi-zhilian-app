@@ -4,6 +4,7 @@ import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class CatalogPage extends StatefulWidget {
@@ -25,6 +26,23 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
+  final _storage = StorageService();
+  List<String> _disabledIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisabled();
+  }
+
+  Future<void> _loadDisabled() async {
+    final ids = await _storage.loadDisabledDomains();
+    if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  List<Domain> _filterDomains(List<Domain> all) {
+    return all.where((d) => !_disabledIds.contains(d.id)).toList();
+  }
   bool _roadmapView = false;
   String _searchQuery = '';
   final Set<int> _difficultyFilters = {};
@@ -117,8 +135,9 @@ class _CatalogPageState extends State<CatalogPage> {
     final progressProvider = context.watch<ProgressProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final domains = contentProvider.domains;
-    final currentDomain = domains.where((d) => d.id == widget.currentDomainId).firstOrNull;
+    final allDomains = contentProvider.domains;
+    final domains = _filterDomains(allDomains);
+    final currentDomain = allDomains.where((d) => d.id == widget.currentDomainId).firstOrNull;
     if (currentDomain == null) {
       return const Center(child: Text('请选择一个领域'));
     }

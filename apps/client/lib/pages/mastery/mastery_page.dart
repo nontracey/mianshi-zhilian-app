@@ -4,6 +4,7 @@ import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 enum MasterySort { scoreAsc, scoreDesc }
@@ -27,6 +28,23 @@ class MasteryPage extends StatefulWidget {
 class _MasteryPageState extends State<MasteryPage> {
   MasterySort _sort = MasterySort.scoreAsc;
   MasteryFilter _filter = MasteryFilter.all;
+  final _storage = StorageService();
+  List<String> _disabledIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisabled();
+  }
+
+  Future<void> _loadDisabled() async {
+    final ids = await _storage.loadDisabledDomains();
+    if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  List<Domain> _filterDomains(List<Domain> all) {
+    return all.where((d) => !_disabledIds.contains(d.id)).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,8 +52,9 @@ class _MasteryPageState extends State<MasteryPage> {
     final progressProvider = context.watch<ProgressProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final domains = contentProvider.domains;
-    final currentDomain = domains
+    final allDomains = contentProvider.domains;
+    final domains = _filterDomains(allDomains);
+    final currentDomain = allDomains
         .where((d) => d.id == widget.currentDomainId)
         .firstOrNull;
     if (currentDomain == null) {
