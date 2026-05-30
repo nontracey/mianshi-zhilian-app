@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/ai_config.dart';
 
@@ -12,6 +13,7 @@ class AiService {
     required List<String> commonMistakes,
     required String userAnswer,
     required String language,
+    Uint8List? imageBytes,
   }) async {
     final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
 
@@ -27,7 +29,10 @@ class AiService {
         'model': config.model,
         'messages': [
           {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': '知识点：$topicTitle\n\n我的回答：\n$userAnswer'},
+          {
+            'role': 'user',
+            'content': _buildUserContent(topicTitle, userAnswer, imageBytes),
+          },
         ],
         'temperature': 0.3,
         'max_tokens': 2000,
@@ -52,12 +57,13 @@ class AiService {
     required List<String> commonMistakes,
     required String userAnswer,
     required String language,
+    Uint8List? imageBytes,
   }) async* {
     final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
 
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-    
+
     final client = http.Client();
     try {
       final request = http.Request('POST', Uri.parse(url));
@@ -67,7 +73,10 @@ class AiService {
         'model': config.model,
         'messages': [
           {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': '知识点：$topicTitle\n\n我的回答：\n$userAnswer'},
+          {
+            'role': 'user',
+            'content': _buildUserContent(topicTitle, userAnswer, imageBytes),
+          },
         ],
         'temperature': 0.3,
         'max_tokens': 2000,
@@ -116,6 +125,25 @@ class AiService {
     } finally {
       client.close();
     }
+  }
+
+  /// 构建用户消息内容，支持图片多模态
+  dynamic _buildUserContent(
+    String topicTitle,
+    String userAnswer,
+    Uint8List? imageBytes,
+  ) {
+    final text = '知识点：$topicTitle\n\n我的回答：\n$userAnswer';
+    if (imageBytes == null || imageBytes.isEmpty) return text;
+
+    final base64Image = base64Encode(imageBytes);
+    return [
+      {'type': 'text', 'text': text},
+      {
+        'type': 'image_url',
+        'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
+      },
+    ];
   }
 
   String _buildSystemPrompt(List<String> mustHave, List<String> commonMistakes, String language) {
@@ -222,5 +250,66 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
       return json.decode(response.body) as Map<String, dynamic>;
     }
     throw Exception('AI 代理评估失败: ${response.statusCode}');
+  }
+
+  /// 通用流式聊天补全
+  Stream<String> sendMessageStream({
+    required AiConfig config,
+    required String userMessage,
+    String? systemPrompt,
+  }) async* {
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+
+    final messages = <Map<String, String>>[];
+    if (systemPrompt != null) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    messages.add({'role': 'user', 'content': userMessage});
+
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse(url));
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer ${config.apiKey}';
+      request.body = json.encode({
+        'model': config.model,
+        'messages': messages,
+        'temperature': 0.5,
+        'max_tokens': 2000,
+        'stream': true,
+      });
+
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        throw Exception('AI 请求失败: ${response.statusCode}');
+      }
+
+      String buffer = '';
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+        while (buffer.contains('\n')) {
+          final index = buffer.indexOf('\n');
+          final line = buffer.substring(0, index).trim();
+          buffer = buffer.substring(index + 1);
+
+          if (line.startsWith('data: ')) {
+            final data = line.substring(6);
+            if (data == '[DONE]') return;
+            try {
+              final jsonData = json.decode(data) as Map<String, dynamic>;
+              final choices = jsonData['choices'] as List?;
+              if (choices != null && choices.isNotEmpty) {
+                final delta = choices[0]['delta'] as Map<String, dynamic>?;
+                final content = delta?['content'] as String?;
+                if (content != null) yield content;
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
   }
 }

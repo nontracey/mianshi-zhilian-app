@@ -543,10 +543,10 @@ class _DomainDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+        color: isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0),
+          color: isDark ? AppColors.borderMidnight : const Color(0xFFE0E0E0),
         ),
       ),
       child: DropdownButtonHideUnderline(
@@ -556,11 +556,11 @@ class _DomainDropdown extends StatelessWidget {
           icon: Icon(
             Icons.keyboard_arrow_down,
             size: 14,
-            color: isDark ? Colors.white54 : const Color(0xFF999999),
+            color: isDark ? Colors.white54 : AppColors.textTertiary,
           ),
           style: TextStyle(
             fontSize: 12,
-            color: isDark ? Colors.white70 : const Color(0xFF666666),
+            color: isDark ? Colors.white70 : AppColors.textSecondary,
           ),
           items: domains.map((d) => DropdownMenuItem(
             value: d.id,
@@ -821,11 +821,13 @@ class _DomainKnowledgeCard extends StatelessWidget {
   const _DomainKnowledgeCard({
     required this.domain,
     required this.masteryPercent,
+    required this.practiceCount,
     required this.onTap,
   });
 
   final Domain domain;
   final int masteryPercent;
+  final int practiceCount;
   final VoidCallback onTap;
 
   IconData _getDomainIcon(String domainId) {
@@ -848,7 +850,6 @@ class _DomainKnowledgeCard extends StatelessWidget {
     final status = getMasteryLabel(masteryPercent);
     final statusColor = getMasteryColor(masteryPercent);
 
-    final practiceCount = domain.topicCount * 3;
     final domainIcon = _getDomainIcon(domain.id);
 
     return Material(
@@ -1015,7 +1016,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
         border: Border.all(
           color: widget.isSelected
               ? AppColors.accent.withValues(alpha: 0.3)
-              : (isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+              : (isDark ? AppColors.borderMidnight : AppColors.borderLight),
         ),
       ),
       child: Column(
@@ -1035,7 +1036,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     decoration: BoxDecoration(
                       color: widget.isSelected
                           ? AppColors.accent
-                          : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+                          : (isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
@@ -1063,7 +1064,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
-                                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1229,7 +1230,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             Text(
@@ -1347,11 +1348,13 @@ class _ReviewItem extends StatelessWidget {
   const _ReviewItem({
     required this.topic,
     required this.score,
+    required this.nextReviewAt,
     required this.onTap,
   });
 
   final Topic topic;
   final int score;
+  final DateTime? nextReviewAt;
   final VoidCallback onTap;
 
   @override
@@ -1361,12 +1364,31 @@ class _ReviewItem extends StatelessWidget {
         : score >= 60
         ? AppColors.warning
         : AppColors.danger;
-    
-    // 模拟复习时间（实际应从数据中获取）
-    final reviewHour = 10 + (topic.title.hashCode % 8);
-    final isToday = topic.title.hashCode % 2 == 0;
-    final timeText = isToday ? '今天 $reviewHour:00' : '明天 ${(reviewHour - 2).clamp(8, 11)}:00';
-    final timeColor = isToday ? const Color(0xFFE5484D) : const Color(0xFF666666);
+
+    // 使用真实的复习时间
+    String timeText;
+    Color timeColor;
+    if (nextReviewAt != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final reviewDate = DateTime(nextReviewAt!.year, nextReviewAt!.month, nextReviewAt!.day);
+      final isToday = reviewDate.isAtSameMomentAs(today);
+      final isTomorrow = reviewDate.isAtSameMomentAs(today.add(const Duration(days: 1)));
+      
+      if (isToday) {
+        timeText = '今天 ${nextReviewAt!.hour}:${nextReviewAt!.minute.toString().padLeft(2, '0')}';
+        timeColor = AppColors.danger;
+      } else if (isTomorrow) {
+        timeText = '明天 ${nextReviewAt!.hour}:${nextReviewAt!.minute.toString().padLeft(2, '0')}';
+        timeColor = AppColors.textSecondary;
+      } else {
+        timeText = '${nextReviewAt!.month}/${nextReviewAt!.day}';
+        timeColor = AppColors.textSecondary;
+      }
+    } else {
+      timeText = '待安排';
+      timeColor = AppColors.textTertiary;
+    }
 
     return InkWell(
       onTap: onTap,
@@ -1410,7 +1432,7 @@ class _ReviewItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    '${topic.domain} · ${topic.domain}',
+                    '${topic.domain} · ${topic.category}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1623,7 +1645,7 @@ class _LeftPanel extends StatelessWidget {
             '到期时间',
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? Colors.white38 : const Color(0xFF999999),
+              color: isDark ? Colors.white38 : AppColors.textTertiary,
             ),
           ),
           child: Column(
@@ -1634,9 +1656,11 @@ class _LeftPanel extends StatelessWidget {
                 ...dueTopics.take(5).map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
                   final score = progress?.score ?? 0;
+                  final nextReviewAt = progress?.nextReviewAt;
                   return _ReviewItem(
                     topic: topic,
                     score: score,
+                    nextReviewAt: nextReviewAt,
                     onTap: () => onTopicTap(topic.id),
                   );
                 }),
@@ -1903,11 +1927,16 @@ class _CenterPanelState extends State<_CenterPanel> {
                           domain.id,
                           widget.contentProvider.topics.values.toList(),
                         );
+                        final practiceCount = widget.progressProvider.getDomainPracticeCount(
+                          domain.id,
+                          widget.contentProvider.topics.values.toList(),
+                        );
                         return SizedBox(
                           width: cardWidth,
                           child: _DomainKnowledgeCard(
                             domain: domain,
                             masteryPercent: dp.masteryPercent,
+                            practiceCount: practiceCount,
                             onTap: () {
                               widget.onDomainChanged(domain.id);
                               if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
@@ -2109,7 +2138,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.accent
-                                  : (isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0)),
+                                  : (isDark ? AppColors.borderMidnight : const Color(0xFFE0E0E0)),
                             ),
                           ),
                           child: Row(
@@ -2287,13 +2316,13 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: isDisabled
-                            ? (isDark ? const Color(0xFF111111) : Colors.grey.shade100)
-                            : (isDark ? const Color(0xFF161B22) : Colors.white),
+                            ? (isDark ? AppColors.surfaceDark : Colors.grey.shade100)
+                            : (isDark ? AppColors.surfaceMidnight : Colors.white),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isDisabled
-                              ? (isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade200)
-                              : (isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+                              ? (isDark ? AppColors.borderDarkSubtle : Colors.grey.shade200)
+                              : (isDark ? AppColors.borderMidnight : AppColors.borderLight),
                         ),
                       ),
                       child: Row(
@@ -2308,7 +2337,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                                     fontWeight: FontWeight.w600,
                                     color: isDisabled
                                         ? Colors.grey
-                                        : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
+                                        : (isDark ? Colors.white : AppColors.textPrimary),
                                   ),
                                 ),
                                 Text(
@@ -2595,7 +2624,7 @@ class _LineChartPainter extends CustomPainter {
     if (data.isEmpty) return;
 
     final paint = Paint()
-      ..color = const Color(0xFF3078F0)
+      ..color = AppColors.accent
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
@@ -2627,7 +2656,7 @@ class _LineChartPainter extends CustomPainter {
 
     // 绘制数据点（跳过 null 值）
     final dotPaint = Paint()
-      ..color = const Color(0xFF3078F0)
+      ..color = AppColors.accent
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < data.length; i++) {
@@ -2683,7 +2712,7 @@ class _AlternativeActions extends StatelessWidget {
                         ? Icons.replay_outlined 
                         : Icons.school_outlined,
                     size: 16,
-                    color: const Color(0xFF3078F0),
+                    color: AppColors.accent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(

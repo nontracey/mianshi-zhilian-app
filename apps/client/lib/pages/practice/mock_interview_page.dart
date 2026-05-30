@@ -3,11 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+
+enum _InterviewStage { main, followUp, clarify, summary }
 
 class MockInterviewPage extends StatefulWidget {
   const MockInterviewPage({super.key, required this.topicIds});
@@ -30,9 +33,103 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   String _scenario = 'mixed';
   late final DateTime _startedAt = DateTime.now();
 
+  // 追问流状态
+  _InterviewStage _stage = _InterviewStage.main;
+  String? _followUpQuestion;
+  final List<Map<String, String>> _followUpHistory = [];
+
   late DateTime _questionStartTime;
   final List<int> _questionDurations = [];
   late final Stopwatch _overallTimer = Stopwatch()..start();
+
+  /// 根据场景过滤后的题目 ID 列表
+  List<String> get _activeTopicIds {
+    if (_scenario == 'mixed') return widget.topicIds;
+    final contentProvider = context.read<ContentProvider>();
+    return widget.topicIds.where((id) {
+      final topic = contentProvider.findTopic(id);
+      if (topic == null) return false;
+      return _matchesScenario(topic, _scenario);
+    }).toList();
+  }
+
+  static bool _matchesScenario(Topic topic, String scenario) {
+    final cat = topic.category.toLowerCase();
+    final tags = topic.tags.map((t) => t.toLowerCase()).toList();
+    switch (scenario) {
+      case 'foundation':
+        return cat.contains('基础') ||
+            cat.contains('概念') ||
+            cat.contains('原理') ||
+            tags.any((t) => t.contains('基础') || t.contains('概念')) ||
+            topic.leetcodeUrl == null;
+      case 'systemDesign':
+        return cat.contains('系统设计') ||
+            cat.contains('架构') ||
+            tags.any((t) =>
+                t.contains('系统设计') ||
+                t.contains('架构') ||
+                t.contains('system'));
+      case 'code':
+        return cat.contains('算法') ||
+            cat.contains('代码') ||
+            cat.contains('编程') ||
+            topic.leetcodeUrl != null ||
+            tags.any((t) => t.contains('算法') || t.contains('代码'));
+      case 'project':
+        return cat.contains('项目') ||
+            cat.contains('实战') ||
+            cat.contains('工程') ||
+            tags.any((t) => t.contains('项目') || t.contains('实战'));
+      default:
+        return true;
+    }
+  }
+
+  void _onScenarioChanged(String value) {
+    if (value == _scenario) return;
+    final hasProgress = _results.isNotEmpty || _evaluationResult != null;
+    if (hasProgress) {
+      showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('切换场景'),
+          content: const Text('切换场景将重新开始面试，当前进度会丢失。确定切换吗？'),
+          actions: [
+            TextButton(
+              onPressed: Navigator.of(ctx).pop,
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      ).then((confirmed) {
+        if (confirmed == true) _applyScenario(value);
+      });
+    } else {
+      _applyScenario(value);
+    }
+  }
+
+  void _applyScenario(String value) {
+    setState(() {
+      _scenario = value;
+      _currentIndex = 0;
+      _results.clear();
+      _evaluationResult = null;
+      _isCompleted = false;
+      _savedSession = false;
+      _followUpHistory.clear();
+      _stage = _InterviewStage.main;
+      _followUpQuestion = null;
+      _answerController.clear();
+      _questionDurations.clear();
+      _questionStartTime = DateTime.now();
+    });
+  }
 
   @override
   void initState() {
@@ -47,9 +144,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   }
 
   Topic? _getCurrentTopic() {
-    if (_currentIndex >= widget.topicIds.length) return null;
+    final ids = _activeTopicIds;
+    if (_currentIndex >= ids.length) return null;
     final contentProvider = context.read<ContentProvider>();
-    return contentProvider.findTopic(widget.topicIds[_currentIndex]);
+    return contentProvider.findTopic(ids[_currentIndex]);
   }
 
   Future<void> _evaluate() async {
@@ -74,75 +172,121 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
     setState(() => _isEvaluating = true);
 
+    // 构建追问上下文
+    String contextualAnswer = answer;
+    if (_followUpHistory.isNotEmpty) {
+      final contextParts = <String>[];
+      for (final qa in _followUpHistory) {
+        contextParts.add('追问：${qa['question']}');
+        contextParts.add('回答：${qa['answer']}');
+      }
+      contextualAnswer = '${contextParts.join('\n')}\n\n当前回答：$answer';
+    }
+
+    // 追问阶段的特殊指令
+    if (_stage == _InterviewStage.followUp) {
+      contextualAnswer = '[追问回答] $contextualAnswer\n\n'
+          '请评估后判断：如果回答已经充分，请返回总体评估；如果还需要进一步澄清，请在 JSON 中额外返回 "followUp" 字段包含追问问题。最多追问2轮。';
+    } else if (_stage == _InterviewStage.clarify) {
+      contextualAnswer = '[澄清回答] $contextualAnswer\n\n'
+          '请给出最终综合评估，不再追问。';
+    }
+
     try {
       final result = await aiProvider.evaluateAnswer(
         topicId: topic.id,
         question: topic.recallPrompts.isNotEmpty
             ? topic.recallPrompts.first.prompt
             : topic.title,
-        userAnswer: answer,
+        userAnswer: contextualAnswer,
         rubric: topic.rubric,
       );
 
       if (mounted) {
-        setState(() {
-          _evaluationResult = result;
-          _results.add({
-            'topicId': topic.id,
-            'topicTitle': topic.title,
-            'score': result['score'] ?? 0,
-            'answer': answer,
-            'question': topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : topic.title,
-            'summary': result['summary'] ?? '',
-            'missedPoints': result['missedPoints'] ?? [],
-            'wrongPoints': result['wrongPoints'] ?? result['errorPoints'] ?? [],
-            'improvedAnswer':
-                result['improvedAnswer'] ?? result['optimizedAnswer'] ?? '',
-            'nextAction': result['nextAction'] ?? '',
-            'aiUnavailable': result['aiUnavailable'] == true,
-          });
-        });
+        final hasFollowUp = result['followUp'] != null &&
+            (result['followUp'] as String).isNotEmpty;
 
-        final progressProvider = context.read<ProgressProvider>();
-        final score = result['score'] as int? ?? 0;
-        await progressProvider.addAttempt(
-          PracticeAttempt(
-            id: DateTime.now().microsecondsSinceEpoch.toString(),
-            topicId: topic.id,
-            promptId: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.id
-                : '',
-            mode: 'mockInterview',
-            question: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : topic.title,
-            answer: answer,
-            createdAt: DateTime.now(),
-            score: result['score'] as int?,
-            level: result['level'] as String?,
-            summary: result['summary'] as String?,
-            missedPoints:
-                (result['missedPoints'] as List<dynamic>?)
-                    ?.map((e) => e.toString())
-                    .toList() ??
-                [],
-            wrongPoints:
-                ((result['wrongPoints'] ?? result['errorPoints'])
-                        as List<dynamic>?)
-                    ?.map((e) => e.toString())
-                    .toList() ??
-                [],
-            improvedAnswer:
-                (result['improvedAnswer'] ?? result['optimizedAnswer'])
-                    as String?,
-            nextAction: result['nextAction'] as String?,
-            aiEvaluated: result['aiUnavailable'] != true,
-          ),
-        );
-        if (result['score'] is int) {
-          await progressProvider.updateTopicProgress(topic.id, score: score);
+        if (hasFollowUp && _followUpHistory.length < 2) {
+          // AI 要求追问
+          setState(() {
+            _followUpQuestion = result['followUp'] as String;
+            _followUpHistory.add({
+              'question': _stage == _InterviewStage.main
+                  ? (topic.recallPrompts.isNotEmpty
+                      ? topic.recallPrompts.first.prompt
+                      : topic.title)
+                  : (_followUpQuestion ?? ''),
+              'answer': answer,
+            });
+            _stage = _stage == _InterviewStage.main
+                ? _InterviewStage.followUp
+                : _InterviewStage.clarify;
+            _answerController.clear();
+            _isEvaluating = false;
+          });
+        } else {
+          // 最终评估
+          setState(() {
+            _evaluationResult = result;
+            _stage = _InterviewStage.summary;
+            _results.add({
+              'topicId': topic.id,
+              'topicTitle': topic.title,
+              'score': result['score'] ?? 0,
+              'answer': answer,
+              'question': topic.recallPrompts.isNotEmpty
+                  ? topic.recallPrompts.first.prompt
+                  : topic.title,
+              'summary': result['summary'] ?? '',
+              'missedPoints': result['missedPoints'] ?? [],
+              'wrongPoints': result['wrongPoints'] ?? result['errorPoints'] ?? [],
+              'improvedAnswer':
+                  result['improvedAnswer'] ?? result['optimizedAnswer'] ?? '',
+              'nextAction': result['nextAction'] ?? '',
+              'aiUnavailable': result['aiUnavailable'] == true,
+              'followUpCount': _followUpHistory.length,
+            });
+          });
+
+          final progressProvider = context.read<ProgressProvider>();
+          final score = result['score'] as int? ?? 0;
+          await progressProvider.addAttempt(
+            PracticeAttempt(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              topicId: topic.id,
+              promptId: topic.recallPrompts.isNotEmpty
+                  ? topic.recallPrompts.first.id
+                  : '',
+              mode: 'mockInterview',
+              question: topic.recallPrompts.isNotEmpty
+                  ? topic.recallPrompts.first.prompt
+                  : topic.title,
+              answer: contextualAnswer,
+              createdAt: DateTime.now(),
+              score: result['score'] as int?,
+              level: result['level'] as String?,
+              summary: result['summary'] as String?,
+              missedPoints:
+                  (result['missedPoints'] as List<dynamic>?)
+                      ?.map((e) => e.toString())
+                      .toList() ??
+                  [],
+              wrongPoints:
+                  ((result['wrongPoints'] ?? result['errorPoints'])
+                          as List<dynamic>?)
+                      ?.map((e) => e.toString())
+                      .toList() ??
+                  [],
+              improvedAnswer:
+                  (result['improvedAnswer'] ?? result['optimizedAnswer'])
+                      as String?,
+              nextAction: result['nextAction'] as String?,
+              aiEvaluated: result['aiUnavailable'] != true,
+            ),
+          );
+          if (result['score'] is int) {
+            await progressProvider.updateTopicProgress(topic.id, score: score);
+          }
         }
       }
     } catch (e) {
@@ -155,7 +299,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && _stage != _InterviewStage.followUp && _stage != _InterviewStage.clarify) {
         setState(() => _isEvaluating = false);
       }
     }
@@ -165,11 +309,14 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final elapsed = DateTime.now().difference(_questionStartTime).inSeconds;
     _questionDurations.add(elapsed);
 
-    if (_currentIndex < widget.topicIds.length - 1) {
+    if (_currentIndex < _activeTopicIds.length - 1) {
       setState(() {
         _currentIndex++;
         _answerController.clear();
         _evaluationResult = null;
+        _stage = _InterviewStage.main;
+        _followUpQuestion = null;
+        _followUpHistory.clear();
         _questionStartTime = DateTime.now();
       });
     } else {
@@ -186,7 +333,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.topicIds.isEmpty) {
+    if (_activeTopicIds.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('模拟面试')),
         body: const Center(child: Text('没有可用的知识点')),
@@ -219,7 +366,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                '${_currentIndex + 1}/${widget.topicIds.length}',
+                '${_currentIndex + 1}/${_activeTopicIds.length}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
@@ -339,6 +486,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     _buildInputSection(),
                     if (_evaluationResult != null) ...[
                       const SizedBox(height: 20),
+                      if (_followUpHistory.isNotEmpty) ...[
+                        _buildFollowUpHistory(),
+                        const SizedBox(height: 16),
+                      ],
                       if (_formalMode)
                         _buildFormalRecorded()
                       else
@@ -349,12 +500,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                         child: FilledButton.icon(
                           onPressed: _nextQuestion,
                           icon: Icon(
-                            _currentIndex < widget.topicIds.length - 1
+                            _currentIndex < _activeTopicIds.length - 1
                                 ? Icons.arrow_forward
                                 : Icons.emoji_events_outlined,
                           ),
                           label: Text(
-                            _currentIndex < widget.topicIds.length - 1
+                            _currentIndex < _activeTopicIds.length - 1
                                 ? '下一题'
                                 : '查看面试报告',
                           ),
@@ -383,7 +534,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: (_currentIndex + 1) / widget.topicIds.length,
+            value: (_currentIndex + 1) / _activeTopicIds.length,
             backgroundColor: Colors.grey.shade200,
             minHeight: 6,
           ),
@@ -398,6 +549,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         _buildInputSection(),
         if (_evaluationResult != null) ...[
           const SizedBox(height: 16),
+          if (_followUpHistory.isNotEmpty) ...[
+            _buildFollowUpHistory(),
+            const SizedBox(height: 12),
+          ],
           if (_formalMode)
             _buildFormalRecorded()
           else
@@ -408,12 +563,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             child: FilledButton.icon(
               onPressed: _nextQuestion,
               icon: Icon(
-                _currentIndex < widget.topicIds.length - 1
+                _currentIndex < _activeTopicIds.length - 1
                     ? Icons.arrow_forward
                     : Icons.emoji_events_outlined,
               ),
               label: Text(
-                _currentIndex < widget.topicIds.length - 1
+                _currentIndex < _activeTopicIds.length - 1
                     ? '下一题'
                     : '查看面试报告',
               ),
@@ -430,6 +585,22 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
   // ── 题目卡片 ──
   Widget _buildQuestionCard(Topic topic) {
+    final stageLabel = switch (_stage) {
+      _InterviewStage.main => '主问',
+      _InterviewStage.followUp => '追问',
+      _InterviewStage.clarify => '澄清',
+      _InterviewStage.summary => '总结',
+    };
+    final stageColor = switch (_stage) {
+      _InterviewStage.main => AppColors.accent,
+      _InterviewStage.followUp => AppColors.warning,
+      _InterviewStage.clarify => AppColors.categoryPurple,
+      _InterviewStage.summary => AppColors.success,
+    };
+    final displayQuestion = _followUpQuestion ??
+        (topic.recallPrompts.isNotEmpty
+            ? topic.recallPrompts.first.prompt
+            : '请解释 ${topic.title} 的核心概念');
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -461,44 +632,64 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.2),
+                  color: stageColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.quiz_outlined,
+                    Icon(
+                      _stage == _InterviewStage.followUp
+                          ? Icons.question_answer_outlined
+                          : Icons.quiz_outlined,
                       size: 13,
-                      color: AppColors.accent,
+                      color: stageColor,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '问题 ${_currentIndex + 1}',
-                      style: const TextStyle(
+                      stageLabel,
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.accent,
+                        color: stageColor,
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
-              Text(
-                topic.title,
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 12,
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '问题 ${_currentIndex + 1}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                    fontSize: 11,
+                  ),
                 ),
               ),
+              const Spacer(),
+              if (_followUpHistory.isNotEmpty)
+                Text(
+                  '第 ${_followUpHistory.length + 1} 轮',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : '请解释 ${topic.title} 的核心概念',
+            displayQuestion,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -586,8 +777,18 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               filled: true,
               suffixIcon: VoiceInputButton(
                 onResult: (text) {
-                  _answerController.text += text;
+                  final current = _answerController.text;
+                  final separator = current.isNotEmpty && !current.endsWith(' ') ? ' ' : '';
+                  final newValue = '$current$separator$text';
+                  _answerController.text = newValue;
+                  _answerController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: newValue.length),
+                  );
                 },
+                sttMode: context.read<SettingsProvider>().settings.sttMode,
+                whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
+                whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
+                whisperModel: context.read<SettingsProvider>().settings.whisperModel,
               ),
             ),
             onChanged: (_) => setState(() {}),
@@ -604,7 +805,11 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.auto_awesome),
-              label: Text(_isEvaluating ? 'AI 评估中...' : '提交并评估'),
+              label: Text(_isEvaluating
+                  ? 'AI 评估中...'
+                  : _stage == _InterviewStage.main
+                      ? '提交并评估'
+                      : '提交回答'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -641,34 +846,46 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 label: '混合',
                 value: 'mixed',
                 selected: _scenario == 'mixed',
-                onSelected: (value) => setState(() => _scenario = value),
+                onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
                 label: '基础知识',
                 value: 'foundation',
                 selected: _scenario == 'foundation',
-                onSelected: (value) => setState(() => _scenario = value),
+                onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
                 label: '系统设计',
                 value: 'systemDesign',
                 selected: _scenario == 'systemDesign',
-                onSelected: (value) => setState(() => _scenario = value),
+                onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
                 label: '代码题',
                 value: 'code',
                 selected: _scenario == 'code',
-                onSelected: (value) => setState(() => _scenario = value),
+                onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
                 label: '项目深挖',
                 value: 'project',
                 selected: _scenario == 'project',
-                onSelected: (value) => setState(() => _scenario = value),
+                onSelected: _onScenarioChanged,
               ),
             ],
           ),
+          if (_scenario != 'mixed') ...[
+            const SizedBox(height: 6),
+            Text(
+              '匹配 ${_activeTopicIds.length} / ${widget.topicIds.length} 题',
+              style: TextStyle(
+                fontSize: 12,
+                color: _activeTopicIds.isEmpty
+                    ? AppColors.danger
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -677,6 +894,68 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             subtitle: const Text('逐题不展示详细反馈，结束后统一复盘'),
             onChanged: (value) => setState(() => _formalMode = value),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFollowUpHistory() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.warning.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.question_answer_outlined, size: 16, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Text(
+                '追问记录（${_followUpHistory.length} 轮）',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ..._followUpHistory.asMap().entries.map((entry) {
+            final index = entry.key;
+            final qa = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Q${index + 1}：${qa['question']}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'A：${qa['answer']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -870,7 +1149,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       {
         'label': '扩展深度',
         'weight': weights['depth'] ?? weights['goodToHave'] ?? 15,
-        'color': const Color(0xFF8B5CF6),
+        'color': AppColors.categoryPurple,
       },
     ];
 
@@ -943,7 +1222,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 end: Alignment.bottomRight,
                 colors: [
                   Theme.of(context).colorScheme.primary,
-                  const Color(0xFF0F3460),
+                  AppColors.categoryDeepBlue,
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
@@ -1138,14 +1417,36 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                               ).colorScheme.onSurfaceVariant,
                             ),
                           ),
-                        if (duration != null)
-                          Text(
-                            '用时 ${_formatDuration(duration)}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
+                        Row(
+                          children: [
+                            if (duration != null)
+                              Text(
+                                '用时 ${_formatDuration(duration)}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            if ((result['followUpCount'] as int? ?? 0) > 0) ...[
+                              if (duration != null)
+                                Text(
+                                  ' · ',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              Text(
+                                '${result['followUpCount']} 轮追问',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.warning,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1235,7 +1536,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           scenario: _scenario,
           startedAt: _startedAt,
           completedAt: DateTime.now(),
-          topicIds: widget.topicIds,
+          topicIds: _activeTopicIds,
           attempts: attempts,
           averageScore: avgScore,
           reportSummary: avgScore >= 85

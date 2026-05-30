@@ -20,3 +20,4 @@ apps/client/android/app/release
 apps/client/macos/Flutter/ephemeral/
 apps/client/windows/flutter/ephemeral/
 .workbuddy/
+.qwen/

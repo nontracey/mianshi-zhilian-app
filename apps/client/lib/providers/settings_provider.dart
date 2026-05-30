@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../models/app_settings.dart';
 import '../models/user_progress.dart';
 import '../services/storage_service.dart';
+import '../services/webdav_sync_service.dart';
 
 // Web 端下载（条件导入）
 import 'web_download/web_download_stub.dart'
@@ -12,8 +12,11 @@ import 'web_download/web_download_stub.dart'
 
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
+  late final WebDavSyncService _webDavSync;
 
-  SettingsProvider(this._storage);
+  SettingsProvider(this._storage) {
+    _webDavSync = WebDavSyncService(_storage);
+  }
 
   AppSettings _settings = const AppSettings();
   bool _isLoading = false;
@@ -152,26 +155,12 @@ class SettingsProvider extends ChangeNotifier {
           settings.webDavPassword.isEmpty) {
         return '请先填写 WebDAV 地址、用户名和应用密码。';
       }
-      final data = await _storage.exportAllData();
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-      final base = settings.webDavUrl.replaceAll(RegExp(r'/+$'), '');
-      final fileName = 'mianshi-zhilian-backup.json';
-      final uri = Uri.parse('$base/$fileName');
-      final basic = base64Encode(
-        utf8.encode('${settings.webDavUsername}:${settings.webDavPassword}'),
+      final result = await _webDavSync.backup(
+        url: settings.webDavUrl,
+        username: settings.webDavUsername,
+        password: settings.webDavPassword,
       );
-      final response = await http.put(
-        uri,
-        headers: {
-          'Authorization': 'Basic $basic',
-          'Content-Type': 'application/json',
-        },
-        body: jsonStr,
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return 'WebDAV 备份完成。';
-      }
-      return 'WebDAV 备份失败：${response.statusCode}';
+      return result.message;
     }
     if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(settings.method)) {
       return '该第三方同步方式待开通，可先使用文件导出或 WebDAV。';
@@ -195,4 +184,37 @@ class SettingsProvider extends ChangeNotifier {
       debugPrint('Export failed: $e');
     }
   }
+
+  /// 从 WebDAV 恢复数据
+  Future<SyncResult> restoreFromWebDav([SyncSettings? syncSettings]) async {
+    final settings = syncSettings ?? const SyncSettings();
+    if (settings.webDavUrl.isEmpty ||
+        settings.webDavUsername.isEmpty ||
+        settings.webDavPassword.isEmpty) {
+      return SyncResult.failure('请先填写 WebDAV 地址、用户名和应用密码');
+    }
+    return _webDavSync.restore(
+      url: settings.webDavUrl,
+      username: settings.webDavUsername,
+      password: settings.webDavPassword,
+    );
+  }
+
+  /// 测试 WebDAV 连接
+  Future<SyncResult> testWebDavConnection([SyncSettings? syncSettings]) async {
+    final settings = syncSettings ?? const SyncSettings();
+    if (settings.webDavUrl.isEmpty ||
+        settings.webDavUsername.isEmpty ||
+        settings.webDavPassword.isEmpty) {
+      return SyncResult.failure('请先填写 WebDAV 地址、用户名和应用密码');
+    }
+    return _webDavSync.testConnection(
+      url: settings.webDavUrl,
+      username: settings.webDavUsername,
+      password: settings.webDavPassword,
+    );
+  }
+
+  /// 获取上次同步时间
+  Future<DateTime?> getLastSyncTime() => _storage.getLastSyncTime();
 }

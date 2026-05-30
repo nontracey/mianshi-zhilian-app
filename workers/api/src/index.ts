@@ -42,6 +42,11 @@ export default {
       return handleGetMe(request, env);
     }
 
+    // 修改密码（需要认证）
+    if (url.pathname === '/auth/change-password' && request.method === 'POST') {
+      return handleChangePassword(request, env);
+    }
+
     // 云端同步（需要认证）
     if (url.pathname === '/sync/progress' && request.method === 'POST') {
       return handleSyncProgress(request, env);
@@ -383,6 +388,52 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
   }
 }
 
+// 修改密码
+async function handleChangePassword(request: Request, env: Env): Promise<Response> {
+  try {
+    const userId = await getUserIdFromRequest(request, env);
+    if (!userId) {
+      return json({ error: '未登录或 token 已过期' }, 401);
+    }
+
+    const body = await request.json() as any;
+    const { oldPassword, newPassword } = body;
+
+    if (!oldPassword || !newPassword) {
+      return json({ error: '请输入原密码和新密码' }, 400);
+    }
+
+    if (newPassword.length < 6) {
+      return json({ error: '新密码长度至少 6 个字符' }, 400);
+    }
+
+    await initDatabase(env.DB);
+
+    const user = await env.DB.prepare('SELECT id, password_hash FROM users WHERE id = ?')
+      .bind(userId)
+      .first() as any;
+
+    if (!user) {
+      return json({ error: '用户不存在' }, 404);
+    }
+
+    const passwordValid = await verifyPassword(oldPassword, user.password_hash);
+    if (!passwordValid) {
+      return json({ error: '原密码错误' }, 401);
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(newHash, userId)
+      .run();
+
+    return json({ success: true, message: '密码修改成功' });
+  } catch (e) {
+    console.error('ChangePassword error:', e);
+    return json({ error: '修改密码失败' }, 500);
+  }
+}
+
 async function handleAiProxy(request: Request, env: Env): Promise<Response> {
   try {
     const body = await request.json() as any;
@@ -440,7 +491,7 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI upstream error:', aiResponse.status, errorText);
+      console.error('AI upstream error:', aiResponse.status);
       return json({
         error: 'AI 服务请求失败',
       }, aiResponse.status);

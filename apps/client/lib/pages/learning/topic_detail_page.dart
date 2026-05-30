@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -98,14 +99,41 @@ class _TopicDetailPageState extends State<TopicDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  topic.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        topic.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (topic.status != null && topic.status != 'production')
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: topic.status == 'test'
+                              ? AppColors.warning.withValues(alpha: 0.1)
+                              : AppColors.info.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          topic.status == 'test' ? '测试内容' : '草稿内容',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: topic.status == 'test'
+                                ? AppColors.warning
+                                : AppColors.info,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 Text(
                   '${topic.domain} · ${topic.category}',
@@ -129,7 +157,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+        color: isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5),
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(2),
@@ -927,7 +955,7 @@ class _InterviewAnswerCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: AppColors.codeBgNavy,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -1158,7 +1186,7 @@ class _AsciiDiagramView extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF07182A),
+        color: AppColors.codeBgDark,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
@@ -1170,7 +1198,7 @@ class _AsciiDiagramView extends StatelessWidget {
             fontFamily: 'JetBrainsMono',
             fontSize: 14,
             height: 1.6,
-            color: Color(0xFFE7EEF8),
+            color: AppColors.syntaxDefault,
             letterSpacing: 0.5,
           ),
         ),
@@ -1188,13 +1216,13 @@ class _HighlightedCode extends StatelessWidget {
   final String language;
 
   // 颜色方案：关键字、字符串、注释、数字等
-  static const _keywordColor = Color(0xFFC792EA); // 紫色
-  static const _stringColor = Color(0xFFC3E88D); // 绿色
-  static const _commentColor = Color(0xFF546E7A); // 灰色
-  static const _numberColor = Color(0xFFF78C6C); // 橙色
-  static const _typeColor = Color(0xFF82AAFF); // 蓝色
-  static const _functionColor = Color(0xFFEEFFFF); // 白色
-  static const _defaultColor = Color(0xFFE7EEF8); // 默认色
+  static const _keywordColor = AppColors.syntaxKeyword;
+  static const _stringColor = AppColors.syntaxString;
+  static const _commentColor = AppColors.syntaxComment;
+  static const _numberColor = AppColors.syntaxNumber;
+  static const _typeColor = AppColors.syntaxType;
+  static const _functionColor = AppColors.syntaxFunction;
+  static const _defaultColor = AppColors.syntaxDefault;
 
   List<_CodeToken> _tokenize(String code) {
     final tokens = <_CodeToken>[];
@@ -1408,7 +1436,7 @@ class _HighlightedCode extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1220),
+        color: AppColors.codeBgDarker,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.28)),
       ),
@@ -1486,7 +1514,7 @@ class _DiagramCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF07182A),
+              color: AppColors.codeBgDark,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: AppColors.accent.withValues(alpha: 0.32),
@@ -1628,7 +1656,7 @@ class _SmartDiagram extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF07182A),
+        color: AppColors.codeBgDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
@@ -1660,7 +1688,7 @@ class _SmartDiagram extends StatelessWidget {
       _DiagramType.flow => (Icons.linear_scale, '流程图', AppColors.accent),
       _DiagramType.hierarchy => (Icons.account_tree, '结构图', AppColors.success),
       _DiagramType.compare => (Icons.compare_arrows, '对比图', AppColors.warning),
-      _DiagramType.cycle => (Icons.autorenew, '循环图', const Color(0xFF8B5CF6)),
+      _DiagramType.cycle => (Icons.autorenew, '循环图', AppColors.categoryPurple),
     };
 
     return Container(
@@ -1796,7 +1824,7 @@ class _SmartDiagram extends StatelessWidget {
       AppColors.accent,
       AppColors.success,
       AppColors.warning,
-      const Color(0xFF8B5CF6),
+      AppColors.categoryPurple,
     ];
     final color = colors[item.level % colors.length];
 
@@ -1918,7 +1946,7 @@ class _SmartDiagram extends StatelessWidget {
             Icon(
               Icons.arrow_downward,
               size: 18,
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.6),
+              color: AppColors.categoryPurple.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 4),
           ],
@@ -1929,12 +1957,12 @@ class _SmartDiagram extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.refresh, size: 18, color: const Color(0xFF8B5CF6)),
+              Icon(Icons.refresh, size: 18, color: AppColors.categoryPurple),
               const SizedBox(width: 8),
               Text(
                 '循环执行',
                 style: TextStyle(
-                  color: const Color(0xFF8B5CF6),
+                  color: AppColors.categoryPurple,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -1947,7 +1975,7 @@ class _SmartDiagram extends StatelessWidget {
   }
 
   Widget _buildCycleStep(int index, String text) {
-    const color = Color(0xFF8B5CF6);
+    const color = AppColors.categoryPurple;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -2063,7 +2091,7 @@ class _SvgDiagramCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF07182A),
+            color: AppColors.codeBgDark,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
           ),
@@ -2151,7 +2179,7 @@ class _FollowUpSection extends StatelessWidget {
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+          color: AppColors.categoryPurple.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -2159,7 +2187,7 @@ class _FollowUpSection extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF8B5CF6),
+            color: AppColors.categoryPurple,
           ),
         ),
       ),
@@ -2215,12 +2243,12 @@ class _FollowUpCardState extends State<_FollowUpCard> {
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: _expanded
-            ? const Color(0xFF8B5CF6).withValues(alpha: 0.06)
+            ? AppColors.categoryPurple.withValues(alpha: 0.06)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: _expanded
-              ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
+              ? AppColors.categoryPurple.withValues(alpha: 0.3)
               : Theme.of(context).dividerColor.withValues(alpha: 0.2),
         ),
       ),
@@ -2241,7 +2269,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                      color: AppColors.categoryPurple.withValues(alpha: 0.15),
                     ),
                     child: Center(
                       child: Text(
@@ -2249,7 +2277,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF8B5CF6),
+                          color: AppColors.categoryPurple,
                         ),
                       ),
                     ),
@@ -2294,7 +2322,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                     duration: const Duration(milliseconds: 200),
                     child: Icon(
                       Icons.expand_more,
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.7),
+                      color: AppColors.categoryPurple.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -2346,10 +2374,10 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF07182A),
+                      color: AppColors.codeBgDark,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                        color: AppColors.categoryPurple.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -2360,7 +2388,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                             const Icon(
                               Icons.auto_awesome,
                               size: 14,
-                              color: Color(0xFF8B5CF6),
+                              color: AppColors.categoryPurple,
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -2368,7 +2396,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: const Color(0xFF8B5CF6),
+                                color: AppColors.categoryPurple,
                               ),
                             ),
                             const Spacer(),
@@ -2579,11 +2607,11 @@ class _MarkdownContent extends StatelessWidget {
         code: TextStyle(
           fontFamily: 'JetBrainsMono',
           fontSize: 13,
-          color: const Color(0xFFE7EEF8),
-          backgroundColor: const Color(0xFF14263A).withValues(alpha: 0.6),
+          color: AppColors.syntaxDefault,
+          backgroundColor: AppColors.codeBgSlate.withValues(alpha: 0.6),
         ),
         codeblockDecoration: BoxDecoration(
-          color: const Color(0xFF0B1220),
+          color: AppColors.codeBgDarker,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
         ),
@@ -2607,13 +2635,13 @@ class _MarkdownContent extends StatelessWidget {
 
 class _CodeSyntaxHighlighter extends SyntaxHighlighter {
   // 关键字颜色
-  static const _keywordColor = Color(0xFFC792EA);
-  static const _stringColor = Color(0xFFC3E88D);
-  static const _commentColor = Color(0xFF546E7A);
-  static const _numberColor = Color(0xFFF78C6C);
-  static const _typeColor = Color(0xFF82AAFF);
-  static const _functionColor = Color(0xFFEEFFFF);
-  static const _defaultColor = Color(0xFFE7EEF8);
+  static const _keywordColor = AppColors.syntaxKeyword;
+  static const _stringColor = AppColors.syntaxString;
+  static const _commentColor = AppColors.syntaxComment;
+  static const _numberColor = AppColors.syntaxNumber;
+  static const _typeColor = AppColors.syntaxType;
+  static const _functionColor = AppColors.syntaxFunction;
+  static const _defaultColor = AppColors.syntaxDefault;
 
   static const _keywords = {
     'abstract',
@@ -3374,8 +3402,18 @@ class _AnswerPanel extends StatelessWidget {
                   ),
                   suffixIcon: VoiceInputButton(
                     onResult: (text) {
-                      answerController.text += text;
+                      final current = answerController.text;
+                      final separator = current.isNotEmpty && !current.endsWith(' ') ? ' ' : '';
+                      final newValue = '$current$separator$text';
+                      answerController.text = newValue;
+                      answerController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: newValue.length),
+                      );
                     },
+                    sttMode: context.read<SettingsProvider>().settings.sttMode,
+                    whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
+                    whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
+                    whisperModel: context.read<SettingsProvider>().settings.whisperModel,
                   ),
                 ),
               ),
@@ -3591,7 +3629,7 @@ class _ScoreRing extends StatelessWidget {
   Color get _color {
     if (score >= 85) return AppColors.success;
     if (score >= 60) return AppColors.warning;
-    return const Color(0xFF64748B);
+    return AppColors.textTertiary;
   }
 
   @override

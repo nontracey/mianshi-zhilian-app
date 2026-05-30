@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'models/app_settings.dart';
+import 'models/user.dart';
 import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/content_provider.dart';
@@ -176,6 +177,22 @@ class _LearningShellState extends State<LearningShell> {
                     _selectedTopicInitialTab = 0;
                   }),
                   onContentStageChanged: (stage) async {
+                    // 检查权限
+                    final authProvider = context.read<AuthProvider>();
+                    final userRole = authProvider.userRole;
+                    if (!userRole.allowedContentEnvs.contains(stage)) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(userRole == UserRole.guest
+                              ? '登录后可查看测试版内容'
+                              : '需要管理员权限查看草稿内容'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
+                    
                     // 切换内容环境
                     final contentEnv = ContentEnv.fromKey(stage);
                     await settings.setContentEnv(contentEnv);
@@ -337,6 +354,17 @@ class _LearningShellState extends State<LearningShell> {
         onDomainChanged: (id) => settings.updateSettings(
           settings.settings.copyWith(currentDomain: id),
         ),
+        onStartPractice: () {
+          final domainTopics = content.getTopicsByDomain(
+            settings.settings.currentDomain,
+          );
+          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
+            ),
+          );
+        },
       ),
       AppSection.profile => const ProfilePage(),
     };

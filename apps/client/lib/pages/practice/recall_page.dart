@@ -1,11 +1,18 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/widgets/privacy_dialog.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
+import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class RecallPage extends StatefulWidget {
@@ -24,8 +31,10 @@ class _RecallPageState extends State<RecallPage> {
   Map<String, dynamic>? _evaluationResult;
   String? _selectedAiConfigId;
   String _inputMode = 'text';
-  bool _hasLocalImageReference = false;
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
   bool _voiceTranscribed = false;
+  final _voiceTranscriptController = TextEditingController();
   
   // 流式输出相关
   String _streamingContent = '';
@@ -34,6 +43,7 @@ class _RecallPageState extends State<RecallPage> {
   @override
   void dispose() {
     _answerController.dispose();
+    _voiceTranscriptController.dispose();
     super.dispose();
   }
 
@@ -105,7 +115,10 @@ class _RecallPageState extends State<RecallPage> {
                     // 完整评估结果
                     if (_evaluationResult != null) ...[
                       const SizedBox(height: 16),
-                      _EvaluationResultPanel(result: _evaluationResult!),
+                      _EvaluationResultPanel(
+                        result: _evaluationResult!,
+                        topic: topic,
+                      ),
                     ],
                   ],
                 ),
@@ -146,7 +159,10 @@ class _RecallPageState extends State<RecallPage> {
               _buildInputSection(context, aiProvider),
               if (_evaluationResult != null) ...[
                 const SizedBox(height: 16),
-                _EvaluationResultPanel(result: _evaluationResult!),
+                _EvaluationResultPanel(
+                  result: _evaluationResult!,
+                  topic: topic,
+                ),
               ],
               const SizedBox(height: 80), // 底部留空给操作条
             ],
@@ -169,17 +185,40 @@ class _RecallPageState extends State<RecallPage> {
 
   // ── 输入区域（共享） ──
   Widget _buildInputSection(BuildContext context, AiProvider aiProvider) {
+    final selectedConfigId = _selectedAiConfigId ??
+        aiProvider.defaultConfig?.id ??
+        aiProvider.enabledConfigs.firstOrNull?.id;
+    final selectedConfig = selectedConfigId != null
+        ? aiProvider.enabledConfigs
+            .where((c) => c.id == selectedConfigId)
+            .firstOrNull
+        : null;
+    final supportsImage = selectedConfig?.supportsImageInput ?? false;
+    final supportsAudio = selectedConfig?.supportsAudioInput ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 模型选择器 + 能力标签
         _ModelSelector(
           selectedId: _selectedAiConfigId,
-          onChanged: (id) => setState(() => _selectedAiConfigId = id),
+          onChanged: (id) => setState(() {
+            _selectedAiConfigId = id;
+            // 切换模型后，若当前模式不支持则回落到文本
+            final config = aiProvider.enabledConfigs
+                .where((c) => c.id == id)
+                .firstOrNull;
+            if (_inputMode == 'image' && !(config?.supportsImageInput ?? false)) {
+              _inputMode = 'text';
+            }
+            if (_inputMode == 'voice' && !(config?.supportsAudioInput ?? false)) {
+              _inputMode = 'text';
+            }
+          }),
         ),
         const SizedBox(height: 16),
 
-        // 输入模式切换
+        // 输入模式切换（根据模型能力动态启用/禁用）
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest
@@ -201,6 +240,8 @@ class _RecallPageState extends State<RecallPage> {
                 label: '语音',
                 value: 'voice',
                 selected: _inputMode == 'voice',
+                enabled: supportsAudio,
+                disabledTooltip: '当前模型不支持语音输入',
                 onTap: () => setState(() {
                   _inputMode = 'voice';
                   _voiceTranscribed = false;
@@ -211,6 +252,8 @@ class _RecallPageState extends State<RecallPage> {
                 label: '图片',
                 value: 'image',
                 selected: _inputMode == 'image',
+                enabled: supportsImage,
+                disabledTooltip: '当前模型不支持图片输入',
                 onTap: () => setState(() => _inputMode = 'image'),
               ),
               _InputModeTab(
@@ -309,17 +352,22 @@ class _RecallPageState extends State<RecallPage> {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               VoiceInputButton(
                 onResult: (text) {
                   setState(() {
-                    _answerController.text =
-                        '${_answerController.text}$text';
+                    _voiceTranscriptController.text =
+                        '${_voiceTranscriptController.text}$text';
                     _voiceTranscribed = true;
                   });
                 },
+                sttMode: context.read<SettingsProvider>().settings.sttMode,
+                whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
+                whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
+                whisperModel: context.read<SettingsProvider>().settings.whisperModel,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -328,7 +376,7 @@ class _RecallPageState extends State<RecallPage> {
                   children: [
                     Text(
                       _voiceTranscribed
-                          ? '语音已转写，可编辑后提交'
+                          ? '语音已转写，可编辑后添加到回答'
                           : '点击麦克风开始语音复述',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
@@ -336,7 +384,7 @@ class _RecallPageState extends State<RecallPage> {
                       ),
                     ),
                     const Text(
-                      '语音会先转成可编辑文字，再进入 AI 评分',
+                      '转写文本可独立编辑，确认后添加到回答',
                       style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -344,6 +392,64 @@ class _RecallPageState extends State<RecallPage> {
               ),
             ],
           ),
+          // 转写编辑区
+          if (_voiceTranscribed) ...[
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                ),
+              ),
+              child: TextField(
+                controller: _voiceTranscriptController,
+                minLines: 3,
+                maxLines: 8,
+                decoration: InputDecoration(
+                  hintText: '语音转写结果...',
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(12),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: '清空转写',
+                    onPressed: () {
+                      setState(() {
+                        _voiceTranscriptController.clear();
+                        _voiceTranscribed = false;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () {
+                      final transcript = _voiceTranscriptController.text.trim();
+                      if (transcript.isNotEmpty) {
+                        setState(() {
+                          final separator = _answerController.text.isNotEmpty ? '\n' : '';
+                          _answerController.text = '${_answerController.text}$separator$transcript';
+                          _voiceTranscriptController.clear();
+                          _voiceTranscribed = false;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已添加到回答'), duration: Duration(seconds: 1)),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加到回答'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -364,34 +470,98 @@ class _RecallPageState extends State<RecallPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                _hasLocalImageReference
-                    ? Icons.image
-                    : Icons.image_outlined,
-                color: AppColors.success,
+          if (_selectedImageBytes != null) ...[
+            // 已选图片预览
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                _selectedImageBytes!,
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _hasLocalImageReference
-                      ? '已标记本地图片参考，请在下方用文字描述图片关键信息'
-                      : '可把截图、架构图或手写笔记作为参考，用文字描述关键点',
-                  style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.check_circle, size: 16, color: AppColors.success),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '已选择: ${_selectedImageName ?? "图片"}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.success),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => setState(
-                  () => _hasLocalImageReference = !_hasLocalImageReference,
+                TextButton(
+                  onPressed: () => setState(() {
+                    _selectedImageBytes = null;
+                    _selectedImageName = null;
+                  }),
+                  child: const Text('移除', style: TextStyle(fontSize: 12)),
                 ),
-                child: Text(_hasLocalImageReference ? '移除标记' : '标记参考'),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ] else ...[
+            // 选择图片
+            Row(
+              children: [
+                const Icon(Icons.image_outlined, color: AppColors.success),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    '添加截图、架构图等，AI 将结合图片评估',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                    label: const Text('相册', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                    label: const Text('拍照', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: source, maxWidth: 1920, imageQuality: 85);
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _selectedImageBytes = bytes;
+            _selectedImageName = file.name;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择图片失败: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildStreamingContent(BuildContext context) {
@@ -451,6 +621,16 @@ class _RecallPageState extends State<RecallPage> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) return;
 
+    // 图片上传前隐私确认
+    if (_selectedImageBytes != null) {
+      final confirmed = await PrivacyService.confirmUpload(
+        context: context,
+        dataType: '图片',
+        dataDescription: '你选择的图片将发送给 AI 进行评估分析。',
+      );
+      if (!confirmed) return;
+    }
+
     setState(() {
       _isEvaluating = true;
       _streamingContent = '';
@@ -479,6 +659,7 @@ class _RecallPageState extends State<RecallPage> {
             : topic.title,
         userAnswer: answer,
         rubric: topic.rubric,
+        imageBytes: _selectedImageBytes,
       );
 
       // 监听流式输出
@@ -558,6 +739,28 @@ class _RecallPageState extends State<RecallPage> {
         if (result['score'] is int) {
           await progressProvider.updateTopicProgress(topicId, score: score);
         }
+
+        // 自动保存 AI 改进版到回答版本库
+        final improvedAnswer =
+            (result['improvedAnswer'] ?? result['optimizedAnswer']) as String?;
+        if (improvedAnswer != null && improvedAnswer.isNotEmpty) {
+          final storage = StorageService();
+          final versionsKey = 'answer_versions_$topicId';
+          final versions = await storage.loadJsonList(versionsKey);
+          // 避免重复保存相同内容
+          final alreadySaved = versions.any(
+            (v) => v['content'] == improvedAnswer && v['type'] == 'ai_modified',
+          );
+          if (!alreadySaved) {
+            versions.add({
+              'type': 'ai_modified',
+              'content': improvedAnswer,
+              'createdAt': DateTime.now().toString().substring(0, 16),
+              'source': 'auto_eval',
+            });
+            await storage.saveJsonList(versionsKey, versions);
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -594,6 +797,7 @@ class _RecallPageState extends State<RecallPage> {
         _answerController.clear();
         _evaluationResult = null;
         _voiceTranscribed = false;
+        _voiceTranscriptController.clear();
       });
     }
   }
@@ -605,6 +809,7 @@ class _RecallPageState extends State<RecallPage> {
         _answerController.clear();
         _evaluationResult = null;
         _voiceTranscribed = false;
+        _voiceTranscriptController.clear();
       });
     }
   }
@@ -919,6 +1124,8 @@ class _InputModeTab extends StatelessWidget {
     required this.value,
     required this.selected,
     required this.onTap,
+    this.enabled = true,
+    this.disabledTooltip,
   });
 
   final IconData icon;
@@ -926,52 +1133,55 @@ class _InputModeTab extends StatelessWidget {
   final String value;
   final bool selected;
   final VoidCallback onTap;
+  final bool enabled;
+  final String? disabledTooltip;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = enabled
+        ? (selected
+            ? AppColors.accent
+            : Theme.of(context).colorScheme.onSurfaceVariant)
+        : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3);
+
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? Theme.of(context).colorScheme.surface
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected
-                    ? AppColors.accent
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? AppColors.accent
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
+      child: Tooltip(
+        message: !enabled && disabledTooltip != null ? disabledTooltip! : '',
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected && enabled
+                  ? Theme.of(context).colorScheme.surface
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: selected && enabled
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: effectiveColor),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: effectiveColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1005,7 +1215,7 @@ class _AnswerInputField extends StatelessWidget {
         hintText: switch (inputMode) {
           'code' => '写下思路、复杂度、边界条件或代码...',
           'image' => '描述图片/架构图/手写笔记中的关键信息...',
-          'voice' => '语音转写文本会出现在这里，可编辑后再提交...',
+          'voice' => '语音转写文本会出现在上方编辑区，确认后添加到这里...',
           _ => '在这里输入你的复述答案...',
         },
         border: OutlineInputBorder(
@@ -1055,13 +1265,23 @@ class _ProgressIndicator extends StatelessWidget {
 
 // ── 评估结果面板 ──────────────────────────────────────────────
 
-class _EvaluationResultPanel extends StatelessWidget {
-  const _EvaluationResultPanel({required this.result});
+class _EvaluationResultPanel extends StatefulWidget {
+  const _EvaluationResultPanel({required this.result, this.topic});
 
   final Map<String, dynamic> result;
+  final Topic? topic;
+
+  @override
+  State<_EvaluationResultPanel> createState() => _EvaluationResultPanelState();
+}
+
+class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
+  bool _showReference = false;
+  int? _selfScore; // 0=不太理解, 1=部分理解, 2=理解良好
 
   @override
   Widget build(BuildContext context) {
+    final result = widget.result;
     final score = result['score'] as int? ?? 0;
     final missed = result['missedPoints'] as List<dynamic>? ?? [];
     final errors =
@@ -1073,6 +1293,12 @@ class _EvaluationResultPanel extends StatelessWidget {
     final summary = result['summary'] as String? ?? '';
     final nextAction = result['nextAction'] as String? ?? '';
     final aiUnavailable = result['aiUnavailable'] == true;
+
+    // 从 learningCards 中提取参考答案
+    final referenceAnswer = widget.topic?.learningCards
+        .where((c) => c.type == 'interviewAnswer')
+        .map((c) => c.content)
+        .firstOrNull;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1112,6 +1338,167 @@ class _EvaluationResultPanel extends StatelessWidget {
             const SizedBox(height: 12),
             Text(summary, style: const TextStyle(height: 1.5)),
           ],
+
+          // 错因标签
+          if (!aiUnavailable) ...[
+            Builder(
+              builder: (context) {
+                final tags = <(String, IconData, Color)>[];
+                if (missed.isNotEmpty) {
+                  tags.add(('概念缺失', Icons.visibility_off_outlined, AppColors.warning));
+                }
+                if (errors.isNotEmpty) {
+                  tags.add(('概念混淆', Icons.swap_horiz, AppColors.danger));
+                }
+                if (summary.contains('表达') || summary.contains('结构')) {
+                  tags.add(('表达不清', Icons.chat_bubble_outline, AppColors.info));
+                }
+                if (tags.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: tags.map((t) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: t.$3.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: t.$3.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(t.$2, size: 14, color: t.$3),
+                            const SizedBox(width: 4),
+                            Text(
+                              t.$1,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: t.$3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                );
+              },
+            ),
+          ],
+
+          // ── 本地练习模式专属：参考答案 + 自评 ──
+          if (aiUnavailable) ...[
+            // 参考答案
+            if (referenceAnswer != null && referenceAnswer.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => setState(() => _showReference = !_showReference),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.lightbulb_outline,
+                            size: 16,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '查看参考答案',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            _showReference
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
+                        ],
+                      ),
+                      if (_showReference) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          referenceAnswer,
+                          style: const TextStyle(height: 1.6, fontSize: 13),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            // 自评
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '自评掌握程度',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _SelfEvalChip(
+                        label: '不太理解',
+                        icon: Icons.sentiment_dissatisfied,
+                        color: AppColors.danger,
+                        selected: _selfScore == 0,
+                        onTap: () => setState(() => _selfScore = 0),
+                      ),
+                      const SizedBox(width: 8),
+                      _SelfEvalChip(
+                        label: '部分理解',
+                        icon: Icons.sentiment_neutral,
+                        color: AppColors.warning,
+                        selected: _selfScore == 1,
+                        onTap: () => setState(() => _selfScore = 1),
+                      ),
+                      const SizedBox(width: 8),
+                      _SelfEvalChip(
+                        label: '理解良好',
+                        icon: Icons.sentiment_satisfied,
+                        color: AppColors.success,
+                        selected: _selfScore == 2,
+                        onTap: () => setState(() => _selfScore = 2),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // 遗漏点
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -1193,7 +1580,77 @@ class _EvaluationResultPanel extends StatelessWidget {
               ),
             ),
           ],
+          // 版本库入口
+          if (widget.topic != null) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AnswerVersionsPage(
+                      topicId: widget.topic!.id,
+                      topicTitle: widget.topic!.title,
+                      question: widget.topic!.recallPrompts.isNotEmpty
+                          ? widget.topic!.recallPrompts.first.prompt
+                          : widget.topic!.title,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.library_books_outlined, size: 16),
+              label: const Text('查看回答版本库'),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _SelfEvalChip extends StatelessWidget {
+  const _SelfEvalChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? color : Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 20, color: selected ? color : Colors.grey),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected ? color : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

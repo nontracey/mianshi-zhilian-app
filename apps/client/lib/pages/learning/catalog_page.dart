@@ -597,9 +597,30 @@ class _CatalogPageState extends State<CatalogPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (topic.status != null && topic.status != 'production')
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: topic.status == 'test'
+                                  ? AppColors.warning.withValues(alpha: 0.1)
+                                  : AppColors.info.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              topic.status == 'test' ? '测试' : '草稿',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: topic.status == 'test'
+                                    ? AppColors.warning
+                                    : AppColors.info,
+                              ),
+                            ),
+                          ),
                         if (topic.highFrequency)
                           Container(
-                            margin: const EdgeInsets.only(left: 8),
+                            margin: const EdgeInsets.only(left: 6),
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.danger.withValues(alpha: 0.1),
@@ -657,9 +678,9 @@ class _CatalogPageState extends State<CatalogPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildActionButton('查阅', const Color(0xFF00CCF9), () => widget.onTopicLearn(topic.id)),
+                      _buildActionButton('查阅', AppColors.categoryCyan, () => widget.onTopicLearn(topic.id)),
                       const SizedBox(width: 6),
-                      _buildActionButton('练习', const Color(0xFF3078F0), () => widget.onTopicPractice(topic.id)),
+                      _buildActionButton('练习', AppColors.accent, () => widget.onTopicPractice(topic.id)),
                     ],
                   ),
                 ],
@@ -771,7 +792,7 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 
   Widget _buildPhaseHeader(BuildContext context, String label, int index, bool isDark, int count) {
-    const colors = [Color(0xFF10B981), Color(0xFF3078F0), Color(0xFFF59E0B), Color(0xFF8B5CF6), Color(0xFFEF4444)];
+    const colors = [AppColors.categoryGreen, AppColors.accent, AppColors.categoryAmber, AppColors.categoryPurple, AppColors.categoryRed];
     final color = colors[index % colors.length];
 
     return Container(

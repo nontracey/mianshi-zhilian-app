@@ -178,6 +178,19 @@ class StorageService {
               'webDavPassword': '[redacted]',
             };
           }
+          if (key == 'settings' &&
+              exportData['data'][key] is Map<String, dynamic>) {
+            exportData['data'][key] = {
+              ...(exportData['data'][key] as Map<String, dynamic>),
+              'whisperApiKey': '[redacted]',
+            };
+          }
+          if (key == 'auth_token') {
+            exportData['data'][key] = '[redacted]';
+          }
+          if (key == 'auth_user') {
+            exportData['data'][key] = '[redacted]';
+          }
         } catch (_) {
           exportData['data'][key] = value;
         }
@@ -237,5 +250,60 @@ class StorageService {
   /// 加载自定义路线
   Future<List<Map<String, dynamic>>> loadCustomRoutes() async {
     return await loadJsonList('custom_routes');
+  }
+
+  /// 导出所有本地数据（不脱敏，用于 WebDAV 备份）
+  Future<Map<String, dynamic>> exportAllDataRaw() async {
+    final prefs = await _instance;
+    final keys = prefs.getKeys();
+
+    final exportData = <String, dynamic>{
+      'version': '1.0',
+      'exportedAt': DateTime.now().toIso8601String(),
+      'data': <String, dynamic>{},
+    };
+
+    for (final key in keys) {
+      final value = prefs.getString(key);
+      if (value != null) {
+        try {
+          exportData['data'][key] = json.decode(value);
+        } catch (_) {
+          exportData['data'][key] = value;
+        }
+      }
+    }
+
+    return exportData;
+  }
+
+  /// 从 Map 导入数据到本地存储
+  Future<void> importAllData(Map<String, dynamic> data) async {
+    final prefs = await _instance;
+    for (final entry in data.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      try {
+        if (value is String) {
+          await prefs.setString(key, value);
+        } else {
+          await prefs.setString(key, json.encode(value));
+        }
+      } catch (e) {
+        debugPrint('importAllData: skip key=$key, error=$e');
+      }
+    }
+  }
+
+  /// 记录上次同步时间
+  Future<void> setLastSyncTime(DateTime time) async {
+    await save('_lastSyncTime', time.toIso8601String());
+  }
+
+  /// 获取上次同步时间
+  Future<DateTime?> getLastSyncTime() async {
+    final data = await load('_lastSyncTime');
+    if (data == null) return null;
+    return DateTime.tryParse(data.toString());
   }
 }

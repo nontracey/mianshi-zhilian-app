@@ -137,6 +137,17 @@ class ProgressProvider extends ChangeNotifier {
     );
   }
 
+  /// 获取指定领域的练习总次数
+  int getDomainPracticeCount(String domainId, List<Topic> topics) {
+    final domainTopicIds = topics
+        .where((t) => t.domainId == domainId)
+        .map((t) => t.id)
+        .toSet();
+    return _progressMap.entries
+        .where((e) => domainTopicIds.contains(e.key))
+        .fold<int>(0, (sum, e) => sum + e.value.practiceCount);
+  }
+
   int getReviewCount(String domainId) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -286,6 +297,40 @@ class ProgressProvider extends ChangeNotifier {
 
   List<PracticeAttempt> get lowScoreAttempts =>
       _attempts.where((a) => (a.score ?? 100) < 60).toList();
+
+  /// 超过 N 天未复习的知识点 ID 列表
+  List<String> getLongUnreviewedTopicIds(List<Topic> topics, {int days = 7}) {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final result = <String>[];
+    for (final topic in topics) {
+      final attempts = getAttemptsForTopic(topic.id);
+      if (attempts.isEmpty) {
+        result.add(topic.id);
+        continue;
+      }
+      final lastAttempt = attempts.first.createdAt;
+      if (lastAttempt.isBefore(cutoff)) {
+        result.add(topic.id);
+      }
+    }
+    return result;
+  }
+
+  /// 最近退步的知识点 ID 列表（最近一次分数低于上一次）
+  List<String> getRegressedTopicIds(List<Topic> topics) {
+    final result = <String>[];
+    for (final topic in topics) {
+      final attempts = getAttemptsForTopic(topic.id);
+      if (attempts.length < 2) continue;
+      // attempts 按时间倒序，第一个是最新的
+      final latest = attempts[0].score ?? 0;
+      final previous = attempts[1].score ?? 0;
+      if (latest < previous) {
+        result.add(topic.id);
+      }
+    }
+    return result;
+  }
 
   int get practiceStreakDays {
     final dates = _attempts

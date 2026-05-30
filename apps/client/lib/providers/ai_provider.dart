@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/ai_config.dart';
 import '../models/topic.dart';
@@ -26,6 +27,7 @@ class AiProvider extends ChangeNotifier {
       _configs.where((c) => c.enabled).toList(growable: false);
   bool get isTesting => _isTesting;
   String? get testResult => _testResult;
+  bool get hasAnyConfig => _configs.any((c) => c.enabled);
 
   @override
   void dispose() {
@@ -143,6 +145,7 @@ class AiProvider extends ChangeNotifier {
     required String question,
     required String userAnswer,
     Rubric? rubric,
+    Uint8List? imageBytes,
   }) async {
     final config = configById(aiConfigId);
     if (config == null || !config.enabled) {
@@ -165,6 +168,7 @@ class AiProvider extends ChangeNotifier {
       commonMistakes: rubric?.commonMistakes ?? [],
       userAnswer: userAnswer,
       language: '中文',
+      imageBytes: imageBytes,
     );
   }
 
@@ -176,6 +180,7 @@ class AiProvider extends ChangeNotifier {
     required String question,
     required String userAnswer,
     Rubric? rubric,
+    Uint8List? imageBytes,
   }) {
     final config = configById(aiConfigId);
     if (config == null || !config.enabled) {
@@ -208,6 +213,7 @@ class AiProvider extends ChangeNotifier {
       commonMistakes: rubric?.commonMistakes ?? [],
       userAnswer: userAnswer,
       language: '中文',
+      imageBytes: imageBytes,
     ).listen(
       (chunk) {
         fullContent += chunk;
@@ -256,5 +262,21 @@ class AiProvider extends ChangeNotifier {
       'improvedAnswer': '',
       'nextAction': '重试',
     };
+  }
+
+  /// 通用流式聊天，用于 AI 改进等场景
+  Stream<String> sendMessageStream(
+    String userMessage, {
+    String? systemPrompt,
+  }) {
+    final config = _defaultConfig ?? _configs.firstWhere(
+      (c) => c.enabled,
+      orElse: () => throw Exception('没有可用的 AI 配置'),
+    );
+    return _aiService.sendMessageStream(
+      config: config,
+      userMessage: userMessage,
+      systemPrompt: systemPrompt,
+    );
   }
 }

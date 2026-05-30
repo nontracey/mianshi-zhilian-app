@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -118,6 +119,14 @@ class InterviewPrepPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        if (plan.jobDescription.trim().isNotEmpty) ...[
+          _JdAnalysisSection(
+            jobDescription: plan.jobDescription,
+            topics: topics,
+            progress: progress,
+          ),
+          const SizedBox(height: 16),
+        ],
         WorkPanel(
           title: '下一步建议',
           children: _buildActions(
@@ -401,6 +410,182 @@ class InfoLine extends StatelessWidget {
           Expanded(child: Text(text)),
         ],
       ),
+    );
+  }
+}
+
+class _JdAnalysisSection extends StatelessWidget {
+  const _JdAnalysisSection({
+    required this.jobDescription,
+    required this.topics,
+    required this.progress,
+  });
+
+  final String jobDescription;
+  final List<Topic> topics;
+  final ProgressProvider progress;
+
+  static const _techKeywords = [
+    'java', 'python', 'go', 'golang', 'rust', 'c++', 'javascript', 'typescript',
+    'spring', 'springboot', 'spring cloud', 'mybatis', 'hibernate',
+    'redis', 'mysql', 'postgresql', 'mongodb', 'elasticsearch', 'es',
+    'kafka', 'rabbitmq', 'rocketmq', 'mq',
+    'docker', 'kubernetes', 'k8s', 'linux', 'nginx',
+    '微服务', '分布式', '高并发', '高可用', '缓存', '消息队列',
+    '设计模式', '数据结构', '算法', '系统设计', '架构',
+    'jvm', 'gc', '并发', '多线程', '线程池', '锁',
+    '网络', 'tcp', 'http', 'https', 'rpc', 'grpc',
+    '数据库', '索引', '事务', 'mvcc', 'b+树',
+    '集合', 'hashmap', 'arraylist', '链表', '树', '图',
+    '排序', '二分', '动态规划', '贪心', '回溯',
+    'react', 'vue', 'flutter', 'android', 'ios',
+    '机器学习', '深度学习', 'llm', 'rag', 'prompt',
+    'ci/cd', 'git', 'jenkins', 'devops',
+    '项目', '实习', '经验',
+  ];
+
+  List<String> _extractKeywords(String jd) {
+    final lower = jd.toLowerCase();
+    return _techKeywords.where((kw) => lower.contains(kw)).toList();
+  }
+
+  List<Topic> _matchTopics(List<String> keywords) {
+    if (keywords.isEmpty) return [];
+    final matched = <String, Topic>{};
+    for (final topic in topics) {
+      final searchText = '${topic.title} ${topic.summary} '
+          '${topic.category} ${topic.tags.join(' ')} '
+          '${topic.rubric?.mustHave.join(' ') ?? ''}'.toLowerCase();
+      for (final kw in keywords) {
+        if (searchText.contains(kw)) {
+          matched[topic.id] = topic;
+          break;
+        }
+      }
+    }
+    return matched.values.toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keywords = _extractKeywords(jobDescription);
+    final matchedTopics = _matchTopics(keywords);
+
+    // 按掌握度排序：未掌握优先
+    matchedTopics.sort((a, b) {
+      final scoreA = progress.getTopicProgress(a.id)?.score ?? 0;
+      final scoreB = progress.getTopicProgress(b.id)?.score ?? 0;
+      return scoreA.compareTo(scoreB);
+    });
+
+    return WorkPanel(
+      title: 'JD 匹配分析',
+      trailing: Text(
+        '${matchedTopics.length} 项匹配',
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.accent,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      children: [
+        if (keywords.isEmpty)
+          const Text('未识别到关键技术词，请检查 JD 内容。')
+        else ...[
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: keywords
+                .map((kw) => Chip(
+                      label: Text(kw, style: const TextStyle(fontSize: 11)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          if (matchedTopics.isEmpty)
+            const Text('当前内容库中未找到与 JD 匹配的知识点。')
+          else ...[
+            Text(
+              '建议优先复习（按掌握度从低到高）：',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...matchedTopics.take(10).map((topic) {
+              final topicProgress = progress.getTopicProgress(topic.id);
+              final score = topicProgress?.score ?? 0;
+              final color = score >= 85
+                  ? AppColors.success
+                  : score >= 60
+                      ? AppColors.warning
+                      : AppColors.danger;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            topic.title,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            topic.category,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        score > 0 ? '$score' : '未练习',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ],
     );
   }
 }

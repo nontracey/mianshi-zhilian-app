@@ -31,11 +31,21 @@ class TodayReviewPage extends StatelessWidget {
       final score = progress.getTopicProgress(topic.id)?.score ?? 0;
       return topic.highFrequency && score < 85;
     }).toList();
+    final longUnreviewedIds = progress.getLongUnreviewedTopicIds(topics);
+    final longUnreviewedTopics = topics
+        .where((t) => longUnreviewedIds.contains(t.id))
+        .toList();
+    final regressedIds = progress.getRegressedTopicIds(topics);
+    final regressedTopics = topics
+        .where((t) => regressedIds.contains(t.id))
+        .toList();
 
     final queue = <Topic>[
       ...dueTopics,
       ...lowScoreTopics,
       ...highFrequencyTopics,
+      ...longUnreviewedTopics,
+      ...regressedTopics,
     ];
     final uniqueQueue = {
       for (final topic in queue) topic.id: topic,
@@ -51,6 +61,8 @@ class TodayReviewPage extends StatelessWidget {
             dueCount: dueTopics.length,
             lowScoreCount: lowScoreTopics.length,
             highFreqCount: highFrequencyTopics.length,
+            longUnreviewedCount: longUnreviewedTopics.length,
+            regressedCount: regressedTopics.length,
             totalCount: uniqueQueue.length,
             onStartAll: uniqueQueue.isEmpty
                 ? null
@@ -89,10 +101,10 @@ class TodayReviewPage extends StatelessWidget {
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
               final lastScore = attempts.isNotEmpty
-                  ? (attempts.last.score ?? 0)
+                  ? (attempts.first.score ?? 0)
                   : 0;
-              // ignore: unnecessary_null_comparison
-              return '最近得分 $lastScore 分，需要重新组织回答';
+              final practiceCount = attempts.length;
+              return '最近得分 $lastScore 分（已练习 $practiceCount 次），需要重新组织回答';
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: null, // 低分不建议跳过
@@ -118,6 +130,53 @@ class TodayReviewPage extends StatelessWidget {
                 SnackBar(content: Text('已将「${topic.title}」推迟到明天')),
               );
             },
+          ),
+          const SizedBox(height: 16),
+
+          // ── 长期未复习 ──
+          _ReviewGroup(
+            title: '长期未复习',
+            icon: Icons.event_busy_outlined,
+            iconColor: AppColors.categoryPurple,
+            emptyText: '所有知识点近期都有复习',
+            emptyIcon: Icons.event_available_outlined,
+            topics: longUnreviewedTopics,
+            progressProvider: progress,
+            reasonBuilder: (topic) {
+              final attempts = progress.getAttemptsForTopic(topic.id);
+              if (attempts.isEmpty) return '从未练习，遗忘风险极高';
+              final lastDate = attempts.first.createdAt;
+              final days = DateTime.now().difference(lastDate).inDays;
+              return '距上次练习已 $days 天，建议尽快复习巩固';
+            },
+            onStart: (topic) => _startRecall(context, [topic]),
+            onSkip: (topic) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('已将「${topic.title}」推迟')),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // ── 最近退步 ──
+          _ReviewGroup(
+            title: '最近退步',
+            icon: Icons.trending_down_outlined,
+            iconColor: AppColors.danger,
+            emptyText: '近期无退步知识点',
+            emptyIcon: Icons.trending_up_outlined,
+            topics: regressedTopics,
+            progressProvider: progress,
+            reasonBuilder: (topic) {
+              final attempts = progress.getAttemptsForTopic(topic.id);
+              if (attempts.length < 2) return '分数下降，需要巩固';
+              final latest = attempts[0].score ?? 0;
+              final previous = attempts[1].score ?? 0;
+              final diff = previous - latest;
+              return '从 $previous 分降至 $latest 分（下降 $diff 分）';
+            },
+            onStart: (topic) => _startRecall(context, [topic]),
+            onSkip: null,
           ),
 
           // ── 空状态提示 ──
@@ -173,10 +232,18 @@ class TodayReviewPage extends StatelessWidget {
     final p = progress.getTopicProgress(topic.id);
     if (p?.nextReviewAt == null) return '需要复习';
     final now = DateTime.now();
-    final days = now.difference(p!.nextReviewAt!).inDays;
-    if (days > 0) return '已逾期 $days 天，遗忘风险增加';
-    if (days == 0) return '今天到期，按遗忘曲线安排';
-    return '提前复习';
+    final daysOverdue = now.difference(p!.nextReviewAt!).inDays;
+    if (daysOverdue > 3) return '已逾期 $daysOverdue 天，遗忘风险极高';
+    if (daysOverdue > 0) return '已逾期 $daysOverdue 天，遗忘风险增加';
+    if (daysOverdue == 0) {
+      final attempts = progress.getAttemptsForTopic(topic.id);
+      if (attempts.isNotEmpty) {
+        final daysSincePractice = now.difference(attempts.first.createdAt).inDays;
+        if (daysSincePractice > 0) return '距上次练习 $daysSincePractice 天，按遗忘曲线到期';
+      }
+      return '今天到期，按遗忘曲线安排';
+    }
+    return '提前复习（原定 ${-daysOverdue} 天后）';
   }
 
   void _startRecall(BuildContext context, List<Topic> topics) {
@@ -195,6 +262,8 @@ class _ReviewHeroPanel extends StatelessWidget {
     required this.dueCount,
     required this.lowScoreCount,
     required this.highFreqCount,
+    required this.longUnreviewedCount,
+    required this.regressedCount,
     required this.totalCount,
     this.onStartAll,
   });
@@ -202,6 +271,8 @@ class _ReviewHeroPanel extends StatelessWidget {
   final int dueCount;
   final int lowScoreCount;
   final int highFreqCount;
+  final int longUnreviewedCount;
+  final int regressedCount;
   final int totalCount;
   final VoidCallback? onStartAll;
 
@@ -215,7 +286,7 @@ class _ReviewHeroPanel extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             Theme.of(context).colorScheme.primary,
-            const Color(0xFF0F3460),
+            AppColors.categoryDeepBlue,
           ],
         ),
         borderRadius: BorderRadius.circular(16),
@@ -261,18 +332,25 @@ class _ReviewHeroPanel extends StatelessWidget {
                 value: dueCount,
                 color: AppColors.warning,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.trending_down_outlined,
                 label: '低分',
                 value: lowScoreCount,
                 color: AppColors.danger,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              _StatChip(
+                icon: Icons.event_busy_outlined,
+                label: '未复习',
+                value: longUnreviewedCount,
+                color: AppColors.categoryPurple,
+              ),
+              const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.priority_high_outlined,
-                label: '高频',
-                value: highFreqCount,
+                label: '退步',
+                value: regressedCount,
                 color: AppColors.accent,
               ),
             ],

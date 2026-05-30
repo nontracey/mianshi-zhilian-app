@@ -61,6 +61,12 @@ class AppSettings {
   final double fontScale;
   final String cardDensity;
 
+  // 语音识别配置
+  final String sttMode; // 'system' | 'whisper'
+  final String? whisperBaseUrl;
+  final String? whisperApiKey;
+  final String whisperModel;
+
   // 知识源配置
   final ContentEnv contentEnv;
   final String? customTestContentUrl;
@@ -86,6 +92,10 @@ class AppSettings {
     this.mockInterviewPreference = 'mixed',
     this.fontScale = 1.0,
     this.cardDensity = 'comfortable',
+    this.sttMode = 'system',
+    this.whisperBaseUrl,
+    this.whisperApiKey,
+    this.whisperModel = 'whisper-1',
     this.contentEnv = ContentEnv.production,
     this.customTestContentUrl,
     this.customProdContentUrl,
@@ -142,6 +152,10 @@ class AppSettings {
     String? mockInterviewPreference,
     double? fontScale,
     String? cardDensity,
+    String? sttMode,
+    String? whisperBaseUrl,
+    String? whisperApiKey,
+    String? whisperModel,
     ContentEnv? contentEnv,
     String? customTestContentUrl,
     String? customProdContentUrl,
@@ -167,6 +181,10 @@ class AppSettings {
         mockInterviewPreference ?? this.mockInterviewPreference,
     fontScale: fontScale ?? this.fontScale,
     cardDensity: cardDensity ?? this.cardDensity,
+    sttMode: sttMode ?? this.sttMode,
+    whisperBaseUrl: whisperBaseUrl ?? this.whisperBaseUrl,
+    whisperApiKey: whisperApiKey ?? this.whisperApiKey,
+    whisperModel: whisperModel ?? this.whisperModel,
     contentEnv: contentEnv ?? this.contentEnv,
     customTestContentUrl: customTestContentUrl ?? this.customTestContentUrl,
     customProdContentUrl: customProdContentUrl ?? this.customProdContentUrl,
@@ -228,6 +246,10 @@ class AppSettings {
         json['mockInterviewPreference'] as String? ?? 'mixed',
     fontScale: (json['fontScale'] as num?)?.toDouble() ?? 1.0,
     cardDensity: json['cardDensity'] as String? ?? 'comfortable',
+    sttMode: json['sttMode'] as String? ?? 'system',
+    whisperBaseUrl: json['whisperBaseUrl'] as String?,
+    whisperApiKey: json['whisperApiKey'] as String?,
+    whisperModel: json['whisperModel'] as String? ?? 'whisper-1',
     contentEnv: ContentEnv.fromKey(
       json['contentEnv'] as String? ?? 'production',
     ),
@@ -255,6 +277,10 @@ class AppSettings {
     'mockInterviewPreference': mockInterviewPreference,
     'fontScale': fontScale,
     'cardDensity': cardDensity,
+    'sttMode': sttMode,
+    'whisperBaseUrl': whisperBaseUrl,
+    'whisperApiKey': whisperApiKey,
+    'whisperModel': whisperModel,
     'contentEnv': contentEnv.key,
     'customTestContentUrl': customTestContentUrl,
     'customProdContentUrl': customProdContentUrl,

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -16,10 +18,12 @@ class MasteryPage extends StatefulWidget {
     super.key,
     required this.currentDomainId,
     required this.onDomainChanged,
+    this.onStartPractice,
   });
 
   final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
+  final VoidCallback? onStartPractice;
 
   @override
   State<MasteryPage> createState() => _MasteryPageState();
@@ -28,6 +32,7 @@ class MasteryPage extends StatefulWidget {
 class _MasteryPageState extends State<MasteryPage> {
   MasterySort _sort = MasterySort.scoreAsc;
   MasteryFilter _filter = MasteryFilter.all;
+  String? _diagnosticFilter; // null / 'longUnreviewed' / 'regressed'
   final _storage = StorageService();
   List<String> _disabledIds = [];
 
@@ -50,6 +55,7 @@ class _MasteryPageState extends State<MasteryPage> {
   Widget build(BuildContext context) {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final allDomains = contentProvider.domains;
@@ -73,9 +79,16 @@ class _MasteryPageState extends State<MasteryPage> {
       final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
       return topic.highFrequency && score < 85;
     }).length;
-    final lowScoreCount = progressProvider.lowScoreAttempts.length;
+    final longUnreviewedIds = progressProvider.getLongUnreviewedTopicIds(domainTopics);
+    final regressedIds = progressProvider.getRegressedTopicIds(domainTopics);
 
-    final filteredTopics = _applyFilter(domainTopics, progressProvider);
+    var filteredTopics = _applyFilter(domainTopics, progressProvider, settingsProvider.settings.contentEnv);
+    // 诊断筛选叠加
+    if (_diagnosticFilter == 'longUnreviewed') {
+      filteredTopics = filteredTopics.where((t) => longUnreviewedIds.contains(t.id)).toList();
+    } else if (_diagnosticFilter == 'regressed') {
+      filteredTopics = filteredTopics.where((t) => regressedIds.contains(t.id)).toList();
+    }
     final sortedTopics = _applySort(filteredTopics, progressProvider);
 
     return Padding(
@@ -87,8 +100,11 @@ class _MasteryPageState extends State<MasteryPage> {
           _buildCompactHeader(context, currentDomain, masteryPercent, domains, contentProvider, isDark),
           const SizedBox(height: 12),
           
-          // 诊断指标
-          _buildDiagnosticCards(context, readiness, dueCount, highFrequencyWeak, lowScoreCount, isDark),
+          // 诊断指标（可点击筛选）
+          _buildDiagnosticCards(
+            context, readiness, dueCount, highFrequencyWeak,
+            longUnreviewedIds.length, regressedIds.length, isDark,
+          ),
           const SizedBox(height: 12),
           
           // 筛选和排序
@@ -183,43 +199,57 @@ class _MasteryPageState extends State<MasteryPage> {
     );
   }
 
-  Widget _buildDiagnosticCards(BuildContext context, int readiness, int dueCount, 
-      int highFrequencyWeak, int lowScoreCount, bool isDark) {
+  Widget _buildDiagnosticCards(BuildContext context, int readiness, int dueCount,
+      int highFrequencyWeak, int longUnreviewedCount, int regressedCount, bool isDark) {
     return Row(
       children: [
         Expanded(child: _buildDiagnosticCard('就绪度', '$readiness', AppColors.accent, isDark)),
         const SizedBox(width: 8),
         Expanded(child: _buildDiagnosticCard('待复习', '$dueCount', AppColors.warning, isDark)),
         const SizedBox(width: 8),
-        Expanded(child: _buildDiagnosticCard('高频未稳', '$highFrequencyWeak', AppColors.accent, isDark)),
+        Expanded(child: _buildDiagnosticCard('未复习', '$longUnreviewedCount', AppColors.accent, isDark,
+          filterKey: 'longUnreviewed')),
         const SizedBox(width: 8),
-        Expanded(child: _buildDiagnosticCard('低分回流', '$lowScoreCount', AppColors.danger, isDark)),
+        Expanded(child: _buildDiagnosticCard('退步', '$regressedCount', AppColors.danger, isDark,
+          filterKey: 'regressed')),
       ],
     );
   }
 
-  Widget _buildDiagnosticCard(String label, String value, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161B22) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+  Widget _buildDiagnosticCard(String label, String value, Color color, bool isDark,
+      {String? filterKey}) {
+    final isActive = filterKey != null && _diagnosticFilter == filterKey;
+    return GestureDetector(
+      onTap: filterKey != null
+          ? () => setState(() => _diagnosticFilter = isActive ? null : filterKey)
+          : null,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isActive
+              ? color.withValues(alpha: 0.12)
+              : (isDark ? const Color(0xFF161B22) : Colors.white),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive
+                ? color
+                : (isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+            width: isActive ? 1.5 : 1,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey),
-          ),
-        ],
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -375,7 +405,7 @@ class _MasteryPageState extends State<MasteryPage> {
           
           // 操作
           TextButton(
-            onPressed: () {},
+            onPressed: widget.onStartPractice,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -386,19 +416,31 @@ class _MasteryPageState extends State<MasteryPage> {
     );
   }
 
-  List<Topic> _applyFilter(List<Topic> topics, ProgressProvider progress) {
+  List<Topic> _applyFilter(List<Topic> topics, ProgressProvider progress, ContentEnv contentEnv) {
+    // 首先按内容阶段过滤
+    var filteredTopics = topics;
+    if (contentEnv == ContentEnv.production) {
+      // 发布阶段只显示 production 状态的内容
+      filteredTopics = topics.where((t) => t.status == null || t.status == 'production').toList();
+    } else if (contentEnv == ContentEnv.test) {
+      // 测试阶段显示 production 和 test 状态的内容
+      filteredTopics = topics.where((t) => t.status == null || t.status == 'production' || t.status == 'test').toList();
+    }
+    // draft 阶段显示所有内容
+
+    // 然后按掌握度过滤
     switch (_filter) {
       case MasteryFilter.skilled:
-        return topics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) >= 85).toList();
+        return filteredTopics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) >= 85).toList();
       case MasteryFilter.familiar:
-        return topics.where((t) {
+        return filteredTopics.where((t) {
           final score = progress.getTopicProgress(t.id)?.score ?? 0;
           return score >= 60 && score < 85;
         }).toList();
       case MasteryFilter.unfamiliar:
-        return topics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) < 60).toList();
+        return filteredTopics.where((t) => (progress.getTopicProgress(t.id)?.score ?? 0) < 60).toList();
       case MasteryFilter.all:
-        return topics;
+        return filteredTopics;
     }
   }
 

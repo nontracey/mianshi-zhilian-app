@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
+import 'package:mianshi_zhilian/models/user.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -11,6 +12,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -45,6 +47,7 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 16),
         _ContentEnvPanel(
           settings: settings,
+          userRole: authProvider.userRole,
           onEnvChanged: (env) async {
             await settingsProvider.setContentEnv(env);
             if (context.mounted) {
@@ -84,6 +87,11 @@ class ProfilePage extends StatelessWidget {
               context,
             ).push(MaterialPageRoute(builder: (_) => const AiConfigPage()));
           },
+        ),
+        const SizedBox(height: 16),
+        _SttConfigPanel(
+          settings: settings,
+          onSettingsChanged: (next) => settingsProvider.updateSettings(next),
         ),
         const SizedBox(height: 16),
         _AppearancePanel(
@@ -134,6 +142,57 @@ class ProfilePage extends StatelessWidget {
               ScaffoldMessenger.of(
                 context,
               ).showSnackBar(SnackBar(content: Text(message)));
+            }
+          },
+          onTestConnection: () async {
+            final result = await settingsProvider.testWebDavConnection(
+              progressProvider.syncSettings,
+            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result.message),
+                  backgroundColor: result.success ? null : AppColors.danger,
+                ),
+              );
+            }
+          },
+          onRestore: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('从云端恢复'),
+                content: const Text(
+                  '恢复将覆盖当前所有本地数据，此操作不可撤销。是否继续？',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('取消'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('确认恢复'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) return;
+            final result = await settingsProvider.restoreFromWebDav(
+              progressProvider.syncSettings,
+            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result.message),
+                  backgroundColor: result.success ? AppColors.success : AppColors.danger,
+                ),
+              );
+              if (result.success) {
+                await context.read<ProgressProvider>().loadProgress();
+                await context.read<SettingsProvider>().loadSettings();
+                await context.read<AiProvider>().loadConfigs();
+              }
             }
           },
           onExport: () => settingsProvider.exportData(),
@@ -721,6 +780,7 @@ class _BindingButton extends StatelessWidget {
 class _ContentEnvPanel extends StatelessWidget {
   const _ContentEnvPanel({
     required this.settings,
+    required this.userRole,
     required this.onEnvChanged,
     required this.onTestUrlChanged,
     required this.onProdUrlChanged,
@@ -728,6 +788,7 @@ class _ContentEnvPanel extends StatelessWidget {
   });
 
   final AppSettings settings;
+  final UserRole userRole;
   final ValueChanged<ContentEnv> onEnvChanged;
   final ValueChanged<String?> onTestUrlChanged;
   final ValueChanged<String?> onProdUrlChanged;
@@ -753,13 +814,17 @@ class _ContentEnvPanel extends StatelessWidget {
       children: [
         // 环境切换
         SegmentedButton<ContentEnv>(
-          segments: const [
-            ButtonSegment(value: ContentEnv.production, label: Text('发布版')),
-            ButtonSegment(value: ContentEnv.test, label: Text('测试版')),
+          segments: [
+            const ButtonSegment(value: ContentEnv.production, label: Text('发布版')),
+            ButtonSegment(
+              value: ContentEnv.test,
+              label: const Text('测试版'),
+              enabled: userRole.allowedContentEnvs.contains('test'),
+            ),
             ButtonSegment(
               value: ContentEnv.draft,
-              label: Text('草稿版'),
-              enabled: false,
+              label: const Text('草稿版'),
+              enabled: userRole.allowedContentEnvs.contains('draft'),
             ),
           ],
           selected: {settings.contentEnv},
@@ -892,6 +957,196 @@ class _AiConfigPanel extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── 语音识别配置面板 ──────────────────────────────────────────────
+
+class _SttConfigPanel extends StatelessWidget {
+  const _SttConfigPanel({
+    required this.settings,
+    required this.onSettingsChanged,
+  });
+
+  final AppSettings settings;
+  final ValueChanged<AppSettings> onSettingsChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWhisper = settings.sttMode == 'whisper';
+
+    return WorkPanel(
+      title: '语音识别',
+      icon: Icons.mic_outlined,
+      children: [
+        // STT 模式切换
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _SttModeCard(
+                  label: '系统语音',
+                  icon: Icons.phone_android,
+                  description: '使用设备内置语音识别',
+                  selected: !isWhisper,
+                  onTap: () => onSettingsChanged(
+                    settings.copyWith(sttMode: 'system'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _SttModeCard(
+                  label: 'Whisper API',
+                  icon: Icons.cloud_outlined,
+                  description: '使用 Whisper 兼容 API',
+                  selected: isWhisper,
+                  onTap: () => onSettingsChanged(
+                    settings.copyWith(sttMode: 'whisper'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Whisper 配置
+        if (isWhisper) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: TextEditingController(
+                    text: settings.whisperBaseUrl ?? '',
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'API 地址',
+                    hintText: 'https://api.openai.com/v1',
+                    isDense: true,
+                  ),
+                  onChanged: (v) => onSettingsChanged(
+                    settings.copyWith(whisperBaseUrl: v),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: TextEditingController(
+                    text: settings.whisperApiKey ?? '',
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'API Key',
+                    hintText: 'sk-...',
+                    isDense: true,
+                  ),
+                  obscureText: true,
+                  onChanged: (v) => onSettingsChanged(
+                    settings.copyWith(whisperApiKey: v),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: TextEditingController(
+                    text: settings.whisperModel,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: '模型名称',
+                    hintText: 'whisper-1',
+                    isDense: true,
+                  ),
+                  onChanged: (v) => onSettingsChanged(
+                    settings.copyWith(whisperModel: v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Text(
+            isWhisper
+                ? 'Whisper API 支持更高质量的语音识别，需要网络连接。支持 OpenAI、Groq 等兼容接口。'
+                : '使用设备内置语音识别，离线可用，但识别质量因设备而异。',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SttModeCard extends StatelessWidget {
+  const _SttModeCard({
+    required this.label,
+    required this.icon,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.secondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? accent
+                : Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
+          ),
+          color: selected ? accent.withValues(alpha: 0.06) : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: selected ? accent : null),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: selected ? accent : null,
+                  ),
+                ),
+                if (selected) ...[
+                  const Spacer(),
+                  Icon(Icons.check_circle, size: 16, color: accent),
+                ],
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1212,6 +1467,8 @@ class _DataManagementPanel extends StatelessWidget {
     required this.onSyncSettingsChanged,
     required this.onSync,
     required this.onExport,
+    this.onTestConnection,
+    this.onRestore,
   });
 
   final AppSettings settings;
@@ -1219,6 +1476,8 @@ class _DataManagementPanel extends StatelessWidget {
   final ValueChanged<SyncSettings> onSyncSettingsChanged;
   final VoidCallback onSync;
   final VoidCallback onExport;
+  final VoidCallback? onTestConnection;
+  final VoidCallback? onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -1314,15 +1573,31 @@ class _DataManagementPanel extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onTestConnection,
+              icon: const Icon(Icons.wifi_find, size: 16),
+              label: const Text('测试连接'),
+            ),
+          ),
         ],
         const SizedBox(height: 8),
         Row(
           children: [
             FilledButton.tonalIcon(
               onPressed: onSync,
-              icon: const Icon(Icons.sync),
-              label: const Text('立即同步'),
+              icon: const Icon(Icons.cloud_upload),
+              label: const Text('备份到云端'),
             ),
+            const SizedBox(width: 12),
+            if (syncSettings.method == 'webdav')
+              FilledButton.tonalIcon(
+                onPressed: onRestore,
+                icon: const Icon(Icons.cloud_download),
+                label: const Text('从云端恢复'),
+              ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
               onPressed: onExport,
@@ -1357,6 +1632,7 @@ class _AboutPanel extends StatefulWidget {
 class _AboutPanelState extends State<_AboutPanel> {
   bool _isChecking = false;
   String? _updateMessage;
+  StateSetter? _currentSetDialogState;
 
   Future<void> _checkUpdate() async {
     setState(() {
@@ -1453,40 +1729,45 @@ class _AboutPanelState extends State<_AboutPanel> {
     // 显示下载进度
     int received = 0;
     int total = platformUpdate.size;
+    bool dialogOpen = true;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('下载更新'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                value: total > 0 ? received / total : null,
-              ),
-              const SizedBox(height: 16),
-              Text('正在下载 v${updateInfo.version}...'),
-              const SizedBox(height: 8),
-              Text(
-                '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              if (total > 0)
-                Text(
-                  '${(received / total * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
+        builder: (ctx, setDialogState) {
+          // 保存 setDialogState 供 onProgress 回调使用
+          _currentSetDialogState = setDialogState;
+          return AlertDialog(
+            title: const Text('下载更新'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  value: total > 0 ? received / total : null,
                 ),
-            ],
-          ),
-        ),
+                const SizedBox(height: 16),
+                Text('正在下载 v${updateInfo.version}...'),
+                const SizedBox(height: 8),
+                Text(
+                  '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                if (total > 0)
+                  Text(
+                    '${(received / total * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
-    );
+    ).then((_) => dialogOpen = false);
 
     // 实际下载和校验
     final filePath = await updateService.downloadUpdate(
@@ -1495,9 +1776,8 @@ class _AboutPanelState extends State<_AboutPanel> {
       onProgress: (r, t) {
         received = r;
         total = t;
-        // 更新对话框（通过 rebuild）
-        if (mounted) {
-          setState(() {});
+        if (mounted && dialogOpen) {
+          _currentSetDialogState?.call(() {});
         }
       },
     );
@@ -1506,18 +1786,77 @@ class _AboutPanelState extends State<_AboutPanel> {
       Navigator.pop(context); // 关闭下载对话框
 
       if (filePath != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('下载完成：$filePath'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _showInstallGuide(filePath, updateInfo.version);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('下载失败或校验不通过，请重试')),
         );
       }
     }
+  }
+
+  void _showInstallGuide(String filePath, String version) {
+    final ext = filePath.split('.').last.toLowerCase();
+    String instruction;
+    IconData icon;
+    switch (ext) {
+      case 'apk':
+        icon = Icons.android;
+        instruction = '下载完成。请在通知栏或文件管理器中打开 APK 文件进行安装。\n'
+            '如提示"未知来源"，请在设置中允许安装。';
+      case 'dmg':
+        icon = Icons.apple;
+        instruction = '下载完成。请打开 DMG 文件，将应用拖入"应用程序"文件夹。';
+      case 'exe':
+        icon = Icons.desktop_windows;
+        instruction = '下载完成。请运行 EXE 文件按照向导完成安装。';
+      default:
+        icon = Icons.folder_open;
+        instruction = '下载完成。请在文件管理器中找到安装包并运行。';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(icon, size: 40, color: AppColors.success),
+        title: Text('v$version 下载完成'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(instruction),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.folder_outlined, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      filePath,
+                      style: const TextStyle(fontSize: 11),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

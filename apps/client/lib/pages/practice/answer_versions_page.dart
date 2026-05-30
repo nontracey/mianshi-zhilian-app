@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -261,12 +263,30 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             color: typeColors[type] ?? Colors.grey,
           ),
         ),
-        subtitle: Text(
-          version['createdAt'] ?? '',
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white38 : const Color(0xFF999999),
-          ),
+        subtitle: Row(
+          children: [
+            Text(
+              version['createdAt'] ?? '',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white38 : const Color(0xFF999999),
+              ),
+            ),
+            if (version['source'] == 'auto_eval') ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Text(
+                  'AI 评估自动保存',
+                  style: TextStyle(fontSize: 10, color: AppColors.accent),
+                ),
+              ),
+            ],
+          ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -574,18 +594,189 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       return;
     }
 
-    // 复制内容到剪贴板，提示用户粘贴到AI对话
-    await Clipboard.setData(ClipboardData(
-      text: '请帮我改进以下面试回答：\n\n$content',
-    ));
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('已复制到剪贴板，可粘贴到 AI 对话中获取改进建议'),
-          duration: Duration(seconds: 3),
-        ),
+    final aiProvider = context.read<AiProvider>();
+    if (!aiProvider.hasAnyConfig) {
+      // 无 AI 配置时降级为复制到剪贴板
+      await Clipboard.setData(ClipboardData(
+        text: '请帮我改进以下面试回答：\n\n$content',
+      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('未配置 AI，已复制到剪贴板，可粘贴到外部 AI 对话'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 显示 AI 改进对话框
+    if (!mounted) return;
+    _showAIImprovementDialog(content);
+  }
+
+  void _showAIImprovementDialog(String originalAnswer) {
+    final aiProvider = context.read<AiProvider>();
+    String improvedText = '';
+    bool isLoading = true;
+    String? error;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          // 首次构建时启动 AI 改进
+          if (isLoading && improvedText.isEmpty && error == null) {
+            _runAIImprovement(
+              originalAnswer,
+              aiProvider,
+              onToken: (token) {
+                if (ctx.mounted) {
+                  setDialogState(() {
+                    improvedText += token;
+                    isLoading = false;
+                  });
+                }
+              },
+              onComplete: () {
+                if (ctx.mounted) {
+                  setDialogState(() => isLoading = false);
+                }
+              },
+              onError: (e) {
+                if (ctx.mounted) {
+                  setDialogState(() {
+                    error = e;
+                    isLoading = false;
+                  });
+                }
+              },
+            );
+          }
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 20, color: AppColors.accent),
+                const SizedBox(width: 8),
+                const Text('AI 改进建议'),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isLoading && improvedText.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('AI 正在分析你的回答...'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (error != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, size: 16, color: AppColors.danger),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(error!, style: const TextStyle(fontSize: 13))),
+                          ],
+                        ),
+                      ),
+                    if (improvedText.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Text(improvedText, style: const TextStyle(height: 1.6)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('关闭'),
+              ),
+              if (improvedText.isNotEmpty)
+                FilledButton.icon(
+                  onPressed: () async {
+                    // 保存为 AI 修改版
+                    setState(() {
+                      _versions.add({
+                        'type': 'ai_modified',
+                        'content': improvedText,
+                        'createdAt': DateTime.now().toString().substring(0, 16),
+                        'source': 'ai_improve',
+                      });
+                    });
+                    await _saveVersions();
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已保存为 AI 修改版')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.save, size: 16),
+                  label: const Text('保存为 AI 修改版'),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _runAIImprovement(
+    String originalAnswer,
+    AiProvider aiProvider, {
+    required void Function(String token) onToken,
+    required void Function() onComplete,
+    required void Function(String error) onError,
+  }) async {
+    try {
+      final prompt = '请帮我改进以下面试回答，使其更结构化、更专业、更完整。'
+          '保留核心要点，优化表达方式，补充关键细节。'
+          '只输出改进后的回答内容，不要加前缀说明。\n\n'
+          '原始回答：\n$originalAnswer';
+
+      final stream = aiProvider.sendMessageStream(
+        prompt,
+        systemPrompt: '你是一位资深面试辅导专家，擅长帮助候选人优化面试回答。',
       );
+
+      await for (final token in stream) {
+        onToken(token);
+      }
+      onComplete();
+    } catch (e) {
+      onError('AI 改进失败: $e');
     }
   }
 

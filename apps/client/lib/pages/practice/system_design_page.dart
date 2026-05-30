@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class SystemDesignPage extends StatefulWidget {
@@ -12,7 +15,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
   String _selectedCategory = 'all';
   final List<Map<String, dynamic>> _savedDesigns = [];
 
-  final List<Map<String, dynamic>> _designTopics = [
+  final List<Map<String, dynamic>> _fallbackTopics = [
     {
       'id': 'url_shortener',
       'title': '短链接系统',
@@ -105,12 +108,45 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     },
   ];
 
+  /// 从内容仓库加载系统设计主题，无内容时使用硬编码回退
+  List<Map<String, dynamic>> _getContentTopics(BuildContext context) {
+    final contentProvider = context.read<ContentProvider>();
+    // 尝试从所有领域中找系统设计相关的主题
+    final allTopics = <Topic>[];
+    for (final domain in contentProvider.domains) {
+      allTopics.addAll(contentProvider.getTopicsByDomain(domain.id));
+    }
+    final systemDesignTopics = allTopics.where((t) {
+      final cat = t.category.toLowerCase();
+      final tags = t.tags.map((e) => e.toLowerCase()).toList();
+      return cat.contains('系统设计') ||
+          cat.contains('架构') ||
+          tags.any((e) =>
+              e.contains('系统设计') ||
+              e.contains('架构') ||
+              e.contains('system-design'));
+    }).toList();
+
+    if (systemDesignTopics.isEmpty) return _fallbackTopics;
+
+    return systemDesignTopics.map((t) => <String, dynamic>{
+      'id': t.id,
+      'title': t.title,
+      'category': t.category.isEmpty ? '通用' : t.category,
+      'difficulty': t.difficulty,
+      'description': t.summary,
+      'keyPoints': t.tags.isEmpty ? ['系统设计'] : t.tags.take(4).toList(),
+      'estimatedMinutes': t.estimatedMinutes,
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final designTopics = _getContentTopics(context);
     final filteredTopics = _selectedCategory == 'all'
-        ? _designTopics
-        : _designTopics.where((t) => t['category'] == _selectedCategory).toList();
+        ? designTopics
+        : designTopics.where((t) => t['category'] == _selectedCategory).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -125,10 +161,10 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       body: Column(
         children: [
           // 顶部统计
-          _buildStatsHeader(context, isDark),
-          
+          _buildStatsHeader(context, isDark, designTopics),
+
           // 分类筛选
-          _buildCategoryFilter(context, isDark),
+          _buildCategoryFilter(context, isDark, designTopics),
           
           // 题目列表
           Expanded(
@@ -145,7 +181,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     );
   }
 
-  Widget _buildStatsHeader(BuildContext context, bool isDark) {
+  Widget _buildStatsHeader(BuildContext context, bool isDark, List<Map<String, dynamic>> topics) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -159,9 +195,9 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem('总题数', '${_designTopics.length}', AppColors.accent),
+          _buildStatItem('总题数', '${topics.length}', AppColors.accent),
           _buildStatItem('已练习', '${_savedDesigns.length}', AppColors.success),
-          _buildStatItem('待练习', '${_designTopics.length - _savedDesigns.length}', AppColors.warning),
+          _buildStatItem('待练习', '${topics.length - _savedDesigns.length}', AppColors.warning),
         ],
       ),
     );
@@ -189,8 +225,9 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     );
   }
 
-  Widget _buildCategoryFilter(BuildContext context, bool isDark) {
-    final categories = ['all', '基础', '社交', '通讯', '搜索', '金融', 'AI', '基础设施'];
+  Widget _buildCategoryFilter(BuildContext context, bool isDark, List<Map<String, dynamic>> topics) {
+    final dynamicCategories = topics.map((t) => t['category'] as String).toSet().toList()..sort();
+    final categories = ['all', ...dynamicCategories];
     
     return Container(
       height: 50,

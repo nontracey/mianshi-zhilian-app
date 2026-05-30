@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/models/user.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
@@ -326,7 +327,7 @@ class _HeaderBarState extends State<HeaderBar> {
             // 左侧：内容阶段切换 + AI 模型选择
             _ContentStageSelector(
               isDark: isDark,
-              isLoggedIn: authProvider.isLoggedIn,
+              userRole: authProvider.userRole,
               onStageChanged: widget.onContentStageChanged,
             ),
             const SizedBox(width: 20),
@@ -418,12 +419,12 @@ class _AiModelSelector extends StatelessWidget {
 class _ContentStageSelector extends StatefulWidget {
   const _ContentStageSelector({
     required this.isDark,
-    this.isLoggedIn = false,
+    this.userRole = UserRole.guest,
     this.onStageChanged,
   });
 
   final bool isDark;
-  final bool isLoggedIn;
+  final UserRole userRole;
   final ValueChanged<String>? onStageChanged;
 
   @override
@@ -435,10 +436,11 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final allowedEnvs = widget.userRole.allowedContentEnvs;
     final stages = [
       ('published', '发布', true),   // 所有用户可用
-      ('testing', '测试', widget.isLoggedIn), // 仅登录用户
-      ('draft', '草稿', widget.isLoggedIn),   // 仅登录用户
+      ('testing', '测试', allowedEnvs.contains('testing')), // 根据角色
+      ('draft', '草稿', allowedEnvs.contains('draft')),   // 根据角色
     ];
 
     return Row(
@@ -469,10 +471,13 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                         widget.onStageChanged?.call(stage.$1);
                       }
                     : () {
+                        final message = widget.userRole == UserRole.guest
+                            ? '登录后可查看测试版内容'
+                            : '需要管理员权限查看草稿内容';
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('登录后可查看测试版和草稿内容'),
-                            duration: Duration(seconds: 2),
+                          SnackBar(
+                            content: Text(message),
+                            duration: const Duration(seconds: 2),
                           ),
                         );
                       },

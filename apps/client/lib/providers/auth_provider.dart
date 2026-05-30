@@ -24,6 +24,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  /// 获取用户角色，未登录返回 guest
+  UserRole get userRole => _user?.role ?? UserRole.guest;
+
   /// 加载已保存的用户信息
   Future<void> loadUser() async {
     try {
