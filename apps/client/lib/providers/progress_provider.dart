@@ -125,10 +125,14 @@ class ProgressProvider extends ChangeNotifier {
 
     // 没有学习过的知识点，掌握度为0
     if (count == 0) return (masteryPercent: 0, topicCount: domainTopics.length);
-    
-    // 只计算已学习知识点的平均分
+
+    // 计算综合掌握度：平均分 × 覆盖率
+    final avgScore = totalScore / count;
+    final coverage = count / domainTopics.length;
+    final masteryPercent = (avgScore * coverage).round();
+
     return (
-      masteryPercent: (totalScore / count).round(),
+      masteryPercent: masteryPercent,
       topicCount: domainTopics.length,
     );
   }
@@ -364,30 +368,30 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   /// 获取掌握度趋势数据（最近7天的平均分）
-  List<double> getMasteryTrend() {
+  List<double?> getMasteryTrend() {
     final now = DateTime.now();
-    final trend = <double>[];
-    
+    final trend = <double?>[];
+
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       final dayStart = DateTime(date.year, date.month, date.day);
       final dayEnd = dayStart.add(const Duration(days: 1));
-      
-      final dayAttempts = _attempts.where((a) => 
-        a.createdAt.isAfter(dayStart) && 
+
+      final dayAttempts = _attempts.where((a) =>
+        a.createdAt.isAfter(dayStart) &&
         a.createdAt.isBefore(dayEnd) &&
         a.score != null
       ).toList();
-      
+
       if (dayAttempts.isNotEmpty) {
         final avgScore = dayAttempts.fold<double>(0, (sum, a) => sum + (a.score ?? 0)) / dayAttempts.length;
         trend.add(avgScore);
       } else {
-        // 如果当天没有数据，使用前一天的数据或默认值
-        trend.add(trend.isNotEmpty ? trend.last : 50.0);
+        // 如果当天没有数据，返回 null
+        trend.add(null);
       }
     }
-    
+
     return trend;
   }
 

@@ -2526,14 +2526,18 @@ class _RightPanel extends StatelessWidget {
 class _MasteryTrendChart extends StatelessWidget {
   const _MasteryTrendChart({required this.trendData});
 
-  final List<double> trendData;
+  final List<double?> trendData;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final dates = List.generate(7, (i) => 
-      '${(now.month).toString().padLeft(2, '0')}-${(now.day - 6 + i).toString().padLeft(2, '0')}'
-    );
+    final dates = List.generate(7, (i) {
+      final date = now.subtract(Duration(days: 6 - i));
+      return '${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    });
+
+    // 检查是否所有数据都是 null
+    final hasData = trendData.any((d) => d != null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2541,10 +2545,20 @@ class _MasteryTrendChart extends StatelessWidget {
         // 图表区域
         SizedBox(
           height: 120,
-          child: CustomPaint(
-            size: const Size(double.infinity, 120),
-            painter: _LineChartPainter(data: trendData),
-          ),
+          child: hasData
+            ? CustomPaint(
+                size: const Size(double.infinity, 120),
+                painter: _LineChartPainter(data: trendData),
+              )
+            : Center(
+                child: Text(
+                  '开始学习后将展示趋势',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
         ),
         const SizedBox(height: 8),
         // X轴标签
@@ -2567,7 +2581,7 @@ class _MasteryTrendChart extends StatelessWidget {
 class _LineChartPainter extends CustomPainter {
   const _LineChartPainter({required this.data});
 
-  final List<double> data;
+  final List<double?> data;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2583,13 +2597,20 @@ class _LineChartPainter extends CustomPainter {
     final height = size.height;
     final stepX = width / (data.length - 1);
 
-    // 绘制线条
+    // 绘制线条（跳过 null 值）
+    bool lastWasNull = true;
     for (int i = 0; i < data.length; i++) {
+      if (data[i] == null) {
+        lastWasNull = true;
+        continue;
+      }
+
       final x = i * stepX;
-      final y = height - (data[i] / 100 * height);
-      
-      if (i == 0) {
+      final y = height - (data[i]! / 100 * height);
+
+      if (lastWasNull) {
         path.moveTo(x, y);
+        lastWasNull = false;
       } else {
         path.lineTo(x, y);
       }
@@ -2597,14 +2618,16 @@ class _LineChartPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // 绘制数据点
+    // 绘制数据点（跳过 null 值）
     final dotPaint = Paint()
       ..color = const Color(0xFF3078F0)
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < data.length; i++) {
+      if (data[i] == null) continue;
+
       final x = i * stepX;
-      final y = height - (data[i] / 100 * height);
+      final y = height - (data[i]! / 100 * height);
       canvas.drawCircle(Offset(x, y), 3, dotPaint);
     }
   }
