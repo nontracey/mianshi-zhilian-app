@@ -1807,21 +1807,27 @@ class _CenterPanelState extends State<_CenterPanel> {
 
   List<Domain> get _domains {
     var domains = widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
-    
+
     // 如果选中了路线，按路线顺序过滤
     if (_selectedRoute != null && _selectedRoute!.domainIds.isNotEmpty) {
       domains = domains.where((d) => _selectedRoute!.domainIds.contains(d.id)).toList();
-      domains.sort((a, b) => 
+      domains.sort((a, b) =>
         _selectedRoute!.domainIds.indexOf(a.id).compareTo(_selectedRoute!.domainIds.indexOf(b.id)));
     }
-    
+
     return domains;
+  }
+
+  // 所有未禁用的领域（不受路线选择影响）
+  List<Domain> get _allEnabledDomains {
+    return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final domains = _domains;
-    
+    final allEnabledDomains = _allEnabledDomains;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1875,22 +1881,22 @@ class _CenterPanelState extends State<_CenterPanel> {
           onTrailingTap: () => _showManageDomains(context),
           child: Column(
             children: [
-              if (domains.isEmpty)
+              if (allEnabledDomains.isEmpty)
                 const _EmptyState(message: '暂无领域数据')
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
                     // 根据宽度决定每行几个卡片
-                    final cardWidth = constraints.maxWidth > 900 
+                    final cardWidth = constraints.maxWidth > 900
                         ? (constraints.maxWidth - 36) / 4  // 一行4个
-                        : constraints.maxWidth > 600 
+                        : constraints.maxWidth > 600
                             ? (constraints.maxWidth - 24) / 3  // 一行3个
                             : (constraints.maxWidth - 12) / 2;  // 一行2个
-                    
+
                     return Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      children: domains.take(8).map((domain) {
+                      children: allEnabledDomains.map((domain) {
                         final dp = widget.progressProvider.getDomainProgress(
                           domain.id,
                           widget.contentProvider.topics.values.toList(),
