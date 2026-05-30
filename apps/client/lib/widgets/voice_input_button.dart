@@ -65,10 +65,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
             widget.onResult(result.recognizedWords);
           }
         },
-        localeId: 'zh_CN',
         listenOptions: stt.SpeechListenOptions(
           listenMode: stt.ListenMode.dictation,
           cancelOnError: true,
+          localeId: 'zh_CN',
         ),
       );
     }

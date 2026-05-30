@@ -462,12 +462,11 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 _versions.removeAt(index);
               });
               await _saveVersions();
+              if (!mounted) return;
               Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('版本已删除')),
-                );
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('版本已删除')),
+              );
             },
             child: const Text('删除'),
           ),
@@ -550,12 +549,11 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   };
                 });
                 await _saveVersions();
+                if (!mounted) return;
                 Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('版本已更新')),
-                  );
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('版本已更新')),
+                );
               },
               child: const Text('保存'),
             ),

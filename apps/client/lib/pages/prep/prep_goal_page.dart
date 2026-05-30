@@ -345,9 +345,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
   }
 
   Widget _buildDatePicker(BuildContext context, bool isDark) {
-    final daysUntil = _interviewDate != null
-        ? _interviewDate!.difference(DateTime.now()).inDays
-        : null;
+    final daysUntil = _interviewDate?.difference(DateTime.now()).inDays;
 
     return InkWell(
       onTap: () async {
