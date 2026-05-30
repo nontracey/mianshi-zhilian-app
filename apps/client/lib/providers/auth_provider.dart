@@ -180,4 +180,43 @@ class AuthProvider extends ChangeNotifier {
       return null;
     }
   }
+
+  /// 修改密码
+  Future<bool> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    if (!isLoggedIn) {
+      _error = '请先登录';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/auth/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: json.encode({
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final data = json.decode(response.body);
+        _error = data['error'] ?? '修改密码失败';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = '网络错误：$e';
+      notifyListeners();
+      return false;
+    }
+  }
 }

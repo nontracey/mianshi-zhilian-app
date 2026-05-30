@@ -175,12 +175,16 @@ class DashboardPage extends StatelessWidget {
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _RightPanel(
+                      currentDomainId: currentDomainId,
+                      domains: domains,
                       masteryPercent: masteryPercent,
                       readiness: readiness,
                       weakTopics: weakTopics,
                       recentAttempts: recentAttempts,
                       onTopicTap: onTopicTap,
+                      onDomainChanged: onDomainChanged,
                       progressProvider: progressProvider,
+                      contentProvider: contentProvider,
                     ),
                   ),
                 ),
@@ -264,12 +268,16 @@ class DashboardPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _RightPanel(
+                    currentDomainId: currentDomainId,
+                    domains: domains,
                     masteryPercent: masteryPercent,
                     readiness: readiness,
                     weakTopics: weakTopics,
                     recentAttempts: recentAttempts,
                     onTopicTap: onTopicTap,
+                    onDomainChanged: onDomainChanged,
                     progressProvider: progressProvider,
+                    contentProvider: contentProvider,
                   ),
                 ],
               ),
@@ -511,6 +519,58 @@ class _AIFeedbackItem extends StatelessWidget {
   }
 }
 
+// ── 领域切换下拉框 ──────────────────────────────────────────────
+
+class _DomainDropdown extends StatelessWidget {
+  const _DomainDropdown({
+    required this.currentDomainId,
+    required this.domains,
+    required this.onChanged,
+  });
+
+  final String currentDomainId;
+  final List<Domain> domains;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: currentDomainId,
+          isDense: true,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            size: 14,
+            color: isDark ? Colors.white54 : const Color(0xFF999999),
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white70 : const Color(0xFF666666),
+          ),
+          items: domains.map((d) => DropdownMenuItem(
+            value: d.id,
+            child: Text(d.title),
+          )).toList(),
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+        ),
+      ),
+    );
+  }
+}
+
 // ── 掌握度概览组件 ──────────────────────────────────────────────
 
 class _MasteryOverview extends StatelessWidget {
@@ -524,124 +584,78 @@ class _MasteryOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Column(
+    return Row(
       children: [
-        // 顶部：总体下拉选择器
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1A2332) : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF263238) : const Color(0xFFE0E0E0),
+        // 环形图
+        SizedBox(
+          width: 100,
+          height: 100,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 100,
+                height: 100,
+                child: CircularProgressIndicator(
+                  value: masteryPercent / 100,
+                  strokeWidth: 8,
+                  backgroundColor: AppColors.success.withValues(alpha: 0.1),
+                  color: AppColors.success,
                 ),
               ),
-              child: Row(
+              Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '总体',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? Colors.white70 : const Color(0xFF666666),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 14,
-                    color: isDark ? Colors.white54 : const Color(0xFF999999),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // 环形图 + 统计
-        Row(
-          children: [
-            // 环形图
-            SizedBox(
-              width: 100,
-              height: 100,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    height: 100,
-                    child: CircularProgressIndicator(
-                      value: masteryPercent / 100,
-                      strokeWidth: 8,
-                      backgroundColor: AppColors.success.withValues(alpha: 0.1),
+                    '$masteryPercent',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
                       color: AppColors.success,
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$masteryPercent',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.success,
-                        ),
-                      ),
-                      const Text(
-                        '综合掌握度',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    '掌握度',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 24),
-            // 统计信息
-            Expanded(
-              child: Column(
-                children: [
-                  _MasteryStatItem(
-                    label: '熟练',
-                    value: '23%',
-                    color: AppColors.success,
-                    dotColor: AppColors.success,
-                  ),
-                  const SizedBox(height: 6),
-                  _MasteryStatItem(
-                    label: '掌握',
-                    value: '45%',
-                    color: AppColors.accent,
-                    dotColor: AppColors.accent,
-                  ),
-                  const SizedBox(height: 6),
-                  _MasteryStatItem(
-                    label: '薄弱',
-                    value: '22%',
-                    color: AppColors.warning,
-                    dotColor: AppColors.warning,
-                  ),
-                  const SizedBox(height: 6),
-                  _MasteryStatItem(
-                    label: '未学',
-                    value: '10%',
-                    color: Colors.grey,
-                    dotColor: Colors.grey,
-                  ),
-                ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        // 统计信息
+        Expanded(
+          child: Column(
+            children: [
+              _MasteryStatItem(
+                label: '就绪度',
+                value: '$readiness',
+                color: AppColors.accent,
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              _MasteryStatItem(
+                label: '熟练',
+                value: '23%',
+                color: AppColors.success,
+              ),
+              const SizedBox(height: 6),
+              _MasteryStatItem(
+                label: '掌握',
+                value: '45%',
+                color: AppColors.accent,
+              ),
+              const SizedBox(height: 6),
+              _MasteryStatItem(
+                label: '薄弱',
+                value: '22%',
+                color: AppColors.warning,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -653,13 +667,13 @@ class _MasteryStatItem extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
-    required this.dotColor,
+    this.dotColor,
   });
 
   final String label;
   final String value;
   final Color color;
-  final Color dotColor;
+  final Color? dotColor;
 
   @override
   Widget build(BuildContext context) {
@@ -669,7 +683,7 @@ class _MasteryStatItem extends StatelessWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: dotColor,
+            color: dotColor ?? color,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -1796,20 +1810,28 @@ class _CenterPanel extends StatelessWidget {
 
 class _RightPanel extends StatelessWidget {
   const _RightPanel({
+    required this.currentDomainId,
+    required this.domains,
     required this.masteryPercent,
     required this.readiness,
     required this.weakTopics,
     required this.recentAttempts,
     required this.onTopicTap,
+    required this.onDomainChanged,
     required this.progressProvider,
+    required this.contentProvider,
   });
 
+  final String currentDomainId;
+  final List<Domain> domains;
   final int masteryPercent;
   final int readiness;
   final List<Topic> weakTopics;
   final List<PracticeAttempt> recentAttempts;
   final ValueChanged<String> onTopicTap;
+  final ValueChanged<String> onDomainChanged;
   final ProgressProvider progressProvider;
+  final ContentProvider contentProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -1823,6 +1845,11 @@ class _RightPanel extends StatelessWidget {
         _PanelCard(
           title: '掌握度概览',
           icon: Icons.pie_chart_outline,
+          headerTrailing: _DomainDropdown(
+            currentDomainId: currentDomainId,
+            domains: domains,
+            onChanged: onDomainChanged,
+          ),
           child: Column(
             children: [
               _MasteryOverview(

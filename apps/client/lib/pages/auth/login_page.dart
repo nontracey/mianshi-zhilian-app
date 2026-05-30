@@ -18,7 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nicknameController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isRegister = false;
   bool _isLoading = false;
   String? _error;
@@ -27,8 +27,13 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
-    _nicknameController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // 防注入：过滤特殊字符
+  String _sanitizeInput(String input) {
+    return input.replaceAll(RegExp(r'[<>"\x27;\(\)]'), '').trim();
   }
 
   Future<void> _submit() async {
@@ -40,25 +45,17 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     final authProvider = context.read<AuthProvider>();
+    final username = _sanitizeInput(_usernameController.text);
+    final password = _passwordController.text;
     bool success;
 
     if (_isRegister) {
-      success = await authProvider.register(
-        _usernameController.text.trim(),
-        _passwordController.text,
-        nickname: _nicknameController.text.trim().isNotEmpty
-            ? _nicknameController.text.trim()
-            : null,
-      );
+      success = await authProvider.register(username, password);
     } else {
-      success = await authProvider.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+      success = await authProvider.login(username, password);
     }
 
     if (success && mounted) {
-      // 登录成功后，合并本地数据到云端
       await _mergeLocalDataToCloud();
       widget.onLoginSuccess?.call();
     } else if (mounted) {
@@ -74,14 +71,11 @@ class _LoginPageState extends State<LoginPage> {
     final progressProvider = context.read<ProgressProvider>();
     final settingsProvider = context.read<SettingsProvider>();
 
-    // 获取本地进度数据
     final progressMap = progressProvider.exportProgress();
     final settings = settingsProvider.settings.toJson();
 
-    // 上传到云端
     await authProvider.syncToCloud(progressMap, settings);
 
-    // 获取云端数据并合并
     final cloudData = await authProvider.getCloudProgress();
     if (cloudData != null && cloudData['progressMap'] != null) {
       await progressProvider.mergeFromCloud(
@@ -107,12 +101,14 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // 用户名
                       TextFormField(
                         controller: _usernameController,
                         decoration: const InputDecoration(
                           labelText: '用户名',
                           hintText: '3-20 个字符',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -125,12 +121,15 @@ class _LoginPageState extends State<LoginPage> {
                         },
                       ),
                       const SizedBox(height: 16),
+                      
+                      // 密码
                       TextFormField(
                         controller: _passwordController,
                         decoration: const InputDecoration(
                           labelText: '密码',
                           hintText: '至少 6 个字符',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lock_outline),
                         ),
                         obscureText: true,
                         validator: (value) {
@@ -143,17 +142,33 @@ class _LoginPageState extends State<LoginPage> {
                           return null;
                         },
                       ),
+                      
+                      // 确认密码（仅注册时显示）
                       if (_isRegister) ...[
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _nicknameController,
+                          controller: _confirmPasswordController,
                           decoration: const InputDecoration(
-                            labelText: '昵称（可选）',
-                            hintText: '默认使用用户名',
+                            labelText: '确认密码',
+                            hintText: '再次输入密码',
                             border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.lock_outline),
                           ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (!_isRegister) return null;
+                            if (value == null || value.isEmpty) {
+                              return '请再次输入密码';
+                            }
+                            if (value != _passwordController.text) {
+                              return '两次输入的密码不一致';
+                            }
+                            return null;
+                          },
                         ),
                       ],
+                      
+                      // 错误提示
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         Container(
@@ -170,28 +185,41 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                       const SizedBox(height: 24),
+                      
+                      // 提交按钮
                       FilledButton(
                         onPressed: _isLoading ? null : _submit,
                         child: _isLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Text(_isRegister ? '注册' : '登录'),
                       ),
                       const SizedBox(height: 12),
+                      
+                      // 切换登录/注册
                       TextButton(
                         onPressed: _isLoading
                             ? null
                             : () => setState(() {
                                 _isRegister = !_isRegister;
                                 _error = null;
+                                _confirmPasswordController.clear();
                               }),
                         child: Text(_isRegister ? '已有账号？去登录' : '没有账号？去注册'),
                       ),
+                      
+                      // 忘记密码
+                      if (!_isRegister) ...[
+                        TextButton(
+                          onPressed: () {
+                            // TODO: 跳转到忘记密码页面
+                          },
+                          child: const Text('忘记密码？'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
