@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
 
 class HeaderBar extends StatefulWidget {
   const HeaderBar({
@@ -82,66 +83,162 @@ class _HeaderBarState extends State<HeaderBar> {
 
     final renderBox = context.findRenderObject() as RenderBox;
     final size = renderBox.size;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         top: size.height + 4,
-        left: size.width - 360,
-        width: 340,
+        right: 16,  // 右对齐
+        width: 300,
         child: Material(
           elevation: 8,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
+          shadowColor: Colors.black.withValues(alpha: 0.15),
           child: Container(
             constraints: const BoxConstraints(maxHeight: 400),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(8),
+              color: isDark ? const Color(0xFF161B22) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0),
+              ),
             ),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(8),
-              children: _searchResults
-                  .map(
-                    (topic) => ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.menu_book_outlined, size: 20),
-                      title: Text(
-                        topic.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 搜索结果标题
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '搜索结果',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white54 : Colors.grey,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      subtitle: Text(
-                        topic.summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      trailing: Chip(
-                        label: Text(
-                          topic.domain,
-                          style: const TextStyle(fontSize: 10),
+                      const Spacer(),
+                      Text(
+                        '${_searchResults.length} 项',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white38 : Colors.grey.shade400,
                         ),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
                       ),
-                      onTap: () {
-                        _removeOverlay();
-                        _searchController.clear();
-                        setState(() {
-                          _isSearching = false;
-                          _searchResults = [];
-                        });
-                        if (widget.onTopicTap != null) {
-                          widget.onTopicTap!(topic.id);
-                        }
-                      },
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: isDark ? const Color(0xFF30363D) : const Color(0xFFF0F0F0)),
+                // 搜索结果列表
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: _searchResults.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: 52,
+                      color: isDark ? const Color(0xFF30363D) : const Color(0xFFF0F0F0),
                     ),
-                  )
-                  .toList(),
+                    itemBuilder: (context, index) {
+                      final topic = _searchResults[index];
+                      return InkWell(
+                        onTap: () {
+                          _removeOverlay();
+                          _searchController.clear();
+                          setState(() {
+                            _isSearching = false;
+                            _searchResults = [];
+                          });
+                          if (widget.onTopicTap != null) {
+                            widget.onTopicTap!(topic.id);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          child: Row(
+                            children: [
+                              // 图标
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.menu_book_outlined, size: 18, color: AppColors.accent),
+                              ),
+                              const SizedBox(width: 12),
+                              // 内容
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      topic.title,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.folder_outlined,
+                                          size: 12,
+                                          color: isDark ? Colors.white38 : Colors.grey,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          topic.domain,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.white38 : Colors.grey,
+                                          ),
+                                        ),
+                                        if (topic.highFrequency) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.warning.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
+                                            child: const Text(
+                                              '高频',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.warning,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // 箭头
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: isDark ? Colors.white24 : Colors.grey.shade300,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -149,6 +246,52 @@ class _HeaderBarState extends State<HeaderBar> {
     );
 
     Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  Widget _buildSearchField(BuildContext context, bool isDark) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: SizedBox(
+        height: 36,
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          onChanged: _onSearchChanged,
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            hintText: '搜索知识点...',
+            hintStyle: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white38 : Colors.grey.shade400,
+            ),
+            prefixIcon: Icon(Icons.search, size: 16, color: isDark ? Colors.white38 : Colors.grey),
+            suffixIcon: _isSearching
+                ? IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      _searchController.clear();
+                      _removeOverlay();
+                      setState(() {
+                        _isSearching = false;
+                        _searchResults = [];
+                      });
+                    },
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            isDense: true,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -180,60 +323,25 @@ class _HeaderBarState extends State<HeaderBar> {
         ),
         child: Row(
           children: [
-            // 内容阶段切换
+            // 左侧：内容阶段切换 + AI 模型选择
             _ContentStageSelector(
               isDark: isDark,
               isLoggedIn: authProvider.isLoggedIn,
               onStageChanged: widget.onContentStageChanged,
             ),
-            const SizedBox(width: 24),
-
-            // AI 模型选择
+            const SizedBox(width: 20),
             _AiModelSelector(
               modelName: currentModelName,
               hasConfig: aiProvider.configs.isNotEmpty,
               isDark: isDark,
             ),
-            const SizedBox(width: 24),
-
-            // 搜索框
-            Expanded(
-              child: SizedBox(
-                width: 300,
-                child: SearchBar(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  hintText: '搜索知识点、题目、路线',
-                  leading: Icon(Icons.search, size: 20, color: isDark ? Colors.white54 : Colors.grey),
-                  trailing: _isSearching
-                      ? [
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _removeOverlay();
-                              setState(() {
-                                _isSearching = false;
-                                _searchResults = [];
-                              });
-                            },
-                          ),
-                        ]
-                      : null,
-                  onChanged: _onSearchChanged,
-                  elevation: WidgetStateProperty.all(0),
-                  backgroundColor: WidgetStateProperty.all(
-                    Theme.of(context).colorScheme.surfaceContainerHighest,
-                  ),
-                  padding: WidgetStateProperty.all(
-                    const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
             
-            // 用户头像
+            // 中间弹性空间
+            const Spacer(),
+            
+            // 右侧：搜索框 + 用户头像
+            _buildSearchField(context, isDark),
+            const SizedBox(width: 12),
             _buildUserAvatar(context, isDark),
           ],
         ),
