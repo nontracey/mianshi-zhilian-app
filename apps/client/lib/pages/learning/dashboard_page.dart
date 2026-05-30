@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
@@ -576,14 +577,16 @@ class _DomainDropdown extends StatelessWidget {
 class _MasteryOverview extends StatelessWidget {
   const _MasteryOverview({
     required this.masteryPercent,
-    required this.readiness,
+    required this.categories,
   });
 
   final int masteryPercent;
-  final int readiness;
+  final List<CategoryMastery> categories;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       children: [
         // 环形图
@@ -614,11 +617,11 @@ class _MasteryOverview extends StatelessWidget {
                       color: AppColors.success,
                     ),
                   ),
-                  const Text(
+                  Text(
                     '掌握度',
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.grey,
+                      color: isDark ? Colors.white54 : Colors.grey,
                     ),
                   ),
                 ],
@@ -627,39 +630,35 @@ class _MasteryOverview extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 24),
-        // 统计信息
+        // 分类掌握度
         Expanded(
           child: Column(
-            children: [
-              _MasteryStatItem(
-                label: '就绪度',
-                value: '$readiness',
-                color: AppColors.accent,
+            children: categories.map((cat) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _MasteryStatItem(
+                label: cat.name,
+                value: '${cat.masteryPercent}%',
+                color: cat.masteryPercent >= 80
+                    ? AppColors.success
+                    : cat.masteryPercent >= 60
+                        ? AppColors.accent
+                        : cat.masteryPercent > 0
+                            ? AppColors.warning
+                            : Colors.grey,
               ),
-              const SizedBox(height: 6),
-              _MasteryStatItem(
-                label: '熟练',
-                value: '23%',
-                color: AppColors.success,
-              ),
-              const SizedBox(height: 6),
-              _MasteryStatItem(
-                label: '掌握',
-                value: '45%',
-                color: AppColors.accent,
-              ),
-              const SizedBox(height: 6),
-              _MasteryStatItem(
-                label: '薄弱',
-                value: '22%',
-                color: AppColors.warning,
-              ),
-            ],
+            )).toList(),
           ),
         ),
       ],
     );
   }
+}
+
+class CategoryMastery {
+  final String name;
+  final int masteryPercent;
+  
+  const CategoryMastery({required this.name, required this.masteryPercent});
 }
 
 class _MasteryStatItem extends StatelessWidget {
@@ -1470,6 +1469,7 @@ class _PanelCard extends StatelessWidget {
     this.trailing,
     this.headerTrailing,
     this.icon,
+    this.onTrailingTap,
   });
 
   final String title;
@@ -1477,6 +1477,7 @@ class _PanelCard extends StatelessWidget {
   final String? trailing;
   final Widget? headerTrailing;
   final IconData? icon;
+  final VoidCallback? onTrailingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1529,18 +1530,34 @@ class _PanelCard extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               if (trailing != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    trailing!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accent,
+                GestureDetector(
+                  onTap: onTrailingTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          trailing!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                        if (onTrailingTap != null) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 14,
+                            color: AppColors.accent,
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
@@ -1715,6 +1732,7 @@ class _CenterPanel extends StatelessWidget {
           title: '当前学习路线',
           icon: Icons.route_outlined,
           trailing: '切换路线',
+          onTrailingTap: () => _showRouteSelector(context),
           child: Column(
             children: [
               if (domains.isEmpty)
@@ -1756,6 +1774,7 @@ class _CenterPanel extends StatelessWidget {
           title: '领域知识卡片',
           icon: Icons.school_outlined,
           trailing: '管理领域',
+          onTrailingTap: () => _showManageDomains(context),
           child: Column(
             children: [
               if (domains.isEmpty)
@@ -1802,9 +1821,200 @@ class _CenterPanel extends StatelessWidget {
       ],
     );
   }
+
+  void _showRouteSelector(BuildContext context) {
+    final routes = [
+      LearningRoute(
+        id: 'java',
+        name: 'Java 后端开发',
+        description: 'Java 核心、Spring、数据库、微服务',
+        domainIds: domains.take(5).map((d) => d.id).toList(),
+        isDefault: true,
+      ),
+      LearningRoute(
+        id: 'frontend',
+        name: '前端开发',
+        description: 'JavaScript、React、Vue、性能优化',
+        domainIds: domains.take(4).map((d) => d.id).toList(),
+        isDefault: true,
+      ),
+      LearningRoute(
+        id: 'agent',
+        name: 'Agent 开发',
+        description: 'AI Agent、RAG、Prompt Engineering',
+        domainIds: domains.take(3).map((d) => d.id).toList(),
+        isDefault: true,
+      ),
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => _RouteSelectorDialog(
+        routes: routes,
+        currentRouteId: currentDomainId,
+        onRouteSelected: (route) {
+          if (route.domainIds.isNotEmpty) {
+            onDomainChanged(route.domainIds.first);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showManageDomains(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _ManageDomainsDialog(domains: domains),
+    );
+  }
 }
 
-// ── 右侧面板：掌握度概览、下一步最佳行动、最近AI反馈 ──────────────────────────────────────────────
+// ── 路线选择对话框 ──────────────────────────────────────────────
+
+class _RouteSelectorDialog extends StatelessWidget {
+  const _RouteSelectorDialog({
+    required this.routes,
+    required this.currentRouteId,
+    required this.onRouteSelected,
+  });
+
+  final List<LearningRoute> routes;
+  final String? currentRouteId;
+  final ValueChanged<LearningRoute> onRouteSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.route, color: AppColors.accent),
+                const SizedBox(width: 8),
+                const Text('选择学习路线', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...routes.map((route) {
+              final isSelected = route.id == currentRouteId;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () {
+                    onRouteSelected(route);
+                    Navigator.pop(context);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.accent.withValues(alpha: 0.08) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.accent
+                            : (isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(route.name, style: TextStyle(fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : null)),
+                              if (route.description.isNotEmpty)
+                                Text(route.description, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        if (isSelected) const Icon(Icons.check_circle, color: AppColors.accent),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 管理领域对话框 ──────────────────────────────────────────────
+
+class _ManageDomainsDialog extends StatelessWidget {
+  const _ManageDomainsDialog({required this.domains});
+  final List<Domain> domains;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 450,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.school_outlined, color: AppColors.accent),
+                const SizedBox(width: 8),
+                const Text('管理领域', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...domains.map((domain) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF161B22) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(domain.title, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+                          Text('${domain.topicCount} 个知识点', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 右侧面板 ──────────────────────────────────────────────
 
 class _RightPanel extends StatelessWidget {
   const _RightPanel({
@@ -1836,6 +2046,26 @@ class _RightPanel extends StatelessWidget {
     // 获取掌握度趋势数据
     final trendData = progressProvider.getMasteryTrend();
     
+    // 计算当前领域的分类掌握度
+    final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
+    
+    // 按分类计算掌握度
+    final categoryMap = <String, List<Topic>>{};
+    for (final topic in domainTopics) {
+      categoryMap.putIfAbsent(topic.category, () => []).add(topic);
+    }
+    
+    final categories = categoryMap.entries.map((entry) {
+      final topics = entry.value;
+      final avgScore = topics.isEmpty ? 0 : 
+        topics.fold<int>(0, (sum, t) {
+          final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+          return sum + score;
+        }) ~/ topics.length;
+      return CategoryMastery(name: entry.key, masteryPercent: avgScore);
+    }).toList()
+      ..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1852,7 +2082,7 @@ class _RightPanel extends StatelessWidget {
             children: [
               _MasteryOverview(
                 masteryPercent: masteryPercent,
-                readiness: readiness,
+                categories: categories.take(4).toList(),
               ),
               const SizedBox(height: 16),
               _MasteryStats(
