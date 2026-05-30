@@ -3048,17 +3048,26 @@ class _RecallTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 左侧：Prompt（题目 + checklist）
-          Expanded(flex: 5, child: _PromptPanel(topic: topic)),
+          Expanded(
+            flex: 5,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: _PromptPanel(topic: topic),
+            ),
+          ),
           const VerticalDivider(width: 1),
           // 右侧：Answer（输入 + 评估）
           Expanded(
             flex: 5,
-            child: _AnswerPanel(
-              topic: topic,
-              answerController: answerController,
-              isEvaluating: isEvaluating,
-              evaluationResult: evaluationResult,
-              onEvaluate: onEvaluate,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: _AnswerPanel(
+                topic: topic,
+                answerController: answerController,
+                isEvaluating: isEvaluating,
+                evaluationResult: evaluationResult,
+                onEvaluate: onEvaluate,
+              ),
             ),
           ),
         ],
@@ -3066,19 +3075,22 @@ class _RecallTab extends StatelessWidget {
     }
 
     // 窄屏：上下排列
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        _PromptPanel(topic: topic),
-        const SizedBox(height: 16),
-        _AnswerPanel(
-          topic: topic,
-          answerController: answerController,
-          isEvaluating: isEvaluating,
-          evaluationResult: evaluationResult,
-          onEvaluate: onEvaluate,
-        ),
-      ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PromptPanel(topic: topic),
+          const SizedBox(height: 16),
+          _AnswerPanel(
+            topic: topic,
+            answerController: answerController,
+            isEvaluating: isEvaluating,
+            evaluationResult: evaluationResult,
+            onEvaluate: onEvaluate,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -3091,8 +3103,8 @@ class _PromptPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 题目
         Container(
@@ -3309,8 +3321,8 @@ class _AnswerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 输入区
         Container(

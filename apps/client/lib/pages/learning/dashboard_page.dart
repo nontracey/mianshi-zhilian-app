@@ -431,11 +431,6 @@ class _AIFeedbackItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = attempt.score ?? 0;
-    final scoreColor = score >= 85
-        ? AppColors.success
-        : score >= 60
-        ? AppColors.warning
-        : AppColors.danger;
     final feedbackType = score >= 85
         ? '表现优秀'
         : score >= 60
@@ -1362,7 +1357,6 @@ class _ReviewItem extends StatelessWidget {
         : AppColors.danger;
     
     // 模拟复习时间（实际应从数据中获取）
-    final now = DateTime.now();
     final reviewHour = 10 + (topic.title.hashCode % 8);
     final isToday = topic.title.hashCode % 2 == 0;
     final timeText = isToday ? '今天 $reviewHour:00' : '明天 ${(reviewHour - 2).clamp(8, 11)}:00';
