@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -1852,6 +1853,7 @@ class _CenterPanel extends StatelessWidget {
       builder: (ctx) => _RouteSelectorDialog(
         routes: routes,
         currentRouteId: currentDomainId,
+        availableDomains: domains,
         onRouteSelected: (route) {
           if (route.domainIds.isNotEmpty) {
             onDomainChanged(route.domainIds.first);
@@ -1864,23 +1866,52 @@ class _CenterPanel extends StatelessWidget {
   void _showManageDomains(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => _ManageDomainsDialog(domains: domains),
+      builder: (ctx) => _ManageDomainsDialog(
+        domains: domains,
+        disabledDomainIds: {},
+        onToggleDomain: (domainId) {
+          // TODO: 保存禁用的领域到本地存储
+        },
+      ),
     );
   }
 }
 
 // ── 路线选择对话框 ──────────────────────────────────────────────
 
-class _RouteSelectorDialog extends StatelessWidget {
+class _RouteSelectorDialog extends StatefulWidget {
   const _RouteSelectorDialog({
     required this.routes,
     required this.currentRouteId,
     required this.onRouteSelected,
+    required this.availableDomains,
   });
 
   final List<LearningRoute> routes;
   final String? currentRouteId;
   final ValueChanged<LearningRoute> onRouteSelected;
+  final List<Domain> availableDomains;
+
+  @override
+  State<_RouteSelectorDialog> createState() => _RouteSelectorDialogState();
+}
+
+class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
+  late List<LearningRoute> _routes;
+
+  @override
+  void initState() {
+    super.initState();
+    _routes = List.from(widget.routes);
+  }
+
+  void _addCustomRoute(LearningRoute route) {
+    setState(() => _routes.add(route));
+  }
+
+  void _deleteRoute(String routeId) {
+    setState(() => _routes.removeWhere((r) => r.id == routeId));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1889,7 +1920,7 @@ class _RouteSelectorDialog extends StatelessWidget {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        width: 400,
+        width: 450,
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1905,46 +1936,104 @@ class _RouteSelectorDialog extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            ...routes.map((route) {
-              final isSelected = route.id == currentRouteId;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: InkWell(
-                  onTap: () {
-                    onRouteSelected(route);
-                    Navigator.pop(context);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.accent.withValues(alpha: 0.08) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.accent
-                            : (isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0)),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+            
+            // 路线列表
+            SizedBox(
+              height: 300,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: _routes.map((route) {
+                    final isSelected = route.id == widget.currentRouteId;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () {
+                          widget.onRouteSelected(route);
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.accent.withValues(alpha: 0.08) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.accent
+                                  : (isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0)),
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Text(route.name, style: TextStyle(fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : null)),
-                              if (route.description.isNotEmpty)
-                                Text(route.description, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(route.name, style: TextStyle(fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : null)),
+                                        if (!route.isDefault) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accent.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
+                                            child: const Text('自定义', style: TextStyle(fontSize: 9, color: AppColors.accent)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    if (route.description.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(route.description, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey)),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              if (!route.isDefault)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  color: Colors.red.shade300,
+                                  onPressed: () => _deleteRoute(route.id),
+                                ),
+                              if (isSelected) const Icon(Icons.check_circle, color: AppColors.accent),
                             ],
                           ),
                         ),
-                        if (isSelected) const Icon(Icons.check_circle, color: AppColors.accent),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // 创建自定义路线
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => RouteEditorDialog(
+                      availableDomains: widget.availableDomains
+                          .map((d) => DomainItem(id: d.id, title: d.title))
+                          .toList(),
+                      onSave: _addCustomRoute,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('创建自定义路线'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1954,9 +2043,29 @@ class _RouteSelectorDialog extends StatelessWidget {
 
 // ── 管理领域对话框 ──────────────────────────────────────────────
 
-class _ManageDomainsDialog extends StatelessWidget {
-  const _ManageDomainsDialog({required this.domains});
+class _ManageDomainsDialog extends StatefulWidget {
+  const _ManageDomainsDialog({
+    required this.domains,
+    required this.disabledDomainIds,
+    required this.onToggleDomain,
+  });
+
   final List<Domain> domains;
+  final Set<String> disabledDomainIds;
+  final ValueChanged<String> onToggleDomain;
+
+  @override
+  State<_ManageDomainsDialog> createState() => _ManageDomainsDialogState();
+}
+
+class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
+  late Set<String> _disabledIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _disabledIds = Set.from(widget.disabledDomainIds);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1980,33 +2089,102 @@ class _ManageDomainsDialog extends StatelessWidget {
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(
+              '切换开关来启用/禁用领域',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.grey),
+            ),
             const SizedBox(height: 16),
-            ...domains.map((domain) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF161B22) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            
+            // 领域列表
+            SizedBox(
+              height: 300,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: widget.domains.map((domain) {
+                    final isDisabled = _disabledIds.contains(domain.id);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDisabled
+                            ? (isDark ? const Color(0xFF111111) : Colors.grey.shade100)
+                            : (isDark ? const Color(0xFF161B22) : Colors.white),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDisabled
+                              ? (isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade200)
+                              : (isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Text(domain.title, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
-                          Text('${domain.topicCount} 个知识点', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  domain.title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: isDisabled
+                                        ? Colors.grey
+                                        : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
+                                  ),
+                                ),
+                                Text(
+                                  '${domain.topicCount} 个知识点',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDisabled ? Colors.grey : (isDark ? Colors.white54 : Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: !isDisabled,
+                            onChanged: (value) {
+                              setState(() {
+                                if (isDisabled) {
+                                  _disabledIds.remove(domain.id);
+                                } else {
+                                  _disabledIds.add(domain.id);
+                                }
+                                widget.onToggleDomain(domain.id);
+                              });
+                            },
+                          ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              );
-            }),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // 说明
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '禁用的领域不会在首页显示，但内容不会被删除',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.grey.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
