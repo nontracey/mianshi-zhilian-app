@@ -165,11 +165,16 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                       child: Row(
                         children: [
                           const Icon(Icons.drag_handle, size: 16, color: AppColors.accent),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
                           Expanded(child: Text(domain.title, style: const TextStyle(fontSize: 13))),
-                          GestureDetector(
+                          const SizedBox(width: 8),
+                          InkWell(
                             onTap: () => setState(() => _selectedDomainIds.removeAt(index)),
-                            child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+                            ),
                           ),
                         ],
                       ),

@@ -579,16 +579,20 @@ class _DomainDropdown extends StatelessWidget {
 class _MasteryOverview extends StatelessWidget {
   const _MasteryOverview({
     required this.masteryPercent,
-    required this.categories,
+    required this.masteredPercent,
+    required this.learningPercent,
+    required this.newPercent,
   });
 
   final int masteryPercent;
-  final List<CategoryMastery> categories;
+  final int masteredPercent;
+  final int learningPercent;
+  final int newPercent;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Row(
       children: [
         // 环形图
@@ -632,23 +636,29 @@ class _MasteryOverview extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 24),
-        // 分类掌握度
+        // 掌握程度百分比
         Expanded(
           child: Column(
-            children: categories.map((cat) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: _MasteryStatItem(
-                label: cat.name,
-                value: '${cat.masteryPercent}%',
-                color: cat.masteryPercent >= 80
-                    ? AppColors.success
-                    : cat.masteryPercent >= 60
-                        ? AppColors.accent
-                        : cat.masteryPercent > 0
-                            ? AppColors.warning
-                            : Colors.grey,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MasteryStatItem(
+                label: '熟练',
+                value: '$masteredPercent%',
+                color: AppColors.success,
               ),
-            )).toList(),
+              const SizedBox(height: 8),
+              _MasteryStatItem(
+                label: '学习中',
+                value: '$learningPercent%',
+                color: AppColors.accent,
+              ),
+              const SizedBox(height: 8),
+              _MasteryStatItem(
+                label: '未掌握',
+                value: '$newPercent%',
+                color: AppColors.warning,
+              ),
+            ],
           ),
         ),
       ],
@@ -738,7 +748,7 @@ class _MasteryStats extends StatelessWidget {
           spacing: 12,
           runSpacing: 12,
           children: categories.take(4).map((cat) {
-            final color = cat.masteryPercent >= 80
+            final color = cat.masteryPercent >= 85
                 ? AppColors.success
                 : cat.masteryPercent >= 60
                     ? AppColors.accent
@@ -773,34 +783,32 @@ class _MasteryStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: color,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: color,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -2408,6 +2416,27 @@ class _RightPanel extends StatelessWidget {
     }).toList()
       ..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
     
+    // 计算掌握程度百分比
+    int totalTopics = domainTopics.length;
+    int masteredCount = 0;
+    int learningCount = 0;
+    int newCount = 0;
+    
+    for (final topic in domainTopics) {
+      final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
+      if (score >= 85) {
+        masteredCount++;
+      } else if (score >= 60) {
+        learningCount++;
+      } else {
+        newCount++;
+      }
+    }
+    
+    final masteredPercent = totalTopics == 0 ? 0 : (masteredCount * 100 ~/ totalTopics);
+    final learningPercent = totalTopics == 0 ? 0 : (learningCount * 100 ~/ totalTopics);
+    final newPercent = totalTopics == 0 ? 0 : (newCount * 100 ~/ totalTopics);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2424,11 +2453,13 @@ class _RightPanel extends StatelessWidget {
             children: [
               _MasteryOverview(
                 masteryPercent: masteryPercent,
-                categories: categories.take(4).toList(),
+                masteredPercent: masteredPercent,
+                learningPercent: learningPercent,
+                newPercent: newPercent,
               ),
               const SizedBox(height: 16),
               _MasteryStats(
-                categories: categories,
+                categories: categories.take(4).toList(),
               ),
             ],
           ),
