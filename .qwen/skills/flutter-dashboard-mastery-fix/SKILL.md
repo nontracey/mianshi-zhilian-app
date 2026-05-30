@@ -83,27 +83,56 @@ Apply consistently in:
 - `ProgressProvider` calculations
 
 ### Issue 4: Route Delete Button Blocked
-**Symptom**: Cannot click delete button on route items in editor
-**Root Cause**: Drag handle icon too close to delete button, tap targets overlap
-**Solution**: Increase spacing and use InkWell for better tap target:
+**Symptom**: Cannot click delete button on route items in editor, even after increasing spacing
+**Root Cause**: `ReorderableListView` default drag handles intercept click events on other interactive elements in the same row
+**Solution**: Disable default drag handles and use `ReorderableDragStartListener`:
+
 ```dart
-Row(
-  children: [
-    const Icon(Icons.drag_handle, size: 16, color: AppColors.accent),
-    const SizedBox(width: 12),  // Increased from 8
-    Expanded(child: Text(domain.title)),
-    const SizedBox(width: 8),   // Added spacing
-    InkWell(
-      onTap: () => setState(() => _selectedDomainIds.removeAt(index)),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.all(4),  // Larger tap target
-        child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+ReorderableListView.builder(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  itemCount: items.length,
+  buildDefaultDragHandles: false,  // 关键：禁用默认拖动手柄
+  onReorder: (oldIndex, newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final item = items.removeAt(oldIndex);
+      items.insert(newIndex, item);
+    });
+  },
+  itemBuilder: (context, index) {
+    return Container(
+      key: ValueKey(items[index]),
+      child: Row(
+        children: [
+          // 只有拖动图标会触发拖动
+          ReorderableDragStartListener(
+            index: index,
+            child: const Icon(Icons.drag_handle, size: 16, color: AppColors.accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(items[index].title)),
+          const SizedBox(width: 8),
+          // 删除按钮现在可以正常点击
+          InkWell(
+            onTap: () => setState(() => items.removeAt(index)),
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+            ),
+          ),
+        ],
       ),
-    ),
-  ],
+    );
+  },
 )
 ```
+
+**Why this works**: 
+- `buildDefaultDragHandles: false` disables the default drag handle that covers the entire row
+- `ReorderableDragStartListener` explicitly defines which element triggers dragging
+- Other interactive elements (delete, edit buttons) are no longer blocked
 
 ## Diagnostic Checklist
 
@@ -114,6 +143,7 @@ When mastery display issues are reported:
 3. **Check data flow**: Verify what data `_MasteryOverview` receives vs what it should display
 4. **Check calculation logic**: Ensure mastery percentages are calculated correctly (not just averages)
 5. **Check git log**: See if recent commits changed mastery-related code
+6. **Check ReorderableListView**: If buttons are blocked, verify `buildDefaultDragHandles: false` is set
 
 ## Key Files
 - `dashboard_page.dart` - Main dashboard with mastery overview
