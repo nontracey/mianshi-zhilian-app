@@ -140,6 +140,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: _selectedDomainIds.length,
+                  buildDefaultDragHandles: false,
                   onReorder: (oldIndex, newIndex) {
                     setState(() {
                       if (newIndex > oldIndex) newIndex--;
@@ -164,7 +165,10 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.drag_handle, size: 16, color: AppColors.accent),
+                          ReorderableDragStartListener(
+                            index: index,
+                            child: const Icon(Icons.drag_handle, size: 16, color: AppColors.accent),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(child: Text(domain.title, style: const TextStyle(fontSize: 13))),
                           const SizedBox(width: 8),
