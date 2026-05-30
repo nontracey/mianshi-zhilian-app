@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -55,69 +56,166 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   Widget build(BuildContext context) {
     final topic = widget.topic;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 1100;
+    final isDesktop = screenWidth >= 900;
 
-    // 桌面端：三栏布局（左侧目录 + 中间知识 + 右侧复述）
-    if (isDesktop) {
-      return _buildDesktopLayout(context, topic);
-    }
-    // 移动端/平板：原有 TabBar 布局
-    return _buildMobileLayout(context, topic);
-  }
-
-  Widget _buildDesktopLayout(BuildContext context, Topic topic) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 顶部导航
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: Text(
-                  topic.title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
+        // 顶部导航栏
+        _buildTopBar(context, topic, isDesktop),
+        // 主内容区域
+        Expanded(
+          child: isDesktop
+              ? _buildDesktopLayout(context, topic)
+              : _buildMobileLayout(context, topic),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context, Topic topic, bool isDesktop) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
           ),
         ),
-        _TopicHeader(topic: topic),
-        const SizedBox(height: 8),
-        // 三栏内容
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 左侧：目录与前置知识
-              SizedBox(
-                width: 240,
-                child: _LeftSidebar(topic: topic),
-              ),
-              const VerticalDivider(width: 1),
-              // 中间：知识卡片流
-              Expanded(
-                flex: 3,
-                child: _KnowledgeTab(topic: topic),
-              ),
-              const VerticalDivider(width: 1),
-              // 右侧：复述与 AI 评估
-              SizedBox(
-                width: 380,
-                child: _RecallTab(
-                  topic: topic,
-                  answerController: _answerController,
-                  isEvaluating: _isEvaluating,
-                  evaluationResult: _evaluationResult,
-                  onEvaluate: _handleEvaluate,
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: widget.onBack,
+            icon: const Icon(Icons.arrow_back, size: 20),
+            style: IconButton.styleFrom(
+              padding: const EdgeInsets.all(8),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  topic.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                Text(
+                  '${topic.domain} · ${topic.category}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Tab 切换按钮
+          _buildTabToggle(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabToggle(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        children: [
+          _buildTabButton(
+            context,
+            label: '知识查阅',
+            icon: Icons.menu_book_outlined,
+            isSelected: _tabController.index == 0,
+            onTap: () => _tabController.animateTo(0),
+          ),
+          _buildTabButton(
+            context,
+            label: '复述练习',
+            icon: Icons.record_voice_over_outlined,
+            isSelected: _tabController.index == 1,
+            onTap: () => _tabController.animateTo(1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Colors.white : (isDark ? Colors.white54 : Colors.grey),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.white : (isDark ? Colors.white54 : Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, Topic topic) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左侧：目录与前置知识
+        SizedBox(
+          width: 220,
+          child: _LeftSidebar(topic: topic),
+        ),
+        const VerticalDivider(width: 1),
+        // 右侧：Tab 内容
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _KnowledgeTab(topic: topic),
+              _RecallTab(
+                topic: topic,
+                answerController: _answerController,
+                isEvaluating: _isEvaluating,
+                evaluationResult: _evaluationResult,
+                onEvaluate: _handleEvaluate,
               ),
             ],
           ),
@@ -128,46 +226,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
 
   Widget _buildMobileLayout(BuildContext context, Topic topic) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 顶部导航
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: Text(
-                  topic.title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-              ),
-              // 右侧快捷操作
-              FilledButton.tonalIcon(
-                onPressed: () => _tabController.animateTo(1),
-                icon: const Icon(Icons.record_voice_over_outlined),
-                label: const Text('开始复述'),
-              ),
-            ],
-          ),
-        ),
         // 标签信息
         _TopicHeader(topic: topic),
-        const SizedBox(height: 8),
-        // Tab 栏
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: '知识学习'),
-            Tab(text: '复述练习'),
-          ],
-        ),
-        const SizedBox(height: 16),
         // Tab 内容
         Expanded(
           child: TabBarView(
@@ -341,21 +402,48 @@ class _LeftSidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          ...topic.prerequisites.map((prereq) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.arrow_right, size: 16, color: AppColors.warning),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    prereq,
-                    style: const TextStyle(fontSize: 12, color: AppColors.warning),
-                  ),
+          ...topic.prerequisites.map((prereq) {
+            // 尝试查找 topic 标题
+            final contentProvider = context.read<ContentProvider>();
+            final prereqTopic = contentProvider.findTopic(prereq);
+            final displayName = prereqTopic?.title ?? prereq;
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: InkWell(
+                onTap: prereqTopic != null
+                    ? () {
+                        // 点击跳转到前置知识
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TopicDetailPage(
+                              topic: prereqTopic,
+                              onBack: () => Navigator.pop(context),
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_right, size: 16, color: AppColors.warning),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: prereqTopic != null ? AppColors.accent : AppColors.warning,
+                          decoration: prereqTopic != null ? TextDecoration.underline : null,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          )),
+              ),
+            );
+          }),
         ],
         // LeetCode 链接
         if (topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty) ...[
