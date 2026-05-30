@@ -768,30 +768,32 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed.startsWith('>')) return true;
 
     // 表格行：| col1 | col2 |
-    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2)
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
       return true;
+    }
 
     // 表格分隔行：| --- | --- |
-    if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) return true;
+    if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) { return true; }
 
     // 分隔线：--- 或 *** 或 ___
-    if (RegExp(r'^[-*_]{3,}\s*$').hasMatch(trimmed)) return true;
+    if (RegExp(r'^[-*_]{3,}\s*$').hasMatch(trimmed)) { return true; }
 
     // 粗体开头：**text**
-    if (trimmed.startsWith('**') && trimmed.contains('**')) return true;
+    if (trimmed.startsWith('**') && trimmed.contains('**')) { return true; }
 
     // 斜体开头：*text*（但不是列表）
     if (trimmed.startsWith('*') &&
         !trimmed.startsWith('* ') &&
         trimmed.endsWith('*') &&
-        trimmed.length > 2)
+        trimmed.length > 2) {
       return true;
+    }
 
     // 链接：[text](url)
-    if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) return true;
+    if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) { return true; }
 
     // 图片：![alt](url)
-    if (trimmed.startsWith('![')) return true;
+    if (trimmed.startsWith('![')) { return true; }
 
     return false;
   }
@@ -805,41 +807,47 @@ class _ExplainCard extends StatelessWidget {
 
     // 多行注释开始或结束
     if (trimmed.startsWith('/*') ||
-        trimmed.startsWith('*') && trimmed.endsWith('*/'))
+        (trimmed.startsWith('*') && trimmed.endsWith('*/'))) {
       return true;
+    }
 
     // Java 关键字开头（严格匹配）
     if (RegExp(
       r'^(?:public|private|protected|static|final|abstract|class|interface|enum|import|package)\s',
-    ).hasMatch(trimmed))
+    ).hasMatch(trimmed)) {
       return true;
+    }
 
     // 控制流关键字
     if (RegExp(
       r'^(?:if|else|for|while|try|catch|finally|switch|case|default|return|throw|throws|new|assert)\b',
-    ).hasMatch(trimmed))
+    ).hasMatch(trimmed)) {
       return true;
+    }
 
     // 类型声明
     if (RegExp(
       r'^(?:void|int|long|double|float|boolean|char|byte|short|String|Object|List|Map|Set)\s+\w+',
-    ).hasMatch(trimmed))
+    ).hasMatch(trimmed)) {
       return true;
+    }
 
     // 行尾有分号（代码特征）
-    if (trimmed.endsWith(';') && !trimmed.startsWith('|')) return true;
+    if (trimmed.endsWith(';') && !trimmed.startsWith('|')) { return true; }
 
     // 花括号单独成行
-    if (trimmed == '{' || trimmed == '}' || trimmed == '};') return true;
+    if (trimmed == '{' || trimmed == '}' || trimmed == '};') { return true; }
 
     // 赋值语句：Type var = value;
-    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';'))
+    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';')) {
       return true;
+    }
 
     // 方法调用：object.method();
     if (RegExp(r'^\w+[\.\[]\w+.*\)\s*;?\s*$').hasMatch(trimmed) &&
-        !trimmed.startsWith('|'))
+        !trimmed.startsWith('|')) {
       return true;
+    }
 
     // new 关键字
     if (RegExp(r'^\w+\s+\w+\s*=\s*new\s').hasMatch(trimmed)) return true;
