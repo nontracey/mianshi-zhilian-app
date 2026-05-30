@@ -1729,11 +1729,13 @@ class _CenterPanel extends StatefulWidget {
 class _CenterPanelState extends State<_CenterPanel> {
   final _storage = StorageService();
   List<String> _disabledIds = [];
+  LearningRoute? _selectedRoute;
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
+    _loadSelectedRoute();
   }
 
   Future<void> _loadDisabled() async {
@@ -1741,8 +1743,67 @@ class _CenterPanelState extends State<_CenterPanel> {
     if (mounted) setState(() => _disabledIds = ids);
   }
 
-  List<Domain> get _domains =>
-      widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+  Future<void> _loadSelectedRoute() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId != null && mounted) {
+      // 加载自定义路线
+      final customData = await _storage.loadJsonList('custom_routes');
+      final customRoutes = customData.map((e) => LearningRoute.fromJson(e)).toList();
+      
+      // 默认路线
+      final defaultRoutes = [
+        LearningRoute(
+          id: 'java',
+          name: 'Java 后端开发',
+          description: 'Java 核心、Spring、数据库、微服务',
+          domainIds: widget.allDomains.take(5).map((d) => d.id).toList(),
+          isDefault: true,
+        ),
+        LearningRoute(
+          id: 'frontend',
+          name: '前端开发',
+          description: 'JavaScript、React、Vue、性能优化',
+          domainIds: widget.allDomains.take(4).map((d) => d.id).toList(),
+          isDefault: true,
+        ),
+        LearningRoute(
+          id: 'agent',
+          name: 'Agent 开发',
+          description: 'AI Agent、RAG、Prompt Engineering',
+          domainIds: widget.allDomains.take(3).map((d) => d.id).toList(),
+          isDefault: true,
+        ),
+      ];
+      
+      final allRoutes = [...defaultRoutes, ...customRoutes];
+      final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
+      if (route != null && mounted) {
+        setState(() => _selectedRoute = route);
+      }
+    }
+  }
+
+  Future<void> _saveSelectedRoute(LearningRoute? route) async {
+    if (route != null) {
+      await _storage.save('selected_route_id', route.id);
+    } else {
+      await _storage.save('selected_route_id', null);
+    }
+    if (mounted) setState(() => _selectedRoute = route);
+  }
+
+  List<Domain> get _domains {
+    var domains = widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+    
+    // 如果选中了路线，按路线顺序过滤
+    if (_selectedRoute != null && _selectedRoute!.domainIds.isNotEmpty) {
+      domains = domains.where((d) => _selectedRoute!.domainIds.contains(d.id)).toList();
+      domains.sort((a, b) => 
+        _selectedRoute!.domainIds.indexOf(a.id).compareTo(_selectedRoute!.domainIds.indexOf(b.id)));
+    }
+    
+    return domains;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1875,9 +1936,10 @@ class _CenterPanelState extends State<_CenterPanel> {
       context: context,
       builder: (ctx) => _RouteSelectorDialog(
         routes: routes,
-        currentRouteId: widget.currentDomainId,
+        currentRouteId: _selectedRoute?.id,
         availableDomains: widget.allDomains,
         onRouteSelected: (route) {
+          _saveSelectedRoute(route);
           if (route.domainIds.isNotEmpty) {
             widget.onDomainChanged(route.domainIds.first);
           }
