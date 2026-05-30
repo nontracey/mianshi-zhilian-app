@@ -447,9 +447,11 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
             ),
           ),
           child: ListTile(
-            leading: Radio<String>(  // ignore: deprecated_member_use
+            leading: Radio<String>(
               value: level.$1,
-              groupValue: _currentLevel,  // ignore: deprecated_member_use
+              // ignore: deprecated_member_use
+              groupValue: _currentLevel,
+              // ignore: deprecated_member_use
               onChanged: (value) {
                 if (value != null) setState(() => _currentLevel = value);
               },
