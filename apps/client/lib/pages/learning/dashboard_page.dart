@@ -91,7 +91,6 @@ class DashboardPage extends StatelessWidget {
     );
     final masteryPercent = domainProgress.masteryPercent;
     final topicCount = domainProgress.topicCount;
-    final reviewCount = progressProvider.getReviewCount(currentDomainId);
     final readiness = progressProvider.readinessScore(domainTopics);
 
     final recommendedTopics = progressProvider.getRecommendedTopics(
@@ -281,13 +280,6 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  String _strategyLabel(String strategy) => switch (strategy) {
-    'smart' => '智能推荐',
-    'path-order' => '路径顺序',
-    'high-frequency' => '高频优先',
-    'review-first' => '复习优先',
-    _ => '低分优先',
-  };
 }
 
 // ── 下一步最佳行动组件 ──────────────────────────────────────────────

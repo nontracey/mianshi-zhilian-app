@@ -22,7 +22,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   String _selectedScale = 'medium';
   final List<String> _selectedTechStack = [];
   final List<Map<String, dynamic>> _savedProjects = [];
-  bool _isLoading = true;
+  
   
   final List<String> _techStackOptions = [
     'Java', 'Python', 'Go', 'JavaScript', 'TypeScript',
@@ -50,7 +50,6 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     setState(() {
       _savedProjects.clear();
       _savedProjects.addAll(data);
-      _isLoading = false;
     });
   }
 

@@ -24,7 +24,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
   final _answerController = TextEditingController();
   final _storage = StorageService();
   String _selectedVersionType = 'draft';
-  bool _isLoading = true;
+  
 
   String get _storageKey => 'answer_versions_${widget.topicId}';
 
@@ -39,7 +39,6 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     setState(() {
       _versions.clear();
       _versions.addAll(data);
-      _isLoading = false;
     });
   }
 

@@ -129,7 +129,6 @@ class _CatalogPageState extends State<CatalogPage> {
       contentProvider.topics.values.toList(),
     );
     final masteryPercent = domainProgress.masteryPercent;
-    final loaded = contentProvider.getLoadedTopicCount(widget.currentDomainId);
     final totalTopics = currentDomain.topicCount;
     
     final filteredTopics = _applyFilters(domainTopics, progressProvider);

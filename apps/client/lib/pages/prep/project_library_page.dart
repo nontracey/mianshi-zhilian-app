@@ -13,7 +13,7 @@ class ProjectLibraryPage extends StatefulWidget {
 class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   final List<Map<String, dynamic>> _projects = [];
   final _storage = StorageService();
-  bool _isLoading = true;
+  
 
   @override
   void initState() {
@@ -26,7 +26,6 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     setState(() {
       _projects.clear();
       _projects.addAll(data);
-      _isLoading = false;
     });
   }
 
