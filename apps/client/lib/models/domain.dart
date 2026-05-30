@@ -8,6 +8,7 @@ class Domain {
   final String? themeColor;
   final String? accentColor;
   final List<Category> categories;
+  final List<LearningPath> learningPaths;
   final int topicCount;
   final String? updatedAt;
   final Color color;
@@ -20,6 +21,7 @@ class Domain {
     this.themeColor,
     this.accentColor,
     this.categories = const [],
+    this.learningPaths = const [],
     this.topicCount = 0,
     this.updatedAt,
     this.color = const Color(0xFF0A2540),
@@ -38,6 +40,11 @@ class Domain {
       categories:
           (json['categories'] as List<dynamic>?)
               ?.map((e) => Category.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      learningPaths:
+          (json['learningPaths'] as List<dynamic>?)
+              ?.map((e) => LearningPath.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       topicCount: (json['topicCount'] as num?)?.toInt() ?? 0,
@@ -94,4 +101,62 @@ class Category {
             .toList() ??
         [],
   );
+}
+
+class LearningPath {
+  final String id;
+  final String title;
+  final String description;
+  final List<LearningPathStep> steps;
+
+  const LearningPath({
+    required this.id,
+    required this.title,
+    required this.description,
+    this.steps = const [],
+  });
+
+  factory LearningPath.fromJson(Map<String, dynamic> json) => LearningPath(
+    id: json['id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    steps:
+        (json['steps'] as List<dynamic>?)
+            ?.map((e) => LearningPathStep.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [],
+  );
+}
+
+class LearningPathStep {
+  final String title;
+  final String description;
+  final List<String> categoryIds;
+  final int estimatedHours;
+  final List<String> prerequisiteSteps;
+
+  const LearningPathStep({
+    required this.title,
+    required this.description,
+    this.categoryIds = const [],
+    this.estimatedHours = 0,
+    this.prerequisiteSteps = const [],
+  });
+
+  factory LearningPathStep.fromJson(Map<String, dynamic> json) =>
+      LearningPathStep(
+        title: json['title'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        categoryIds:
+            (json['categoryIds'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+        estimatedHours: (json['estimatedHours'] as num?)?.toInt() ?? 0,
+        prerequisiteSteps:
+            (json['prerequisiteSteps'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+      );
 }

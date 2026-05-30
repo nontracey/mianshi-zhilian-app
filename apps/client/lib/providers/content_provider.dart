@@ -56,6 +56,7 @@ class ContentProvider extends ChangeNotifier {
               themeColor: fullDomain.themeColor,
               accentColor: fullDomain.accentColor,
               categories: fullDomain.categories,
+              learningPaths: fullDomain.learningPaths,
               topicCount: domain.topicCount,
               updatedAt: domain.updatedAt,
               color: fullDomain.color,

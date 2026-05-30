@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:mianshi_zhilian/utils/mastery_utils.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
@@ -844,25 +845,9 @@ class _DomainKnowledgeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final domainColor = domain.color;
-    final status = masteryPercent >= 80
-        ? '掌握'
-        : masteryPercent >= 60
-        ? '良好'
-        : masteryPercent >= 40
-        ? '中等'
-        : masteryPercent > 0
-        ? '薄弱'
-        : '未学';
-    final statusColor = masteryPercent >= 80
-        ? AppColors.success
-        : masteryPercent >= 60
-        ? AppColors.accent
-        : masteryPercent >= 40
-        ? AppColors.warning
-        : masteryPercent > 0
-        ? AppColors.danger
-        : Colors.grey;
-    
+    final status = getMasteryLabel(masteryPercent);
+    final statusColor = getMasteryColor(masteryPercent);
+
     final practiceCount = domain.topicCount * 3;
     final domainIcon = _getDomainIcon(domain.id);
 
@@ -1012,16 +997,13 @@ class _LearningPathItemState extends State<_LearningPathItem> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final status = widget.masteryPercent >= 80
+    final level = getMasteryLevel(widget.masteryPercent);
+    final status = level == MasteryLevel.mastered
         ? '已完成'
-        : widget.masteryPercent > 0
+        : level == MasteryLevel.learning
         ? '进行中'
         : '未开始';
-    final statusColor = widget.masteryPercent >= 80
-        ? AppColors.success
-        : widget.masteryPercent > 0
-        ? AppColors.accent
-        : Colors.grey;
+    final statusColor = getMasteryColor(widget.masteryPercent);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1279,8 +1261,8 @@ class _WeakTopicItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scoreColor = score >= 60 ? AppColors.warning : AppColors.danger;
-    final level = score >= 80
+    final scoreColor = getMasteryColor(score);
+    final level = score >= 85
         ? '高'
         : score >= 60
         ? '中'
@@ -1762,33 +1744,36 @@ class _CenterPanelState extends State<_CenterPanel> {
       // 加载自定义路线
       final customData = await _storage.loadJsonList('custom_routes');
       final customRoutes = customData.map((e) => LearningRoute.fromJson(e)).toList();
-      
+
       // 默认路线
       final defaultRoutes = [
         LearningRoute(
           id: 'java',
           name: 'Java 后端开发',
-          description: 'Java 核心、Spring、数据库、微服务',
+          description: 'Java 核心、JVM、并发、Spring、数据库、中间件、系统设计',
           domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'frontend',
           name: '前端开发',
-          description: 'JavaScript、React、Vue、性能优化',
-          domainIds: ['frontend', 'algorithm', 'network', 'design-pattern'],
+          description: 'JavaScript、TypeScript、React、Vue、前端工程化',
+          domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'agent',
           name: 'Agent 开发',
-          description: 'AI Agent、RAG、Prompt Engineering',
+          description: 'LLM、RAG、Agent、MCP、Function Calling、AI 工程化',
           domainIds: ['agent', 'algorithm', 'architecture', 'network'],
           isDefault: true,
         ),
       ];
-      
-      final allRoutes = [...defaultRoutes, ...customRoutes];
+
+      // 从内容仓库生成的学习路线
+      final contentRoutes = _generateRoutesFromContent();
+
+      final allRoutes = [...defaultRoutes, ...contentRoutes, ...customRoutes];
       final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
       if (route != null && mounted) {
         setState(() => _selectedRoute = route);
@@ -1821,6 +1806,23 @@ class _CenterPanelState extends State<_CenterPanel> {
   // 所有未禁用的领域（不受路线选择影响）
   List<Domain> get _allEnabledDomains {
     return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+  }
+
+  // 从内容仓库的 learningPaths 生成学习路线
+  List<LearningRoute> _generateRoutesFromContent() {
+    final routes = <LearningRoute>[];
+    for (final domain in widget.allDomains) {
+      for (final path in domain.learningPaths) {
+        routes.add(LearningRoute(
+          id: '${domain.id}_${path.id}',
+          name: path.title,
+          description: path.description,
+          domainIds: [domain.id],
+          isDefault: false,
+        ));
+      }
+    }
+    return routes;
   }
 
   @override
@@ -1927,29 +1929,34 @@ class _CenterPanelState extends State<_CenterPanel> {
   }
 
   void _showRouteSelector(BuildContext context) {
-    final routes = [
+    final defaultRoutes = [
       LearningRoute(
         id: 'java',
         name: 'Java 后端开发',
-        description: 'Java 核心、Spring、数据库、微服务',
+        description: 'Java 核心、JVM、并发、Spring、数据库、中间件、系统设计',
         domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'frontend',
         name: '前端开发',
-        description: 'JavaScript、React、Vue、性能优化',
-        domainIds: ['frontend', 'algorithm', 'network', 'design-pattern'],
+        description: 'JavaScript、TypeScript、React、Vue、前端工程化',
+        domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'agent',
         name: 'Agent 开发',
-        description: 'AI Agent、RAG、Prompt Engineering',
+        description: 'LLM、RAG、Agent、MCP、Function Calling、AI 工程化',
         domainIds: ['agent', 'algorithm', 'architecture', 'network'],
         isDefault: true,
       ),
     ];
+
+    // 从内容仓库生成的学习路线
+    final contentRoutes = _generateRoutesFromContent();
+
+    final routes = [...defaultRoutes, ...contentRoutes];
 
     showDialog(
       context: context,
