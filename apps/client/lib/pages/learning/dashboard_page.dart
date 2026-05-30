@@ -712,47 +712,45 @@ class _MasteryStatItem extends StatelessWidget {
 
 class _MasteryStats extends StatelessWidget {
   const _MasteryStats({
-    required this.weakTopics,
+    required this.categories,
   });
 
-  final List<Topic> weakTopics;
+  final List<CategoryMastery> categories;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _MasteryStatCard(
-              title: 'Java',
-              value: '72%',
-              color: AppColors.success,
-            ),
-            const SizedBox(width: 12),
-            _MasteryStatCard(
-              title: 'Agent',
-              value: '61%',
-              color: AppColors.accent,
-            ),
-          ],
+    if (categories.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无分类数据',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade500,
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _MasteryStatCard(
-              title: '算法',
-              value: '55%',
-              color: AppColors.warning,
-            ),
-            const SizedBox(width: 12),
-            _MasteryStatCard(
-              title: '前端',
-              value: '66%',
-              color: AppColors.accent,
-            ),
-          ],
-        ),
-      ],
+      );
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: categories.take(4).map((cat) {
+        final color = cat.masteryPercent >= 80
+            ? AppColors.success
+            : cat.masteryPercent >= 60
+                ? AppColors.accent
+                : cat.masteryPercent > 0
+                    ? AppColors.warning
+                    : Colors.grey;
+        return         SizedBox(
+          width: (MediaQuery.of(context).size.width - 64) / 2,
+          child: _MasteryStatCard(
+            title: cat.name,
+            value: '${cat.masteryPercent}%',
+            color: color,
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -2302,7 +2300,7 @@ class _RightPanel extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _MasteryStats(
-                weakTopics: weakTopics,
+                categories: categories,
               ),
             ],
           ),
