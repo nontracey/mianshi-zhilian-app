@@ -13,10 +13,21 @@ jobs:
         working-directory: apps/client
     steps:
       - uses: actions/checkout@v4
+      
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+      
+      - uses: actions/cache@v4
+        with:
+          path: |
+            apps/client/.dart_tool
+            apps/client/build
+          key: flutter-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**') }}
+          restore-keys: |
+            flutter-${{ runner.os }}-
+      
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
