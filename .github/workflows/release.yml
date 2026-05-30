@@ -11,14 +11,100 @@ permissions:
 jobs:
   prepare-release:
     runs-on: ubuntu-latest
+    outputs:
+      release_notes: ${{ steps.generate_notes.outputs.notes }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            echo "tag=$GITHUB_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate release notes
+        id: generate_notes
+        run: |
+          PREV_TAG=${{ steps.prev_tag.outputs.tag }}
+          CURRENT_TAG=${GITHUB_REF_NAME}
+          
+          # 获取上一个版本号
+          PREV_VERSION=${PREV_TAG#v}
+          CURRENT_VERSION=${CURRENT_TAG#v}
+          
+          # 生成 changelog
+          {
+            echo "## v${CURRENT_VERSION}"
+            echo ""
+            echo "### 📦 版本更新"
+            echo ""
+            
+            # 获取 commit messages，按类型分组
+            FEAT_COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -i "^feat" | sed 's/^feat: //; s/^feat(.*)//' || true)
+            FIX_COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -i "^fix" | sed 's/^fix: //; s/^fix(.*)//' || true)
+            DOCS_COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -i "^docs" | sed 's/^docs: //; s/^docs(.*)//' || true)
+            OTHER_COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" | grep -ivE "^(feat|fix|docs)" || true)
+            
+            if [ -n "$FEAT_COMMITS" ]; then
+              echo "#### ✨ 新功能"
+              echo "$FEAT_COMMITS" | while read -r line; do
+                [ -n "$line" ] && echo "- $line"
+              done
+              echo ""
+            fi
+            
+            if [ -n "$FIX_COMMITS" ]; then
+              echo "#### 🐛 问题修复"
+              echo "$FIX_COMMITS" | while read -r line; do
+                [ -n "$line" ] && echo "- $line"
+              done
+              echo ""
+            fi
+            
+            if [ -n "$DOCS_COMMITS" ]; then
+              echo "#### 📝 文档更新"
+              echo "$DOCS_COMMITS" | while read -r line; do
+                [ -n "$line" ] && echo "- $line"
+              done
+              echo ""
+            fi
+            
+            if [ -n "$OTHER_COMMITS" ]; then
+              echo "#### 🔧 其他改动"
+              echo "$OTHER_COMMITS" | while read -r line; do
+                [ -n "$line" ] && echo "- $line"
+              done
+              echo ""
+            fi
+            
+            # 统计
+            TOTAL=$(git log ${PREV_TAG}..HEAD --oneline | wc -l)
+            echo "---"
+            echo "**共 ${TOTAL} 个提交**"
+          } > release_notes.md
+          
+          # 输出内容
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
       - name: Ensure GitHub Release exists
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          NOTES=$(cat release_notes.md)
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --target "${GITHUB_SHA}" --title "${GITHUB_REF_NAME}" --notes "面试智练 ${GITHUB_REF_NAME}"
+            gh release create "${GITHUB_REF_NAME}" \
+              --target "${GITHUB_SHA}" \
+              --title "${GITHUB_REF_NAME}" \
+              --notes-file release_notes.md \
+              --draft
 
   android:
     runs-on: ubuntu-latest
