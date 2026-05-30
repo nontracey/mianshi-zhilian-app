@@ -117,15 +117,18 @@ class ProgressProvider extends ChangeNotifier {
     int count = 0;
     for (final topic in domainTopics) {
       final progress = _progressMap[topic.id];
-      if (progress != null) {
+      if (progress != null && progress.score > 0) {
         totalScore += progress.score;
         count++;
       }
     }
 
+    // 没有学习过的知识点，掌握度为0
     if (count == 0) return (masteryPercent: 0, topicCount: domainTopics.length);
+    
+    // 只计算已学习知识点的平均分
     return (
-      masteryPercent: (totalScore / domainTopics.length).round(),
+      masteryPercent: (totalScore / count).round(),
       topicCount: domainTopics.length,
     );
   }

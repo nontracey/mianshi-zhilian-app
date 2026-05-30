@@ -216,4 +216,26 @@ class StorageService {
     if (data == null) return null;
     return data as Map<String, dynamic>;
   }
+
+  /// 保存禁用的领域列表
+  Future<void> saveDisabledDomains(List<String> domainIds) async {
+    await save('disabled_domains', domainIds);
+  }
+
+  /// 加载禁用的领域列表
+  Future<List<String>> loadDisabledDomains() async {
+    final data = await load('disabled_domains');
+    if (data == null) return [];
+    return (data as List).map((e) => e.toString()).toList();
+  }
+
+  /// 保存自定义路线
+  Future<void> saveCustomRoutes(List<Map<String, dynamic>> routes) async {
+    await save('custom_routes', routes);
+  }
+
+  /// 加载自定义路线
+  Future<List<Map<String, dynamic>>> loadCustomRoutes() async {
+    return await loadJsonList('custom_routes');
+  }
 }

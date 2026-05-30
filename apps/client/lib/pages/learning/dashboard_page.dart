@@ -9,6 +9,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -1864,16 +1865,25 @@ class _CenterPanel extends StatelessWidget {
   }
 
   void _showManageDomains(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => _ManageDomainsDialog(
-        domains: domains,
-        disabledDomainIds: {},
-        onToggleDomain: (domainId) {
-          // TODO: 保存禁用的领域到本地存储
-        },
-      ),
-    );
+    final storage = StorageService();
+    storage.loadDisabledDomains().then((disabledIds) {
+      showDialog(
+        context: context,
+        builder: (ctx) => _ManageDomainsDialog(
+          domains: domains,
+          disabledDomainIds: disabledIds.toSet(),
+          onToggleDomain: (domainId) async {
+            final currentDisabled = await storage.loadDisabledDomains();
+            if (currentDisabled.contains(domainId)) {
+              currentDisabled.remove(domainId);
+            } else {
+              currentDisabled.add(domainId);
+            }
+            await storage.saveDisabledDomains(currentDisabled);
+          },
+        ),
+      );
+    });
   }
 }
 
@@ -2235,11 +2245,17 @@ class _RightPanel extends StatelessWidget {
     
     final categories = categoryMap.entries.map((entry) {
       final topics = entry.value;
-      final avgScore = topics.isEmpty ? 0 : 
-        topics.fold<int>(0, (sum, t) {
-          final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
-          return sum + score;
-        }) ~/ topics.length;
+      int totalScore = 0;
+      int learnedCount = 0;
+      for (final t in topics) {
+        final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+        if (score > 0) {
+          totalScore += score;
+          learnedCount++;
+        }
+      }
+      // 没有学习过的分类，掌握度为0
+      final avgScore = learnedCount == 0 ? 0 : totalScore ~/ learnedCount;
       return CategoryMastery(name: entry.key, masteryPercent: avgScore);
     }).toList()
       ..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
