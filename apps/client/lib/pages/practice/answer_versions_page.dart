@@ -463,8 +463,9 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
               });
               await _saveVersions();
               if (!context.mounted) return;
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 const SnackBar(content: Text('版本已删除')),
               );
             },
@@ -550,8 +551,9 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 });
                 await _saveVersions();
                 if (!context.mounted) return;
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(content: Text('版本已更新')),
                 );
               },
