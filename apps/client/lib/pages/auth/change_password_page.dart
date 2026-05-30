@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
-import 'package:mianshi_zhilian/theme/colors.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -23,11 +22,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  // 防注入
-  String _sanitize(String input) {
-    return input.replaceAll(RegExp(r'[<>"\x27;\(\)]'), '').trim();
   }
 
   Future<void> _changePassword() async {

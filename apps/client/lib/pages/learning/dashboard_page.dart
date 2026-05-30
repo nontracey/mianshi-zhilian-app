@@ -667,13 +667,11 @@ class _MasteryStatItem extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
-    this.dotColor,
   });
 
   final String label;
   final String value;
   final Color color;
-  final Color? dotColor;
 
   @override
   Widget build(BuildContext context) {
@@ -683,7 +681,7 @@ class _MasteryStatItem extends StatelessWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: dotColor ?? color,
+            color: color,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
