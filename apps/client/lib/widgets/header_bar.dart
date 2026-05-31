@@ -309,6 +309,9 @@ class _HeaderBarState extends State<HeaderBar> {
         ? aiProvider.configs.first.name
         : l10n.get('未配置_AI_模型');
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = screenWidth >= 600;
+
     final surfaceColor = Theme.of(context).colorScheme.surface;
     final borderColor = Theme.of(context).colorScheme.outline;
 
@@ -333,23 +336,78 @@ class _HeaderBarState extends State<HeaderBar> {
               userRole: authProvider.userRole,
               onStageChanged: widget.onContentStageChanged,
             ),
-            const SizedBox(width: 20),
-            _AiModelSelector(
-              modelName: currentModelName,
-              hasConfig: aiProvider.configs.isNotEmpty,
-              isDark: isDark,
-            ),
-            
+            if (isWide) const SizedBox(width: 20),
+            if (isWide)
+              _AiModelSelector(
+                modelName: currentModelName,
+                hasConfig: aiProvider.configs.isNotEmpty,
+                isDark: isDark,
+              ),
+
             // 中间弹性空间
             const Spacer(),
-            
+
             // 右侧：搜索框 + 用户头像
-            _buildSearchField(context, isDark),
+            isWide
+                ? _buildSearchField(context, isDark)
+                : _buildMobileSearchIcon(context, isDark),
             const SizedBox(width: 12),
             _buildUserAvatar(context, isDark),
           ],
         ),
       ),
+    );
+  }
+
+  void _showMobileSearchDialog(BuildContext context, bool isDark) {
+    final searchController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('搜索知识点'), style: const TextStyle(fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: searchController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: l10n.get('搜索知识点'),
+              prefixIcon: Icon(Icons.search, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              isDense: true,
+            ),
+            onSubmitted: (value) {
+              if (value.trim().isNotEmpty) {
+                Navigator.of(ctx).pop();
+                _onSearchChanged(value.trim());
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.get('取消')),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (searchController.text.trim().isNotEmpty) {
+                Navigator.of(ctx).pop();
+                _onSearchChanged(searchController.text.trim());
+              }
+            },
+            child: Text(l10n.get('搜索')),
+          ),
+        ],
+      ),
+    ).then((_) => searchController.dispose());
+  }
+
+  Widget _buildMobileSearchIcon(BuildContext context, bool isDark) {
+    return IconButton(
+      icon: Icon(Icons.search, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
+      onPressed: () => _showMobileSearchDialog(context, isDark),
+      tooltip: l10n.get('搜索'),
     );
   }
 
