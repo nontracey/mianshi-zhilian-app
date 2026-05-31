@@ -99,6 +99,8 @@ mianshi-zhilian-app/
 │   ├── src/index.ts            # API 路由和处理
 │   └── wrangler.toml           # Worker 配置
 ├── scripts/                     # 构建脚本
+├── skills/                      # 项目级 AI 技能（skills），供 CLI/agent 共享使用
+│   └── doc-code-audit/          # 文档 vs 代码一致性审计
 └── .github/workflows/          # CI/CD 配置
 ```
 
