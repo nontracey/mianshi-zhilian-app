@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../main.dart';
 import '../theme/colors.dart';
+import '../providers/localization_provider.dart';
 
 IconData _sectionIcon(AppSection section) => switch (section) {
   AppSection.dashboard => Icons.dashboard_outlined,
@@ -12,13 +14,13 @@ IconData _sectionIcon(AppSection section) => switch (section) {
   AppSection.profile => Icons.person_outline,
 };
 
-String _sectionTitle(AppSection section) => switch (section) {
-  AppSection.dashboard => '学习',
-  AppSection.catalog => '目录',
-  AppSection.practice => '练习',
-  AppSection.prep => '面试',
-  AppSection.mastery => '掌握度',
-  AppSection.profile => '设置',
+String _sectionTitle(AppSection section, LocalizationProvider l10n) => switch (section) {
+  AppSection.dashboard => l10n.get('学习'),
+  AppSection.catalog => l10n.get('目录'),
+  AppSection.practice => l10n.get('练习'),
+  AppSection.prep => l10n.get('面试'),
+  AppSection.mastery => l10n.get('掌握度'),
+  AppSection.profile => l10n.get('设置'),
 };
 
 class NavigationRailPanel extends StatelessWidget {
@@ -47,6 +49,7 @@ class NavigationRailPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = Theme.of(context).colorScheme.surface;
     final borderColor = Theme.of(context).colorScheme.outline;
@@ -76,7 +79,7 @@ class NavigationRailPanel extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '面试智练',
+                          l10n.get('面试智练'),
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -95,7 +98,7 @@ class NavigationRailPanel extends StatelessWidget {
                         onPressed: onToggleCollapse,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        tooltip: '收缩侧边栏',
+                        tooltip: l10n.get('收缩侧边栏'),
                       ),
                     ],
                   ),
@@ -127,7 +130,7 @@ class NavigationRailPanel extends StatelessWidget {
                     color: isDark ? Colors.white54 : Colors.grey,
                   ),
                   onPressed: onToggleCollapse,
-                  tooltip: '展开侧边栏',
+                  tooltip: l10n.get('展开侧边栏'),
                 ),
               ),
             ),
@@ -140,7 +143,7 @@ class NavigationRailPanel extends StatelessWidget {
                 children: [
                   _StatItem(
                     icon: Icons.access_time,
-                    label: '学习总时长',
+                    label: l10n.get('学习总时长'),
                     value: '${totalHours.toStringAsFixed(1)} h',
                     trailing: todayHoursGrowth > 0 ? '+${todayHoursGrowth.toStringAsFixed(1)}h' : null,
                     trailingColor: const Color(0xFF10B981),
@@ -149,8 +152,8 @@ class NavigationRailPanel extends StatelessWidget {
                   const SizedBox(height: 12),
                   _StatItem(
                     icon: Icons.local_fire_department_outlined,
-                    label: '连续学习',
-                    value: '$streakDays 天',
+                    label: l10n.get('连续学习'),
+                    value: l10n.getp('{days} 天', {'days': streakDays}),
                     isDark: isDark,
                   ),
                 ],
@@ -164,7 +167,7 @@ class NavigationRailPanel extends StatelessWidget {
               child: Column(
                 children: [
                   Tooltip(
-                    message: '连续学习 $streakDays 天',
+                    message: l10n.getp('连续学习 {days} 天', {'days': streakDays}),
                     child: Icon(
                       Icons.local_fire_department_outlined,
                       size: 20,
@@ -197,12 +200,13 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final accentColor = const Color(0xFF3078F0);
     
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8 : 12, vertical: 4),
       child: Tooltip(
-        message: isCollapsed ? _sectionTitle(section) : '',
+        message: isCollapsed ? _sectionTitle(section, l10n) : '',
         child: Material(
           color: active
               ? (isDark ? accentColor.withValues(alpha: 0.15) : accentColor.withValues(alpha: 0.08))
@@ -233,7 +237,7 @@ class _NavButton extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          _sectionTitle(section),
+                          _sectionTitle(section, l10n),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: active ? FontWeight.w600 : FontWeight.w500,

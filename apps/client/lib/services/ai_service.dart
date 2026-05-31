@@ -46,7 +46,7 @@ class AiService {
       return _parseEvaluationResult(content);
     }
 
-    throw Exception('AI 评估失败: ${response.statusCode} ${response.body}');
+    throw Exception('evaluation_failed:${response.statusCode}');
   }
 
   /// 流式调用 OpenAI 兼容 API 评估用户回答
@@ -86,7 +86,7 @@ class AiService {
       final response = await client.send(request);
       
       if (response.statusCode != 200) {
-        throw Exception('AI 评估失败: ${response.statusCode}');
+        throw Exception('evaluation_failed:${response.statusCode}');
       }
 
       // 处理 SSE 流
@@ -189,7 +189,7 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
-      'nextAction': '重试',
+      'nextAction': 'retry',
     };
   }
 
@@ -249,7 +249,7 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('AI 代理评估失败: ${response.statusCode}');
+    throw Exception('proxy_eval_failed:${response.statusCode}');
   }
 
   /// 通用流式聊天补全
@@ -282,7 +282,7 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
 
       final response = await client.send(request);
       if (response.statusCode != 200) {
-        throw Exception('AI 请求失败: ${response.statusCode}');
+        throw Exception('ai_request_failed:${response.statusCode}');
       }
 
       String buffer = '';

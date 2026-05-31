@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -37,6 +39,7 @@ class PrivacyConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -56,10 +59,10 @@ class PrivacyConfirmDialog extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              '数据上传确认',
-              style: TextStyle(fontSize: 18),
+              l10n.get('数据上传确认'),
+              style: const TextStyle(fontSize: 18),
             ),
           ),
         ],
@@ -81,7 +84,7 @@ class PrivacyConfirmDialog extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '即将上传的$dataType',
+                    '${l10n.get('即将上传的')}$dataType',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.accent,
@@ -105,7 +108,7 @@ class PrivacyConfirmDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '数据内容：',
+                  l10n.get('数据内容：'),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -134,13 +137,13 @@ class PrivacyConfirmDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.shield_outlined, size: 16, color: AppColors.success),
-                    SizedBox(width: 6),
+                    const Icon(Icons.shield_outlined, size: 16, color: AppColors.success),
+                    const SizedBox(width: 6),
                     Text(
-                      '隐私保护',
-                      style: TextStyle(
+                      l10n.get('隐私保护'),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                         color: AppColors.success,
@@ -149,9 +152,9 @@ class PrivacyConfirmDialog extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                _buildPrivacyItem('数据仅发送到您配置的 AI 服务'),
-                _buildPrivacyItem('不会存储到我们的服务器'),
-                _buildPrivacyItem('您可以随时在设置中撤销授权'),
+                _buildPrivacyItem(l10n.get('数据仅发送到您配置的 AI 服务')),
+                _buildPrivacyItem(l10n.get('不会存储到我们的服务器')),
+                _buildPrivacyItem(l10n.get('您可以随时在设置中撤销授权')),
               ],
             ),
           ),
@@ -160,12 +163,12 @@ class PrivacyConfirmDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: onCancel ?? () => Navigator.pop(context, false),
-          child: const Text('取消'),
+          child: Text(l10n.get('取消')),
         ),
         FilledButton.icon(
           onPressed: onConfirm,
           icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-          label: const Text('确认上传'),
+          label: Text(l10n.get('确认上传')),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.accent,
           ),
@@ -239,6 +242,7 @@ class PrivacySettingsPage extends StatefulWidget {
 }
 
 class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   bool _confirmBeforeUpload = true;
   bool _saveAnswerLocally = true;
   bool _saveImageLocally = true;
@@ -252,7 +256,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('隐私设置'),
+        title: Text(l10n.get('隐私设置')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -264,16 +268,16 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
               color: AppColors.accent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.shield_outlined, size: 20, color: AppColors.accent),
-                    SizedBox(width: 8),
+                    const Icon(Icons.shield_outlined, size: 20, color: AppColors.accent),
+                    const SizedBox(width: 8),
                     Text(
-                      '隐私保护承诺',
-                      style: TextStyle(
+                      l10n.get('隐私保护承诺'),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
                         color: AppColors.accent,
@@ -281,16 +285,14 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
-                  '您的数据安全是我们的首要任务。所有敏感数据默认保存在本地，只有在您明确确认后才会上传到 AI 服务进行评估。',
+                  l10n.get('您的数据安全是我们的首要任务。所有敏感数据默认保存在本地，只有在您明确确认后才会上传到 AI 服务进行评估。'),
                   style: TextStyle(fontSize: 14, height: 1.6),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  '• 我们不会存储您的练习数据到服务器\n'
-                  '• 数据仅发送到您配置的 AI 服务\n'
-                  '• 您可以随时导出或删除本地数据',
+                  l10n.get('隐私说明_列表'),
                   style: TextStyle(fontSize: 13, height: 1.6),
                 ),
               ],
@@ -299,11 +301,11 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
           const SizedBox(height: 20),
 
           // 上传确认设置
-          _buildSectionHeader('上传确认', Icons.cloud_upload_outlined, isDark),
+          _buildSectionHeader(l10n.get('上传确认'), Icons.cloud_upload_outlined, isDark),
           const SizedBox(height: 12),
           _buildSwitchTile(
-            title: '上传前确认',
-            subtitle: '每次上传数据到 AI 服务前显示确认对话框',
+            title: l10n.get('上传前确认'),
+            subtitle: l10n.get('每次上传数据到 AI 服务前显示确认对话框'),
             value: _confirmBeforeUpload,
             onChanged: (v) => setState(() => _confirmBeforeUpload = v),
             isDark: isDark,
@@ -311,39 +313,39 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
           const SizedBox(height: 20),
 
           // 本地保存设置
-          _buildSectionHeader('本地保存', Icons.save_outlined, isDark),
+          _buildSectionHeader(l10n.get('本地保存'), Icons.save_outlined, isDark),
           const SizedBox(height: 12),
           _buildSwitchTile(
-            title: '回答草稿',
-            subtitle: '将回答草稿保存在本地',
+            title: l10n.get('回答草稿'),
+            subtitle: l10n.get('将回答草稿保存在本地'),
             value: _saveAnswerLocally,
             onChanged: (v) => setState(() => _saveAnswerLocally = v),
             isDark: isDark,
           ),
           _buildSwitchTile(
-            title: '图片附件',
-            subtitle: '将上传的图片保存在本地',
+            title: l10n.get('图片附件'),
+            subtitle: l10n.get('将上传的图片保存在本地'),
             value: _saveImageLocally,
             onChanged: (v) => setState(() => _saveImageLocally = v),
             isDark: isDark,
           ),
           _buildSwitchTile(
-            title: '语音录音',
-            subtitle: '将语音录音保存在本地',
+            title: l10n.get('语音录音'),
+            subtitle: l10n.get('将语音录音保存在本地'),
             value: _saveVoiceLocally,
             onChanged: (v) => setState(() => _saveVoiceLocally = v),
             isDark: isDark,
           ),
           _buildSwitchTile(
-            title: '项目信息',
-            subtitle: '将项目深挖信息保存在本地',
+            title: l10n.get('项目信息'),
+            subtitle: l10n.get('将项目深挖信息保存在本地'),
             value: _saveProjectLocally,
             onChanged: (v) => setState(() => _saveProjectLocally = v),
             isDark: isDark,
           ),
           _buildSwitchTile(
-            title: '岗位描述',
-            subtitle: '将 JD 岗位描述保存在本地',
+            title: l10n.get('岗位描述'),
+            subtitle: l10n.get('将 JD 岗位描述保存在本地'),
             value: _saveJdLocally,
             onChanged: (v) => setState(() => _saveJdLocally = v),
             isDark: isDark,
@@ -351,21 +353,21 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
           const SizedBox(height: 20),
 
           // 数据管理
-          _buildSectionHeader('数据管理', Icons.storage_outlined, isDark),
+          _buildSectionHeader(l10n.get('数据管理'), Icons.storage_outlined, isDark),
           const SizedBox(height: 12),
           _buildActionButton(
-            title: '导出本地数据',
-            subtitle: '将所有本地数据导出为 JSON 文件',
+            title: l10n.get('导出本地数据'),
+            subtitle: l10n.get('将所有本地数据导出为 JSON 文件'),
             icon: Icons.file_download_outlined,
-            onTap: () => _exportData(context),
+            onTap: () => _exportData(context, l10n),
             isDark: isDark,
           ),
           _buildActionButton(
-            title: '清除本地数据',
-            subtitle: '删除所有本地保存的练习数据',
+            title: l10n.get('清除本地数据'),
+            subtitle: l10n.get('删除所有本地保存的练习数据'),
             icon: Icons.delete_outline,
             iconColor: Colors.red,
-            onTap: () => _showClearDataDialog(context),
+            onTap: () => _showClearDataDialog(context, l10n),
             isDark: isDark,
           ),
         ],
@@ -457,42 +459,42 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     );
   }
 
-  Future<void> _exportData(BuildContext context) async {
+  Future<void> _exportData(BuildContext context, LocalizationProvider l10n) async {
     try {
       final storage = StorageService();
       final data = await storage.exportAllData();
       final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-      
+
       // 复制到剪贴板
       await Clipboard.setData(ClipboardData(text: jsonStr));
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('数据已复制到剪贴板，可粘贴保存'),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(l10n.get('数据已复制到剪贴板，可粘贴保存')),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e')),
+          SnackBar(content: Text('${l10n.get('导出失败')}: $e')),
         );
       }
     }
   }
 
-  void _showClearDataDialog(BuildContext context) {
+  void _showClearDataDialog(BuildContext context, LocalizationProvider l10n) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('确认清除'),
-        content: const Text('确定要清除所有本地数据吗？此操作不可撤销。'),
+        title: Text(l10n.get('确认清除')),
+        content: Text(l10n.get('确定要清除所有本地数据吗？此操作不可撤销。')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(l10n.get('取消')),
           ),
           FilledButton(
             onPressed: () async {
@@ -502,19 +504,19 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                 await storage.clearAllData();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('数据已清除')),
+                    SnackBar(content: Text(l10n.get('数据已清除'))),
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('清除失败: $e')),
+                    SnackBar(content: Text('${l10n.get('清除失败')}: $e')),
                   );
                 }
               }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('清除'),
+            child: Text(l10n.get('清除')),
           ),
         ],
       ),

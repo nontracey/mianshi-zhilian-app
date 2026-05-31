@@ -6,6 +6,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../../providers/localization_provider.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -26,6 +27,7 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _storage = StorageService();
   List<String> _disabledIds = [];
 
@@ -131,6 +133,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -139,7 +142,7 @@ class _CatalogPageState extends State<CatalogPage> {
     final domains = _filterDomains(allDomains);
     final currentDomain = allDomains.where((d) => d.id == widget.currentDomainId).firstOrNull;
     if (currentDomain == null) {
-      return const Center(child: Text('请选择一个领域'));
+      return Center(child: Text(l10n.get('请选择一个领域')));
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
@@ -229,7 +232,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   height: 36,
                   child: TextField(
                     decoration: InputDecoration(
-                      hintText: '搜索当前领域...',
+                      hintText: l10n.get('搜索当前领域'),
                       prefixIcon: const Icon(Icons.search, size: 18),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
@@ -263,7 +266,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   color: _hasActiveFilters ? Theme.of(context).colorScheme.primary : null,
                 ),
                 onPressed: () => setState(() => _showFilters = !_showFilters),
-                tooltip: _showFilters ? '隐藏筛选' : '显示筛选',
+                tooltip: _showFilters ? l10n.get('隐藏筛选') : l10n.get('显示筛选'),
                 style: IconButton.styleFrom(
                   backgroundColor: _hasActiveFilters 
                       ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
@@ -293,7 +296,7 @@ class _CatalogPageState extends State<CatalogPage> {
           Row(
             children: [
               Text(
-                '$totalTopics 个知识点',
+                l10n.getp('{count} 个知识点', {'count': totalTopics}),
                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
               ),
               const SizedBox(width: 12),
@@ -344,7 +347,7 @@ class _CatalogPageState extends State<CatalogPage> {
             children: [
               // 难度筛选
               ...([1, 2, 3, 4, 5].map((d) {
-                final labels = {1: '入门', 2: '基础', 3: '中等', 4: '较难', 5: '困难'};
+                final labels = {1: l10n.get('入门'), 2: l10n.get('基础'), 3: l10n.get('中等'), 4: l10n.get('较难'), 5: l10n.get('困难')};
                 final colors = {
                   1: const Color(0xFF10B981),
                   2: const Color(0xFF00CCF9),
@@ -373,7 +376,7 @@ class _CatalogPageState extends State<CatalogPage> {
               
               // 高频筛选
               FilterChip(
-                label: const Text('高频', style: TextStyle(fontSize: 11)),
+                label: Text(l10n.get('高频'), style: TextStyle(fontSize: 11)),
                 avatar: const Icon(Icons.local_fire_department, size: 14),
                 selected: _highFrequencyOnly,
                 selectedColor: AppColors.danger.withValues(alpha: 0.15),
@@ -385,7 +388,7 @@ class _CatalogPageState extends State<CatalogPage> {
               
               // 含代码题
               FilterChip(
-                label: const Text('代码题', style: TextStyle(fontSize: 11)),
+                label: Text(l10n.get('代码题'), style: TextStyle(fontSize: 11)),
                 avatar: const Icon(Icons.code, size: 14),
                 selected: _hasCodeOnly,
                 selectedColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
@@ -397,7 +400,7 @@ class _CatalogPageState extends State<CatalogPage> {
               
               // 含LeetCode
               FilterChip(
-                label: const Text('LeetCode', style: TextStyle(fontSize: 11)),
+                label: Text('LeetCode', style: TextStyle(fontSize: 11)),
                 avatar: const Icon(Icons.link, size: 14),
                 selected: _hasLeetcodeOnly,
                 selectedColor: const Color(0xFF10B981).withValues(alpha: 0.15),
@@ -408,7 +411,7 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
               
               // 掌握度筛选
-              ...({'skilled': '熟练', 'familiar': '不熟练', 'unfamiliar': '未掌握'}.entries.map((e) {
+              ...({'skilled': l10n.get('熟练'), 'familiar': l10n.get('不熟练'), 'unfamiliar': l10n.get('未掌握')}.entries.map((e) {
                 final colors = {'skilled': AppColors.success, 'familiar': AppColors.warning, 'unfamiliar': AppColors.danger};
                 return FilterChip(
                   label: Text(e.value, style: const TextStyle(fontSize: 11)),
@@ -432,7 +435,7 @@ class _CatalogPageState extends State<CatalogPage> {
               // 清除筛选
               if (_hasActiveFilters)
                 ActionChip(
-                  label: const Text('清除', style: TextStyle(fontSize: 11)),
+                  label: Text(l10n.get('清除'), style: TextStyle(fontSize: 11)),
                   avatar: const Icon(Icons.filter_alt_off, size: 14),
                   onPressed: _clearFilters,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -445,12 +448,12 @@ class _CatalogPageState extends State<CatalogPage> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Text('排序：', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+              Text(l10n.get('排序'), style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
               const SizedBox(width: 8),
-              _buildSortChip('默认', 'order', isDark),
-              _buildSortChip('难度', 'difficulty', isDark),
-              _buildSortChip('分数', 'score', isDark),
-              _buildSortChip('复习时间', 'reviewTime', isDark),
+              _buildSortChip(l10n.get('默认'), 'order', isDark),
+              _buildSortChip(l10n.get('难度'), 'difficulty', isDark),
+              _buildSortChip(l10n.get('分数'), 'score', isDark),
+              _buildSortChip(l10n.get('复习时间'), 'reviewTime', isDark),
             ],
           ),
         ],
@@ -492,12 +495,12 @@ class _CatalogPageState extends State<CatalogPage> {
         children: [
           Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
-          Text('没有找到匹配的知识点', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+          Text(l10n.get('没有找到匹配的知识点'), style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
           const SizedBox(height: 8),
           if (_hasActiveFilters)
             TextButton(
               onPressed: _clearFilters,
-              child: const Text('清除筛选'),
+              child: Text(l10n.get('清除筛选')),
             ),
         ],
       ),
@@ -525,11 +528,11 @@ class _CatalogPageState extends State<CatalogPage> {
     final nextReview = progress?.nextReviewAt;
     
     final difficultyLabel = switch (topic.difficulty) {
-      1 => '入门',
-      2 => '基础',
-      3 => '中等',
-      4 => '较难',
-      5 => '困难',
+      1 => l10n.get('入门'),
+      2 => l10n.get('基础'),
+      3 => l10n.get('中等'),
+      4 => l10n.get('较难'),
+      5 => l10n.get('困难'),
       _ => '',
     };
     final difficultyColor = switch (topic.difficulty) {
@@ -608,7 +611,7 @@ class _CatalogPageState extends State<CatalogPage> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              topic.status == 'test' ? '测试' : '草稿',
+                              topic.status == 'test' ? l10n.get('测试') : l10n.get('草稿'),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -626,7 +629,7 @@ class _CatalogPageState extends State<CatalogPage> {
                               color: AppColors.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text('高频', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger)),
+                            child: Text(l10n.get('高频'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger)),
                           ),
                       ],
                     ),
@@ -640,11 +643,11 @@ class _CatalogPageState extends State<CatalogPage> {
                         if (difficultyLabel.isNotEmpty)
                           _buildMiniTag(difficultyLabel, difficultyColor, isDark),
                         if (topic.interviewFrequencyLabel != null && !topic.highFrequency)
-                          _buildMiniTag(topic.interviewFrequencyLabel!, AppColors.warning, isDark),
+                          _buildMiniTag(l10n.get(topic.interviewFrequencyLabel!), AppColors.warning, isDark),
                         if (topic.estimatedMinutes > 0)
-                          _buildMiniTag('${topic.estimatedMinutes}分钟', Colors.grey, isDark),
+                          _buildMiniTag(l10n.getp('{minutes}分钟', {'minutes': topic.estimatedMinutes}), Colors.grey, isDark),
                         if (hasCode)
-                          _buildMiniTag('代码', const Color(0xFF8B5CF6), isDark),
+                          _buildMiniTag(l10n.get('代码'), Color(0xFF8B5CF6), isDark),
                         if (hasLeetcode)
                           _buildMiniTag('LeetCode', const Color(0xFF10B981), isDark),
                       ],
@@ -661,7 +664,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 children: [
                   if (score > 0)
                     Text(
-                      '$score分',
+                      l10n.getp('{score}分', {'score': score}),
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: statusColor),
                     ),
                   if (nextReview != null) ...[
@@ -678,9 +681,9 @@ class _CatalogPageState extends State<CatalogPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildActionButton('查阅', AppColors.categoryCyan, () => widget.onTopicLearn(topic.id)),
+                      _buildActionButton(l10n.get('查阅'), AppColors.categoryCyan, () => widget.onTopicLearn(topic.id)),
                       const SizedBox(width: 6),
-                      _buildActionButton('练习', AppColors.accent, () => widget.onTopicPractice(topic.id)),
+                      _buildActionButton(l10n.get('练习'), AppColors.accent, () => widget.onTopicPractice(topic.id)),
                     ],
                   ),
                 ],
@@ -723,14 +726,14 @@ class _CatalogPageState extends State<CatalogPage> {
     
     if (diff.isNegative) {
       final pastDiff = now.difference(time);
-      if (pastDiff.inMinutes < 60) return '${pastDiff.inMinutes}分钟前';
-      if (pastDiff.inHours < 24) return '${pastDiff.inHours}小时前';
-      return '${pastDiff.inDays}天前';
+      if (pastDiff.inMinutes < 60) return l10n.getp('{n}分钟前', {'n': pastDiff.inMinutes});
+      if (pastDiff.inHours < 24) return l10n.getp('{n}小时前', {'n': pastDiff.inHours});
+      return l10n.getp('{n}天前', {'n': pastDiff.inDays});
     }
     
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟后';
-    if (diff.inHours < 24) return '${diff.inHours}小时后';
-    return '${diff.inDays}天后';
+    if (diff.inMinutes < 60) return l10n.getp('{n}分钟后', {'n': diff.inMinutes});
+    if (diff.inHours < 24) return l10n.getp('{n}小时后', {'n': diff.inHours});
+    return l10n.getp('{n}天后', {'n': diff.inDays});
   }
 
   Widget _buildRoadmapView(BuildContext context, List<Topic> topics, 
@@ -743,19 +746,19 @@ class _CatalogPageState extends State<CatalogPage> {
     if (hasPhaseData) {
       // 按 phase 分组
       for (final topic in topics) {
-        final phase = topic.phase ?? '未分类';
+        final phase = topic.phase ?? l10n.get('未分类');
         groups.putIfAbsent(phase, () => []).add(topic);
       }
     } else {
       // 按 category 分组（用 domain 作为分类）
       for (final topic in topics) {
-        final category = topic.domain.isNotEmpty ? topic.domain : '未分类';
+        final category = topic.domain.isNotEmpty ? topic.domain : l10n.get('未分类');
         groups.putIfAbsent(category, () => []).add(topic);
       }
     }
 
     // 排序
-    const phaseOrder = ['基础', '入门', '进阶', '中级', '高级', '困难'];
+    final phaseOrder = [l10n.get('基础'), l10n.get('入门'), l10n.get('进阶'), l10n.get('中级'), l10n.get('高级'), l10n.get('困难')];
     final sortedKeys = groups.keys.toList()
       ..sort((a, b) {
         final ia = phaseOrder.indexOf(a);
@@ -768,7 +771,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
     if (topics.isEmpty) {
       return Center(
-        child: Text('暂无知识点', style: TextStyle(color: Colors.grey.shade500)),
+        child: Text(l10n.get('暂无知识点'), style: TextStyle(color: Colors.grey.shade500)),
       );
     }
 
@@ -818,7 +821,7 @@ class _CatalogPageState extends State<CatalogPage> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              '$count 题',
+              l10n.getp('{count} 题', {'count': count}),
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
             ),
           ),

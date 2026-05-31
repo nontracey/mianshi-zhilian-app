@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -10,6 +12,7 @@ class ProjectDigPage extends StatefulWidget {
 }
 
 class _ProjectDigPageState extends State<ProjectDigPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _formKey = GlobalKey<FormState>();
   final _projectNameController = TextEditingController();
   final _backgroundController = TextEditingController();
@@ -73,7 +76,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('项目深挖训练'),
+        title: Text(l10n.get('项目深挖训练')),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -126,9 +129,9 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             children: [
               const Icon(Icons.school_outlined, size: 20, color: AppColors.accent),
               const SizedBox(width: 8),
-              const Text(
-                'STAR 法则',
-                style: TextStyle(
+              Text(
+                l10n.get('STAR 法则'),
+                style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   color: AppColors.accent,
@@ -137,7 +140,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
               const Spacer(),
               TextButton(
                 onPressed: () => _showSTARGuide(context),
-                child: const Text('详细指南'),
+                child: Text(l10n.get('详细指南')),
               ),
             ],
           ),
@@ -183,35 +186,35 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader('项目信息', Icons.work_outline, isDark),
+          _buildSectionHeader(l10n.get('项目信息'), Icons.work_outline, isDark),
           const SizedBox(height: 12),
           
           // 项目名称
           TextFormField(
             controller: _projectNameController,
             decoration: InputDecoration(
-              labelText: '项目名称',
-              hintText: '例如：电商秒杀系统、分布式缓存方案',
+              labelText: l10n.get('项目名称'),
+              hintText: l10n.get('例如：电商秒杀系统、分布式缓存方案'),
               prefixIcon: const Icon(Icons.folder_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            validator: (v) => v?.trim().isEmpty == true ? '请输入项目名称' : null,
+            validator: (v) => v?.trim().isEmpty == true ? l10n.get('请输入项目名称') : null,
           ),
           const SizedBox(height: 16),
           
           // 你的角色
-          _buildSectionHeader('你的角色', Icons.person_outline, isDark),
+          _buildSectionHeader(l10n.get('你的角色'), Icons.person_outline, isDark),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              ('developer', '开发工程师'),
-              ('tech_lead', '技术负责人'),
-              ('architect', '架构师'),
-              ('pm', '项目经理'),
+              ('developer', l10n.get('开发工程师')),
+              ('tech_lead', l10n.get('技术负责人')),
+              ('architect', l10n.get('架构师')),
+              ('pm', l10n.get('项目经理')),
             ].map((role) => ChoiceChip(
               label: Text(role.$2),
               selected: _selectedRole == role.$1,
@@ -223,15 +226,15 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           const SizedBox(height: 16),
           
           // 项目规模
-          _buildSectionHeader('项目规模', Icons.scale_outlined, isDark),
+          _buildSectionHeader(l10n.get('项目规模'), Icons.scale_outlined, isDark),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              ('small', '小型（1-3人）'),
-              ('medium', '中型（4-10人）'),
-              ('large', '大型（10人以上）'),
+              ('small', l10n.get('小型（1-3人）')),
+              ('medium', l10n.get('中型（4-10人）')),
+              ('large', l10n.get('大型（10人以上）')),
             ].map((scale) => ChoiceChip(
               label: Text(scale.$2),
               selected: _selectedScale == scale.$1,
@@ -243,7 +246,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           const SizedBox(height: 16),
           
           // 技术栈
-          _buildSectionHeader('技术栈', Icons.code_outlined, isDark),
+          _buildSectionHeader(l10n.get('技术栈'), Icons.code_outlined, isDark),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -271,7 +274,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           const SizedBox(height: 16),
           
           // STAR 详细描述
-          _buildSectionHeader('STAR 详细描述', Icons.description_outlined, isDark),
+          _buildSectionHeader(l10n.get('STAR 详细描述'), Icons.description_outlined, isDark),
           const SizedBox(height: 8),
           
           // Situation - 背景
@@ -279,8 +282,8 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             controller: _backgroundController,
             maxLines: 3,
             decoration: InputDecoration(
-              labelText: 'Situation（背景）',
-              hintText: '项目背景、业务场景、面临的问题',
+              labelText: l10n.get('Situation（背景）'),
+              hintText: l10n.get('项目背景、业务场景、面临的问题'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -293,8 +296,8 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             controller: _techDecisionController,
             maxLines: 3,
             decoration: InputDecoration(
-              labelText: 'Task（任务）',
-              hintText: '你的职责、需要达成的目标',
+              labelText: l10n.get('Task（任务）'),
+              hintText: l10n.get('你的职责、需要达成的目标'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -307,8 +310,8 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             controller: _difficultyController,
             maxLines: 4,
             decoration: InputDecoration(
-              labelText: 'Action（行动）',
-              hintText: '技术方案、具体实现、遇到的难点及解决方案',
+              labelText: l10n.get('Action（行动）'),
+              hintText: l10n.get('技术方案、具体实现、遇到的难点及解决方案'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -321,8 +324,8 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             controller: _resultController,
             maxLines: 3,
             decoration: InputDecoration(
-              labelText: 'Result（结果）',
-              hintText: '取得的成果、数据指标、经验总结',
+              labelText: l10n.get('Result（结果）'),
+              hintText: l10n.get('取得的成果、数据指标、经验总结'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -352,18 +355,18 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
 
   Widget _buildCommonQuestions(BuildContext context, bool isDark) {
     final questions = [
-      ('技术决策', '为什么选择这个技术方案？考虑过哪些替代方案？'),
-      ('难点攻克', '项目中遇到的最大技术难点是什么？如何解决的？'),
-      ('性能优化', '做过哪些性能优化？效果如何？'),
-      ('故障处理', '线上出过什么故障？如何排查和解决的？'),
-      ('架构设计', '系统的整体架构是怎样的？为什么这样设计？'),
-      ('团队协作', '如何协调团队成员？遇到分歧怎么处理？'),
+      (l10n.get('技术决策'), '为什么选择这个技术方案？考虑过哪些替代方案？'),
+      (l10n.get('难点攻克'), '项目中遇到的最大技术难点是什么？如何解决的？'),
+      (l10n.get('性能优化'), '做过哪些性能优化？效果如何？'),
+      (l10n.get('故障处理'), '线上出过什么故障？如何排查和解决的？'),
+      (l10n.get('架构设计'), '系统的整体架构是怎样的？为什么这样设计？'),
+      (l10n.get('团队协作'), '如何协调团队成员？遇到分歧怎么处理？'),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('常见深挖问题', Icons.help_outline, isDark),
+        _buildSectionHeader(l10n.get('常见深挖问题'), Icons.help_outline, isDark),
         const SizedBox(height: 12),
         ...questions.map((q) => Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -410,7 +413,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('已保存项目', Icons.folder_outlined, isDark),
+        _buildSectionHeader(l10n.get('已保存项目'), Icons.folder_outlined, isDark),
         const SizedBox(height: 12),
         ..._savedProjects.map((project) => Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -463,7 +466,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           child: FilledButton.icon(
             onPressed: _saveAndPractice,
             icon: const Icon(Icons.save_outlined),
-            label: const Text('保存并开始深挖练习'),
+            label: Text(l10n.get('保存并开始深挖练习')),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -475,7 +478,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           child: OutlinedButton.icon(
             onPressed: () => _startRandomDig(context),
             icon: const Icon(Icons.shuffle),
-            label: const Text('随机项目深挖练习'),
+            label: Text(l10n.get('随机项目深挖练习')),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -489,7 +492,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('STAR 法则详解'),
+        title: Text(l10n.get('STAR 法则详解')),
         content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,7 +521,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
+            child: Text(l10n.get('知道了')),
           ),
         ],
       ),
@@ -566,15 +569,15 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('项目深挖练习'),
+        title: Text(l10n.get('项目深挖练习')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('项目：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(l10n.getp('项目：{name}', {'name': project['name']}), style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
-              const Text('面试官可能会问：', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('面试官可能会问：'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...questions.map((q) => _buildDigQuestion(q)),
             ],
@@ -583,7 +586,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
+            child: Text(l10n.get('关闭')),
           ),
           FilledButton(
             onPressed: () {
@@ -591,7 +594,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
               // 返回项目数据
               Navigator.of(context).pop(project);
             },
-            child: const Text('开始练习'),
+            child: Text(l10n.get('开始练习')),
           ),
         ],
       ),
@@ -614,7 +617,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   void _startRandomDig(BuildContext context) {
     if (_savedProjects.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先添加项目')),
+        SnackBar(content: Text(l10n.get('请先添加项目'))),
       );
       return;
     }
@@ -624,7 +627,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     final project = random.first;
     
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已选择项目：${project['name']}')),
+      SnackBar(content: Text('${l10n.get('已选择项目')}：${project['name']}')),
     );
     
     _startDigPractice(project);

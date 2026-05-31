@@ -40,7 +40,7 @@ class InterviewPrepPage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         WorkPanel(
-          title: plan.hasTarget ? '面试准备 · ${plan.targetRole}' : l10n.get('通用技术面试准备'),
+          title: plan.hasTarget ? l10n.getp('面试准备 · {role}', {'role': plan.targetRole}) : l10n.get('通用技术面试准备'),
           trailing: FilledButton.tonalIcon(
             onPressed: () => _showPlanDialog(context, progress, plan, l10n),
             icon: const Icon(Icons.tune_outlined),
@@ -60,19 +60,19 @@ class InterviewPrepPage extends StatelessWidget {
                   _PrepMetric(
                     label: l10n.get('今日待复习'),
                     value: '$reviewCount',
-                    suffix: '项',
+                    suffix: l10n.get('项'),
                     color: AppColors.warning,
                   ),
                   _PrepMetric(
                     label: l10n.get('高频未稳'),
                     value: '$highFrequencyUnmastered',
-                    suffix: '项',
+                    suffix: l10n.get('项'),
                     color: AppColors.accent,
                   ),
                   _PrepMetric(
                     label: l10n.get('低分回流'),
                     value: '$lowScoreCount',
-                    suffix: '次',
+                    suffix: l10n.get('次'),
                     color: AppColors.danger,
                   ),
                 ];
@@ -212,8 +212,8 @@ class InterviewPrepPage extends StatelessWidget {
   String _targetDescription(BuildContext context, PrepPlan plan) {
     final l10n = context.watch<LocalizationProvider>();
     final parts = <String>[];
-    if (plan.techStack.isNotEmpty) parts.add('技术栈：${plan.techStack}');
-    if (plan.dailyMinutes > 0) parts.add('每日 ${plan.dailyMinutes} 分钟');
+    if (plan.techStack.isNotEmpty) parts.add(l10n.getp('技术栈：{techStack}', {'techStack': plan.techStack}));
+    if (plan.dailyMinutes > 0) parts.add(l10n.getp('每日 {minutes} 分钟', {'minutes': plan.dailyMinutes}));
     if (plan.interviewDate != null) {
       final days = plan.interviewDate!.difference(DateTime.now()).inDays + 1;
       parts.add(days > 0 ? '距离面试 $days 天' : l10n.get('面试日期已到'));
@@ -268,7 +268,7 @@ class InterviewPrepPage extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: Text('每日投入 $dailyMinutes 分钟')),
+                      Expanded(child: Text(l10n.getp('每日投入 {minutes} 分钟', {'minutes': dailyMinutes}))),
                       IconButton(
                         onPressed: dailyMinutes > 15
                             ? () => setDialogState(() => dailyMinutes -= 15)
@@ -303,7 +303,7 @@ class InterviewPrepPage extends StatelessWidget {
                     label: Text(
                       interviewDate == null
                           ? l10n.get('选择面试日期_可选')
-                          : '面试日期：${interviewDate!.year}-${interviewDate!.month}-${interviewDate!.day}',
+                          : l10n.getp('面试日期：{year}-{month}-{day}', {'year': interviewDate!.year, 'month': interviewDate!.month, 'day': interviewDate!.day}),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -489,7 +489,7 @@ class _JdAnalysisSection extends StatelessWidget {
     return WorkPanel(
       title: l10n.get('JD_匹配分析'),
       trailing: Text(
-        '${matchedTopics.length} 项匹配',
+        l10n.getp('{count} 项匹配', {'count': matchedTopics.length}),
         style: TextStyle(
           fontSize: 12,
           color: AppColors.accent,

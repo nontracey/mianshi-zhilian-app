@@ -14,6 +14,7 @@ import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../../providers/localization_provider.dart';
 
 class RecallPage extends StatefulWidget {
   const RecallPage({super.key, required this.topicIds});
@@ -25,6 +26,7 @@ class RecallPage extends StatefulWidget {
 }
 
 class _RecallPageState extends State<RecallPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   int _currentIndex = 0;
   final _answerController = TextEditingController();
   bool _isEvaluating = false;
@@ -49,8 +51,9 @@ class _RecallPageState extends State<RecallPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     if (widget.topicIds.isEmpty) {
-      return const Center(child: Text('没有可练习的知识点'));
+      return Center(child: Text(l10n.get('没有可练习的知识点')));
     }
 
     final contentProvider = context.watch<ContentProvider>();
@@ -58,7 +61,7 @@ class _RecallPageState extends State<RecallPage> {
     final topic = contentProvider.findTopic(widget.topicIds[_currentIndex]);
 
     if (topic == null) {
-      return const Center(child: Text('知识点未找到'));
+      return Center(child: Text(l10n.get('知识点未找到')));
     }
 
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -230,18 +233,18 @@ class _RecallPageState extends State<RecallPage> {
             children: [
               _InputModeTab(
                 icon: Icons.notes_outlined,
-                label: '文本',
+                label: l10n.get('文本'),
                 value: 'text',
                 selected: _inputMode == 'text',
                 onTap: () => setState(() => _inputMode = 'text'),
               ),
               _InputModeTab(
                 icon: Icons.mic_outlined,
-                label: '语音',
+                label: l10n.get('语音'),
                 value: 'voice',
                 selected: _inputMode == 'voice',
                 enabled: supportsAudio,
-                disabledTooltip: '当前模型不支持语音输入',
+                disabledTooltip: l10n.get('当前模型不支持语音输入'),
                 onTap: () => setState(() {
                   _inputMode = 'voice';
                   _voiceTranscribed = false;
@@ -249,16 +252,16 @@ class _RecallPageState extends State<RecallPage> {
               ),
               _InputModeTab(
                 icon: Icons.image_outlined,
-                label: '图片',
+                label: l10n.get('图片'),
                 value: 'image',
                 selected: _inputMode == 'image',
                 enabled: supportsImage,
-                disabledTooltip: '当前模型不支持图片输入',
+                disabledTooltip: l10n.get('当前模型不支持图片输入'),
                 onTap: () => setState(() => _inputMode = 'image'),
               ),
               _InputModeTab(
                 icon: Icons.code,
-                label: '代码',
+                label: l10n.get('代码'),
                 value: 'code',
                 selected: _inputMode == 'code',
                 onTap: () => setState(() => _inputMode = 'code'),
@@ -296,10 +299,10 @@ class _RecallPageState extends State<RecallPage> {
                   : const Icon(Icons.auto_awesome),
               label: Text(
                 _isEvaluating
-                    ? '评估中...'
+                    ? l10n.get('评估中')
                     : aiProvider.enabledConfigs.isEmpty
-                    ? '保存本地练习'
-                    : '获取 AI 评估',
+                    ? l10n.get('保存本地练习')
+                    : l10n.get('获取_AI_评估'),
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -324,7 +327,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '未配置 AI 模型，将保存为本地练习。配置后可获得深度评分。',
+                    l10n.get('未配置_AI_模型_将保存为本地练习_配置后可获得深度评分'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -376,15 +379,15 @@ class _RecallPageState extends State<RecallPage> {
                   children: [
                     Text(
                       _voiceTranscribed
-                          ? '语音已转写，可编辑后添加到回答'
-                          : '点击麦克风开始语音复述',
+                          ? l10n.get('语音已转写_可编辑后添加到回答')
+                          : l10n.get('点击麦克风开始语音复述'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
-                    const Text(
-                      '转写文本可独立编辑，确认后添加到回答',
+                    Text(
+                      l10n.get('转写文本可独立编辑_确认后添加到回答'),
                       style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -408,12 +411,12 @@ class _RecallPageState extends State<RecallPage> {
                 minLines: 3,
                 maxLines: 8,
                 decoration: InputDecoration(
-                  hintText: '语音转写结果...',
+                  hintText: l10n.get('语音转写结果'),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(12),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, size: 18),
-                    tooltip: '清空转写',
+                    tooltip: l10n.get('清空转写'),
                     onPressed: () {
                       setState(() {
                         _voiceTranscriptController.clear();
@@ -439,12 +442,12 @@ class _RecallPageState extends State<RecallPage> {
                           _voiceTranscribed = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已添加到回答'), duration: Duration(seconds: 1)),
+                          SnackBar(content: Text(l10n.get('已添加到回答')), duration: Duration(seconds: 1)),
                         );
                       }
                     },
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('添加到回答'),
+                    label: Text(l10n.get('添加到回答')),
                   ),
                 ),
               ],
@@ -488,7 +491,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '已选择: ${_selectedImageName ?? "图片"}',
+                    '已选择: ${_selectedImageName ?? l10n.get('图片')}',
                     style: const TextStyle(fontSize: 12, color: AppColors.success),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -498,7 +501,7 @@ class _RecallPageState extends State<RecallPage> {
                     _selectedImageBytes = null;
                     _selectedImageName = null;
                   }),
-                  child: const Text('移除', style: TextStyle(fontSize: 12)),
+                  child: Text(l10n.get('移除'), style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -508,10 +511,10 @@ class _RecallPageState extends State<RecallPage> {
               children: [
                 const Icon(Icons.image_outlined, color: AppColors.success),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    '添加截图、架构图等，AI 将结合图片评估',
-                    style: TextStyle(fontSize: 13),
+                    l10n.get('添加截图_架构图等_AI_将结合图片评估'),
+                    style: const TextStyle(fontSize: 13),
                   ),
                 ),
               ],
@@ -523,7 +526,7 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined, size: 16),
-                    label: const Text('相册', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.get('相册'), style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -531,7 +534,7 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                    label: const Text('拍照', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.get('拍照'), style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ],
@@ -558,7 +561,7 @@ class _RecallPageState extends State<RecallPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('选择图片失败: $e')),
+          SnackBar(content: Text(l10n.getp('选择图片失败: {error}', {'error': e}))),
         );
       }
     }
@@ -588,8 +591,8 @@ class _RecallPageState extends State<RecallPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'AI 正在分析...',
+              Text(
+                l10n.get('AI_正在分析'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -605,7 +608,7 @@ class _RecallPageState extends State<RecallPage> {
           ),
           // 闪烁光标效果
           if (_isStreaming)
-            const Text(
+            Text(
               '▊',
               style: TextStyle(
                 color: AppColors.accent,
@@ -625,8 +628,8 @@ class _RecallPageState extends State<RecallPage> {
     if (_selectedImageBytes != null) {
       final confirmed = await PrivacyService.confirmUpload(
         context: context,
-        dataType: '图片',
-        dataDescription: '你选择的图片将发送给 AI 进行评估分析。',
+        dataType: l10n.get('图片'),
+        dataDescription: l10n.get('你选择的图片将发送给_AI_进行评估分析'),
       );
       if (!confirmed) return;
     }
@@ -684,7 +687,7 @@ class _RecallPageState extends State<RecallPage> {
               _isStreaming = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('流式输出失败：$error')),
+              SnackBar(content: Text(l10n.getp('流式输出失败：{error}', {'error': error}))),
             );
           }
         },
@@ -766,7 +769,7 @@ class _RecallPageState extends State<RecallPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('评估失败：$e')));
+        ).showSnackBar(SnackBar(content: Text(l10n.getp('评估失败：{error}', {'error': e}))));
       }
     } finally {
       if (mounted) {
@@ -781,11 +784,11 @@ class _RecallPageState extends State<RecallPage> {
     final wrong =
         (result['wrongPoints'] ?? result['errorPoints']) as List<dynamic>? ??
         [];
-    if (missed.isNotEmpty) tags.add('概念缺失');
-    if (wrong.isNotEmpty) tags.add('概念混淆');
+    if (missed.isNotEmpty) tags.add(l10n.get('概念缺失'));
+    if (wrong.isNotEmpty) tags.add(l10n.get('概念混淆'));
     final summary = (result['summary'] ?? '').toString();
     if (summary.contains('表达') || summary.contains('结构')) {
-      tags.add('表达不清');
+      tags.add(l10n.get('表达不清'));
     }
     return tags;
   }
@@ -824,6 +827,7 @@ class _QuestionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -859,8 +863,8 @@ class _QuestionPanel extends StatelessWidget {
                     color: AppColors.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text(
-                    '高频',
+                  child: Text(
+                    l10n.get('高频'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -874,7 +878,7 @@ class _QuestionPanel extends StatelessWidget {
           Text(
             topic.recallPrompts.isNotEmpty
                 ? topic.recallPrompts.first.prompt
-                : '请用自己的话解释 ${topic.title} 的核心内容。',
+                : l10n.getp('请用自己的话解释 {title} 的核心内容。', {'title': topic.title}),
             style: const TextStyle(fontSize: 15, height: 1.6),
           ),
           if (topic.interviewerFocus?.isNotEmpty == true) ...[
@@ -896,7 +900,7 @@ class _QuestionPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '面试官关注：${topic.interviewerFocus}',
+                      '${l10n.get('面试官关注')}${topic.interviewerFocus}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -922,6 +926,7 @@ class _RubricPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final mustHave = rubric.mustHave as List<dynamic>? ?? [];
     final commonMistakes = rubric.commonMistakes as List<dynamic>? ?? [];
 
@@ -939,8 +944,8 @@ class _RubricPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '评分要点',
+          Text(
+            l10n.get('评分要点'),
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           if (mustHave.isNotEmpty) ...[
@@ -971,7 +976,7 @@ class _RubricPanel extends StatelessWidget {
           if (commonMistakes.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              '常见错误：',
+              l10n.get('常见错误'),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -1010,9 +1015,11 @@ class _ModelSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final aiProvider = context.watch<AiProvider>();
     final configs = aiProvider.enabledConfigs;
     if (configs.isEmpty) {
+      final l10n = context.watch<LocalizationProvider>();
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -1023,12 +1030,12 @@ class _ModelSelector extends StatelessWidget {
           children: [
             const Icon(Icons.hub_outlined, size: 18),
             const SizedBox(width: 8),
-            const Expanded(child: Text('未配置 AI 模型，本次使用本地练习模式')),
+            Expanded(child: Text(l10n.get('未配置_AI_模型_本次使用本地练习模式'))),
             TextButton(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请到个人中心 -> AI 配置添加你的模型')),
+                SnackBar(content: Text(l10n.get('请到个人中心__AI_配置添加你的模型'))),
               ),
-              child: const Text('去配置'),
+              child: Text(l10n.get('去配置')),
             ),
           ],
         ),
@@ -1042,7 +1049,7 @@ class _ModelSelector extends StatelessWidget {
           ? selected
           : configs.first.id,
       decoration: InputDecoration(
-        labelText: '评分模型',
+        labelText: l10n.get('评分模型'),
         isDense: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1081,15 +1088,16 @@ class _CapabilityTags extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final tags = <Widget>[];
     if (config.supportsTextInput == true) {
-      tags.add(_tag('文本', AppColors.accent));
+      tags.add(_tag(l10n.get('文本'), AppColors.accent));
     }
     if (config.supportsImageInput == true) {
-      tags.add(_tag('图片', AppColors.success));
+      tags.add(_tag(l10n.get('图片'), AppColors.success));
     }
     if (config.supportsAudioInput == true) {
-      tags.add(_tag('语音', AppColors.warning));
+      tags.add(_tag(l10n.get('语音'), AppColors.warning));
     }
     if (tags.isEmpty) return const SizedBox();
     return Row(mainAxisSize: MainAxisSize.min, children: tags);
@@ -1204,6 +1212,7 @@ class _AnswerInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return TextField(
       controller: controller,
       minLines: 6,
@@ -1213,10 +1222,10 @@ class _AnswerInputField extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         hintText: switch (inputMode) {
-          'code' => '写下思路、复杂度、边界条件或代码...',
-          'image' => '描述图片/架构图/手写笔记中的关键信息...',
-          'voice' => '语音转写文本会出现在上方编辑区，确认后添加到这里...',
-          _ => '在这里输入你的复述答案...',
+          'code' => l10n.get('写下思路_复杂度_边界条件或代码'),
+          'image' => l10n.get('描述图片_架构图_手写笔记中的关键信息'),
+          'voice' => l10n.get('语音转写文本会出现在上方编辑区_确认后添加到这里'),
+          _ => l10n.get('在这里输入你的复述答案'),
         },
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1238,12 +1247,13 @@ class _ProgressIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         children: [
           Text(
-            '第 $current / $total 题',
+            l10n.getp('第 {current} / {total} 题', {'current': current, 'total': total}),
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           const SizedBox(width: 16),
@@ -1281,6 +1291,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final result = widget.result;
     final score = result['score'] as int? ?? 0;
     final missed = result['missedPoints'] as List<dynamic>? ?? [];
@@ -1324,7 +1335,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
               ),
               const SizedBox(width: 8),
               Text(
-                aiUnavailable ? '本地练习已保存' : 'AI 评估结果',
+                aiUnavailable ? l10n.get('本地练习已保存') : l10n.get('AI_评估结果'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -1345,13 +1356,16 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
               builder: (context) {
                 final tags = <(String, IconData, Color)>[];
                 if (missed.isNotEmpty) {
-                  tags.add(('概念缺失', Icons.visibility_off_outlined, AppColors.warning));
+                  final l10n = context.watch<LocalizationProvider>();
+                  tags.add((l10n.get('概念缺失'), Icons.visibility_off_outlined, AppColors.warning));
                 }
                 if (errors.isNotEmpty) {
-                  tags.add(('概念混淆', Icons.swap_horiz, AppColors.danger));
+                  final l10n = context.watch<LocalizationProvider>();
+                  tags.add((l10n.get('概念混淆'), Icons.swap_horiz, AppColors.danger));
                 }
                 if (summary.contains('表达') || summary.contains('结构')) {
-                  tags.add(('表达不清', Icons.chat_bubble_outline, AppColors.info));
+                  final l10n = context.watch<LocalizationProvider>();
+                  tags.add((l10n.get('表达不清'), Icons.chat_bubble_outline, AppColors.info));
                 }
                 if (tags.isEmpty) return const SizedBox.shrink();
                 return Padding(
@@ -1417,8 +1431,8 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                             color: AppColors.accent,
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '查看参考答案',
+                          Text(
+                            l10n.get('查看参考答案'),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -1462,15 +1476,15 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '自评掌握程度',
+                  Text(
+                    l10n.get('自评掌握程度'),
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       _SelfEvalChip(
-                        label: '不太理解',
+                        label: l10n.get('不太理解'),
                         icon: Icons.sentiment_dissatisfied,
                         color: AppColors.danger,
                         selected: _selfScore == 0,
@@ -1478,7 +1492,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: '部分理解',
+                        label: l10n.get('部分理解'),
                         icon: Icons.sentiment_neutral,
                         color: AppColors.warning,
                         selected: _selfScore == 1,
@@ -1486,7 +1500,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: '理解良好',
+                        label: l10n.get('理解良好'),
                         icon: Icons.sentiment_satisfied,
                         color: AppColors.success,
                         selected: _selfScore == 2,
@@ -1504,7 +1518,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.tips_and_updates_outlined,
-              label: '遗漏点',
+              label: l10n.get('遗漏点'),
               color: AppColors.warning,
             ),
             const SizedBox(height: 8),
@@ -1520,7 +1534,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.cancel_outlined,
-              label: '错误点',
+              label: l10n.get('错误点'),
               color: AppColors.danger,
             ),
             const SizedBox(height: 8),
@@ -1536,7 +1550,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.auto_fix_high_outlined,
-              label: '优化回答',
+              label: l10n.get('优化回答'),
               color: AppColors.success,
             ),
             const SizedBox(height: 8),
@@ -1598,7 +1612,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 );
               },
               icon: const Icon(Icons.library_books_outlined, size: 16),
-              label: const Text('查看回答版本库'),
+              label: Text(l10n.get('查看回答版本库')),
             ),
           ],
         ],
@@ -1733,6 +1747,7 @@ class _NavigationButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -1741,12 +1756,12 @@ class _NavigationButtons extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: hasPrevious ? onPrevious : null,
             icon: const Icon(Icons.arrow_back, size: 18),
-            label: const Text('上一个'),
+            label: Text(l10n.get('上一个')),
           ),
           FilledButton.icon(
             onPressed: hasNext ? onNext : null,
             icon: const Icon(Icons.arrow_forward, size: 18),
-            label: const Text('下一个'),
+            label: Text(l10n.get('下一个')),
           ),
         ],
       ),
@@ -1779,6 +1794,7 @@ class _BottomActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -1827,10 +1843,10 @@ class _BottomActionBar extends StatelessWidget {
                     : const Icon(Icons.auto_awesome, size: 18),
                 label: Text(
                   isEvaluating
-                      ? '评估中...'
+                      ? l10n.get('评估中')
                       : hasAi
-                      ? 'AI 评估'
-                      : '保存练习',
+                      ? l10n.get('AI_评估')
+                      : l10n.get('保存练习'),
                 ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),

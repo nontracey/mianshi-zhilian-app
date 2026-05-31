@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/pages/practice/weakness_training_page.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
+import '../../providers/localization_provider.dart';
 
 class PracticePage extends StatelessWidget {
   const PracticePage({
@@ -25,6 +26,7 @@ class PracticePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final progressProvider = context.watch<ProgressProvider>();
     final reviewCount = progressProvider.getReviewCount(currentDomainId);
     final contentProvider = context.watch<ContentProvider>();
@@ -33,13 +35,14 @@ class PracticePage extends StatelessWidget {
 
     // 还没有加载到任何知识点时显示空状态
     if (domainTopics.isEmpty && contentProvider.isLoadingTopics) {
+      final l10n = context.watch<LocalizationProvider>();
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text('正在加载知识点...', style: TextStyle(color: Colors.grey.shade500)),
+            Text(l10n.get('正在加载知识点'), style: TextStyle(color: Colors.grey.shade500)),
           ],
         ),
       );
@@ -55,7 +58,7 @@ class PracticePage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         Text(
-          '选择练习模式',
+          l10n.get('选择练习模式'),
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -75,8 +78,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.today_outlined,
-                    title: '今日复习',
-                    subtitle: '基于遗忘曲线，今天有 $reviewCount 个知识点待复习',
+                    title: l10n.get('今日复习'),
+                    subtitle: l10n.getp('基于遗忘曲线，今天有 {count} 个知识点待复习', {'count': reviewCount}),
                     color: AppColors.accent,
                     onTap: onDailyReview,
                   ),
@@ -85,8 +88,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.casino_outlined,
-                    title: '随机抽问',
-                    subtitle: '选择领域后随机抽取知识点进行复述练习',
+                    title: l10n.get('随机抽问'),
+                    subtitle: l10n.get('选择领域后随机抽取知识点进行复述练习'),
                     color: AppColors.success,
                     onTap: () => _showDomainPicker(context, domains),
                   ),
@@ -95,8 +98,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.question_answer_outlined,
-                    title: '追问训练',
-                    subtitle: '模拟面试官追问，深入练习知识点',
+                    title: l10n.get('追问训练'),
+                    subtitle: l10n.get('模拟面试官追问_深入练习知识点'),
                     color: AppColors.categoryPurple,
                     onTap: () => _startFollowUpTraining(context, domainTopics),
                   ),
@@ -105,8 +108,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.trending_down_outlined,
-                    title: '弱点训练包',
-                    subtitle: '针对薄弱知识点进行专项训练',
+                    title: l10n.get('弱点训练包'),
+                    subtitle: l10n.get('针对薄弱知识点进行专项训练'),
                     color: AppColors.danger,
                     onTap: () => _startWeaknessTraining(context),
                   ),
@@ -115,8 +118,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.local_fire_department_outlined,
-                    title: '高频冲刺',
-                    subtitle: '针对高频面试题进行强化训练',
+                    title: l10n.get('高频冲刺'),
+                    subtitle: l10n.get('针对高频面试题进行强化训练'),
                     color: AppColors.warning,
                     onTap: () => _startHighFrequencyTraining(context, domainTopics),
                   ),
@@ -125,8 +128,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.work_outline,
-                    title: '项目深挖',
-                    subtitle: 'STAR法则练习，深入项目细节',
+                    title: l10n.get('项目深挖'),
+                    subtitle: l10n.get('STAR法则练习_深入项目细节'),
                     color: AppColors.categoryGreen,
                     onTap: () => _startProjectDig(context),
                   ),
@@ -135,8 +138,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.architecture_outlined,
-                    title: '系统设计',
-                    subtitle: '系统设计面试练习',
+                    title: l10n.get('系统设计'),
+                    subtitle: l10n.get('系统设计面试练习'),
                     color: AppColors.categoryAmber,
                     onTap: () => _startSystemDesign(context),
                   ),
@@ -145,8 +148,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.groups_outlined,
-                    title: '模拟面试',
-                    subtitle: '连续多题模式，模拟真实面试场景',
+                    title: l10n.get('模拟面试'),
+                    subtitle: l10n.get('连续多题模式_模拟真实面试场景'),
                     color: AppColors.categoryRed,
                     onTap: onMockInterview,
                   ),
@@ -160,10 +163,11 @@ class PracticePage extends StatelessWidget {
   }
 
   void _showDomainPicker(BuildContext context, List domains) {
+    final l10n = context.watch<LocalizationProvider>();
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('选择领域'),
+        title: Text(l10n.get('选择领域')),
         children: domains
             .map<SimpleDialogOption>(
               (domain) => SimpleDialogOption(
@@ -186,8 +190,9 @@ class PracticePage extends StatelessWidget {
         .toList();
     
     if (topicsWithFollowUps.isEmpty) {
+      final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前领域没有可追问的知识点')),
+        SnackBar(content: Text(l10n.get('当前领域没有可追问的知识点'))),
       );
       return;
     }
@@ -219,8 +224,9 @@ class PracticePage extends StatelessWidget {
         .toList();
     
     if (highFrequencyTopics.isEmpty) {
+      final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前领域没有高频知识点')),
+        SnackBar(content: Text(l10n.get('当前领域没有高频知识点'))),
       );
       return;
     }
@@ -263,6 +269,7 @@ class _EmptyPracticeState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Center(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 40),
@@ -290,13 +297,13 @@ class _EmptyPracticeState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              '暂无可练习的知识点',
+            Text(
+              l10n.get('暂无可练习的知识点'),
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              '知识点正在加载中，请稍等片刻再试',
+              l10n.get('知识点正在加载中_请稍等片刻再试'),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -304,7 +311,7 @@ class _EmptyPracticeState extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('重新加载'),
+              label: Text(l10n.get('重新加载')),
             ),
           ],
         ),

@@ -7,6 +7,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../providers/localization_provider.dart';
 
 class HeaderBar extends StatefulWidget {
   const HeaderBar({
@@ -27,6 +28,7 @@ class HeaderBar extends StatefulWidget {
 }
 
 class _HeaderBarState extends State<HeaderBar> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   List<Topic> _searchResults = [];
@@ -113,7 +115,7 @@ class _HeaderBarState extends State<HeaderBar> {
                   child: Row(
                     children: [
                       Text(
-                        '搜索结果',
+                        l10n.get('搜索结果'),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -122,7 +124,7 @@ class _HeaderBarState extends State<HeaderBar> {
                       ),
                       const Spacer(),
                       Text(
-                        '${_searchResults.length} 项',
+                        l10n.getp('{count} 项', {'count': _searchResults.length}),
                         style: TextStyle(
                           fontSize: 11,
                           color: isDark ? Colors.white38 : Colors.grey.shade400,
@@ -211,8 +213,8 @@ class _HeaderBarState extends State<HeaderBar> {
                                               color: AppColors.warning.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(3),
                                             ),
-                                            child: const Text(
-                                              '高频',
+                                            child: Text(
+                                              l10n.get('高频'),
                                               style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.w600,
@@ -260,7 +262,7 @@ class _HeaderBarState extends State<HeaderBar> {
           onChanged: _onSearchChanged,
           style: const TextStyle(fontSize: 13),
           decoration: InputDecoration(
-            hintText: '搜索知识点...',
+            hintText: l10n.get('搜索知识点'),
             hintStyle: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.grey.shade400,
@@ -297,6 +299,7 @@ class _HeaderBarState extends State<HeaderBar> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final aiProvider = context.watch<AiProvider>();
     final authProvider = context.watch<AuthProvider>();
@@ -304,7 +307,7 @@ class _HeaderBarState extends State<HeaderBar> {
     // 获取当前使用的AI模型名称
     final currentModelName = aiProvider.configs.isNotEmpty
         ? aiProvider.configs.first.name
-        : '未配置 AI 模型';
+        : l10n.get('未配置_AI_模型');
 
     final surfaceColor = Theme.of(context).colorScheme.surface;
     final borderColor = Theme.of(context).colorScheme.outline;
@@ -378,6 +381,7 @@ class _AiModelSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -399,7 +403,7 @@ class _AiModelSelector extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              hasConfig ? modelName : '未配置 AI',
+              hasConfig ? modelName : l10n.get('未配置_AI'),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -432,21 +436,23 @@ class _ContentStageSelector extends StatefulWidget {
 }
 
 class _ContentStageSelectorState extends State<_ContentStageSelector> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   String _currentStage = 'published';
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final allowedEnvs = widget.userRole.allowedContentEnvs;
     final stages = [
-      ('published', '发布', true),   // 所有用户可用
-      ('testing', '测试', allowedEnvs.contains('testing')), // 根据角色
-      ('draft', '草稿', allowedEnvs.contains('draft')),   // 根据角色
+      ('published', l10n.get('发布'), true),   // 所有用户可用
+      ('testing', l10n.get('测试'), allowedEnvs.contains('testing')), // 根据角色
+      ('draft', l10n.get('草稿'), allowedEnvs.contains('draft')),   // 根据角色
     ];
 
     return Row(
       children: [
         Text(
-          '内容',
+          l10n.get('内容'),
           style: TextStyle(
             fontSize: 12,
             color: widget.isDark ? Colors.white54 : const Color(0xFF666666),
@@ -472,8 +478,8 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                       }
                     : () {
                         final message = widget.userRole == UserRole.guest
-                            ? '登录后可查看测试版内容'
-                            : '需要管理员权限查看草稿内容';
+                            ? l10n.get('登录后可查看测试版内容')
+                            : l10n.get('需要管理员权限查看草稿内容');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(message),

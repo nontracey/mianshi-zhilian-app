@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../l10n/l10n.dart';
 import '../models/user.dart';
 import '../services/storage_service.dart';
 
@@ -72,13 +73,13 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? '注册失败';
+        _error = data['error'] as String? ?? L10n.get('register_failed', 'zh');
         _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = '网络错误：$e';
+      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
       _isLoading = false;
       notifyListeners();
       return false;
@@ -108,13 +109,13 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? '登录失败';
+        _error = data['error'] as String? ?? L10n.get('login_failed', 'zh');
         _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = '网络错误：$e';
+      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
       _isLoading = false;
       notifyListeners();
       return false;
@@ -190,7 +191,7 @@ class AuthProvider extends ChangeNotifier {
     required String newPassword,
   }) async {
     if (!isLoggedIn) {
-      _error = '请先登录';
+      _error = L10n.get('please_login_first', 'zh');
       notifyListeners();
       return false;
     }
@@ -212,12 +213,12 @@ class AuthProvider extends ChangeNotifier {
         return true;
       } else {
         final data = json.decode(response.body);
-        _error = data['error'] ?? '修改密码失败';
+        _error = data['error'] ?? L10n.get('change_password_failed', 'zh');
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = '网络错误：$e';
+      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
       notifyListeners();
       return false;
     }

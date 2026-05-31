@@ -319,7 +319,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('AI 评估失败：$e'),
+            content: Text(l10n.getp('AI 评估失败：{error}', {'error': e})),
             action: SnackBarAction(label: l10n.get('重试'), onPressed: _handleEvaluate),
           ),
         );
@@ -548,7 +548,7 @@ class _TopicHeader extends StatelessWidget {
           ),
           Chip(
             label: Text(
-              '${topic.estimatedMinutes} 分钟',
+              l10n.getp('{minutes} 分钟', {'minutes': topic.estimatedMinutes}),
               style: const TextStyle(fontSize: 12),
             ),
             avatar: const Icon(Icons.timer_outlined, size: 14),
@@ -558,7 +558,9 @@ class _TopicHeader extends StatelessWidget {
           if (topic.highFrequency)
             Chip(
               label: Text(
-                topic.interviewFrequencyLabel ?? l10n.get('高频'),
+                topic.interviewFrequencyLabel != null
+                    ? l10n.get(topic.interviewFrequencyLabel!)
+                    : l10n.get('高频'),
                 style: TextStyle(
                   fontSize: 12,
                   color: topic.interviewFrequency == 'medium'
@@ -2193,7 +2195,7 @@ class _FollowUpSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          '${followUps.length} 题',
+          l10n.getp('{count} 题', {'count': followUps.length}),
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -3400,7 +3402,7 @@ class _AnswerPanel extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${answerController.text.length} 字',
+                    l10n.getp('{count} 字', {'count': answerController.text.length}),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
@@ -3650,6 +3652,7 @@ class _ScoreRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return SizedBox(
       width: size,
       height: size,
@@ -3690,7 +3693,7 @@ class _ScoreRing extends StatelessWidget {
                 ),
               ),
               Text(
-                '分',
+                l10n.get('分'),
                 style: TextStyle(fontSize: size * 0.12, color: _color),
               ),
             ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/ai_config.dart';
 import '../models/topic.dart';
 import '../services/ai_service.dart';
@@ -108,9 +109,11 @@ class AiProvider extends ChangeNotifier {
 
     try {
       final success = await _aiService.testConnection(config);
-      _testResult = success ? '连接成功' : '连接失败';
+      _testResult = success
+          ? L10n.get('connection_success', 'zh')
+          : L10n.get('connection_failed', 'zh');
     } catch (e) {
-      _testResult = '连接失败: $e';
+      _testResult = L10n.getp('connection_failed_with_error', 'zh', {'error': '$e'});
     }
 
     _isTesting = false;
@@ -152,12 +155,12 @@ class AiProvider extends ChangeNotifier {
       return {
         'score': null,
         'level': 'local',
-        'summary': '还没有配置可用的 AI 模型。本次回答已按本地练习保存，配置 AI 后可以重新评估。',
+        'summary': L10n.get('ai_not_configured_summary', 'zh'),
         'missedPoints': <String>[],
         'wrongPoints': <String>[],
         'errorPoints': <String>[],
         'improvedAnswer': '',
-        'nextAction': '前往个人中心配置 AI，或继续本地练习',
+        'nextAction': L10n.get('ai_not_configured_action', 'zh'),
         'aiUnavailable': true,
       };
     }
@@ -167,7 +170,7 @@ class AiProvider extends ChangeNotifier {
       mustHave: rubric?.mustHave ?? [],
       commonMistakes: rubric?.commonMistakes ?? [],
       userAnswer: userAnswer,
-      language: '中文',
+      language: 'zh',
       imageBytes: imageBytes,
     );
   }
@@ -187,12 +190,12 @@ class AiProvider extends ChangeNotifier {
       final result = Future.value({
         'score': null,
         'level': 'local',
-        'summary': '还没有配置可用的 AI 模型。本次回答已按本地练习保存，配置 AI 后可以重新评估。',
+        'summary': L10n.get('ai_not_configured_summary', 'zh'),
         'missedPoints': <String>[],
         'wrongPoints': <String>[],
         'errorPoints': <String>[],
         'improvedAnswer': '',
-        'nextAction': '前往个人中心配置 AI，或继续本地练习',
+        'nextAction': L10n.get('ai_not_configured_action', 'zh'),
         'aiUnavailable': true,
       });
       return (stream: const Stream.empty(), result: result);
@@ -212,7 +215,7 @@ class AiProvider extends ChangeNotifier {
       mustHave: rubric?.mustHave ?? [],
       commonMistakes: rubric?.commonMistakes ?? [],
       userAnswer: userAnswer,
-      language: '中文',
+      language: 'zh',
       imageBytes: imageBytes,
     ).listen(
       (chunk) {
@@ -260,7 +263,7 @@ class AiProvider extends ChangeNotifier {
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
-      'nextAction': '重试',
+      'nextAction': L10n.get('retry', 'zh'),
     };
   }
 
@@ -271,7 +274,7 @@ class AiProvider extends ChangeNotifier {
   }) {
     final config = _defaultConfig ?? _configs.firstWhere(
       (c) => c.enabled,
-      orElse: () => throw Exception('没有可用的 AI 配置'),
+      orElse: () => throw Exception(L10n.get('no_ai_config_available', 'zh')),
     );
     return _aiService.sendMessageStream(
       config: config,

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/localization_provider.dart';
 import '../theme/colors.dart';
 
 class ScoreBadge extends StatelessWidget {
@@ -19,19 +21,23 @@ class ScoreBadge extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: _color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      '$score 分 · $_label',
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.w800,
-        color: _color,
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final label = l10n.get(_label);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
-    ),
-  );
+      child: Text(
+        l10n.getp('{score} 分 · {label}', {'score': '$score', 'label': label}),
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          color: _color,
+        ),
+      ),
+    );
+  }
 }

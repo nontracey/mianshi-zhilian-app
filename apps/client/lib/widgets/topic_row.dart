@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/topic.dart';
 import '../models/user_progress.dart';
+import '../providers/localization_provider.dart';
 import 'status_dot.dart';
 
 class TopicRow extends StatelessWidget {
@@ -19,6 +21,7 @@ class TopicRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final score = progress?.score ?? 0;
 
     return Card(
@@ -31,8 +34,8 @@ class TopicRow extends StatelessWidget {
         trailing: Wrap(
           spacing: 8,
           children: [
-            OutlinedButton(onPressed: onDetail, child: const Text('知识查阅')),
-            FilledButton(onPressed: onLearn, child: const Text('学习模式')),
+            OutlinedButton(onPressed: onDetail, child: Text(l10n.get('知识查阅'))),
+            FilledButton(onPressed: onLearn, child: Text(l10n.get('学习模式'))),
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../../providers/localization_provider.dart';
 
 class SystemDesignPage extends StatefulWidget {
   const SystemDesignPage({super.key});
@@ -12,98 +13,99 @@ class SystemDesignPage extends StatefulWidget {
 }
 
 class _SystemDesignPageState extends State<SystemDesignPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   String _selectedCategory = 'all';
   final List<Map<String, dynamic>> _savedDesigns = [];
 
-  final List<Map<String, dynamic>> _fallbackTopics = [
+  List<Map<String, dynamic>> get _fallbackTopics => [
     {
       'id': 'url_shortener',
-      'title': '短链接系统',
-      'category': '基础',
+      'title': l10n.get('短链接系统'),
+      'category': l10n.get('基础'),
       'difficulty': 2,
-      'description': '设计一个短链接生成和跳转服务',
-      'keyPoints': ['哈希算法', '数据库设计', '缓存策略', '重定向机制'],
+      'description': l10n.get('设计一个短链接生成和跳转服务'),
+      'keyPoints': [l10n.get('哈希算法'), l10n.get('数据库设计'), l10n.get('缓存策略'), l10n.get('重定向机制')],
       'estimatedMinutes': 30,
     },
     {
       'id': 'feed_system',
-      'title': '信息流系统',
-      'category': '社交',
+      'title': l10n.get('信息流系统'),
+      'category': l10n.get('社交'),
       'difficulty': 3,
-      'description': '设计社交媒体的信息流推送系统',
-      'keyPoints': ['推拉模式', '时间线排序', '缓存策略', '分页加载'],
+      'description': l10n.get('设计社交媒体的信息流推送系统'),
+      'keyPoints': [l10n.get('推拉模式'), l10n.get('时间线排序'), l10n.get('缓存策略'), l10n.get('分页加载')],
       'estimatedMinutes': 45,
     },
     {
       'id': 'chat_system',
-      'title': '即时通讯系统',
-      'category': '通讯',
+      'title': l10n.get('即时通讯系统'),
+      'category': l10n.get('通讯'),
       'difficulty': 3,
-      'description': '设计一个支持单聊和群聊的即时通讯系统',
-      'keyPoints': ['WebSocket', '消息队列', '离线消息', '已读状态'],
+      'description': l10n.get('设计一个支持单聊和群聊的即时通讯系统'),
+      'keyPoints': ['WebSocket', l10n.get('消息队列'), l10n.get('离线消息'), l10n.get('已读状态')],
       'estimatedMinutes': 45,
     },
     {
       'id': 'search_engine',
-      'title': '搜索引擎',
-      'category': '搜索',
+      'title': l10n.get('搜索引擎'),
+      'category': l10n.get('搜索'),
       'difficulty': 4,
-      'description': '设计一个全文搜索引擎',
-      'keyPoints': ['倒排索引', '分词器', '相关性排序', '分布式搜索'],
+      'description': l10n.get('设计一个全文搜索引擎'),
+      'keyPoints': [l10n.get('倒排索引'), l10n.get('分词器'), l10n.get('相关性排序'), l10n.get('分布式搜索')],
       'estimatedMinutes': 60,
     },
     {
       'id': 'payment_system',
-      'title': '支付系统',
-      'category': '金融',
+      'title': l10n.get('支付系统'),
+      'category': l10n.get('金融'),
       'difficulty': 4,
-      'description': '设计一个安全可靠的支付系统',
-      'keyPoints': ['事务一致性', '幂等性', '对账机制', '风控策略'],
+      'description': l10n.get('设计一个安全可靠的支付系统'),
+      'keyPoints': [l10n.get('事务一致性'), l10n.get('幂等性'), l10n.get('对账机制'), l10n.get('风控策略')],
       'estimatedMinutes': 60,
     },
     {
       'id': 'recommendation',
-      'title': '推荐系统',
+      'title': l10n.get('推荐系统'),
       'category': 'AI',
       'difficulty': 4,
-      'description': '设计一个个性化内容推荐系统',
-      'keyPoints': ['协同过滤', '内容推荐', '实时特征', 'AB测试'],
+      'description': l10n.get('设计一个个性化内容推荐系统'),
+      'keyPoints': [l10n.get('协同过滤'), l10n.get('内容推荐'), l10n.get('实时特征'), l10n.get('AB测试')],
       'estimatedMinutes': 60,
     },
     {
       'id': 'distributed_cache',
-      'title': '分布式缓存',
-      'category': '基础设施',
+      'title': l10n.get('分布式缓存'),
+      'category': l10n.get('基础设施'),
       'difficulty': 3,
-      'description': '设计一个分布式缓存系统',
-      'keyPoints': ['一致性哈希', '缓存穿透', '缓存雪崩', '数据同步'],
+      'description': l10n.get('设计一个分布式缓存系统'),
+      'keyPoints': [l10n.get('一致性哈希'), l10n.get('缓存穿透'), l10n.get('缓存雪崩'), l10n.get('数据同步')],
       'estimatedMinutes': 45,
     },
     {
       'id': 'message_queue',
-      'title': '消息队列',
-      'category': '基础设施',
+      'title': l10n.get('消息队列'),
+      'category': l10n.get('基础设施'),
       'difficulty': 4,
-      'description': '设计一个高可用的消息队列系统',
-      'keyPoints': ['持久化', '消费确认', '顺序消息', '死信队列'],
+      'description': l10n.get('设计一个高可用的消息队列系统'),
+      'keyPoints': [l10n.get('持久化'), l10n.get('消费确认'), l10n.get('顺序消息'), l10n.get('死信队列')],
       'estimatedMinutes': 60,
     },
     {
       'id': 'rate_limiter',
-      'title': '限流系统',
-      'category': '基础设施',
+      'title': l10n.get('限流系统'),
+      'category': l10n.get('基础设施'),
       'difficulty': 2,
-      'description': '设计一个API限流系统',
-      'keyPoints': ['令牌桶', '滑动窗口', '分布式限流', '降级策略'],
+      'description': l10n.get('设计一个API限流系统'),
+      'keyPoints': [l10n.get('令牌桶'), l10n.get('滑动窗口'), l10n.get('分布式限流'), l10n.get('降级策略')],
       'estimatedMinutes': 30,
     },
     {
       'id': 'task_scheduler',
-      'title': '任务调度系统',
-      'category': '基础设施',
+      'title': l10n.get('任务调度系统'),
+      'category': l10n.get('基础设施'),
       'difficulty': 3,
-      'description': '设计一个分布式任务调度系统',
-      'keyPoints': ['定时任务', '任务依赖', '失败重试', '负载均衡'],
+      'description': l10n.get('设计一个分布式任务调度系统'),
+      'keyPoints': [l10n.get('定时任务'), l10n.get('任务依赖'), l10n.get('失败重试'), l10n.get('负载均衡')],
       'estimatedMinutes': 45,
     },
   ];
@@ -132,10 +134,10 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     return systemDesignTopics.map((t) => <String, dynamic>{
       'id': t.id,
       'title': t.title,
-      'category': t.category.isEmpty ? '通用' : t.category,
+      'category': t.category.isEmpty ? l10n.get('通用') : t.category,
       'difficulty': t.difficulty,
       'description': t.summary,
-      'keyPoints': t.tags.isEmpty ? ['系统设计'] : t.tags.take(4).toList(),
+      'keyPoints': t.tags.isEmpty ? [l10n.get('系统设计')] : t.tags.take(4).toList(),
       'estimatedMinutes': t.estimatedMinutes,
     }).toList();
   }
@@ -150,7 +152,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('系统设计练习'),
+        title: Text(l10n.get('系统设计练习')),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -195,9 +197,9 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem('总题数', '${topics.length}', AppColors.accent),
-          _buildStatItem('已练习', '${_savedDesigns.length}', AppColors.success),
-          _buildStatItem('待练习', '${topics.length - _savedDesigns.length}', AppColors.warning),
+          _buildStatItem(l10n.get('总题数'), '${topics.length}', AppColors.accent),
+          _buildStatItem(l10n.get('已练习'), '${_savedDesigns.length}', AppColors.success),
+          _buildStatItem(l10n.get('待练习'), '${topics.length - _savedDesigns.length}', AppColors.warning),
         ],
       ),
     );
@@ -240,7 +242,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
               selected: isSelected,
-              label: Text(cat == 'all' ? '全部' : cat),
+              label: Text(cat == 'all' ? l10n.get('全部') : cat),
               onSelected: (_) => setState(() => _selectedCategory = cat),
               backgroundColor: isDark ? const Color(0xFF1A2332) : Colors.white,
               selectedColor: AppColors.accent.withValues(alpha: 0.2),
@@ -259,7 +261,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
 
   Widget _buildDesignCard(BuildContext context, Map<String, dynamic> topic, bool isDark) {
     final difficulty = topic['difficulty'] as int;
-    final difficultyLabels = {1: '入门', 2: '基础', 3: '中等', 4: '较难', 5: '困难'};
+    final difficultyLabels = {1: l10n.get('入门'), 2: l10n.get('基础'), 3: l10n.get('中等'), 4: l10n.get('较难'), 5: l10n.get('困难')};
     final difficultyColors = {
       1: const Color(0xFF10B981),
       2: const Color(0xFF00CCF9),
@@ -304,7 +306,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      difficultyLabels[difficulty] ?? '未知',
+                      difficultyLabels[difficulty] ?? l10n.get('未知'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -359,7 +361,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '预计 ${topic['estimatedMinutes']} 分钟',
+                    '${l10n.get('预计')} ${topic['estimatedMinutes']} ${l10n.get('分钟')}',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -369,7 +371,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                   TextButton.icon(
                     onPressed: () => _startDesignPractice(context, topic),
                     icon: const Icon(Icons.play_arrow, size: 18),
-                    label: const Text('开始练习'),
+                    label: Text(l10n.get('开始练习')),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
@@ -446,41 +448,41 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
           const SizedBox(height: 20),
           
           // 设计步骤
-          _buildDesignStep('1. 需求澄清', [
-            '确认功能范围和非功能需求',
-            '明确用户规模和流量预估',
-            '确定数据一致性要求',
-            '识别核心功能和次要功能',
+          _buildDesignStep(l10n.get('1_需求澄清'), [
+            l10n.get('确认功能范围和非功能需求'),
+            l10n.get('明确用户规模和流量预估'),
+            l10n.get('确定数据一致性要求'),
+            l10n.get('识别核心功能和次要功能'),
           ]),
-          _buildDesignStep('2. 容量估算', [
-            '日活用户数（DAU）',
-            '每用户每日请求数（QPS）',
-            '存储容量估算',
-            '带宽需求估算',
+          _buildDesignStep(l10n.get('2_容量估算'), [
+            l10n.get('日活用户数_DAU'),
+            l10n.get('每用户每日请求数_QPS'),
+            l10n.get('存储容量估算'),
+            l10n.get('带宽需求估算'),
           ]),
-          _buildDesignStep('3. 系统架构', [
-            '整体架构图设计',
-            '核心组件划分',
-            '数据流向设计',
-            '接口设计',
+          _buildDesignStep(l10n.get('3_系统架构'), [
+            l10n.get('整体架构图设计'),
+            l10n.get('核心组件划分'),
+            l10n.get('数据流向设计'),
+            l10n.get('接口设计'),
           ]),
-          _buildDesignStep('4. 数据存储', [
-            '数据库选型（SQL/NoSQL）',
-            '表结构设计',
-            '索引设计',
-            '分库分表策略',
+          _buildDesignStep(l10n.get('4_数据存储'), [
+            l10n.get('数据库选型_SQL_NoSQL'),
+            l10n.get('表结构设计'),
+            l10n.get('索引设计'),
+            l10n.get('分库分表策略'),
           ]),
-          _buildDesignStep('5. 核心设计', [
-            '关键业务流程',
-            '并发处理方案',
-            '缓存策略',
-            '消息队列使用',
+          _buildDesignStep(l10n.get('5_核心设计'), [
+            l10n.get('关键业务流程'),
+            l10n.get('并发处理方案'),
+            l10n.get('缓存策略'),
+            l10n.get('消息队列使用'),
           ]),
-          _buildDesignStep('6. 扩展优化', [
-            '性能瓶颈分析',
-            '可扩展性设计',
-            '高可用方案',
-            '监控告警',
+          _buildDesignStep(l10n.get('6_扩展优化'), [
+            l10n.get('性能瓶颈分析'),
+            l10n.get('可扩展性设计'),
+            l10n.get('高可用方案'),
+            l10n.get('监控告警'),
           ]),
           const SizedBox(height: 20),
           
@@ -491,7 +493,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: const Text('关闭'),
+                  label: Text(l10n.get('关闭')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -503,7 +505,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                     _showPracticeGuide(context, topic);
                   },
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('开始练习'),
+                  label: Text(l10n.get('开始练习')),
                 ),
               ),
             ],
@@ -560,37 +562,37 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('系统设计面试指南'),
-        content: const SingleChildScrollView(
+        title: Text(l10n.get('系统设计面试指南')),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('面试流程', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('1. 需求澄清（5分钟）'),
-              Text('2. 容量估算（5分钟）'),
-              Text('3. 系统架构（15分钟）'),
-              Text('4. 核心设计（15分钟）'),
-              Text('5. 扩展优化（10分钟）'),
+              Text(l10n.get('面试流程'), style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(l10n.get('1_需求澄清_5分钟')),
+              Text(l10n.get('2_容量估算_5分钟')),
+              Text(l10n.get('3_系统架构_15分钟')),
+              Text(l10n.get('4_核心设计_15分钟')),
+              Text(l10n.get('5_扩展优化_10分钟')),
               SizedBox(height: 16),
-              Text('评分维度', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('• 问题分析能力'),
-              Text('• 架构设计能力'),
-              Text('• 技术深度'),
-              Text('• 沟通表达能力'),
+              Text(l10n.get('评分维度'), style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(l10n.get('问题分析能力')),
+              Text(l10n.get('架构设计能力')),
+              Text(l10n.get('技术深度')),
+              Text(l10n.get('沟通表达能力')),
               SizedBox(height: 16),
-              Text('注意事项', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('• 先确认需求再设计方案'),
-              Text('• 从高层设计逐步深入'),
-              Text('• 主动讨论 trade-off'),
-              Text('• 考虑边界情况和异常处理'),
+              Text(l10n.get('注意事项'), style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(l10n.get('先确认需求再设计方案')),
+              Text(l10n.get('从高层设计逐步深入')),
+              Text(l10n.get('主动讨论_tradeoff')),
+              Text(l10n.get('考虑边界情况和异常处理')),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
+            child: Text(l10n.get('知道了')),
           ),
         ],
       ),
@@ -603,7 +605,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('练习：${topic['title']}'),
+        title: Text(l10n.getp('练习：{title}', {'title': topic['title']})),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -611,14 +613,14 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
             children: [
               Text(topic['description'] ?? '', style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 16),
-              const Text('关键知识点：', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('关键知识点'), style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...keyPoints.map((point) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('• '),
+                    Text('• '),
                     Expanded(child: Text(point)),
                   ],
                 ),
@@ -630,15 +632,15 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                   color: AppColors.accent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('练习建议', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text(l10n.get('练习建议'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     SizedBox(height: 4),
-                    Text('1. 按照需求澄清 → 容量估算 → 架构设计 → 核心设计 → 扩展优化的顺序进行', style: TextStyle(fontSize: 12)),
-                    Text('2. 用纸笔画出架构图', style: TextStyle(fontSize: 12)),
-                    Text('3. 记录关键决策和 trade-off', style: TextStyle(fontSize: 12)),
-                    Text('4. 控制时间在 30-45 分钟内', style: TextStyle(fontSize: 12)),
+                    Text(l10n.get('1_按照需求澄清__容量估算__架构设计__核心设计__扩展优化的顺序进行'), style: TextStyle(fontSize: 12)),
+                    Text(l10n.get('2_用纸笔画出架构图'), style: TextStyle(fontSize: 12)),
+                    Text(l10n.get('3_记录关键决策和_tradeoff'), style: TextStyle(fontSize: 12)),
+                    Text(l10n.get('4_控制时间在_3045_分钟内'), style: TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -648,19 +650,19 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
+            child: Text(l10n.get('关闭')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('开始计时，按步骤完成系统设计'),
+                SnackBar(
+                  content: Text(l10n.get('开始计时_按步骤完成系统设计')),
                   duration: Duration(seconds: 3),
                 ),
               );
             },
-            child: const Text('开始练习'),
+            child: Text(l10n.get('开始练习')),
           ),
         ],
       ),

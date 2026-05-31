@@ -2,13 +2,32 @@ import 'package:flutter/material.dart';
 
 /// 知识源环境
 enum ContentEnv {
-  test('test', '测试版'),
-  draft('draft', '草稿版'),
-  production('production', '发布版');
+  test,
+  draft,
+  production;
 
-  const ContentEnv(this.key, this.label);
-  final String key;
-  final String label;
+  String get key {
+    switch (this) {
+      case ContentEnv.test:
+        return 'test';
+      case ContentEnv.draft:
+        return 'draft';
+      case ContentEnv.production:
+        return 'production';
+    }
+  }
+
+  /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
+  String get label {
+    switch (this) {
+      case ContentEnv.test:
+        return '测试版';
+      case ContentEnv.draft:
+        return '草稿版';
+      case ContentEnv.production:
+        return '发布版';
+    }
+  }
 
   static ContentEnv fromKey(String key) => ContentEnv.values.firstWhere(
     (e) => e.key == key,
@@ -18,14 +37,37 @@ enum ContentEnv {
 
 /// 主题类型
 enum AppThemeType {
-  system('system', '跟随系统'),
-  elegantWhite('elegantWhite', '典雅白'),
-  qualityBlack('qualityBlack', '气质黑'),
-  midnightBlue('midnightBlue', '午夜蓝');
+  system,
+  elegantWhite,
+  qualityBlack,
+  midnightBlue;
 
-  const AppThemeType(this.key, this.label);
-  final String key;
-  final String label;
+  String get key {
+    switch (this) {
+      case AppThemeType.system:
+        return 'system';
+      case AppThemeType.elegantWhite:
+        return 'elegantWhite';
+      case AppThemeType.qualityBlack:
+        return 'qualityBlack';
+      case AppThemeType.midnightBlue:
+        return 'midnightBlue';
+    }
+  }
+
+  /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
+  String get label {
+    switch (this) {
+      case AppThemeType.system:
+        return '跟随系统';
+      case AppThemeType.elegantWhite:
+        return '典雅白';
+      case AppThemeType.qualityBlack:
+        return '气质黑';
+      case AppThemeType.midnightBlue:
+        return '午夜蓝';
+    }
+  }
 
   static AppThemeType fromKey(String key) => AppThemeType.values.firstWhere(
     (e) => e.key == key,

@@ -307,8 +307,9 @@ class _NextBestAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return const _EmptyState(message: '暂无推荐行动');
+      return _EmptyState(message: l10n.get('暂无推荐行动'));
     }
 
     final nextTopic = weakTopics.first;
@@ -324,7 +325,7 @@ class _NextBestAction extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '推荐任务',
+              l10n.get('推荐任务'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -369,12 +370,12 @@ class _NextBestAction extends StatelessWidget {
                   children: [
                     _ActionTag(
                       icon: Icons.access_time,
-                      text: '预计用时 25 分钟',
+                      text: l10n.get('预计用时_25_分钟'),
                     ),
                     const SizedBox(width: 12),
                     _ActionTag(
                       icon: Icons.quiz_outlined,
-                      text: '考点 6 个',
+                      text: l10n.get('考点_6_个'),
                     ),
                   ],
                 ),
@@ -387,7 +388,7 @@ class _NextBestAction extends StatelessWidget {
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('开始学习'),
+                    child: Text(l10n.get('开始学习')),
                   ),
                 ),
               ],
@@ -442,12 +443,13 @@ class _AIFeedbackItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final score = attempt.score ?? 0;
     final feedbackType = score >= 85
-        ? '表现优秀'
+        ? l10n.get('表现优秀')
         : score >= 60
-        ? '解题思路待优化'
-        : '知识点掌握不足';
+        ? l10n.get('解题思路待优化')
+        : l10n.get('知识点掌握不足');
     final feedbackColor = score >= 85
         ? AppColors.success
         : score >= 60
@@ -502,7 +504,7 @@ class _AIFeedbackItem extends StatelessWidget {
             ),
           ),
           Text(
-            _timeAgo(attempt.createdAt),
+            _timeAgo(attempt.createdAt, l10n),
             style: TextStyle(
               fontSize: 10,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -513,12 +515,12 @@ class _AIFeedbackItem extends StatelessWidget {
     );
   }
 
-  String _timeAgo(DateTime dateTime) {
+  String _timeAgo(DateTime dateTime, LocalizationProvider l10n) {
     final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
+    if (diff.inMinutes < 1) return l10n.get('刚刚');
+    if (diff.inMinutes < 60) return l10n.getp('{minutes} 分钟前', {'minutes': diff.inMinutes});
+    if (diff.inHours < 24) return l10n.getp('{hours} 小时前', {'hours': diff.inHours});
+    if (diff.inDays < 7) return l10n.getp('{days} 天前', {'days': diff.inDays});
     return '${dateTime.month}/${dateTime.day}';
   }
 }
@@ -592,6 +594,7 @@ class _MasteryOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Row(
@@ -625,7 +628,7 @@ class _MasteryOverview extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '掌握度',
+                    l10n.get('掌握度'),
                     style: TextStyle(
                       fontSize: 10,
                       color: isDark ? Colors.white54 : Colors.grey,
@@ -643,19 +646,19 @@ class _MasteryOverview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MasteryStatItem(
-                label: '熟练',
+                label: l10n.get('熟练'),
                 value: '$masteredPercent%',
                 color: AppColors.success,
               ),
               const SizedBox(height: 8),
               _MasteryStatItem(
-                label: '学习中',
+                label: l10n.get('学习中'),
                 value: '$learningPercent%',
                 color: AppColors.accent,
               ),
               const SizedBox(height: 8),
               _MasteryStatItem(
-                label: '未掌握',
+                label: l10n.get('未掌握'),
                 value: '$newPercent%',
                 color: AppColors.warning,
               ),
@@ -730,10 +733,11 @@ class _MasteryStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     if (categories.isEmpty) {
       return Center(
         child: Text(
-          '暂无分类数据',
+          l10n.get('暂无分类数据'),
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey.shade500,
@@ -845,6 +849,7 @@ class _DomainKnowledgeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final domainColor = domain.color;
     final status = getMasteryLabel(masteryPercent);
@@ -948,12 +953,12 @@ class _DomainKnowledgeCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '${domain.topicCount} 考点',
+                      l10n.getp('{count} 考点', {'count': domain.topicCount}),
                       style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      '$practiceCount 练习',
+                      l10n.getp('{count} 练习', {'count': practiceCount}),
                       style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
                     ),
                   ],
@@ -997,13 +1002,14 @@ class _LearningPathItemState extends State<_LearningPathItem> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final level = getMasteryLevel(widget.masteryPercent);
     final status = level == MasteryLevel.mastered
-        ? '已完成'
+        ? l10n.get('已完成')
         : level == MasteryLevel.learning
-        ? '进行中'
-        : '未开始';
+        ? l10n.get('进行中')
+        : l10n.get('未开始');
     final statusColor = getMasteryColor(widget.masteryPercent);
 
     return Container(
@@ -1092,7 +1098,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                         Row(
                           children: [
                             Text(
-                              '进度 ${widget.masteryPercent}%',
+                              l10n.getp('进度 {percent}%', {'percent': widget.masteryPercent}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1100,7 +1106,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              '考点 ${widget.domain.topicCount}',
+                              l10n.getp('考点 {count}', {'count': widget.domain.topicCount}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1154,7 +1160,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.menu_book_outlined,
-                        label: '知识点',
+                        label: l10n.get('知识点'),
                         value: '${widget.domain.topicCount}',
                         isDark: isDark,
                       ),
@@ -1162,7 +1168,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.trending_up,
-                        label: '掌握度',
+                        label: l10n.get('掌握度'),
                         value: '${widget.masteryPercent}%',
                         isDark: isDark,
                       ),
@@ -1170,7 +1176,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.category_outlined,
-                        label: '分类',
+                        label: l10n.get('分类'),
                         value: '${widget.domain.categories.length}',
                         isDark: isDark,
                       ),
@@ -1194,7 +1200,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     child: OutlinedButton.icon(
                       onPressed: widget.onViewCatalog ?? widget.onTap,
                       icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('查看知识目录'),
+                      label: Text(l10n.get('查看知识目录')),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
@@ -1262,12 +1268,13 @@ class _WeakTopicItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final scoreColor = getMasteryColor(score);
     final level = score >= 85
-        ? '高'
+        ? l10n.get('高')
         : score >= 60
-        ? '中'
-        : '低';
+        ? l10n.get('中')
+        : l10n.get('低');
 
     return InkWell(
       onTap: onTap,
@@ -1333,7 +1340,7 @@ class _WeakTopicItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),
-              child: const Text('去练习', style: TextStyle(fontSize: 11)),
+              child: Text(l10n.get('去练习'), style: TextStyle(fontSize: 11)),
             ),
           ],
         ),
@@ -1359,6 +1366,7 @@ class _ReviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final scoreColor = score >= 85
         ? AppColors.success
         : score >= 60
@@ -1376,17 +1384,17 @@ class _ReviewItem extends StatelessWidget {
       final isTomorrow = reviewDate.isAtSameMomentAs(today.add(const Duration(days: 1)));
       
       if (isToday) {
-        timeText = '今天 ${nextReviewAt!.hour}:${nextReviewAt!.minute.toString().padLeft(2, '0')}';
+        timeText = l10n.getp('今天 {hour}:{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
         timeColor = AppColors.danger;
       } else if (isTomorrow) {
-        timeText = '明天 ${nextReviewAt!.hour}:${nextReviewAt!.minute.toString().padLeft(2, '0')}';
+        timeText = l10n.getp('明天 {hour}:{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
         timeColor = AppColors.textSecondary;
       } else {
         timeText = '${nextReviewAt!.month}/${nextReviewAt!.day}';
         timeColor = AppColors.textSecondary;
       }
     } else {
-      timeText = '待安排';
+      timeText = l10n.get('待安排');
       timeColor = AppColors.textTertiary;
     }
 
@@ -1461,8 +1469,8 @@ class _ReviewItem extends StatelessWidget {
                   color: AppColors.warning.withValues(alpha: 0.3),
                 ),
               ),
-              child: const Text(
-                '复习',
+              child: Text(
+                l10n.get('复习'),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -1631,6 +1639,7 @@ class _LeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Column(
@@ -1638,11 +1647,11 @@ class _LeftPanel extends StatelessWidget {
       children: [
         // 今日复习队列
         _PanelCard(
-          title: '今日复习队列',
+          title: l10n.get('今日复习队列'),
           icon: Icons.replay_outlined,
           trailing: '${dueTopics.length}',
           headerTrailing: Text(
-            '到期时间',
+            l10n.get('到期时间'),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white38 : AppColors.textTertiary,
@@ -1651,7 +1660,7 @@ class _LeftPanel extends StatelessWidget {
           child: Column(
             children: [
               if (dueTopics.isEmpty)
-                const _EmptyState(message: '暂无到期内容')
+                _EmptyState(message: l10n.get('暂无到期内容'))
               else
                 ...dueTopics.take(5).map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1667,7 +1676,7 @@ class _LeftPanel extends StatelessWidget {
               if (dueTopics.length > 5)
                 TextButton(
                   onPressed: onReview,
-                  child: const Text('查看全部复习'),
+                  child: Text(l10n.get('查看全部复习')),
                 ),
             ],
           ),
@@ -1675,13 +1684,13 @@ class _LeftPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 薄弱知识点TOP5
         _PanelCard(
-          title: '薄弱知识点 TOP 5',
+          title: l10n.get('薄弱知识点_TOP_5'),
           icon: Icons.trending_down_outlined,
           trailing: '${weakTopics.length}',
           child: Column(
             children: [
               if (weakTopics.isEmpty)
-                const _EmptyState(message: '暂无薄弱项')
+                _EmptyState(message: l10n.get('暂无薄弱项'))
               else
                 ...weakTopics.map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1746,6 +1755,7 @@ class _CenterPanel extends StatefulWidget {
 }
 
 class _CenterPanelState extends State<_CenterPanel> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _storage = StorageService();
   List<String> _disabledIds = [];
   LearningRoute? _selectedRoute;
@@ -1773,22 +1783,22 @@ class _CenterPanelState extends State<_CenterPanel> {
       final defaultRoutes = [
         LearningRoute(
           id: 'java',
-          name: 'Java 后端开发',
-          description: 'Java 核心、JVM、并发、Spring、数据库、中间件、系统设计',
+          name: l10n.get('Java_后端开发'),
+          description: l10n.get('Java_核心_JVM_并发_Spring_数据库_中间件_系统设计'),
           domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'frontend',
-          name: '前端开发',
-          description: 'JavaScript、TypeScript、React、Vue、前端工程化',
+          name: l10n.get('前端开发'),
+          description: l10n.get('JavaScript_TypeScript_React_Vue_前端工程化'),
           domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'agent',
-          name: 'Agent 开发',
-          description: 'LLM、RAG、Agent、MCP、Function Calling、AI 工程化',
+          name: l10n.get('Agent_开发'),
+          description: l10n.get('text_cbc3c2e6'),
           domainIds: ['agent', 'algorithm', 'architecture', 'network'],
           isDefault: true,
         ),
@@ -1851,6 +1861,7 @@ class _CenterPanelState extends State<_CenterPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final domains = _domains;
     final allEnabledDomains = _allEnabledDomains;
 
@@ -1859,14 +1870,14 @@ class _CenterPanelState extends State<_CenterPanel> {
       children: [
         // 当前学习路线
         _PanelCard(
-          title: '当前学习路线',
+          title: l10n.get('当前学习路线'),
           icon: Icons.route_outlined,
-          trailing: '切换路线',
+          trailing: l10n.get('切换路线'),
           onTrailingTap: () => _showRouteSelector(context),
           child: Column(
             children: [
               if (domains.isEmpty)
-                const _EmptyState(message: '暂无学习路线')
+                _EmptyState(message: l10n.get('暂无学习路线'))
               else
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
@@ -1901,14 +1912,14 @@ class _CenterPanelState extends State<_CenterPanel> {
         const SizedBox(height: 16),
         // 领域知识卡片
         _PanelCard(
-          title: '领域知识卡片',
+          title: l10n.get('领域知识卡片'),
           icon: Icons.school_outlined,
-          trailing: '管理领域',
+          trailing: l10n.get('管理领域'),
           onTrailingTap: () => _showManageDomains(context),
           child: Column(
             children: [
               if (allEnabledDomains.isEmpty)
-                const _EmptyState(message: '暂无领域数据')
+                _EmptyState(message: l10n.get('暂无领域数据'))
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -1958,25 +1969,26 @@ class _CenterPanelState extends State<_CenterPanel> {
   }
 
   void _showRouteSelector(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final defaultRoutes = [
       LearningRoute(
         id: 'java',
-        name: 'Java 后端开发',
-        description: 'Java 核心、JVM、并发、Spring、数据库、中间件、系统设计',
+        name: l10n.get('Java_后端开发'),
+        description: l10n.get('Java_核心_JVM_并发_Spring_数据库_中间件_系统设计'),
         domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'frontend',
-        name: '前端开发',
-        description: 'JavaScript、TypeScript、React、Vue、前端工程化',
+        name: l10n.get('前端开发'),
+        description: l10n.get('JavaScript_TypeScript_React_Vue_前端工程化'),
         domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'agent',
-        name: 'Agent 开发',
-        description: 'LLM、RAG、Agent、MCP、Function Calling、AI 工程化',
+        name: l10n.get('Agent_开发'),
+        description: l10n.get('text_cbc3c2e6'),
         domainIds: ['agent', 'algorithm', 'architecture', 'network'],
         isDefault: true,
       ),
@@ -2047,6 +2059,7 @@ class _RouteSelectorDialog extends StatefulWidget {
 }
 
 class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   late List<LearningRoute> _routes;
   final _storage = StorageService();
 
@@ -2091,6 +2104,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
@@ -2106,7 +2120,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               children: [
                 const Icon(Icons.route, color: AppColors.accent),
                 const SizedBox(width: 8),
-                const Text('选择学习路线', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(l10n.get('选择学习路线'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
@@ -2119,6 +2133,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               child: SingleChildScrollView(
                 child: Column(
                   children: _routes.asMap().entries.map((entry) {
+                    final l10n = context.watch<LocalizationProvider>();
                     final index = entry.key;
                     final route = entry.value;
                     final isSelected = route.id == widget.currentRouteId;
@@ -2158,7 +2173,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                               color: AppColors.accent.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(3),
                                             ),
-                                            child: const Text('自定义', style: TextStyle(fontSize: 9, color: AppColors.accent)),
+                                            child: Text(l10n.get('自定义'), style: TextStyle(fontSize: 9, color: AppColors.accent)),
                                           ),
                                         ],
                                       ],
@@ -2236,7 +2251,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                   );
                 },
                 icon: const Icon(Icons.add),
-                label: const Text('创建自定义路线'),
+                label: Text(l10n.get('创建自定义路线')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -2267,6 +2282,7 @@ class _ManageDomainsDialog extends StatefulWidget {
 }
 
 class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   late Set<String> _disabledIds;
 
   @override
@@ -2277,6 +2293,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
@@ -2292,14 +2309,14 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
               children: [
                 const Icon(Icons.school_outlined, color: AppColors.accent),
                 const SizedBox(width: 8),
-                const Text('管理领域', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(l10n.get('管理领域'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              '切换开关来启用/禁用领域',
+              l10n.get('切换开关来启用_禁用领域'),
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -2341,7 +2358,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                                   ),
                                 ),
                                 Text(
-                                  '${domain.topicCount} 个知识点',
+                                  l10n.getp('{count} 个知识点', {'count': domain.topicCount}),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: isDisabled ? Colors.grey : (isDark ? Colors.white54 : Colors.grey),
@@ -2386,7 +2403,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '禁用的领域不会在首页显示，但内容不会被删除',
+                      l10n.get('禁用的领域不会在首页显示_但内容不会被删除'),
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.grey.shade700),
                     ),
                   ),
@@ -2429,6 +2446,7 @@ class _RightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     // 获取掌握度趋势数据
     final trendData = progressProvider.getMasteryTrend();
     
@@ -2484,7 +2502,7 @@ class _RightPanel extends StatelessWidget {
       children: [
         // 掌握度概览
         _PanelCard(
-          title: '掌握度概览',
+          title: l10n.get('掌握度概览'),
           icon: Icons.pie_chart_outline,
           headerTrailing: _DomainDropdown(
             currentDomainId: currentDomainId,
@@ -2509,14 +2527,14 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 掌握度趋势
         _PanelCard(
-          title: '掌握度趋势（近 7 天）',
+          title: l10n.get('掌握度趋势_近_7_天'),
           icon: Icons.trending_up_outlined,
           child: _MasteryTrendChart(trendData: trendData),
         ),
         const SizedBox(height: 16),
         // 下一步最佳行动
         _PanelCard(
-          title: '下一步最佳行动',
+          title: l10n.get('下一步最佳行动'),
           icon: Icons.lightbulb_outline,
           child: _NextBestAction(
             weakTopics: weakTopics,
@@ -2526,7 +2544,7 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 备选行动
         _PanelCard(
-          title: '备选行动',
+          title: l10n.get('备选行动'),
           icon: Icons.list_alt_outlined,
           child: _AlternativeActions(
             weakTopics: weakTopics,
@@ -2536,13 +2554,13 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 最近AI反馈
         _PanelCard(
-          title: '最近 AI 反馈',
+          title: l10n.get('最近_AI_反馈'),
           icon: Icons.auto_awesome_outlined,
-          trailing: '查看全部',
+          trailing: l10n.get('查看全部'),
           child: Column(
             children: [
               if (recentAttempts.isEmpty)
-                const _EmptyState(message: '暂无反馈记录')
+                _EmptyState(message: l10n.get('暂无反馈记录'))
               else
                 ...recentAttempts.take(3).map((attempt) {
                   return _AIFeedbackItem(
@@ -2566,6 +2584,7 @@ class _MasteryTrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final now = DateTime.now();
     final dates = List.generate(7, (i) {
       final date = now.subtract(Duration(days: 6 - i));
@@ -2588,7 +2607,7 @@ class _MasteryTrendChart extends StatelessWidget {
               )
             : Center(
                 child: Text(
-                  '开始学习后将展示趋势',
+                  l10n.get('开始学习后将展示趋势'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2685,8 +2704,9 @@ class _AlternativeActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return const _EmptyState(message: '暂无备选行动');
+      return _EmptyState(message: l10n.get('暂无备选行动'));
     }
 
     // 取第2-4个薄弱知识点作为备选
@@ -2720,7 +2740,7 @@ class _AlternativeActions extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${topic.id.contains('review') ? '复习' : '学习'}：${topic.title}',
+                          l10n.getp('{type}：{title}', {'type': topic.id.contains('review') ? l10n.get('复习') : l10n.get('学习'), 'title': topic.title}),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

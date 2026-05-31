@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/domain.dart';
+import '../providers/localization_provider.dart';
 import '../theme/colors.dart';
 
 class ManageDomainsDialog extends StatefulWidget {
@@ -19,6 +21,8 @@ class ManageDomainsDialog extends StatefulWidget {
 }
 
 class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+
   late List<Domain> _domains;
 
   @override
@@ -45,9 +49,9 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
               children: [
                 const Icon(Icons.school_outlined, color: AppColors.accent),
                 const SizedBox(width: 8),
-                const Text(
-                  '管理领域',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                Text(
+                  l10n.get('管理领域'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 IconButton(
@@ -58,7 +62,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              '拖动排序，点击删除按钮移除领域',
+              l10n.get('拖动排序，点击删除按钮移除领域'),
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.white54 : Colors.grey,
@@ -115,7 +119,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                               ),
                             ),
                             Text(
-                              '${domain.topicCount} 个知识点',
+                              l10n.getp('{count} 个知识点', {'count': domain.topicCount}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -156,7 +160,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '删除领域不会删除内容，只是从当前视图移除',
+                      l10n.get('删除领域不会删除内容，只是从当前视图移除'),
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.white70 : Colors.grey.shade700,
@@ -174,7 +178,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('完成'),
+                child: Text(l10n.get('完成')),
               ),
             ),
           ],

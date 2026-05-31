@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/localization_provider.dart';
 import '../models/domain.dart';
 import '../theme/colors.dart';
 
@@ -18,6 +20,7 @@ class DomainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return SizedBox(
       width: 330,
       child: InkWell(
@@ -54,7 +57,7 @@ class DomainCard extends StatelessWidget {
                     : AppColors.accent,
               ),
               const SizedBox(height: 8),
-              Text('$masteryPercent% 熟练 · 点击切换领域'),
+              Text(l10n.getp('domain_mastery_tap_switch', {'percent': '$masteryPercent'})),
             ],
           ),
         ),

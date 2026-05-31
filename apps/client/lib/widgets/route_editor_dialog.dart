@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:provider/provider.dart';
 
 class RouteEditorDialog extends StatefulWidget {
   const RouteEditorDialog({
@@ -25,6 +27,8 @@ class DomainItem {
 }
 
 class _RouteEditorDialogState extends State<RouteEditorDialog> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+
   late TextEditingController _nameController;
   late TextEditingController _descController;
   late List<String> _selectedDomainIds;
@@ -47,13 +51,13 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
   void _save() {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入路线名称')),
+        SnackBar(content: Text(l10n.get('请输入路线名称'))),
       );
       return;
     }
     if (_selectedDomainIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请至少选择一个领域')),
+        SnackBar(content: Text(l10n.get('请至少选择一个领域'))),
       );
       return;
     }
@@ -87,7 +91,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                   const Icon(Icons.route, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    widget.existingRoute != null ? '编辑路线' : '创建自定义路线',
+                    widget.existingRoute != null ? l10n.get('编辑路线') : l10n.get('创建自定义路线'),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
@@ -103,8 +107,8 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  labelText: '路线名称',
-                  hintText: '例如：Java 后端开发',
+                  labelText: l10n.get('路线名称'),
+                  hintText: l10n.get('例如：Java 后端开发'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.label_outline),
                 ),
@@ -116,8 +120,8 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                 controller: _descController,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  labelText: '路线描述（可选）',
-                  hintText: '简要描述这条路线的学习目标',
+                  labelText: l10n.get('路线描述（可选）'),
+                  hintText: l10n.get('简要描述这条路线的学习目标'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.description_outlined),
                 ),
@@ -126,7 +130,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
 
               // 选择领域
               Text(
-                '选择领域（点击添加，拖动排序）',
+                l10n.get('选择领域（点击添加，拖动排序）'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : Colors.black87,
@@ -190,7 +194,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
 
               // 可选领域
               Text(
-                '可选领域',
+                l10n.get('可选领域'),
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark ? Colors.white54 : Colors.grey,
@@ -217,7 +221,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _save,
-                  child: const Text('保存路线'),
+                  child: Text(l10n.get('保存路线')),
                 ),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/app_settings.dart';
 import '../models/user_progress.dart';
 import '../services/storage_service.dart';
@@ -143,29 +144,29 @@ class SettingsProvider extends ChangeNotifier {
   Future<String> syncData([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
     if (settings.method == 'local') {
-      return '当前为本地模式，数据已保存在本机。';
+      return L10n.get('local_mode_data_saved', 'zh');
     }
     if (settings.method == 'file') {
       await exportData();
-      return '已生成本地导出文件。';
+      return L10n.get('local_export_generated', 'zh');
     }
     if (settings.method == 'webdav') {
       if (settings.webDavUrl.isEmpty ||
           settings.webDavUsername.isEmpty ||
           settings.webDavPassword.isEmpty) {
-        return '请先填写 WebDAV 地址、用户名和应用密码。';
+        return L10n.get('please_fill_webdav_credentials', 'zh');
       }
       final result = await _webDavSync.backup(
         url: settings.webDavUrl,
         username: settings.webDavUsername,
         password: settings.webDavPassword,
       );
-      return result.message;
+      return result.l10nKey;
     }
     if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(settings.method)) {
-      return '该第三方同步方式待开通，可先使用文件导出或 WebDAV。';
+      return L10n.get('third_party_sync_coming_soon', 'zh');
     }
-    return '云同步暂不可用，本地数据不受影响。';
+    return L10n.get('cloud_sync_unavailable', 'zh');
   }
 
   Future<void> exportData() async {
@@ -191,7 +192,7 @@ class SettingsProvider extends ChangeNotifier {
     if (settings.webDavUrl.isEmpty ||
         settings.webDavUsername.isEmpty ||
         settings.webDavPassword.isEmpty) {
-      return SyncResult.failure('请先填写 WebDAV 地址、用户名和应用密码');
+      return SyncResult.failure(L10n.get('please_fill_webdav_credentials', 'zh'));
     }
     return _webDavSync.restore(
       url: settings.webDavUrl,
@@ -206,7 +207,7 @@ class SettingsProvider extends ChangeNotifier {
     if (settings.webDavUrl.isEmpty ||
         settings.webDavUsername.isEmpty ||
         settings.webDavPassword.isEmpty) {
-      return SyncResult.failure('请先填写 WebDAV 地址、用户名和应用密码');
+      return SyncResult.failure(L10n.get('please_fill_webdav_credentials', 'zh'));
     }
     return _webDavSync.testConnection(
       url: settings.webDavUrl,

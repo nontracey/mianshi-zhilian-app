@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mianshi_zhilian/services/whisper_stt_service.dart';
@@ -182,7 +183,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       widget.onListeningChanged?.call(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('voice_record_failed_with_error', {'error': '$e'}))),
+          SnackBar(content: Text(l10n.getp('录音失败', {'error': '$e'}))),
         );
       }
     }
@@ -237,7 +238,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('voice_recognize_failed_with_error', {'error': '$e'}))),
+          SnackBar(content: Text(l10n.getp('语音识别失败', {'error': '$e'}))),
         );
       }
     }

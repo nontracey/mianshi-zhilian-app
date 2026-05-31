@@ -33,14 +33,18 @@ class AiConfig {
 
   bool get canEvaluate => enabled && supportsTextInput;
 
-  String get capabilityLabel {
+  /// 能力标签（返回 l10n key 列表，UI 层使用 l10n.get() 逐个翻译后拼接）
+  List<String> get capabilityLabels {
     final labels = <String>[];
     if (supportsTextInput) labels.add('文本');
     if (supportsImageInput) labels.add('图片');
     if (supportsAudioInput) labels.add('语音');
     if (supportsStreaming) labels.add('流式');
-    return labels.isEmpty ? '未声明能力' : labels.join(' · ');
+    return labels.isEmpty ? ['未声明能力'] : labels;
   }
+
+  @Deprecated('Use capabilityLabels with l10n.get() instead')
+  String get capabilityLabel => capabilityLabels.join(' · ');
 
   AiConfig copyWith({
     String? id,

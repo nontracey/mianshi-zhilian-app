@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
+import '../../providers/localization_provider.dart';
 
 class ProjectLibraryPage extends StatefulWidget {
   const ProjectLibraryPage({super.key});
@@ -11,6 +13,7 @@ class ProjectLibraryPage extends StatefulWidget {
 }
 
 class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final List<Map<String, dynamic>> _projects = [];
   final _storage = StorageService();
   
@@ -51,7 +54,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('项目深挖库'),
+        title: Text(l10n.get('项目深挖库')),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -65,7 +68,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _navigateToAddProject(context),
         icon: const Icon(Icons.add),
-        label: const Text('添加项目'),
+        label: Text(l10n.get('添加项目')),
       ),
     );
   }
@@ -84,7 +87,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              '还没有保存的项目',
+              l10n.get('还没有保存的项目'),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -93,7 +96,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '添加你的项目经历，方便面试前快速复习',
+              l10n.get('添加你的项目经历，方便面试前快速复习'),
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
@@ -103,7 +106,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             FilledButton.icon(
               onPressed: () => _navigateToAddProject(context),
               icon: const Icon(Icons.add),
-              label: const Text('添加项目'),
+              label: Text(l10n.get('添加项目')),
             ),
           ],
         ),
@@ -184,33 +187,33 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                   ),
                   PopupMenuButton(
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('编辑'),
+                            const Icon(Icons.edit, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.get('编辑')),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'practice',
                         child: Row(
                           children: [
-                            Icon(Icons.play_arrow, size: 18),
-                            SizedBox(width: 8),
-                            Text('深挖练习'),
+                            const Icon(Icons.play_arrow, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.get('深挖练习')),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('删除', style: TextStyle(color: Colors.red)),
+                            const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(l10n.get('删除'), style: const TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -253,7 +256,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
 
               // 更新时间
               Text(
-                '更新于 ${project['updatedAt'] ?? ''}',
+                '${l10n.get('更新于')} ${project['updatedAt'] ?? ''}',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -439,10 +442,10 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           const SizedBox(height: 20),
 
           // STAR 详情
-          _buildStarDetail('Situation（背景）', project['background']),
-          _buildStarDetail('Task（任务）', project['task']),
-          _buildStarDetail('Action（行动）', project['action']),
-          _buildStarDetail('Result（结果）', project['result']),
+          _buildStarDetail(l10n.get('Situation（背景）'), project['background']),
+          _buildStarDetail(l10n.get('Task（任务）'), project['task']),
+          _buildStarDetail(l10n.get('Action（行动）'), project['action']),
+          _buildStarDetail(l10n.get('Result（结果）'), project['result']),
           const SizedBox(height: 20),
 
           // 操作按钮
@@ -452,7 +455,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: const Text('关闭'),
+                  label: Text(l10n.get('关闭')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -463,7 +466,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                     _startProjectDig(context, project);
                   },
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('深挖练习'),
+                  label: Text(l10n.get('深挖练习')),
                 ),
               ),
             ],
@@ -518,19 +521,19 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('项目深挖练习'),
+        title: Text(l10n.get('项目深挖练习')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('项目：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text('${l10n.get('项目')}：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
               if (project['techStack'] != null) ...[
                 const SizedBox(height: 4),
-                Text('技术栈：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text('${l10n.get('技术栈')}：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
               const SizedBox(height: 16),
-              const Text('面试官可能会问：', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('面试官可能会问：'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...questions.map((q) => _buildDigQuestion(q)),
             ],
@@ -539,20 +542,20 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
+            child: Text(l10n.get('关闭')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               // 显示提示，让用户自己练习
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('请对着这些问题进行口头练习，记录你的回答'),
-                  duration: Duration(seconds: 3),
+                SnackBar(
+                  content: Text(l10n.get('请对着这些问题进行口头练习，记录你的回答')),
+                  duration: const Duration(seconds: 3),
                 ),
               );
             },
-            child: const Text('开始练习'),
+            child: Text(l10n.get('开始练习')),
           ),
         ],
       ),

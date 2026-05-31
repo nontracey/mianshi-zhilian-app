@@ -16,21 +16,21 @@ class WebDavSyncService {
     required String password,
   }) async {
     final base = _normalizeUrl(url);
-    if (base == null) return SyncResult.failure('请输入有效的 WebDAV 地址');
+    if (base == null) return SyncResult.failure('webdav_invalid_url');
     try {
       final uri = Uri.parse('$base/');
       final response = await _request('PROPFIND', uri, username, password, {
         'Depth': '0',
       });
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return SyncResult.success('连接成功');
+        return SyncResult.success('connection_success');
       }
       if (response.statusCode == 401) {
-        return SyncResult.failure('认证失败，请检查用户名和密码');
+        return SyncResult.failure('auth_failed_check_credentials');
       }
-      return SyncResult.failure('连接失败：${response.statusCode}');
+      return SyncResult.failure('connection_failed_status', {'status': '${response.statusCode}'});
     } catch (e) {
-      return SyncResult.failure('连接错误：$e');
+      return SyncResult.failure('connection_failed_with_error', {'error': '$e'});
     }
   }
 
@@ -41,7 +41,7 @@ class WebDavSyncService {
     required String password,
   }) async {
     final base = _normalizeUrl(url);
-    if (base == null) return SyncResult.failure('请输入有效的 WebDAV 地址');
+    if (base == null) return SyncResult.failure('webdav_invalid_url');
     try {
       final fullData = await _storage.exportAllDataRaw();
       final jsonStr = const JsonEncoder.withIndent('  ').convert(fullData);
@@ -54,11 +54,11 @@ class WebDavSyncService {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         await _storage.setLastSyncTime(DateTime.now());
-        return SyncResult.success('备份完成');
+        return SyncResult.success('backup_complete');
       }
-      return SyncResult.failure('备份失败：${response.statusCode}');
+      return SyncResult.failure('backup_failed_status', {'status': '${response.statusCode}'});
     } catch (e) {
-      return SyncResult.failure('备份错误：$e');
+      return SyncResult.failure('backup_error', {'error': '$e'});
     }
   }
 
@@ -69,14 +69,14 @@ class WebDavSyncService {
     required String password,
   }) async {
     final base = _normalizeUrl(url);
-    if (base == null) return SyncResult.failure('请输入有效的 WebDAV 地址');
+    if (base == null) return SyncResult.failure('webdav_invalid_url');
     try {
       final uri = Uri.parse('$base/mianshi-zhilian-backup.json');
 
       final response = await _request('GET', uri, username, password);
 
       if (response.statusCode == 404) {
-        return SyncResult.failure('云端无备份文件');
+        return SyncResult.failure('webdav_no_backup_file');
       }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final body = utf8.decode(response.bodyBytes);
@@ -84,15 +84,15 @@ class WebDavSyncService {
 
         final data = remoteData['data'] as Map<String, dynamic>?;
         if (data == null) {
-          return SyncResult.failure('备份文件格式错误');
+          return SyncResult.failure('webdav_invalid_backup_format');
         }
 
         await _storage.importAllData(data);
-        return SyncResult.success('恢复完成，共导入 ${data.length} 项数据');
+        return SyncResult.success('restore_complete', {'count': '${data.length}'});
       }
-      return SyncResult.failure('下载失败：${response.statusCode}');
+      return SyncResult.failure('download_failed_status', {'status': '${response.statusCode}'});
     } catch (e) {
-      return SyncResult.failure('恢复错误：$e');
+      return SyncResult.failure('restore_error', {'error': '$e'});
     }
   }
 
@@ -161,10 +161,16 @@ class WebDavSyncService {
 
 class SyncResult {
   final bool success;
-  final String message;
-  const SyncResult._(this.success, this.message);
-  factory SyncResult.success(String msg) => SyncResult._(true, msg);
-  factory SyncResult.failure(String msg) => SyncResult._(false, msg);
+  final String l10nKey;
+  final Map<String, String> params;
+  const SyncResult._(this.success, this.l10nKey, this.params);
+  factory SyncResult.success(String key, [Map<String, String>? params]) =>
+      SyncResult._(true, key, params ?? const {});
+  factory SyncResult.failure(String key, [Map<String, String>? params]) =>
+      SyncResult._(false, key, params ?? const {});
+
+  @override
+  String toString() => l10nKey;
 }
 
 class SyncFileInfo {

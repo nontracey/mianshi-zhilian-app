@@ -18,6 +18,7 @@ void main() {
         contentApi: contentApi,
         aiService: aiService,
         updateService: updateService,
+        initialLanguage: 'zh',
       ),
     );
 

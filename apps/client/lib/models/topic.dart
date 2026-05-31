@@ -195,7 +195,7 @@ class Topic {
   bool get highFrequency =>
       interviewFrequency == 'high' || recommendWeight >= 80;
 
-  /// 面试频率标签文本
+  /// 面试频率标签（返回 l10n key，UI 层使用 l10n.get() 获取显示文本）
   String? get interviewFrequencyLabel {
     if (interviewFrequency == 'high') return '高频';
     if (interviewFrequency == 'medium') return '中频';

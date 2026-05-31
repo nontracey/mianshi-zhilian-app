@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../../providers/localization_provider.dart';
 
 enum MasterySort { scoreAsc, scoreDesc }
 
@@ -30,6 +31,7 @@ class MasteryPage extends StatefulWidget {
 }
 
 class _MasteryPageState extends State<MasteryPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   MasterySort _sort = MasterySort.scoreAsc;
   MasteryFilter _filter = MasteryFilter.all;
   String? _diagnosticFilter; // null / 'longUnreviewed' / 'regressed'
@@ -53,6 +55,7 @@ class _MasteryPageState extends State<MasteryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
@@ -64,7 +67,7 @@ class _MasteryPageState extends State<MasteryPage> {
         .where((d) => d.id == widget.currentDomainId)
         .firstOrNull;
     if (currentDomain == null) {
-      return const Center(child: Text('请选择一个领域'));
+      return Center(child: Text(l10n.get('请选择一个领域')));
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
@@ -114,7 +117,7 @@ class _MasteryPageState extends State<MasteryPage> {
           // 知识点列表
           Expanded(
             child: sortedTopics.isEmpty
-                ? Center(child: Text('暂无数据', style: TextStyle(color: Colors.grey.shade500)))
+                ? Center(child: Text(l10n.get('暂无数据'), style: TextStyle(color: Colors.grey.shade500)))
                 : ListView.builder(
                     itemCount: sortedTopics.length,
                     itemBuilder: (context, index) {
@@ -203,14 +206,14 @@ class _MasteryPageState extends State<MasteryPage> {
       int highFrequencyWeak, int longUnreviewedCount, int regressedCount, bool isDark) {
     return Row(
       children: [
-        Expanded(child: _buildDiagnosticCard('就绪度', '$readiness', AppColors.accent, isDark)),
+        Expanded(child: _buildDiagnosticCard(l10n.get('就绪度'), '$readiness', AppColors.accent, isDark)),
         const SizedBox(width: 8),
-        Expanded(child: _buildDiagnosticCard('待复习', '$dueCount', AppColors.warning, isDark)),
+        Expanded(child: _buildDiagnosticCard(l10n.get('待复习'), '$dueCount', AppColors.warning, isDark)),
         const SizedBox(width: 8),
-        Expanded(child: _buildDiagnosticCard('未复习', '$longUnreviewedCount', AppColors.accent, isDark,
+        Expanded(child: _buildDiagnosticCard(l10n.get('未复习'), '$longUnreviewedCount', AppColors.accent, isDark,
           filterKey: 'longUnreviewed')),
         const SizedBox(width: 8),
-        Expanded(child: _buildDiagnosticCard('退步', '$regressedCount', AppColors.danger, isDark,
+        Expanded(child: _buildDiagnosticCard(l10n.get('退步'), '$regressedCount', AppColors.danger, isDark,
           filterKey: 'regressed')),
       ],
     );
@@ -263,19 +266,19 @@ class _MasteryPageState extends State<MasteryPage> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip('全部', MasteryFilter.all, isDark),
-                _buildFilterChip('熟练', MasteryFilter.skilled, isDark),
-                _buildFilterChip('不熟练', MasteryFilter.familiar, isDark),
-                _buildFilterChip('未掌握', MasteryFilter.unfamiliar, isDark),
+                _buildFilterChip(l10n.get('全部'), MasteryFilter.all, isDark),
+                _buildFilterChip(l10n.get('熟练'), MasteryFilter.skilled, isDark),
+                _buildFilterChip(l10n.get('不熟练'), MasteryFilter.familiar, isDark),
+                _buildFilterChip(l10n.get('未掌握'), MasteryFilter.unfamiliar, isDark),
               ],
             ),
           ),
         ),
         const SizedBox(width: 16),
         // 排序
-        _buildSortChip('低→高', MasterySort.scoreAsc, isDark),
+        _buildSortChip(l10n.get('低高'), MasterySort.scoreAsc, isDark),
         const SizedBox(width: 8),
-        _buildSortChip('高→低', MasterySort.scoreDesc, isDark),
+        _buildSortChip(l10n.get('高低'), MasterySort.scoreDesc, isDark),
       ],
     );
   }
@@ -391,7 +394,7 @@ class _MasteryPageState extends State<MasteryPage> {
                           color: AppColors.danger.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(3),
                         ),
-                        child: const Text('高频', style: TextStyle(fontSize: 10, color: AppColors.danger)),
+                        child: Text(l10n.get('高频'), style: TextStyle(fontSize: 10, color: AppColors.danger)),
                       ),
                     Text(
                       '${topic.domain} · ${topic.difficultyLabel}',
@@ -409,7 +412,7 @@ class _MasteryPageState extends State<MasteryPage> {
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
-            child: const Text('开始练习', style: TextStyle(fontSize: 12)),
+            child: Text(l10n.get('开始练习'), style: TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -459,12 +462,12 @@ class _MasteryPageState extends State<MasteryPage> {
 }
 
 extension on Topic {
-  String get difficultyLabel => switch (difficulty) {
-    1 => '入门',
-    2 => '基础',
-    3 => '中等',
-    4 => '较难',
-    5 => '困难',
+  String difficultyLabel(LocalizationProvider l10n) => switch (difficulty) {
+    1 => l10n.get('入门'),
+    2 => l10n.get('基础'),
+    3 => l10n.get('中等'),
+    4 => l10n.get('较难'),
+    5 => l10n.get('困难'),
     _ => '',
   };
 }

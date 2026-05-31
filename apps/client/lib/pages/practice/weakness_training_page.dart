@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 
@@ -19,6 +20,8 @@ class WeaknessTrainingPage extends StatefulWidget {
 }
 
 class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+
   String _selectedCategory = 'all';
   String _sortBy = 'score'; // score, frequency, recent
 
@@ -34,7 +37,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('弱点训练包'),
+        title: Text(l10n.get('弱点训练包')),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -165,13 +168,13 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
           // 总数统计
           Row(
             children: [
-              _buildStatItem('弱点总数', '${weakTopics.length}', AppColors.warning),
+              _buildStatItem(l10n.get('弱点总数'), '${weakTopics.length}', AppColors.warning),
               const SizedBox(width: 24),
-              _buildStatItem('概念缺失', '${categorized['concept']?.length ?? 0}', AppColors.danger),
+              _buildStatItem(l10n.get('概念缺失'), '${categorized['concept']?.length ?? 0}', AppColors.danger),
               const SizedBox(width: 24),
-              _buildStatItem('混淆不清', '${categorized['confusion']?.length ?? 0}', AppColors.warning),
+              _buildStatItem(l10n.get('混淆不清'), '${categorized['confusion']?.length ?? 0}', AppColors.warning),
               const SizedBox(width: 24),
-              _buildStatItem('表达问题', '${categorized['expression']?.length ?? 0}', AppColors.accent),
+              _buildStatItem(l10n.get('表达问题'), '${categorized['expression']?.length ?? 0}', AppColors.accent),
             ],
           ),
           const SizedBox(height: 12),
@@ -188,7 +191,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '建议每天训练 5-10 个弱点，持续 1 周可显著提升',
+                    l10n.get('建议每天训练 5-10 个弱点，持续 1 周可显著提升'),
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.accent,
@@ -227,12 +230,12 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
 
   Widget _buildCategoryFilter(BuildContext context, Map<String, List<Topic>> categorized, bool isDark) {
     final categories = [
-      ('all', '全部', Icons.all_inclusive),
-      ('concept', '概念缺失', Icons.lightbulb_outline),
-      ('confusion', '混淆不清', Icons.compare_arrows),
-      ('expression', '表达问题', Icons.record_voice_over),
-      ('depth', '深度不足', Icons.layers),
-      ('code', '代码边界', Icons.code),
+      ('all', l10n.get('全部'), Icons.all_inclusive),
+      ('concept', l10n.get('概念缺失'), Icons.lightbulb_outline),
+      ('confusion', l10n.get('混淆不清'), Icons.compare_arrows),
+      ('expression', l10n.get('表达问题'), Icons.record_voice_over),
+      ('depth', l10n.get('深度不足'), Icons.layers),
+      ('code', l10n.get('代码边界'), Icons.code),
     ];
 
     return Container(
@@ -243,7 +246,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
         children: categories.map((cat) {
           final isSelected = _selectedCategory == cat.$1;
           final count = categorized[cat.$1]?.length ?? 0;
-          
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
@@ -302,7 +305,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
             Icon(Icons.check_circle_outline, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
             Text(
-              '没有找到弱点知识点',
+              l10n.get('没有找到弱点知识点'),
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ],
@@ -318,18 +321,18 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
           child: Row(
             children: [
               Text(
-                '排序：',
+                '${l10n.get('排序')}：',
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark ? Colors.white54 : const Color(0xFF666666),
                 ),
               ),
               const SizedBox(width: 8),
-              _buildSortChip('分数低→高', 'score', isDark),
+              _buildSortChip(l10n.get('分数低→高'), 'score', isDark),
               const SizedBox(width: 8),
-              _buildSortChip('高频优先', 'frequency', isDark),
+              _buildSortChip(l10n.get('高频优先'), 'frequency', isDark),
               const SizedBox(width: 8),
-              _buildSortChip('最近练习', 'recent', isDark),
+              _buildSortChip(l10n.get('最近练习'), 'recent', isDark),
             ],
           ),
         ),
@@ -456,9 +459,9 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
                               color: AppColors.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              '高频',
-                              style: TextStyle(
+                            child: Text(
+                              l10n.get('高频'),
+                              style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.danger,
@@ -491,7 +494,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      '练习 ${attempts.length} 次 · ${topic.domain}',
+                      '${l10n.get('练习')} ${attempts.length} ${l10n.get('次')} · ${topic.domain}',
                       style: TextStyle(
                         fontSize: 11,
                         color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -531,7 +534,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
             ? null
             : () => _startTraining(context, filteredTopics.take(10).toList()),
         icon: const Icon(Icons.play_arrow),
-        label: Text('开始训练 (${filteredTopics.length > 10 ? 10 : filteredTopics.length} 题)'),
+        label: Text('${l10n.get('开始训练')} (${filteredTopics.length > 10 ? 10 : filteredTopics.length} ${l10n.get('题')})'),
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
@@ -542,7 +545,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
   void _startTraining(BuildContext context, List<Topic> topics) {
     if (topics.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有可训练的知识点')),
+        SnackBar(content: Text(l10n.get('没有可训练的知识点'))),
       );
       return;
     }
@@ -558,33 +561,33 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('弱点训练指南'),
-        content: const SingleChildScrollView(
+        title: Text(l10n.get('弱点训练指南')),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('错误类型说明', style: TextStyle(fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('• 概念缺失：对基本概念理解不足'),
-              Text('• 混淆不清：与其他概念混淆'),
-              Text('• 表达问题：知道但说不清楚'),
-              Text('• 深度不足：理解停留在表面'),
-              Text('• 代码边界：代码实现细节不清楚'),
-              SizedBox(height: 16),
-              Text('训练建议', style: TextStyle(fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('1. 每天专注训练 5-10 个弱点'),
-              Text('2. 先看参考答案，理解正确思路'),
-              Text('3. 用自己的话复述，不要死记硬背'),
-              Text('4. 隔天复习，巩固记忆'),
+              Text(l10n.get('错误类型说明'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text('• ${l10n.get('概念缺失')}：${l10n.get('weakness_concept_missing')}'),
+              Text('• ${l10n.get('混淆不清')}：${l10n.get('weakness_confusion')}'),
+              Text('• ${l10n.get('表达问题')}：${l10n.get('weakness_expression')}'),
+              Text('• ${l10n.get('深度不足')}：${l10n.get('weakness_insufficient_depth')}'),
+              Text('• ${l10n.get('代码边界')}：${l10n.get('weakness_code_boundary')}'),
+              const SizedBox(height: 16),
+              Text(l10n.get('训练建议'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text('1. ${l10n.get('weakness_tip_1')}'),
+              Text('2. ${l10n.get('weakness_tip_2')}'),
+              Text('3. ${l10n.get('weakness_tip_3')}'),
+              Text('4. ${l10n.get('weakness_tip_4')}'),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
+            child: Text(l10n.get('知道了')),
           ),
         ],
       ),

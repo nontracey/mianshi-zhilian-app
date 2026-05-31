@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+
+import 'l10n/l10n.dart';
 
 import 'models/app_settings.dart';
 import 'models/user.dart';
@@ -42,6 +45,7 @@ void main() async {
       contentApi: contentApi,
       aiService: aiService,
       updateService: updateService,
+      initialLanguage: savedSettings.language,
     ),
   );
 }
@@ -53,6 +57,7 @@ class MianshiZhilianApp extends StatefulWidget {
   final ContentApiService contentApi;
   final AiService aiService;
   final UpdateService updateService;
+  final String initialLanguage;
 
   const MianshiZhilianApp({
     super.key,
@@ -60,6 +65,7 @@ class MianshiZhilianApp extends StatefulWidget {
     required this.contentApi,
     required this.aiService,
     required this.updateService,
+    required this.initialLanguage,
   });
 
   @override
@@ -89,14 +95,18 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(widget.storage)..loadUser(),
         ),
-        ChangeNotifierProvider(create: (_) => LocalizationProvider()),
+        ChangeNotifierProvider(create: (_) => LocalizationProvider(initialLanguage: widget.initialLanguage)),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
+          final l10n = context.watch<LocalizationProvider>();
           // 设置加载完成后，再加载内容（使用当前领域）
           if (!settings.isLoading && !_contentLoaded) {
             _contentLoaded = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
+              // 同步语言设置到 LocalizationProvider
+              context.read<LocalizationProvider>().setLanguage(settings.settings.language);
+              // 加载内容
               final contentProvider = context.read<ContentProvider>();
               contentProvider.loadContent(
                 currentDomainId: settings.settings.currentDomain,
@@ -117,10 +127,17 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             cardDensity: settings.settings.cardDensity,
             systemIsDark: systemIsDark,
           );
-          
+
           return MaterialApp(
-            title: '面试智练',
+            title: l10n.get('面试智练'),
             debugShowCheckedModeBanner: false,
+            locale: Locale(l10n.language),
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: L10n.supportedLocales,
             themeMode: settings.settings.themeMode,
             theme: theme,
             home: const LearningShell(),
@@ -146,6 +163,7 @@ class _LearningShellState extends State<LearningShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final wide = MediaQuery.sizeOf(context).width >= 860;
     final settings = context.watch<SettingsProvider>();
     final content = context.watch<ContentProvider>();
@@ -170,7 +188,7 @@ class _LearningShellState extends State<LearningShell> {
             child: Column(
               children: [
                 HeaderBar(
-                  title: _sectionTitle(_section),
+                  title: _sectionTitle(_section, l10n),
                   onProfile: () => _setSection(AppSection.profile),
                   onTopicTap: (topicId) => setState(() {
                     _selectedTopicId = topicId;
@@ -185,8 +203,8 @@ class _LearningShellState extends State<LearningShell> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(userRole == UserRole.guest
-                              ? '登录后可查看测试版内容'
-                              : '需要管理员权限查看草稿内容'),
+                              ? l10n.get('登录后可查看测试版内容')
+                              : l10n.get('需要管理员权限查看草稿内容')),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -215,30 +233,30 @@ class _LearningShellState extends State<LearningShell> {
           : NavigationBar(
               selectedIndex: _section.index,
               onDestinationSelected: (i) => _setSection(AppSection.values[i]),
-              destinations: const [
+              destinations: [
                 NavigationDestination(
                   icon: Icon(Icons.dashboard_outlined),
-                  label: '学习',
+                  label: l10n.get('学习'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.menu_book_outlined),
-                  label: '知识',
+                  label: l10n.get('目录'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.psychology_alt_outlined),
-                  label: '练习',
+                  label: l10n.get('练习'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.flag_outlined),
-                  label: '面试',
+                  label: l10n.get('面试'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.bar_chart_outlined),
-                  label: '掌握',
+                  label: l10n.get('掌握度'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline),
-                  label: '我的',
+                  label: l10n.get('设置'),
                 ),
               ],
             ),
@@ -377,12 +395,12 @@ class _LearningShellState extends State<LearningShell> {
     });
   }
 
-  String _sectionTitle(AppSection section) => switch (section) {
-    AppSection.dashboard => '学习中心',
-    AppSection.catalog => '领域知识目录',
-    AppSection.practice => 'AI 主动复述',
-    AppSection.prep => '面试准备',
-    AppSection.mastery => '掌握度看板',
-    AppSection.profile => '个人中心',
+  String _sectionTitle(AppSection section, LocalizationProvider l10n) => switch (section) {
+    AppSection.dashboard => l10n.get('dashboard_title'),
+    AppSection.catalog => l10n.get('catalog_title'),
+    AppSection.practice => l10n.get('practice_title'),
+    AppSection.prep => l10n.get('面试准备'),
+    AppSection.mastery => l10n.get('mastery_title'),
+    AppSection.profile => l10n.get('profile_title'),
   };
 }

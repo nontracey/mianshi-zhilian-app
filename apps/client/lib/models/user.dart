@@ -3,6 +3,7 @@ enum UserRole {
   user,
   admin;
 
+  /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
   String get label {
     switch (this) {
       case UserRole.guest:

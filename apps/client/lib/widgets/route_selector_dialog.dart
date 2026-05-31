@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/learning_route.dart';
+import '../providers/localization_provider.dart';
 import '../theme/colors.dart';
 
 class RouteSelectorDialog extends StatelessWidget {
@@ -18,6 +20,7 @@ class RouteSelectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
@@ -34,9 +37,9 @@ class RouteSelectorDialog extends StatelessWidget {
               children: [
                 const Icon(Icons.route, color: AppColors.accent),
                 const SizedBox(width: 8),
-                const Text(
-                  '选择学习路线',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                Text(
+                  l10n.get('选择学习路线'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 IconButton(
@@ -136,7 +139,7 @@ class RouteSelectorDialog extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onCreateRoute,
                 icon: const Icon(Icons.add),
-                label: const Text('创建自定义路线'),
+                label: Text(l10n.get('创建自定义路线')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
