@@ -6,7 +6,6 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class CatalogPage extends StatefulWidget {
@@ -46,6 +45,7 @@ class _CatalogPageState extends State<CatalogPage> {
   List<Domain> _filterDomains(List<Domain> all) {
     return all.where((d) => !_disabledIds.contains(d.id)).toList();
   }
+
   bool _roadmapView = false;
   String _searchQuery = '';
   final Set<int> _difficultyFilters = {};
@@ -60,27 +60,41 @@ class _CatalogPageState extends State<CatalogPage> {
     var result = topics;
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      result = result.where((t) =>
-          t.title.toLowerCase().contains(q) ||
-          t.summary.toLowerCase().contains(q) ||
-          t.tags.any((tag) => tag.toLowerCase().contains(q))).toList();
+      result = result
+          .where(
+            (t) =>
+                t.title.toLowerCase().contains(q) ||
+                t.summary.toLowerCase().contains(q) ||
+                t.tags.any((tag) => tag.toLowerCase().contains(q)),
+          )
+          .toList();
     }
     if (_difficultyFilters.isNotEmpty) {
-      result = result.where((t) => _difficultyFilters.contains(t.difficulty)).toList();
+      result = result
+          .where((t) => _difficultyFilters.contains(t.difficulty))
+          .toList();
     }
     if (_highFrequencyOnly) {
       result = result.where((t) => t.highFrequency).toList();
     }
     if (_hasCodeOnly) {
-      result = result.where((t) => t.recallPrompts.any((p) => p.mode == 'code')).toList();
+      result = result
+          .where((t) => t.recallPrompts.any((p) => p.mode == 'code'))
+          .toList();
     }
     if (_hasLeetcodeOnly) {
-      result = result.where((t) => t.leetcodeUrl != null && t.leetcodeUrl!.isNotEmpty).toList();
+      result = result
+          .where((t) => t.leetcodeUrl != null && t.leetcodeUrl!.isNotEmpty)
+          .toList();
     }
     if (_statusFilters.isNotEmpty) {
       result = result.where((t) {
         final score = progress.getTopicProgress(t.id)?.score ?? 0;
-        final status = score >= 85 ? 'skilled' : score > 0 ? 'familiar' : 'unfamiliar';
+        final status = score >= 85
+            ? 'skilled'
+            : score > 0
+            ? 'familiar'
+            : 'unfamiliar';
         return _statusFilters.contains(status);
       }).toList();
     }
@@ -141,19 +155,23 @@ class _CatalogPageState extends State<CatalogPage> {
 
     final allDomains = contentProvider.domains;
     final domains = _filterDomains(allDomains);
-    final currentDomain = allDomains.where((d) => d.id == widget.currentDomainId).firstOrNull;
+    final currentDomain = allDomains
+        .where((d) => d.id == widget.currentDomainId)
+        .firstOrNull;
     if (currentDomain == null) {
-      return Center(child: Text(l10n.get('8bf7_select_4e00_4e2a_domain')));
+      return Center(child: Text(l10n.get('please_select_one_domain')));
     }
 
-    final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
+    final domainTopics = contentProvider.getTopicsByDomain(
+      widget.currentDomainId,
+    );
     final domainProgress = progressProvider.getDomainProgress(
       widget.currentDomainId,
       contentProvider.topics.values.toList(),
     );
     final masteryPercent = domainProgress.masteryPercent;
     final totalTopics = currentDomain.topicCount;
-    
+
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
 
@@ -163,28 +181,48 @@ class _CatalogPageState extends State<CatalogPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 顶部：紧凑的领域选择和搜索
-          _buildCompactHeader(context, currentDomain, masteryPercent, totalTopics, domains, contentProvider, isDark),
+          _buildCompactHeader(
+            context,
+            currentDomain,
+            masteryPercent,
+            totalTopics,
+            domains,
+            contentProvider,
+            isDark,
+          ),
           const SizedBox(height: 12),
-          
+
           // 筛选栏（可折叠）
           if (_showFilters) ...[
             _buildFilterBar(context, isDark),
             const SizedBox(height: 12),
           ],
-          
+
           // 知识点列表
           Expanded(
             child: sortedTopics.isEmpty
                 ? _buildEmptyState(context)
-                : _buildTopicList(context, sortedTopics, progressProvider, isDark),
+                : _buildTopicList(
+                    context,
+                    sortedTopics,
+                    progressProvider,
+                    isDark,
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCompactHeader(BuildContext context, Domain domain, int masteryPercent, 
-      int totalTopics, List<Domain> domains, ContentProvider contentProvider, bool isDark) {
+  Widget _buildCompactHeader(
+    BuildContext context,
+    Domain domain,
+    int masteryPercent,
+    int totalTopics,
+    List<Domain> domains,
+    ContentProvider contentProvider,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -201,19 +239,34 @@ class _CatalogPageState extends State<CatalogPage> {
             children: [
               // 领域下拉选择
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: widget.currentDomainId,
                     isDense: true,
-                    items: domains.map((d) => DropdownMenuItem(
-                      value: d.id,
-                      child: Text(d.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    )).toList(),
+                    items: domains
+                        .map(
+                          (d) => DropdownMenuItem(
+                            value: d.id,
+                            child: Text(
+                              d.title,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) {
                       if (value != null) {
                         widget.onDomainChanged(value);
@@ -226,7 +279,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              
+
               // 搜索框
               Expanded(
                 child: SizedBox(
@@ -238,7 +291,8 @@ class _CatalogPageState extends State<CatalogPage> {
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
-                              onPressed: () => setState(() => _searchQuery = ''),
+                              onPressed: () =>
+                                  setState(() => _searchQuery = ''),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                             )
@@ -248,8 +302,13 @@ class _CatalogPageState extends State<CatalogPage> {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 0,
+                      ),
                       isDense: true,
                     ),
                     style: const TextStyle(fontSize: 13),
@@ -258,32 +317,45 @@ class _CatalogPageState extends State<CatalogPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              
+
               // 筛选按钮
               IconButton(
                 icon: Icon(
                   _showFilters ? Icons.filter_list_off : Icons.filter_list,
                   size: 20,
-                  color: _hasActiveFilters ? Theme.of(context).colorScheme.primary : null,
+                  color: _hasActiveFilters
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 onPressed: () => setState(() => _showFilters = !_showFilters),
-                tooltip: _showFilters ? l10n.get('hide_filter') : l10n.get('show_filter'),
+                tooltip: _showFilters
+                    ? l10n.get('hide_filter')
+                    : l10n.get('show_filter'),
                 style: IconButton.styleFrom(
-                  backgroundColor: _hasActiveFilters 
-                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                  backgroundColor: _hasActiveFilters
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1)
                       : null,
                 ),
               ),
               const SizedBox(width: 4),
-              
+
               // 视图切换
               SegmentedButton<bool>(
                 segments: const [
-                  ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16)),
-                  ButtonSegment(value: true, icon: Icon(Icons.account_tree, size: 16)),
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.view_list, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.account_tree, size: 16),
+                  ),
                 ],
                 selected: {_roadmapView},
-                onSelectionChanged: (next) => setState(() => _roadmapView = next.first),
+                onSelectionChanged: (next) =>
+                    setState(() => _roadmapView = next.first),
                 style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -291,14 +363,17 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ],
           ),
-          
+
           // 第二行：掌握度进度条
           const SizedBox(height: 8),
           Row(
             children: [
               Text(
-                l10n.getp('{count}_4e2a_knowledge_point', {'count': totalTopics}),
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+                l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white54 : Colors.grey,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -306,7 +381,9 @@ class _CatalogPageState extends State<CatalogPage> {
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
                     value: masteryPercent / 100,
-                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                     color: Theme.of(context).colorScheme.primary,
                     minHeight: 4,
                   ),
@@ -348,7 +425,13 @@ class _CatalogPageState extends State<CatalogPage> {
             children: [
               // 难度筛选
               ...([1, 2, 3, 4, 5].map((d) {
-                final labels = {1: l10n.get('beginner'), 2: l10n.get('basic'), 3: l10n.get('medium'), 4: l10n.get('8f83_96be'), 5: l10n.get('hard')};
+                final labels = {
+                  1: l10n.get('beginner'),
+                  2: l10n.get('basic'),
+                  3: l10n.get('medium'),
+                  4: l10n.get('compare_difficult'),
+                  5: l10n.get('hard'),
+                };
                 final colors = {
                   1: const Color(0xFF10B981),
                   2: const Color(0xFF00CCF9),
@@ -374,10 +457,13 @@ class _CatalogPageState extends State<CatalogPage> {
                   visualDensity: VisualDensity.compact,
                 );
               })),
-              
+
               // 高频筛选
               FilterChip(
-                label: Text(l10n.get('high_freq'), style: TextStyle(fontSize: 11)),
+                label: Text(
+                  l10n.get('high_freq'),
+                  style: TextStyle(fontSize: 11),
+                ),
                 avatar: const Icon(Icons.local_fire_department, size: 14),
                 selected: _highFrequencyOnly,
                 selectedColor: AppColors.danger.withValues(alpha: 0.15),
@@ -386,10 +472,13 @@ class _CatalogPageState extends State<CatalogPage> {
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
-              
+
               // 含代码题
               FilterChip(
-                label: Text(l10n.get('code_question_count'), style: TextStyle(fontSize: 11)),
+                label: Text(
+                  l10n.get('code_question_count'),
+                  style: TextStyle(fontSize: 11),
+                ),
                 avatar: const Icon(Icons.code, size: 14),
                 selected: _hasCodeOnly,
                 selectedColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
@@ -398,7 +487,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
-              
+
               // 含LeetCode
               FilterChip(
                 label: Text('LeetCode', style: TextStyle(fontSize: 11)),
@@ -410,10 +499,18 @@ class _CatalogPageState extends State<CatalogPage> {
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
-              
+
               // 掌握度筛选
-              ...({'skilled': l10n.get('719f_7ec3'), 'familiar': l10n.get('not_719f_7ec3'), 'unfamiliar': l10n.get('un_mastery')}.entries.map((e) {
-                final colors = {'skilled': AppColors.success, 'familiar': AppColors.warning, 'unfamiliar': AppColors.danger};
+              ...({
+                'skilled': l10n.get('skilled_training'),
+                'familiar': l10n.get('not_skilled_training'),
+                'unfamiliar': l10n.get('un_mastery'),
+              }.entries.map((e) {
+                final colors = {
+                  'skilled': AppColors.success,
+                  'familiar': AppColors.warning,
+                  'unfamiliar': AppColors.danger,
+                };
                 return FilterChip(
                   label: Text(e.value, style: const TextStyle(fontSize: 11)),
                   selected: _statusFilters.contains(e.key),
@@ -432,11 +529,14 @@ class _CatalogPageState extends State<CatalogPage> {
                   visualDensity: VisualDensity.compact,
                 );
               })),
-              
+
               // 清除筛选
               if (_hasActiveFilters)
                 ActionChip(
-                  label: Text(l10n.get('clear'), style: TextStyle(fontSize: 11)),
+                  label: Text(
+                    l10n.get('clear'),
+                    style: TextStyle(fontSize: 11),
+                  ),
                   avatar: const Icon(Icons.filter_alt_off, size: 14),
                   onPressed: _clearFilters,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -444,12 +544,18 @@ class _CatalogPageState extends State<CatalogPage> {
                 ),
             ],
           ),
-          
+
           // 排序选项
           const SizedBox(height: 12),
           Row(
             children: [
-              Text(l10n.get('sort'), style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+              Text(
+                l10n.get('sort'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white54 : Colors.grey,
+                ),
+              ),
               const SizedBox(width: 8),
               _buildSortChip(l10n.get('default'), 'order', isDark),
               _buildSortChip(l10n.get('difficulty'), 'difficulty', isDark),
@@ -481,7 +587,9 @@ class _CatalogPageState extends State<CatalogPage> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white70 : Colors.grey.shade700),
             ),
           ),
         ),
@@ -496,7 +604,10 @@ class _CatalogPageState extends State<CatalogPage> {
         children: [
           Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
-          Text(l10n.get('6ca1_has_627e_5230_5339_914d_7684_knowledge_point'), style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+          Text(
+            l10n.get('not_has_find_to_match_assign_knowledge_point'),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 8),
           if (_hasActiveFilters)
             TextButton(
@@ -508,31 +619,44 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildTopicList(BuildContext context, List<Topic> topics, 
-      ProgressProvider progressProvider, bool isDark) {
+  Widget _buildTopicList(
+    BuildContext context,
+    List<Topic> topics,
+    ProgressProvider progressProvider,
+    bool isDark,
+  ) {
     if (_roadmapView) {
       return _buildRoadmapView(context, topics, progressProvider, isDark);
     }
-    
+
     return ListView.builder(
       itemCount: topics.length,
       itemBuilder: (context, index) {
-        return _buildTopicCard(context, topics[index], progressProvider, isDark);
+        return _buildTopicCard(
+          context,
+          topics[index],
+          progressProvider,
+          isDark,
+        );
       },
     );
   }
 
-  Widget _buildTopicCard(BuildContext context, Topic topic, 
-      ProgressProvider progressProvider, bool isDark) {
+  Widget _buildTopicCard(
+    BuildContext context,
+    Topic topic,
+    ProgressProvider progressProvider,
+    bool isDark,
+  ) {
     final progress = progressProvider.getTopicProgress(topic.id);
     final score = progress?.score ?? 0;
     final nextReview = progress?.nextReviewAt;
-    
+
     final difficultyLabel = switch (topic.difficulty) {
       1 => l10n.get('beginner'),
       2 => l10n.get('basic'),
       3 => l10n.get('medium'),
-      4 => l10n.get('8f83_96be'),
+      4 => l10n.get('compare_difficult'),
       5 => l10n.get('hard'),
       _ => '',
     };
@@ -544,15 +668,16 @@ class _CatalogPageState extends State<CatalogPage> {
       5 => const Color(0xFF7C3AED),
       _ => Colors.grey,
     };
-    
+
     final statusColor = score >= 85
         ? AppColors.success
         : score > 0
         ? AppColors.warning
         : Colors.grey;
-    
+
     final hasCode = topic.recallPrompts.any((p) => p.mode == 'code');
-    final hasLeetcode = topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty;
+    final hasLeetcode =
+        topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -580,7 +705,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              
+
               // 主要信息
               Expanded(
                 child: Column(
@@ -595,16 +720,22 @@ class _CatalogPageState extends State<CatalogPage> {
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
-                              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (topic.status != null && topic.status != 'production')
+                        if (topic.status != null &&
+                            topic.status != 'production')
                           Container(
                             margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: topic.status == 'test'
                                   ? AppColors.warning.withValues(alpha: 0.1)
@@ -612,7 +743,9 @@ class _CatalogPageState extends State<CatalogPage> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              topic.status == 'test' ? l10n.get('test') : l10n.get('8349_7a3f'),
+                              topic.status == 'test'
+                                  ? l10n.get('test')
+                                  : l10n.get('draft_2'),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -625,48 +758,85 @@ class _CatalogPageState extends State<CatalogPage> {
                         if (topic.highFrequency)
                           Container(
                             margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(l10n.get('high_freq'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger)),
+                            child: Text(
+                              l10n.get('high_freq'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.danger,
+                              ),
+                            ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    
+
                     // 标签行
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
                       children: [
                         if (difficultyLabel.isNotEmpty)
-                          _buildMiniTag(difficultyLabel, difficultyColor, isDark),
-                        if (topic.interviewFrequencyLabel != null && !topic.highFrequency)
-                          _buildMiniTag(l10n.get(topic.interviewFrequencyLabel!), AppColors.warning, isDark),
+                          _buildMiniTag(
+                            difficultyLabel,
+                            difficultyColor,
+                            isDark,
+                          ),
+                        if (topic.interviewFrequencyLabel != null &&
+                            !topic.highFrequency)
+                          _buildMiniTag(
+                            l10n.get(topic.interviewFrequencyLabel!),
+                            AppColors.warning,
+                            isDark,
+                          ),
                         if (topic.estimatedMinutes > 0)
-                          _buildMiniTag(l10n.getp('{minutes}_min_1', {'minutes': topic.estimatedMinutes}), Colors.grey, isDark),
+                          _buildMiniTag(
+                            l10n.getp('minutes_min_1_2', {
+                              'minutes': topic.estimatedMinutes,
+                            }),
+                            Colors.grey,
+                            isDark,
+                          ),
                         if (hasCode)
-                          _buildMiniTag(l10n.get('code'), Color(0xFF8B5CF6), isDark),
+                          _buildMiniTag(
+                            l10n.get('code'),
+                            Color(0xFF8B5CF6),
+                            isDark,
+                          ),
                         if (hasLeetcode)
-                          _buildMiniTag('LeetCode', const Color(0xFF10B981), isDark),
+                          _buildMiniTag(
+                            'LeetCode',
+                            const Color(0xFF10B981),
+                            isDark,
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // 右侧信息
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (score > 0)
                     Text(
-                      l10n.getp('{score}_5206_1', {'score': score}),
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: statusColor),
+                      l10n.getp('score_score_1_2', {'score': score}),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: statusColor,
+                      ),
                     ),
                   if (nextReview != null) ...[
                     const SizedBox(height: 4),
@@ -674,7 +844,11 @@ class _CatalogPageState extends State<CatalogPage> {
                       _formatReviewTime(nextReview),
                       style: TextStyle(
                         fontSize: 11,
-                        color: nextReview.isBefore(DateTime.now()) ? AppColors.danger : (isDark ? Colors.white38 : const Color(0xFF999999)),
+                        color: nextReview.isBefore(DateTime.now())
+                            ? AppColors.danger
+                            : (isDark
+                                  ? Colors.white38
+                                  : const Color(0xFF999999)),
                       ),
                     ),
                   ],
@@ -682,9 +856,17 @@ class _CatalogPageState extends State<CatalogPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildActionButton(l10n.get('67e5_9605'), AppColors.categoryCyan, () => widget.onTopicLearn(topic.id)),
+                      _buildActionButton(
+                        l10n.get('check_read'),
+                        AppColors.categoryCyan,
+                        () => widget.onTopicLearn(topic.id),
+                      ),
                       const SizedBox(width: 6),
-                      _buildActionButton(l10n.get('practice'), AppColors.accent, () => widget.onTopicPractice(topic.id)),
+                      _buildActionButton(
+                        l10n.get('practice'),
+                        AppColors.accent,
+                        () => widget.onTopicPractice(topic.id),
+                      ),
                     ],
                   ),
                 ],
@@ -703,7 +885,14 @@ class _CatalogPageState extends State<CatalogPage> {
         color: color.withValues(alpha: isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 
@@ -716,7 +905,14 @@ class _CatalogPageState extends State<CatalogPage> {
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
       ),
     );
   }
@@ -724,42 +920,61 @@ class _CatalogPageState extends State<CatalogPage> {
   String _formatReviewTime(DateTime time) {
     final now = DateTime.now();
     final diff = time.difference(now);
-    
+
     if (diff.isNegative) {
       final pastDiff = now.difference(time);
-      if (pastDiff.inMinutes < 60) return l10n.getp('{n}_min_524d', {'n': pastDiff.inMinutes});
-      if (pastDiff.inHours < 24) return l10n.getp('{n}_hour_524d', {'n': pastDiff.inHours});
-      return l10n.getp('{n}_day_524d', {'n': pastDiff.inDays});
+      if (pastDiff.inMinutes < 60)
+        return l10n.getp('n_min_ago_2', {'n': pastDiff.inMinutes});
+      if (pastDiff.inHours < 24)
+        return l10n.getp('n_hour_ago_2', {'n': pastDiff.inHours});
+      return l10n.getp('n_day_ago_2', {'n': pastDiff.inDays});
     }
-    
-    if (diff.inMinutes < 60) return l10n.getp('{n}_min_540e', {'n': diff.inMinutes});
-    if (diff.inHours < 24) return l10n.getp('{n}_hour_540e', {'n': diff.inHours});
-    return l10n.getp('{n}_day_540e', {'n': diff.inDays});
+
+    if (diff.inMinutes < 60)
+      return l10n.getp('n_min_after_2', {'n': diff.inMinutes});
+    if (diff.inHours < 24)
+      return l10n.getp('n_hour_after_2', {'n': diff.inHours});
+    return l10n.getp('n_day_after_2', {'n': diff.inDays});
   }
 
-  Widget _buildRoadmapView(BuildContext context, List<Topic> topics, 
-      ProgressProvider progressProvider, bool isDark) {
+  Widget _buildRoadmapView(
+    BuildContext context,
+    List<Topic> topics,
+    ProgressProvider progressProvider,
+    bool isDark,
+  ) {
     // 检查是否有 phase 数据
-    final hasPhaseData = topics.any((t) => t.phase != null && t.phase!.isNotEmpty);
-    
+    final hasPhaseData = topics.any(
+      (t) => t.phase != null && t.phase!.isNotEmpty,
+    );
+
     final Map<String, List<Topic>> groups = {};
-    
+
     if (hasPhaseData) {
       // 按 phase 分组
       for (final topic in topics) {
-        final phase = topic.phase ?? l10n.get('un_5206_7c7b');
+        final phase = topic.phase ?? l10n.get('un_score_category');
         groups.putIfAbsent(phase, () => []).add(topic);
       }
     } else {
       // 按 category 分组（用 domain 作为分类）
       for (final topic in topics) {
-        final category = topic.domain.isNotEmpty ? topic.domain : l10n.get('un_5206_7c7b');
+        final category = topic.domain.isNotEmpty
+            ? topic.domain
+            : l10n.get('un_score_category');
         groups.putIfAbsent(category, () => []).add(topic);
       }
     }
 
     // 排序
-    final phaseOrder = [l10n.get('basic'), l10n.get('beginner'), l10n.get('8fdb_9636'), l10n.get('intermediate'), l10n.get('senior'), l10n.get('hard')];
+    final phaseOrder = [
+      l10n.get('basic'),
+      l10n.get('beginner'),
+      l10n.get('progress_level'),
+      l10n.get('intermediate'),
+      l10n.get('senior'),
+      l10n.get('hard'),
+    ];
     final sortedKeys = groups.keys.toList()
       ..sort((a, b) {
         final ia = phaseOrder.indexOf(a);
@@ -772,7 +987,10 @@ class _CatalogPageState extends State<CatalogPage> {
 
     if (topics.isEmpty) {
       return Center(
-        child: Text(l10n.get('6682_no_knowledge_point'), style: TextStyle(color: Colors.grey.shade500)),
+        child: Text(
+          l10n.get('temporary_no_knowledge_point'),
+          style: TextStyle(color: Colors.grey.shade500),
+        ),
       );
     }
 
@@ -781,13 +999,16 @@ class _CatalogPageState extends State<CatalogPage> {
       itemBuilder: (context, index) {
         final key = sortedKeys[index];
         final groupTopics = groups[key]!;
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPhaseHeader(context, key, index, isDark, groupTopics.length),
             const SizedBox(height: 8),
-            ...groupTopics.map((topic) => _buildTopicCard(context, topic, progressProvider, isDark)),
+            ...groupTopics.map(
+              (topic) =>
+                  _buildTopicCard(context, topic, progressProvider, isDark),
+            ),
             if (index < sortedKeys.length - 1) const SizedBox(height: 16),
           ],
         );
@@ -795,8 +1016,20 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildPhaseHeader(BuildContext context, String label, int index, bool isDark, int count) {
-    const colors = [AppColors.categoryGreen, AppColors.accent, AppColors.categoryAmber, AppColors.categoryPurple, AppColors.categoryRed];
+  Widget _buildPhaseHeader(
+    BuildContext context,
+    String label,
+    int index,
+    bool isDark,
+    int count,
+  ) {
+    const colors = [
+      AppColors.categoryGreen,
+      AppColors.accent,
+      AppColors.categoryAmber,
+      AppColors.categoryPurple,
+      AppColors.categoryRed,
+    ];
     final color = colors[index % colors.length];
 
     return Container(
@@ -812,7 +1045,11 @@ class _CatalogPageState extends State<CatalogPage> {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
           ),
           const SizedBox(width: 8),
           Container(
@@ -822,8 +1059,12 @@ class _CatalogPageState extends State<CatalogPage> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              l10n.getp('{count}_question_count', {'count': count}),
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+              l10n.getp('count_question_count_2', {'count': count}),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],

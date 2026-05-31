@@ -9,7 +9,6 @@ import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 import 'recall_page.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class TodayReviewPage extends StatelessWidget {
@@ -55,7 +54,7 @@ class TodayReviewPage extends StatelessWidget {
     }.values.toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('4eca_day_review_5de5_4f5c_53f0'))),
+      appBar: AppBar(title: Text(l10n.get('today_day_review_work_platform'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -75,10 +74,10 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 到期与逾期 ──
           _ReviewGroup(
-            title: l10n.get('5230_671f_4e0e_903e_671f'),
+            title: l10n.get('to_day_and_overdue'),
             icon: Icons.schedule_outlined,
             iconColor: AppColors.warning,
-            emptyText: l10n.get('6682_no_5230_671f_review'),
+            emptyText: l10n.get('temporary_no_to_day_review'),
             emptyIcon: Icons.check_circle_outline,
             topics: dueTopics,
             progressProvider: progress,
@@ -86,7 +85,14 @@ class TodayReviewPage extends StatelessWidget {
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf_5230_660e_day', {'title': topic.title}))),
+                SnackBar(
+                  content: Text(
+                    l10n.getp(
+                      'already_will_title_push_postpone_to_clear_day_2',
+                      {'title': topic.title},
+                    ),
+                  ),
+                ),
               );
             },
           ),
@@ -94,10 +100,10 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 低分与错因回流 ──
           _ReviewGroup(
-            title: l10n.get('4f4e_5206_4e0e_9519_56e0_56de_6d41'),
+            title: l10n.get('low_score_and_error_because_back_flow'),
             icon: Icons.trending_down_outlined,
             iconColor: AppColors.danger,
-            emptyText: l10n.get('6682_no_4f4e_5206_56de_6d41'),
+            emptyText: l10n.get('temporary_no_low_score_back_flow'),
             emptyIcon: Icons.sentiment_satisfied_outlined,
             topics: lowScoreTopics,
             progressProvider: progress,
@@ -107,7 +113,10 @@ class TodayReviewPage extends StatelessWidget {
                   ? (attempts.first.score ?? 0)
                   : 0;
               final practiceCount = attempts.length;
-              return l10n.getp('recent_5f97_5206_{lastscore}_5206_already_practice_{practice', {'lastScore': lastScore, 'practiceCount': practiceCount});
+              return l10n.getp(
+                'recent_get_score_lastscore_already_practice_practice_2',
+                {'lastScore': lastScore, 'practiceCount': practiceCount},
+              );
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: null, // 低分不建议跳过
@@ -119,18 +128,28 @@ class TodayReviewPage extends StatelessWidget {
             title: l10n.get('high_freq_unstable'),
             icon: Icons.priority_high_outlined,
             iconColor: AppColors.accent,
-            emptyText: l10n.get('high_freq_knowledge_mastery_7a33_5b9a'),
+            emptyText: l10n.get('high_freq_knowledge_mastery_stable_fixed'),
             emptyIcon: Icons.verified_outlined,
             topics: highFrequencyTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final score = progress.getTopicProgress(topic.id)?.score ?? 0;
-              return l10n.getp('high_freq_knowledge_point_current_{score}_5206_un_8fbe_719f', {'score': score});
+              return l10n.getp(
+                'high_freq_knowledge_point_current_score_score_un_reach_skilled_2',
+                {'score': score},
+              );
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf_5230_660e_day', {'title': topic.title}))),
+                SnackBar(
+                  content: Text(
+                    l10n.getp(
+                      'already_will_title_push_postpone_to_clear_day_2',
+                      {'title': topic.title},
+                    ),
+                  ),
+                ),
               );
             },
           ),
@@ -138,24 +157,34 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 长期未复习 ──
           _ReviewGroup(
-            title: l10n.get('957f_671f_un_review'),
+            title: l10n.get('long_day_un_review'),
             icon: Icons.event_busy_outlined,
             iconColor: AppColors.categoryPurple,
-            emptyText: l10n.get('6240_has_knowledge_point_8fd1_671f_90fd_has_review'),
+            emptyText: l10n.get('all_has_knowledge_point_recent_day_review'),
             emptyIcon: Icons.event_available_outlined,
             topics: longUnreviewedTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.isEmpty) return l10n.get('4ece_un_practice_forgetting_98ce_9669_6781_9ad8');
+              if (attempts.isEmpty)
+                return l10n.get('never_practiced_high_forgetting_risk');
               final lastDate = attempts.first.createdAt;
               final days = DateTime.now().difference(lastDate).inDays;
-              return l10n.getp('8ddd_last_practice_already_{days}_day_suggestion_5c3d_5feb_r', {'days': days});
+              return l10n.getp(
+                'distance_last_practice_already_days_day_suggestion_exhaust_fast_r_2',
+                {'days': days},
+              );
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf', {'title': topic.title}))),
+                SnackBar(
+                  content: Text(
+                    l10n.getp('already_will_title_push_postpone_2', {
+                      'title': topic.title,
+                    }),
+                  ),
+                ),
               );
             },
           ),
@@ -163,20 +192,28 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 最近退步 ──
           _ReviewGroup(
-            title: l10n.get('recent_9000_6b65'),
+            title: l10n.get('recent_regression_step'),
             icon: Icons.trending_down_outlined,
             iconColor: AppColors.danger,
-            emptyText: l10n.get('8fd1_671f_no_9000_6b65_knowledge_point'),
+            emptyText: l10n.get(
+              'recent_day_no_regression_step_knowledge_point',
+            ),
             emptyIcon: Icons.trending_up_outlined,
             topics: regressedTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.length < 2) return l10n.get('score_4e0b_964d_9700_8981_5de9_56fa');
+              if (attempts.length < 2)
+                return l10n.get(
+                  'score_lower_drop_demand_key_reinforce_consolidate',
+                );
               final latest = attempts[0].score ?? 0;
               final previous = attempts[1].score ?? 0;
               final diff = previous - latest;
-              return l10n.getp('4ece_{previous}_5206_964d_81f3_{latest}_5206_4e0b_964d_{diff', {'previous': previous, 'latest': latest, 'diff': diff});
+              return l10n.getp(
+                'from_previous_score_drop_to_latest_lower_diff_2',
+                {'previous': previous, 'latest': latest, 'diff': diff},
+              );
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: null,
@@ -203,7 +240,7 @@ class TodayReviewPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    l10n.get('4eca_day_review_already_complete'),
+                    l10n.get('today_day_review_already_complete'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -212,7 +249,9 @@ class TodayReviewPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.get('6ca1_has_5230_671f_6216_weak_content_9700_8981_review_53ef_4'),
+                    l10n.get(
+                      'not_has_to_day_or_weak_content_demand_key_review_optional_4',
+                    ),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -234,20 +273,36 @@ class TodayReviewPage extends StatelessWidget {
   ) {
     final l10n = context.watch<LocalizationProvider>();
     final p = progress.getTopicProgress(topic.id);
-    if (p?.nextReviewAt == null) return l10n.get('9700_8981_review');
+    if (p?.nextReviewAt == null) return l10n.get('demand_key_review');
     final now = DateTime.now();
     final daysOverdue = now.difference(p!.nextReviewAt!).inDays;
-    if (daysOverdue > 3) return l10n.getp('already_903e_671f_{daysoverdue}_day_forgetting_98ce_9669_678', {'daysOverdue': daysOverdue});
-    if (daysOverdue > 0) return l10n.getp('already_903e_671f_{daysoverdue}_day_forgetting_98ce_9669_589', {'daysOverdue': daysOverdue});
+    if (daysOverdue > 3)
+      return l10n.getp(
+        'already_overdue_day_daysoverdue_forgetting_wind_risk_678_2',
+        {'daysOverdue': daysOverdue},
+      );
+    if (daysOverdue > 0)
+      return l10n.getp(
+        'already_overdue_day_daysoverdue_forgetting_wind_risk_589_2',
+        {'daysOverdue': daysOverdue},
+      );
     if (daysOverdue == 0) {
       final attempts = progress.getAttemptsForTopic(topic.id);
       if (attempts.isNotEmpty) {
-        final daysSincePractice = now.difference(attempts.first.createdAt).inDays;
-        if (daysSincePractice > 0) return l10n.getp('8ddd_last_practice_{dayssincepractice}_day_6309_forgetting_c', {'daysSincePractice': daysSincePractice});
+        final daysSincePractice = now
+            .difference(attempts.first.createdAt)
+            .inDays;
+        if (daysSincePractice > 0)
+          return l10n.getp(
+            'distance_last_practice_dayssincepractice_day_press_forgetting_c_2',
+            {'daysSincePractice': daysSincePractice},
+          );
       }
-      return l10n.get('4eca_day_5230_671f_6309_forgetting_curve_5b89_6392');
+      return l10n.get('today_due_by_forgetting_curve');
     }
-    return l10n.getp('63d0_524d_review_539f_5b9a_{days}_day_540e', {'days': -daysOverdue});
+    return l10n.getp('advance_ago_review_original_fixed_days_day_after_2', {
+      'days': -daysOverdue,
+    });
   }
 
   void _startRecall(BuildContext context, List<Topic> topics) {
@@ -319,8 +374,11 @@ class _ReviewHeroPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             totalCount == 0
-                ? l10n.get('6682_no_5f85_review_content')
-                : l10n.getp('total_{totalcount}_4e2a_knowledge_point_pending_review', {'totalCount': totalCount}),
+                ? l10n.get('temporary_no_pending_review_content')
+                : l10n.getp(
+                    'total_totalcount_knowledge_point_pending_review_2',
+                    {'totalCount': totalCount},
+                  ),
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -333,14 +391,14 @@ class _ReviewHeroPanel extends StatelessWidget {
             children: [
               _StatChip(
                 icon: Icons.schedule_outlined,
-                label: l10n.get('5230_671f'),
+                label: l10n.get('to_day'),
                 value: dueCount,
                 color: AppColors.warning,
               ),
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.trending_down_outlined,
-                label: l10n.get('4f4e_5206'),
+                label: l10n.get('low_score'),
                 value: lowScoreCount,
                 color: AppColors.danger,
               ),
@@ -354,7 +412,7 @@ class _ReviewHeroPanel extends StatelessWidget {
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.priority_high_outlined,
-                label: l10n.get('9000_6b65'),
+                label: l10n.get('regression_step'),
                 value: regressedCount,
                 color: AppColors.accent,
               ),
@@ -367,7 +425,7 @@ class _ReviewHeroPanel extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onStartAll,
                 icon: const Icon(Icons.play_arrow, size: 20),
-                label: Text(l10n.get('4e00_952e_start_all_review')),
+                label: Text(l10n.get('one_key_start_all_review')),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.bgDark,
@@ -418,10 +476,7 @@ class _StatChip extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 11,
-                  ),
+                  style: const TextStyle(color: Colors.white60, fontSize: 11),
                 ),
               ],
             ),
@@ -599,7 +654,9 @@ class _ReviewTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  l10n.getp('{minutes}_min', {'minutes': topic.estimatedMinutes}),
+                  l10n.getp('minutes_min_2', {
+                    'minutes': topic.estimatedMinutes,
+                  }),
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -628,22 +685,24 @@ class _ReviewTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    ...lastMissed.take(2).map(
-                      (p) => Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          '· $p',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                    ...lastMissed
+                        .take(2)
+                        .map(
+                          (p) => Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '· $p',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -672,7 +731,7 @@ class _ReviewTile extends StatelessWidget {
                         vertical: 10,
                       ),
                     ),
-                    child: Text(l10n.get('63a8_8fdf')),
+                    child: Text(l10n.get('push_postpone')),
                   ),
                 ],
               ],

@@ -9,7 +9,6 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 enum _InterviewStage { main, followUp, clarify, summary }
@@ -69,10 +68,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       case 'systemDesign':
         return cat.contains('系统设计') ||
             cat.contains('架构') ||
-            tags.any((t) =>
-                t.contains('系统设计') ||
-                t.contains('架构') ||
-                t.contains('system'));
+            tags.any(
+              (t) =>
+                  t.contains('系统设计') ||
+                  t.contains('架构') ||
+                  t.contains('system'),
+            );
       case 'code':
         return cat.contains('算法') ||
             cat.contains('代码') ||
@@ -97,8 +98,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(l10n.get('5207_6362_scenario')),
-          content: Text(l10n.get('5207_6362_scenario_5c06_91cd_new_start_interview_current_pro')),
+          title: Text(l10n.get('toggle_switch_scenario')),
+          content: Text(
+            l10n.get(
+              'toggle_switch_scenario_will_restart_new_start_interview_current_pro',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: Navigator.of(ctx).pop,
@@ -106,7 +111,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.get('786e_5b9a')),
+              child: Text(l10n.get('confirm_fixed')),
             ),
           ],
         ),
@@ -159,9 +164,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
       final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_input_4f60_7684_answer'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('please_first_input_your_answer'))),
+      );
       return;
     }
 
@@ -171,9 +176,11 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final aiProvider = context.read<AiProvider>();
     if (aiProvider.defaultConfig == null) {
       final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_5728_personal_center_config_ai'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.get('please_first_at_personal_center_config_ai')),
+        ),
+      );
       return;
     }
 
@@ -192,11 +199,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
     // 追问阶段的特殊指令
     if (_stage == _InterviewStage.followUp) {
-      contextualAnswer = '[追问回答] $contextualAnswer\n\n'
-          '${l10n.get('text_ea189e1f')}';
+      contextualAnswer =
+          '[追问回答] $contextualAnswer\n\n'
+          '${l10n.get('evaluation_instruction')}';
     } else if (_stage == _InterviewStage.clarify) {
-      contextualAnswer = '[澄清回答] $contextualAnswer\n\n'
-          '${l10n.get('8bf7_7ed9_51fa_6700_7ec8_7efc_5408_evaluation_not_518d_follo')}';
+      contextualAnswer =
+          '[澄清回答] $contextualAnswer\n\n'
+          '${l10n.get('please_give_output_most_final_comprehensive_combine_evaluation_not_again_follo')}';
     }
 
     try {
@@ -210,7 +219,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       );
 
       if (mounted) {
-        final hasFollowUp = result['followUp'] != null &&
+        final hasFollowUp =
+            result['followUp'] != null &&
             (result['followUp'] as String).isNotEmpty;
 
         if (hasFollowUp && _followUpHistory.length < 2) {
@@ -220,8 +230,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             _followUpHistory.add({
               'question': _stage == _InterviewStage.main
                   ? (topic.recallPrompts.isNotEmpty
-                      ? topic.recallPrompts.first.prompt
-                      : topic.title)
+                        ? topic.recallPrompts.first.prompt
+                        : topic.title)
                   : (_followUpQuestion ?? ''),
               'answer': answer,
             });
@@ -246,7 +256,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   : topic.title,
               'summary': result['summary'] ?? '',
               'missedPoints': result['missedPoints'] ?? [],
-              'wrongPoints': result['wrongPoints'] ?? result['errorPoints'] ?? [],
+              'wrongPoints':
+                  result['wrongPoints'] ?? result['errorPoints'] ?? [],
               'improvedAnswer':
                   result['improvedAnswer'] ?? result['optimizedAnswer'] ?? '',
               'nextAction': result['nextAction'] ?? '',
@@ -301,13 +312,20 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.getp('ai_evaluation_fail_{error}', {'error': e})),
-            action: SnackBarAction(label: l10n.get('retry'), onPressed: _evaluate),
+            content: Text(
+              l10n.getp('ai_evaluation_fail_error_2', {'error': e}),
+            ),
+            action: SnackBarAction(
+              label: l10n.get('retry'),
+              onPressed: _evaluate,
+            ),
           ),
         );
       }
     } finally {
-      if (mounted && _stage != _InterviewStage.followUp && _stage != _InterviewStage.clarify) {
+      if (mounted &&
+          _stage != _InterviewStage.followUp &&
+          _stage != _InterviewStage.clarify) {
         setState(() => _isEvaluating = false);
       }
     }
@@ -343,8 +361,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   Widget build(BuildContext context) {
     if (_activeTopicIds.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('6a21_62df_interview'))),
-        body: Center(child: Text(l10n.get('6ca1_has_53ef_7528_7684_knowledge_point'))),
+        appBar: AppBar(title: Text(l10n.get('mode_mock_interview'))),
+        body: Center(
+          child: Text(l10n.get('not_has_optional_use_knowledge_point')),
+        ),
       );
     }
 
@@ -356,7 +376,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     if (topic == null) {
       final l10n = context.watch<LocalizationProvider>();
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('6a21_62df_interview'))),
+        appBar: AppBar(title: Text(l10n.get('mode_mock_interview'))),
         body: Center(child: Text(l10n.get('knowledge_point_loading_fail'))),
       );
     }
@@ -384,7 +404,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(l10n.get('6a21_62df_interview')),
+            Text(l10n.get('mode_mock_interview')),
           ],
         ),
         actions: [
@@ -517,7 +537,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                           label: Text(
                             _currentIndex < _activeTopicIds.length - 1
                                 ? l10n.get('next_question_count')
-                                : l10n.get('67e5_770b_interview_62a5_544a'),
+                                : l10n.get(
+                                    'check_view_interview_report_notify',
+                                  ),
                           ),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -564,10 +586,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             _buildFollowUpHistory(),
             const SizedBox(height: 12),
           ],
-          if (_formalMode)
-            _buildFormalRecorded()
-          else
-            _buildEvaluationResult(),
+          if (_formalMode) _buildFormalRecorded() else _buildEvaluationResult(),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -581,7 +600,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               label: Text(
                 _currentIndex < _activeTopicIds.length - 1
                     ? l10n.get('next_question_count')
-                    : l10n.get('67e5_770b_interview_62a5_544a'),
+                    : l10n.get('check_view_interview_report_notify'),
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -598,9 +617,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   Widget _buildQuestionCard(Topic topic) {
     final l10n = context.watch<LocalizationProvider>();
     final stageLabel = switch (_stage) {
-      _InterviewStage.main => l10n.get('4e3b_95ee'),
+      _InterviewStage.main => l10n.get('main_question'),
       _InterviewStage.followUp => l10n.get('follow_up'),
-      _InterviewStage.clarify => l10n.get('6f84_6e05'),
+      _InterviewStage.clarify => l10n.get('clarify'),
       _InterviewStage.summary => l10n.get('summary'),
     };
     final stageColor = switch (_stage) {
@@ -609,10 +628,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       _InterviewStage.clarify => AppColors.categoryPurple,
       _InterviewStage.summary => AppColors.success,
     };
-    final displayQuestion = _followUpQuestion ??
+    final displayQuestion =
+        _followUpQuestion ??
         (topic.recallPrompts.isNotEmpty
             ? topic.recallPrompts.first.prompt
-            : l10n.getp('8bf7_explain_{title}_7684_core_concept', {'title': topic.title}));
+            : l10n.getp('please_explain_title_core_concept_2', {
+                'title': topic.title,
+              }));
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -639,10 +661,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: stageColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
@@ -671,16 +690,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  l10n.getp('problem_{index}', {'index': _currentIndex + 1}),
+                  l10n.getp('problem_index_2', {'index': _currentIndex + 1}),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: AppColors.accent,
@@ -691,11 +707,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Spacer(),
               if (_followUpHistory.isNotEmpty)
                 Text(
-                  l10n.getp('7b2c_{round}_8f6e', {'round': _followUpHistory.length + 1}),
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
-                  ),
+                  l10n.getp('round_round_2', {
+                    'round': _followUpHistory.length + 1,
+                  }),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
             ],
           ),
@@ -728,7 +743,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.getp('interviewer_focus_format', {'focus': topic.interviewerFocus}),
+                      l10n.getp('interviewer_focus_format', {
+                        'focus': topic.interviewerFocus,
+                      }),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -764,16 +781,15 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Icon(Icons.edit_note_outlined, size: 18),
               const SizedBox(width: 8),
               Text(
-                l10n.get('4f60_7684_answer'),
+                l10n.get('your_answer'),
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               Text(
-                l10n.getp('{count}_5b57', {'count': _answerController.text.length}),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
+                l10n.getp('count_char_2', {
+                  'count': _answerController.text.length,
+                }),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
           ),
@@ -783,7 +799,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             minLines: 6,
             maxLines: 12,
             decoration: InputDecoration(
-              hintText: l10n.get('8bf7_input_4f60_7684_answer'),
+              hintText: l10n.get('please_input_your_answer'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -791,7 +807,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               suffixIcon: VoiceInputButton(
                 onResult: (text) {
                   final current = _answerController.text;
-                  final separator = current.isNotEmpty && !current.endsWith(' ') ? ' ' : '';
+                  final separator = current.isNotEmpty && !current.endsWith(' ')
+                      ? ' '
+                      : '';
                   final newValue = '$current$separator$text';
                   _answerController.text = newValue;
                   _answerController.selection = TextSelection.fromPosition(
@@ -799,9 +817,18 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   );
                 },
                 sttMode: context.read<SettingsProvider>().settings.sttMode,
-                whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
-                whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
-                whisperModel: context.read<SettingsProvider>().settings.whisperModel,
+                whisperBaseUrl: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperBaseUrl,
+                whisperApiKey: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperApiKey,
+                whisperModel: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperModel,
               ),
             ),
             onChanged: (_) => setState(() {}),
@@ -818,11 +845,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.auto_awesome),
-              label: Text(_isEvaluating
-                  ? l10n.get('ai_evaluation_4e2d')
-                  : _stage == _InterviewStage.main
-                      ? l10n.get('submit_5e76_evaluation')
-                      : l10n.get('submit_answer')),
+              label: Text(
+                _isEvaluating
+                    ? l10n.get('ai_evaluation_in')
+                    : _stage == _InterviewStage.main
+                    ? l10n.get('submit_and_evaluation')
+                    : l10n.get('submit_answer'),
+              ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -857,7 +886,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             runSpacing: 8,
             children: [
               _ScenarioChip(
-                label: l10n.get('6df7_5408'),
+                label: l10n.get('mix_combine'),
                 value: 'mixed',
                 selected: _scenario == 'mixed',
                 onSelected: _onScenarioChanged,
@@ -891,7 +920,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           if (_scenario != 'mixed') ...[
             const SizedBox(height: 6),
             Text(
-              l10n.getp('5339_914d_{matched}_{total}_question_count', {'matched': _activeTopicIds.length, 'total': widget.topicIds.length}),
+              l10n.getp('match_assign_matched_total_question_count_2', {
+                'matched': _activeTopicIds.length,
+                'total': widget.topicIds.length,
+              }),
               style: TextStyle(
                 fontSize: 12,
                 color: _activeTopicIds.isEmpty
@@ -904,8 +936,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _formalMode,
-            title: Text(l10n.get('6b63_5f0f_6a21_62df_6a21_5f0f')),
-            subtitle: Text(l10n.get('9010_question_count_not_5c55_793a_detail_feedback_end_540e_7')),
+            title: Text(l10n.get('correct_mode_mock')),
+            subtitle: Text(
+              l10n.get(
+                'gradual_question_count_not_expand_show_detail_feedback_end_after_7',
+              ),
+            ),
             onChanged: (value) => setState(() => _formalMode = value),
           ),
         ],
@@ -919,19 +955,23 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.warning.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.question_answer_outlined, size: 16, color: AppColors.warning),
+              const Icon(
+                Icons.question_answer_outlined,
+                size: 16,
+                color: AppColors.warning,
+              ),
               const SizedBox(width: 8),
               Text(
-                l10n.getp('follow_up_8bb0_5f55_{count}_8f6e', {'count': _followUpHistory.length}),
+                l10n.getp('follow_up_record_count_round_2', {
+                  'count': _followUpHistory.length,
+                }),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -987,7 +1027,11 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         children: [
           Icon(Icons.check_circle_outline, color: AppColors.accent),
           SizedBox(width: 8),
-          Expanded(child: Text(l10n.get('answer_already_8bb0_5f55_6b63_5f0f_6a21_62df_6a21_5f0f_5c06'))),
+          Expanded(
+            child: Text(
+              l10n.get('answer_already_record_correct_mode_mock_will'),
+            ),
+          ),
         ],
       ),
     );
@@ -1044,11 +1088,15 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           Text(summary, style: const TextStyle(height: 1.5)),
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _buildPointList(l10n.get('missed_70b9'), missed, AppColors.warning),
+            _buildPointList(
+              l10n.get('missed_point'),
+              missed,
+              AppColors.warning,
+            ),
           ],
           if (wrong.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _buildPointList(l10n.get('wrong_70b9'), wrong, AppColors.danger),
+            _buildPointList(l10n.get('wrong_point'), wrong, AppColors.danger),
           ],
           if (improved.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1103,7 +1151,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 const Icon(Icons.timer_outlined, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
                 Text(
-                  l10n.getp('672c_question_count_7528_65f6_{duration}', {'duration': _formatDuration(_questionDurations.last)}),
+                  l10n.getp('local_question_count_use_time_duration_2', {
+                    'duration': _formatDuration(_questionDurations.last),
+                  }),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -1118,7 +1168,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: color)),
+        Text(
+          title,
+          style: TextStyle(fontWeight: FontWeight.w700, color: color),
+        ),
         const SizedBox(height: 6),
         ...points.map(
           (p) => Padding(
@@ -1136,7 +1189,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text('$p', style: const TextStyle(height: 1.4))),
+                Expanded(
+                  child: Text('$p', style: const TextStyle(height: 1.4)),
+                ),
               ],
             ),
           ),
@@ -1149,12 +1204,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final l10n = context.watch<LocalizationProvider>();
     final dimensions = [
       {
-        'label': l10n.get('concept_5b8c_6574_6027'),
+        'label': l10n.get('concept_complete_overall_capability'),
         'weight': weights['concept'] ?? weights['mustHave'] ?? 40,
         'color': AppColors.accent,
       },
       {
-        'label': l10n.get('expression_51c6_786e_6027'),
+        'label': l10n.get('expression_standard_confirm_capability'),
         'weight': weights['expression'] ?? weights['accuracy'] ?? 25,
         'color': AppColors.success,
       },
@@ -1227,7 +1282,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     _saveSessionIfNeeded(avgScore);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('interview_62a5_544a'))),
+      appBar: AppBar(title: Text(l10n.get('interview_report_notify'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -1278,7 +1333,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   ),
                 ),
                 Text(
-                  l10n.get('5e73_5747_5206'),
+                  l10n.get('flat_average_score'),
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
                 const SizedBox(height: 16),
@@ -1288,19 +1343,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     _ResultStat(
                       icon: Icons.timer_outlined,
                       value: _formatDuration(totalSeconds),
-                      label: l10n.get('603b_7528_65f6'),
+                      label: l10n.get('total_use_time'),
                     ),
                     const SizedBox(width: 24),
                     _ResultStat(
                       icon: Icons.quiz_outlined,
                       value: '${_results.length}',
-                      label: l10n.get('question_6570'),
+                      label: l10n.get('question_count'),
                     ),
                     const SizedBox(width: 24),
                     _ResultStat(
                       icon: Icons.warning_amber_outlined,
                       value: '$weakCount',
-                      label: l10n.get('9700_review'),
+                      label: l10n.get('demand_review'),
                       valueColor: weakCount > 0 ? AppColors.danger : null,
                     ),
                   ],
@@ -1333,7 +1388,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        l10n.get('suggestion_next_8f6e_training_5305'),
+                        l10n.get('suggestion_next_round_training_pack'),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppColors.danger,
@@ -1343,7 +1398,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.getp('{count}_question_count_5f97_5206_4f4e_4e8e_60_5206_suggestio', {'count': weakCount}),
+                    l10n.getp(
+                      'count_question_count_get_score_low_in_60_suggestio_2',
+                      {'count': weakCount},
+                    ),
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1359,7 +1417,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       Navigator.of(context).pop(weakIds);
                     },
                     icon: const Icon(Icons.replay_outlined, size: 18),
-                    label: Text(l10n.get('590d_76d8_weak_knowledge_point')),
+                    label: Text(l10n.get('review_disk_weak_knowledge_point')),
                   ),
                 ],
               ),
@@ -1369,7 +1427,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
           // ── 各题得分 ──
           Text(
-            l10n.get('5404_question_count_5f97_5206'),
+            l10n.get('each_question_count_get_score'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
@@ -1388,9 +1446,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).dividerColor.withValues(alpha: 0.2),
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
                 ),
               ),
               child: Row(
@@ -1439,7 +1495,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                           children: [
                             if (duration != null)
                               Text(
-                                l10n.getp('7528_65f6_{duration}', {'duration': _formatDuration(duration)}),
+                                l10n.getp('use_time_duration_2', {
+                                  'duration': _formatDuration(duration),
+                                }),
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.grey.shade500,
@@ -1455,7 +1513,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                                   ),
                                 ),
                               Text(
-                                '${result['followUpCount'] ?? 0}${l10n.get('8f6e_follow_up')}',
+                                '${result['followUpCount'] ?? 0}${l10n.get('round_follow_up')}',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: AppColors.warning,
@@ -1472,7 +1530,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        l10n.getp('{score}_5206', {'score': score}),
+                        l10n.getp('score_score_2', {'score': score}),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: score >= 85
@@ -1484,7 +1542,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       ),
                       if (score < 60)
                         Text(
-                          l10n.get('9700_review'),
+                          l10n.get('demand_review'),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColors.danger,
@@ -1515,7 +1573,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     // 可以从外部触发再来一场
                   },
                   icon: const Icon(Icons.replay_outlined, size: 18),
-                  label: Text(l10n.get('518d_6765_4e00_573a')),
+                  label: Text(l10n.get('again_come_one_round')),
                 ),
               ),
             ],
@@ -1559,13 +1617,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           attempts: attempts,
           averageScore: avgScore,
           reportSummary: avgScore >= 85
-              ? l10n.get('6574_4f53_8868_73b0_7a33_5b9a_53ef_4ee5_7ee7_7eed_6b63_5f0f')
-              : l10n.get('suggestion_5148_590d_76d8_4f4e_5206_question_count_518d_8fdb'),
+              ? l10n.get('overall_performance_stable_can_continue')
+              : l10n.get(
+                  'suggestion_first_review_disk_low_score_question_count_again_progress',
+                ),
           weakTopicIds: _results
               .where((r) => (r['score'] as int? ?? 0) < 60)
               .map((r) => r['topicId'] as String)
               .toList(),
-          nextActions: [l10n.get('590d_76d8_4f4e_5206_question_count'), l10n.get('6e05_7406_4eca_day_review'), l10n.get('518d_8fdb_884c_4e00_573a_6a21_62df_interview')],
+          nextActions: [
+            l10n.get('review_disk_low_score_question_count'),
+            l10n.get('clarify_principle_today_day_review'),
+            l10n.get('again_progress_action_one_round_mode_mock_interview'),
+          ],
           formalMode: _formalMode,
         ),
       );
@@ -1625,7 +1689,10 @@ class _ResultStat extends StatelessWidget {
             color: valueColor ?? Colors.white,
           ),
         ),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white54, fontSize: 11),
+        ),
       ],
     );
   }

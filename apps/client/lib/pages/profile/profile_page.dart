@@ -76,7 +76,11 @@ class ProfilePage extends StatelessWidget {
               final l10n = context.watch<LocalizationProvider>();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(l10n.get('cache_already_clear_6b63_5728_91cd_new_loading_current_domai')),
+                  content: Text(
+                    l10n.get(
+                      'cache_already_clear_correct_at_restart_new_loading_current_domai',
+                    ),
+                  ),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -142,9 +146,9 @@ class ProfilePage extends StatelessWidget {
               ),
             );
             if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(L10n.get(message, l10n.language))));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(L10n.get(message, l10n.language))),
+              );
             }
           },
           onTestConnection: () async {
@@ -154,7 +158,9 @@ class ProfilePage extends StatelessWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(L10n.getp(result.l10nKey, l10n.language, result.params)),
+                  content: Text(
+                    L10n.getp(result.l10nKey, l10n.language, result.params),
+                  ),
                   backgroundColor: result.success ? null : AppColors.danger,
                 ),
               );
@@ -164,9 +170,11 @@ class ProfilePage extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(l10n.get('4ece_cloud_restore')),
+                title: Text(l10n.get('from_cloud_restore')),
                 content: Text(
-                  l10n.get('restore_5c06_8986_76d6_current_6240_has_local_data_6b64_64cd'),
+                  l10n.get(
+                    'restore_will_overwrite_cover_current_all_has_local_data_this_operate',
+                  ),
                 ),
                 actions: [
                   TextButton(
@@ -187,8 +195,12 @@ class ProfilePage extends StatelessWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(L10n.getp(result.l10nKey, l10n.language, result.params)),
-                  backgroundColor: result.success ? AppColors.success : AppColors.danger,
+                  content: Text(
+                    L10n.getp(result.l10nKey, l10n.language, result.params),
+                  ),
+                  backgroundColor: result.success
+                      ? AppColors.success
+                      : AppColors.danger,
                 ),
               );
               if (result.success) {
@@ -234,9 +246,9 @@ class _AccountPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return WorkPanel(
-      title: l10n.get('8d26_6237_management'),
+      title: l10n.get('accounting_account_management'),
       icon: Icons.person_outline,
       children: [
         Row(
@@ -249,7 +261,9 @@ class _AccountPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    authProvider.isLoggedIn ? _displayName : l10n.get(_displayName),
+                    authProvider.isLoggedIn
+                        ? _displayName
+                        : l10n.get(_displayName),
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -260,7 +274,7 @@ class _AccountPanel extends StatelessWidget {
                   Text(
                     authProvider.isLoggedIn
                         ? '@${authProvider.user!.username}'
-                        : l10n.get('local_6e38_5ba2_6a21_5f0f_data_save_5728_672c_673a'),
+                        : l10n.get('local_guest_mode_data_save_at_machine'),
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white54 : Colors.grey,
@@ -273,7 +287,7 @@ class _AccountPanel extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout, size: 18),
-                label: Text(l10n.get('9000_51fa')),
+                label: Text(l10n.get('regression_output')),
               )
             else
               FilledButton.icon(
@@ -288,9 +302,18 @@ class _AccountPanel extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _MiniStat(label: l10n.get('practice_8bb0_5f55'), value: '$attemptsCount'),
-            _MiniStat(label: l10n.get('streak_day_6570'), value: '$streakDays'),
-            _MiniStat(label: l10n.get('sync_65b9_5f0f'), value: _syncLabel(syncSettings.method, l10n)),
+            _MiniStat(
+              label: l10n.get('practice_record'),
+              value: '$attemptsCount',
+            ),
+            _MiniStat(
+              label: l10n.get('streak_day_count'),
+              value: '$streakDays',
+            ),
+            _MiniStat(
+              label: l10n.get('sync_method_mode'),
+              value: _syncLabel(syncSettings.method, l10n),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -301,32 +324,43 @@ class _AccountPanel extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => _showEditProfileDialog(context),
               icon: const Icon(Icons.badge_outlined, size: 18),
-              label: Text(l10n.get('modify_8d44_6599')),
+              label: Text(l10n.get('modify_resource_material')),
             ),
             _BindingButton(
               icon: Icons.mail_outline,
-              label: profile.emailBound ? l10n.get('email_already_bind') : l10n.get('bind_email'),
-              status: profile.emailBound ? l10n.get('already_bind') : l10n.get('5f85_5f00_901a'),
+              label: profile.emailBound
+                  ? l10n.get('email_already_bind')
+                  : l10n.get('bind_email'),
+              status: profile.emailBound
+                  ? l10n.get('already_bind')
+                  : l10n.get('pending_open'),
               onTap: () => _showUnavailable(context, l10n.get('email_bind')),
             ),
             _BindingButton(
               icon: Icons.wechat,
-              label: profile.wechatBound ? l10n.get('wechat_already_bind') : l10n.get('bind_wechat'),
-              status: profile.wechatBound ? l10n.get('already_bind') : l10n.get('5f85_5f00_901a'),
+              label: profile.wechatBound
+                  ? l10n.get('wechat_already_bind')
+                  : l10n.get('bind_wechat'),
+              status: profile.wechatBound
+                  ? l10n.get('already_bind')
+                  : l10n.get('pending_open'),
               onTap: () => _showUnavailable(context, l10n.get('wechat_bind')),
             ),
             _BindingButton(
               icon: Icons.link_outlined,
-              label: l10n.get('bind_5176_4ed6_account'),
-              status: l10n.get('5f85_5f00_901a'),
-              onTap: () => _showUnavailable(context, l10n.get('7b2c_4e09_65b9_account_bind')),
+              label: l10n.get('bind_its_other_account'),
+              status: l10n.get('pending_open'),
+              onTap: () => _showUnavailable(
+                context,
+                l10n.get('three_method_account_bind'),
+              ),
             ),
           ],
         ),
         if (!authProvider.isLoggedIn) ...[
           const SizedBox(height: 12),
           Text(
-            l10n.get('text_84761062'),
+            l10n.get('login_offline_description'),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -347,8 +381,11 @@ class _AccountPanel extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.1),
+            backgroundImage:
+                profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
                 ? NetworkImage(profile.avatarUrl!)
                 : null,
             child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
@@ -359,7 +396,9 @@ class _AccountPanel extends StatelessWidget {
                           ? _displayName
                           : l10n.get(_displayName);
                       return Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : l10n.get('672c'),
+                        name.isNotEmpty
+                            ? name[0].toUpperCase()
+                            : l10n.get('local'),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
                           fontSize: 20,
@@ -379,7 +418,11 @@ class _AccountPanel extends StatelessWidget {
                 color: Theme.of(context).colorScheme.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+              child: const Icon(
+                Icons.camera_alt,
+                size: 12,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -400,7 +443,7 @@ class _AccountPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              l10n.get('66f4_6362_avatar'),
+              l10n.get('update_switch_avatar'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 24),
@@ -412,7 +455,7 @@ class _AccountPanel extends StatelessWidget {
                   _buildAvatarOption(
                     context,
                     icon: Icons.camera_alt,
-                    label: l10n.get('62cd_7167'),
+                    label: l10n.get('photo'),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await _pickImageFromCamera(context);
@@ -422,7 +465,7 @@ class _AccountPanel extends StatelessWidget {
                 _buildAvatarOption(
                   context,
                   icon: Icons.photo_library,
-                  label: l10n.get('76f8_518c'),
+                  label: l10n.get('mutual_book'),
                   onTap: () async {
                     Navigator.pop(ctx);
                     await _pickImageFromGallery(context);
@@ -442,11 +485,14 @@ class _AccountPanel extends StatelessWidget {
                 _buildAvatarOption(
                   context,
                   icon: Icons.shuffle,
-                  label: l10n.get('968f_673a'),
+                  label: l10n.get('random_machine'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    final newSeed = DateTime.now().millisecondsSinceEpoch.toString();
-                    onProfileChanged(profile.copyWith(avatarSeed: newSeed, avatarUrl: null));
+                    final newSeed = DateTime.now().millisecondsSinceEpoch
+                        .toString();
+                    onProfileChanged(
+                      profile.copyWith(avatarSeed: newSeed, avatarUrl: null),
+                    );
                   },
                 ),
               ],
@@ -458,7 +504,10 @@ class _AccountPanel extends StatelessWidget {
                   Navigator.pop(ctx);
                   onProfileChanged(profile.copyWith(avatarUrl: null));
                 },
-                child: Text(l10n.get('restore_default_avatar'), style: TextStyle(color: Colors.red)),
+                child: Text(
+                  l10n.get('restore_default_avatar'),
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
           ],
         ),
@@ -483,7 +532,9 @@ class _AccountPanel extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('62cd_7167_fail_{error}', {'error': e}))),
+          SnackBar(
+            content: Text(l10n.getp('photo_fail_error_2', {'error': e})),
+          ),
         );
       }
     }
@@ -503,7 +554,10 @@ class _AccountPanel extends StatelessWidget {
         if (kIsWeb) {
           // Web 端需要读取为 base64 或 data URL
           final bytes = await image.readAsBytes();
-          final base64 = Uri.dataFromBytes(bytes, mimeType: 'image/jpeg').toString();
+          final base64 = Uri.dataFromBytes(
+            bytes,
+            mimeType: 'image/jpeg',
+          ).toString();
           onProfileChanged(profile.copyWith(avatarUrl: base64));
         } else {
           // 移动端直接使用文件路径
@@ -513,13 +567,18 @@ class _AccountPanel extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('select_56fe_7247_fail_{error}', {'error': e}))),
+          SnackBar(
+            content: Text(
+              l10n.getp('select_image_picture_fail_error_2', {'error': e}),
+            ),
+          ),
         );
       }
     }
   }
 
-  Widget _buildAvatarOption(BuildContext context, {
+  Widget _buildAvatarOption(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -532,7 +591,9 @@ class _AccountPanel extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: Theme.of(context).colorScheme.primary),
@@ -572,32 +633,42 @@ class _AccountPanel extends StatelessWidget {
               }
               Navigator.pop(ctx);
             },
-            child: Text(l10n.get('786e_5b9a')),
+            child: Text(l10n.get('confirm_fixed')),
           ),
         ],
       ),
     );
   }
 
-  String _syncLabel(String method, LocalizationProvider l10n) => switch (method) {
-    'webdav' => 'WebDAV',
-    'cloud' => l10n.get('4e91_sync'),
-    'file' => l10n.get('file'),
-    _ => l10n.get('local'),
-  };
+  String _syncLabel(String method, LocalizationProvider l10n) =>
+      switch (method) {
+        'webdav' => 'WebDAV',
+        'cloud' => l10n.get('cloud_sync'),
+        'file' => l10n.get('file'),
+        _ => l10n.get('local'),
+      };
 
   void _showUnavailable(BuildContext context, String name) {
     final l10n = context.watch<LocalizationProvider>();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.getp('{name}_feature_5f85_5f00_901a_53ef_5148_4f7f_7528_local_data', {'name': name}))));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          l10n.getp(
+            'name_feature_pending_open_optional_first_use_local_data_2',
+            {'name': name},
+          ),
+        ),
+      ),
+    );
   }
 
   void _showEditProfileDialog(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final nicknameController = TextEditingController(text: l10n.get(profile.nickname));
+    final nicknameController = TextEditingController(
+      text: l10n.get(profile.nickname),
+    );
     final emailController = TextEditingController(text: profile.email);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -628,26 +699,31 @@ class _AccountPanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.get('edit_personal_8d44_6599'),
+              l10n.get('edit_personal_resource_material'),
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 24),
-            
+
             // 头像预览
             Center(
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                    backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
+                    backgroundImage:
+                        profile.avatarUrl != null &&
+                            profile.avatarUrl!.isNotEmpty
                         ? NetworkImage(profile.avatarUrl!)
                         : null,
-                    child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
+                    child:
+                        profile.avatarUrl == null || profile.avatarUrl!.isEmpty
                         ? Text(
                             nicknameController.text.isNotEmpty
                                 ? nicknameController.text[0].toUpperCase()
-                                : l10n.get('7528'),
+                                : l10n.get('use'),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontSize: 28,
@@ -663,19 +739,19 @@ class _AccountPanel extends StatelessWidget {
                       _showAvatarPicker(context);
                     },
                     icon: const Icon(Icons.camera_alt, size: 16),
-                    label: Text(l10n.get('66f4_6362_avatar')),
+                    label: Text(l10n.get('update_switch_avatar')),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // 昵称输入
             TextField(
               controller: nicknameController,
               decoration: InputDecoration(
                 labelText: l10n.get('nickname'),
-                hintText: l10n.get('input_4f60_7684_nickname'),
+                hintText: l10n.get('input_your_nickname'),
                 prefixIcon: const Icon(Icons.person_outline),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -683,12 +759,12 @@ class _AccountPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // 邮箱输入
             TextField(
               controller: emailController,
               decoration: InputDecoration(
-                labelText: l10n.get('email_5c55_793a_7528'),
+                labelText: l10n.get('email_expand_show_use'),
                 hintText: 'your@email.com',
                 prefixIcon: const Icon(Icons.email_outlined),
                 border: OutlineInputBorder(
@@ -698,14 +774,16 @@ class _AccountPanel extends StatelessWidget {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 8),
-            
+
             // 提示
             Text(
-              l10n.get('email_4ec5_7528_4e8e_5c55_793a_not_5f71_54cd_data_sync'),
+              l10n.get(
+                'email_only_use_in_expand_show_not_shadow_response_data_sync',
+              ),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 24),
-            
+
             // 保存按钮
             SizedBox(
               width: double.infinity,
@@ -715,9 +793,10 @@ class _AccountPanel extends StatelessWidget {
                     LocalProfile(
                       nickname: nicknameController.text.trim().isEmpty
                           ? l10n.get('local_user')
-                          : nicknameController.text.trim() == l10n.get('local_user')
-                              ? l10n.get('local_user')
-                              : nicknameController.text.trim(),
+                          : nicknameController.text.trim() ==
+                                l10n.get('local_user')
+                          ? l10n.get('local_user')
+                          : nicknameController.text.trim(),
                       email: emailController.text.trim(),
                       avatarSeed: profile.avatarSeed,
                       avatarUrl: profile.avatarUrl,
@@ -727,7 +806,11 @@ class _AccountPanel extends StatelessWidget {
                   );
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.get('8d44_6599_already_update'))),
+                    SnackBar(
+                      content: Text(
+                        l10n.get('resource_material_already_update'),
+                      ),
+                    ),
                   );
                 },
                 style: FilledButton.styleFrom(
@@ -825,26 +908,29 @@ class _ContentEnvPanel extends StatelessWidget {
     );
 
     return WorkPanel(
-      title: l10n.get('knowledge_6e90_config'),
+      title: l10n.get('knowledge_source_config'),
       icon: Icons.cloud_outlined,
       trailing: FilledButton.tonalIcon(
         onPressed: onApplyChanged,
         icon: const Icon(Icons.refresh),
-        label: Text(l10n.get('application_5e76_91cd_8f7d')),
+        label: Text(l10n.get('application_and_restart_load')),
       ),
       children: [
         // 环境切换
         SegmentedButton<ContentEnv>(
           segments: [
-            ButtonSegment(value: ContentEnv.production, label: Text(l10n.get('publish_7248'))),
+            ButtonSegment(
+              value: ContentEnv.production,
+              label: Text(l10n.get('publish_version')),
+            ),
             ButtonSegment(
               value: ContentEnv.test,
-              label: Text(l10n.get('test_7248')),
+              label: Text(l10n.get('test_version')),
               enabled: userRole.allowedContentEnvs.contains('test'),
             ),
             ButtonSegment(
               value: ContentEnv.draft,
-              label: Text(l10n.get('8349_7a3f_7248')),
+              label: Text(l10n.get('draft_version')),
               enabled: userRole.allowedContentEnvs.contains('draft'),
             ),
           ],
@@ -872,7 +958,7 @@ class _ContentEnvPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.getp('current_{url}', {'url': settings.contentBaseUrl}),
+                  l10n.getp('current_url_2', {'url': settings.contentBaseUrl}),
                   style: const TextStyle(fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -884,7 +970,7 @@ class _ContentEnvPanel extends StatelessWidget {
 
         // 测试版自定义 URL
         Text(
-          l10n.get('test_7248_address_7559_7a7a_4f7f_7528_default'),
+          l10n.get('test_version_address_retain_empty_use_default'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -892,7 +978,9 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.getp('default_{url}_content_test', {'url': AppSettings.defaultWorkerApiUrl}),
+          l10n.getp('default_url_content_test_2', {
+            'url': AppSettings.defaultWorkerApiUrl,
+          }),
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -902,7 +990,7 @@ class _ContentEnvPanel extends StatelessWidget {
         TextField(
           controller: testController,
           decoration: InputDecoration(
-            hintText: l10n.get('custom_test_7248_url'),
+            hintText: l10n.get('custom_test_version_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
@@ -912,7 +1000,7 @@ class _ContentEnvPanel extends StatelessWidget {
 
         // 发布版自定义 URL
         Text(
-          l10n.get('publish_7248_address_7559_7a7a_4f7f_7528_default'),
+          l10n.get('publish_version_address_retain_empty_use_default'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -930,7 +1018,7 @@ class _ContentEnvPanel extends StatelessWidget {
         TextField(
           controller: prodController,
           decoration: InputDecoration(
-            hintText: l10n.get('custom_publish_7248_url'),
+            hintText: l10n.get('custom_publish_version_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
@@ -968,14 +1056,20 @@ class _AiConfigPanel extends StatelessWidget {
           InfoRow(
             icon: Icons.hub_outlined,
             title: defaultConfig.name,
-            subtitle:
-                '模型：${defaultConfig.model} · ${defaultConfig.enabled ? l10n.get('already_enable') : l10n.get('already_disable')}',
+            subtitle: l10n.getp('model_status', {
+              'model': defaultConfig.model,
+              'status': defaultConfig.enabled
+                  ? l10n.get('already_enable')
+                  : l10n.get('already_disable'),
+            }),
           ),
         ] else ...[
           InfoRow(
             icon: Icons.warning_amber_outlined,
             title: l10n.get('un_config_ai'),
-            subtitle: l10n.get('8bf7_add_ai_config_4ee5_4f7f_7528_evaluation_feature'),
+            subtitle: l10n.get(
+              'please_add_ai_config_by_use_evaluation_feature',
+            ),
           ),
         ],
       ],
@@ -1000,7 +1094,7 @@ class _SttConfigPanel extends StatelessWidget {
     final isWhisper = settings.sttMode == 'whisper';
 
     return WorkPanel(
-      title: l10n.get('8bed_97f3_8bc6_522b'),
+      title: l10n.get('speech_voice_identify_distinct'),
       icon: Icons.mic_outlined,
       children: [
         // STT 模式切换
@@ -1010,13 +1104,14 @@ class _SttConfigPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: _SttModeCard(
-                  label: l10n.get('system_8bed_97f3'),
+                  label: l10n.get('system_speech_voice'),
                   icon: Icons.phone_android,
-                  description: l10n.get('4f7f_7528_8bbe_5907_5185_7f6e_8bed_97f3_8bc6_522b'),
-                  selected: !isWhisper,
-                  onTap: () => onSettingsChanged(
-                    settings.copyWith(sttMode: 'system'),
+                  description: l10n.get(
+                    'use_design_alternate_internal_set_speech_voice_identify_distinct',
                   ),
+                  selected: !isWhisper,
+                  onTap: () =>
+                      onSettingsChanged(settings.copyWith(sttMode: 'system')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1024,11 +1119,10 @@ class _SttConfigPanel extends StatelessWidget {
                 child: _SttModeCard(
                   label: 'Whisper API',
                   icon: Icons.cloud_outlined,
-                  description: l10n.get('4f7f_7528_whisper_517c_5bb9_api'),
+                  description: l10n.get('use_whisper_also_capacity_api'),
                   selected: isWhisper,
-                  onTap: () => onSettingsChanged(
-                    settings.copyWith(sttMode: 'whisper'),
-                  ),
+                  onTap: () =>
+                      onSettingsChanged(settings.copyWith(sttMode: 'whisper')),
                 ),
               ),
             ],
@@ -1050,9 +1144,8 @@ class _SttConfigPanel extends StatelessWidget {
                     hintText: 'https://api.openai.com/v1',
                     isDense: true,
                   ),
-                  onChanged: (v) => onSettingsChanged(
-                    settings.copyWith(whisperBaseUrl: v),
-                  ),
+                  onChanged: (v) =>
+                      onSettingsChanged(settings.copyWith(whisperBaseUrl: v)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -1065,9 +1158,8 @@ class _SttConfigPanel extends StatelessWidget {
                     isDense: true,
                   ),
                   obscureText: true,
-                  onChanged: (v) => onSettingsChanged(
-                    settings.copyWith(whisperApiKey: v),
-                  ),
+                  onChanged: (v) =>
+                      onSettingsChanged(settings.copyWith(whisperApiKey: v)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -1075,13 +1167,12 @@ class _SttConfigPanel extends StatelessWidget {
                     text: settings.whisperModel,
                   ),
                   decoration: InputDecoration(
-                    labelText: l10n.get('6a21_578b_name'),
+                    labelText: l10n.get('mode_type_name'),
                     hintText: 'whisper-1',
                     isDense: true,
                   ),
-                  onChanged: (v) => onSettingsChanged(
-                    settings.copyWith(whisperModel: v),
-                  ),
+                  onChanged: (v) =>
+                      onSettingsChanged(settings.copyWith(whisperModel: v)),
                 ),
               ],
             ),
@@ -1092,8 +1183,10 @@ class _SttConfigPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Text(
             isWhisper
-                ? l10n.get('text_60307d1a')
-                : l10n.get('4f7f_7528_8bbe_5907_5185_7f6e_8bed_97f3_8bc6_522b_offline_53'),
+                ? l10n.get('whisper_api_description')
+                : l10n.get(
+                    'use_design_alternate_internal_set_speech_voice_identify_distinct_offline_53',
+                  ),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).textTheme.bodySmall?.color,
@@ -1203,11 +1296,14 @@ class _AppearancePanel extends StatelessWidget {
     final density = settings.cardDensity;
 
     return WorkPanel(
-      title: l10n.get('appearance_4e0e_theme'),
+      title: l10n.get('appearance_and_theme'),
       icon: Icons.palette_outlined,
       children: [
         // 主题选择
-        Text(l10n.get('theme_98ce_683c'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          l10n.get('theme_wind_style'),
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -1215,7 +1311,7 @@ class _AppearancePanel extends StatelessWidget {
           children: AppThemeType.values.map((type) {
             final isSelected = themeType == type;
             return ChoiceChip(
-              label: Text(l10n.get(type.label)),
+              label: Text(l10n.get(type.labelKey)),
               selected: isSelected,
               onSelected: (_) => onThemeTypeChanged(type),
               avatar: _getThemeIcon(type),
@@ -1223,7 +1319,10 @@ class _AppearancePanel extends StatelessWidget {
           }).toList(),
         ),
         const SizedBox(height: 16),
-        Text(l10n.get('4e3b_8272_select'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          l10n.get('main_color_select'),
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,
@@ -1251,7 +1350,10 @@ class _AppearancePanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Text(l10n.get('5f3a_8c03_8272_select'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          l10n.get('accent_schedule_color_select'),
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,
@@ -1281,7 +1383,10 @@ class _AppearancePanel extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Text(l10n.get('font_size'), style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              l10n.get('font_size'),
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             const Spacer(),
             Text('${(fontScale * 100).toInt()}%'),
           ],
@@ -1296,10 +1401,19 @@ class _AppearancePanel extends StatelessWidget {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: density,
-          decoration: InputDecoration(labelText: l10n.get('card_density'), isDense: true),
+          decoration: InputDecoration(
+            labelText: l10n.get('card_density'),
+            isDense: true,
+          ),
           items: [
-            DropdownMenuItem(value: 'comfortable', child: Text(l10n.get('comfortable'))),
-            DropdownMenuItem(value: 'compact', child: Text(l10n.get('compact'))),
+            DropdownMenuItem(
+              value: 'comfortable',
+              child: Text(l10n.get('comfortable')),
+            ),
+            DropdownMenuItem(
+              value: 'compact',
+              child: Text(l10n.get('compact')),
+            ),
           ],
           onChanged: (value) {
             if (value != null) onDensityChanged(value);
@@ -1341,13 +1455,31 @@ class _LearningSettingsPanel extends StatelessWidget {
       children: [
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
-          decoration: InputDecoration(labelText: l10n.get('recommend_strategy'), isDense: true),
+          decoration: InputDecoration(
+            labelText: l10n.get('recommend_strategy'),
+            isDense: true,
+          ),
           items: [
-            DropdownMenuItem(value: 'smart', child: Text(l10n.get('667a_80fd_recommend'))),
-            DropdownMenuItem(value: 'low-score-first', child: Text(l10n.get('4f4e_5206_priority'))),
-            DropdownMenuItem(value: 'path-order', child: Text(l10n.get('8def_5f84_987a_5e8f'))),
-            DropdownMenuItem(value: 'high-frequency', child: Text(l10n.get('high_freq_priority'))),
-            DropdownMenuItem(value: 'review-first', child: Text(l10n.get('review_priority'))),
+            DropdownMenuItem(
+              value: 'smart',
+              child: Text(l10n.get('intelligence_enable_recommend')),
+            ),
+            DropdownMenuItem(
+              value: 'low-score-first',
+              child: Text(l10n.get('low_score_priority')),
+            ),
+            DropdownMenuItem(
+              value: 'path-order',
+              child: Text(l10n.get('road_path_smooth_sequence')),
+            ),
+            DropdownMenuItem(
+              value: 'high-frequency',
+              child: Text(l10n.get('high_freq_priority')),
+            ),
+            DropdownMenuItem(
+              value: 'review-first',
+              child: Text(l10n.get('review_priority')),
+            ),
           ],
           onChanged: (value) {
             if (value != null) {
@@ -1388,7 +1520,7 @@ class _LearningSettingsPanel extends StatelessWidget {
         ),
         SwitchListTile(
           value: settings.allowSkipLowFrequency,
-          title: Text(l10n.get('5141_8bb8_8df3_8fc7_low_freq_knowledge')),
+          title: Text(l10n.get('allow_skip_pass_low_freq_knowledge')),
           onChanged: (value) => onSettingsChanged(
             settings.copyWith(allowSkipLowFrequency: value),
           ),
@@ -1396,15 +1528,30 @@ class _LearningSettingsPanel extends StatelessWidget {
         DropdownButtonFormField<String>(
           initialValue: settings.mockInterviewPreference,
           decoration: InputDecoration(
-            labelText: l10n.get('6a21_62df_interview_7ec4_5377_504f_597d'),
+            labelText: l10n.get('mode_mock_interview_group_volume_bias_good'),
             isDense: true,
           ),
           items: [
-            DropdownMenuItem(value: 'mixed', child: Text(l10n.get('6df7_5408'))),
-            DropdownMenuItem(value: 'foundation', child: Text(l10n.get('basic_knowledge'))),
-            DropdownMenuItem(value: 'systemDesign', child: Text(l10n.get('system_design'))),
-            DropdownMenuItem(value: 'code', child: Text(l10n.get('code_question_count'))),
-            DropdownMenuItem(value: 'project', child: Text(l10n.get('project_deep_dig'))),
+            DropdownMenuItem(
+              value: 'mixed',
+              child: Text(l10n.get('mix_combine')),
+            ),
+            DropdownMenuItem(
+              value: 'foundation',
+              child: Text(l10n.get('basic_knowledge')),
+            ),
+            DropdownMenuItem(
+              value: 'systemDesign',
+              child: Text(l10n.get('system_design')),
+            ),
+            DropdownMenuItem(
+              value: 'code',
+              child: Text(l10n.get('code_question_count')),
+            ),
+            DropdownMenuItem(
+              value: 'project',
+              child: Text(l10n.get('project_deep_dig')),
+            ),
           ],
           onChanged: (value) {
             if (value != null) {
@@ -1476,7 +1623,7 @@ class _LanguagePanel extends StatelessWidget {
         SegmentedButton<String>(
           segments: [
             ButtonSegment(value: 'zh', label: Text(l10n.get('chinese'))),
-            ButtonSegment(value: 'en', label: Text('English')),
+            ButtonSegment(value: 'en', label: Text(l10n.get('english'))),
           ],
           selected: {settings.language},
           onSelectionChanged: (value) => onLanguageChanged(value.first),
@@ -1509,33 +1656,68 @@ class _DataManagementPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('sync_4e0e_backup'),
+      title: l10n.get('sync_and_backup'),
       children: [
         InfoRow(
           icon: Icons.cloud_sync_outlined,
-          title: l10n.getp('current_65b9_5f0f_{method}', {'method': _methodLabel(syncSettings.method, l10n)}),
+          title: l10n.getp('current_method_mode_method_2', {
+            'method': _methodLabel(syncSettings.method, l10n),
+          }),
           subtitle: syncSettings.lastSyncAt == null
               ? l10n.get(syncSettings.lastSyncStatus)
               : '${l10n.get(syncSettings.lastSyncStatus)} · ${syncSettings.lastSyncAt}',
         ),
         DropdownButtonFormField<String>(
           initialValue: syncSettings.method,
-          decoration: InputDecoration(labelText: l10n.get('sync_65b9_5f0f'), isDense: true),
+          decoration: InputDecoration(
+            labelText: l10n.get('sync_method_mode'),
+            isDense: true,
+          ),
           items: [
-            DropdownMenuItem(value: 'local', child: Text(l10n.get('local_6a21_5f0f'))),
-            DropdownMenuItem(value: 'file', child: Text(l10n.get('file_import_export'))),
-            DropdownMenuItem(value: 'webdav', child: Text(l10n.get('custom_webdav'))),
-            DropdownMenuItem(value: 'cloud', child: Text(l10n.get('account_4e91_sync'))),
-            DropdownMenuItem(value: 'baidu', child: Text(l10n.get('767e_5ea6_7f51_76d8_5f85_5f00_901a'))),
-            DropdownMenuItem(value: 'quark', child: Text(l10n.get('5938_514b_7f51_76d8_5f85_5f00_901a'))),
-            DropdownMenuItem(value: 'aliyun', child: Text(l10n.get('963f_91cc_4e91_76d8_5f85_5f00_901a'))),
-            DropdownMenuItem(value: 'onedrive', child: Text(l10n.get('onedrive_5f85_5f00_901a'))),
+            DropdownMenuItem(
+              value: 'local',
+              child: Text(l10n.get('local_mode')),
+            ),
+            DropdownMenuItem(
+              value: 'file',
+              child: Text(l10n.get('file_import_export')),
+            ),
+            DropdownMenuItem(
+              value: 'webdav',
+              child: Text(l10n.get('custom_webdav')),
+            ),
+            DropdownMenuItem(
+              value: 'cloud',
+              child: Text(l10n.get('account_cloud_sync')),
+            ),
+            DropdownMenuItem(
+              value: 'baidu',
+              child: Text(l10n.get('hundred_degree_web_disk_pending_open')),
+            ),
+            DropdownMenuItem(
+              value: 'quark',
+              child: Text(l10n.get('quark_web_disk_coming_soon')),
+            ),
+            DropdownMenuItem(
+              value: 'aliyun',
+              child: Text(l10n.get('ali_cloud_disk_coming_soon')),
+            ),
+            DropdownMenuItem(
+              value: 'onedrive',
+              child: Text(l10n.get('onedrive_pending_open')),
+            ),
           ],
           onChanged: (value) {
             if (value == null) return;
             if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(value)) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('{method}_feature_5f85_5f00_901a', {'method': _methodLabel(value, l10n)}))),
+                SnackBar(
+                  content: Text(
+                    l10n.getp('method_feature_pending_open_2', {
+                      'method': _methodLabel(value, l10n),
+                    }),
+                  ),
+                ),
               );
             }
             onSyncSettingsChanged(
@@ -1545,7 +1727,9 @@ class _DataManagementPanel extends StatelessWidget {
                 webDavUsername: syncSettings.webDavUsername,
                 webDavPassword: syncSettings.webDavPassword,
                 lastSyncAt: syncSettings.lastSyncAt,
-                lastSyncStatus: value == 'local' ? l10n.get('local_6a21_5f0f') : l10n.get('5f85_config'),
+                lastSyncStatus: value == 'local'
+                    ? l10n.get('local_mode')
+                    : l10n.get('pending_config'),
               ),
             );
           },
@@ -1588,7 +1772,9 @@ class _DataManagementPanel extends StatelessWidget {
           TextFormField(
             initialValue: syncSettings.webDavPassword,
             obscureText: true,
-            decoration: InputDecoration(labelText: l10n.get('application_password')),
+            decoration: InputDecoration(
+              labelText: l10n.get('application_password'),
+            ),
             onChanged: (value) => onSyncSettingsChanged(
               SyncSettings(
                 method: syncSettings.method,
@@ -1616,14 +1802,14 @@ class _DataManagementPanel extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onSync,
               icon: const Icon(Icons.cloud_upload),
-              label: Text(l10n.get('backup_5230_cloud')),
+              label: Text(l10n.get('backup_to_cloud')),
             ),
             const SizedBox(width: 12),
             if (syncSettings.method == 'webdav')
               FilledButton.tonalIcon(
                 onPressed: onRestore,
                 icon: const Icon(Icons.cloud_download),
-                label: Text(l10n.get('4ece_cloud_restore')),
+                label: Text(l10n.get('from_cloud_restore')),
               ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
@@ -1637,16 +1823,17 @@ class _DataManagementPanel extends StatelessWidget {
     );
   }
 
-  String _methodLabel(String method, LocalizationProvider l10n) => switch (method) {
-    'file' => l10n.get('file_import_export'),
-    'webdav' => 'WebDAV',
-    'cloud' => l10n.get('account_4e91_sync'),
-    'baidu' => l10n.get('767e_5ea6_7f51_76d8'),
-    'quark' => l10n.get('5938_514b_7f51_76d8'),
-    'aliyun' => l10n.get('963f_91cc_4e91_76d8'),
-    'onedrive' => 'OneDrive',
-    _ => l10n.get('local_6a21_5f0f'),
-  };
+  String _methodLabel(String method, LocalizationProvider l10n) =>
+      switch (method) {
+        'file' => l10n.get('file_import_export'),
+        'webdav' => 'WebDAV',
+        'cloud' => l10n.get('account_cloud_sync'),
+        'baidu' => l10n.get('hundred_degree_web_disk'),
+        'quark' => l10n.get('quark_web_disk'),
+        'aliyun' => l10n.get('ali_cloud_disk'),
+        'onedrive' => 'OneDrive',
+        _ => l10n.get('local_mode'),
+      };
 }
 
 class _AboutPanel extends StatefulWidget {
@@ -1677,10 +1864,13 @@ class _AboutPanelState extends State<_AboutPanel> {
         setState(() {
           _isChecking = false;
           if (updateInfo != null) {
-            _updateMessage = l10n.getp('53d1_73b0_new_version_v{version}', {'version': updateInfo.version});
+            _updateMessage = l10n.getp(
+              'publish_current_new_version_v_version_2',
+              {'version': updateInfo.version},
+            );
             _showUpdateDialog(updateInfo);
           } else {
-            _updateMessage = l10n.get('already_is_6700_new_version');
+            _updateMessage = l10n.get('already_is_most_new_version');
           }
         });
       }
@@ -1689,7 +1879,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         final l10n = context.watch<LocalizationProvider>();
         setState(() {
           _isChecking = false;
-          _updateMessage = l10n.get('68c0_67e5_update_fail');
+          _updateMessage = l10n.get('inspect_check_update_fail');
         });
       }
     }
@@ -1700,14 +1890,23 @@ class _AboutPanelState extends State<_AboutPanel> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.getp('53d1_73b0_new_version_v{version}', {'version': updateInfo.version})),
+        title: Text(
+          l10n.getp('publish_current_new_version_v_version_2', {
+            'version': updateInfo.version,
+          }),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.getp('publish_day_671f_{date}', {'date': updateInfo.releaseDate})),
+            Text(
+              l10n.getp('publish_day_date_2', {'date': updateInfo.releaseDate}),
+            ),
             const SizedBox(height: 12),
-            Text(l10n.get('update_content'), style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              l10n.get('update_content'),
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             ...updateInfo.notes.map(
               (note) => Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1716,7 +1915,11 @@ class _AboutPanelState extends State<_AboutPanel> {
             ),
             const SizedBox(height: 12),
             Text(
-              l10n.getp('5e73_53f0_{size}', {'size': UpdateService.formatSize(updateInfo.platforms.values.first.size)}),
+              l10n.getp('flat_platform_size_2', {
+                'size': UpdateService.formatSize(
+                  updateInfo.platforms.values.first.size,
+                ),
+              }),
               style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
           ],
@@ -1724,14 +1927,14 @@ class _AboutPanelState extends State<_AboutPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('7a0d_540e_518d_8bf4')),
+            child: Text(l10n.get('slightly_after_again_explain')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               _downloadUpdate(updateInfo);
             },
-            child: Text(l10n.get('7acb_5373_update')),
+            child: Text(l10n.get('establish_instant_update')),
           ),
         ],
       ),
@@ -1745,18 +1948,28 @@ class _AboutPanelState extends State<_AboutPanel> {
 
     if (platformUpdate == null) {
       final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('current_5e73_53f0_6682_no_update_5305'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.get('current_flat_platform_temporary_no_update_pack'),
+          ),
+        ),
+      );
       return;
     }
 
     // Web 端提示刷新
     if (kIsWeb) {
       final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('web_7aef_8bf7_5237_new_page_83b7_53d6_6700_new_version'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.get(
+              'web_client_please_refresh_new_page_gain_fetch_most_version',
+            ),
+          ),
+        ),
+      );
       return;
     }
 
@@ -1781,7 +1994,11 @@ class _AboutPanelState extends State<_AboutPanel> {
                   value: total > 0 ? received / total : null,
                 ),
                 const SizedBox(height: 16),
-                Text(l10n.getp('6b63_5728_download_v{version}', {'version': updateInfo.version})),
+                Text(
+                  l10n.getp('downloading_v_version_2', {
+                    'version': updateInfo.version,
+                  }),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
@@ -1824,7 +2041,13 @@ class _AboutPanelState extends State<_AboutPanel> {
         _showInstallGuide(filePath, updateInfo.version);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('download_fail_6216_6821_9a8c_not_901a_8fc7_8bf7_retry'))),
+          SnackBar(
+            content: Text(
+              l10n.get(
+                'download_fail_or_school_verify_not_open_pass_please_retry',
+              ),
+            ),
+          ),
         );
       }
     }
@@ -1838,20 +2061,31 @@ class _AboutPanelState extends State<_AboutPanel> {
     switch (ext) {
       case 'apk':
         icon = Icons.android;
-        instruction = l10n.get('download_complete_8bf7_5728_notification_680f_6216_file_mana')
-            + l10n.get('5982_hint_un_77e5_6765_6e90_8bf7_5728_settings_4e2d_5141_8bb');
+        instruction =
+            l10n.get(
+              'download_complete_please_at_notification_bar_or_file_mana',
+            ) +
+            l10n.get(
+              'if_hint_un_known_come_source_please_at_settings_in_allow_8bb',
+            );
         break;
       case 'dmg':
         icon = Icons.apple;
-        instruction = l10n.get('download_complete_8bf7_6253_5f00_dmg_file_5c06_application_6');
+        instruction = l10n.get(
+          'download_complete_please_type_open_dmg_file_will_application_6',
+        );
         break;
       case 'exe':
         icon = Icons.desktop_windows;
-        instruction = l10n.get('download_complete_8bf7_8fd0_884c_exe_file_6309_7167_5411_5bf');
+        instruction = l10n.get(
+          'download_complete_please_operate_action_exe_file_press_photo_direction_5bf',
+        );
         break;
       default:
         icon = Icons.folder_open;
-        instruction = l10n.get('download_complete_8bf7_5728_file_management_5668_4e2d_627e_5');
+        instruction = l10n.get(
+          'download_complete_please_at_file_management_device_in_find_5',
+        );
         break;
     }
 
@@ -1859,7 +2093,9 @@ class _AboutPanelState extends State<_AboutPanel> {
       context: context,
       builder: (ctx) => AlertDialog(
         icon: Icon(icon, size: 40, color: AppColors.success),
-        title: Text(l10n.getp('v{version}_download_complete', {'version': version})),
+        title: Text(
+          l10n.getp('v_version_download_complete_2', {'version': version}),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1892,7 +2128,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('77e5_9053_4e86')),
+            child: Text(l10n.get('known_channel')),
           ),
         ],
       ),
@@ -1903,24 +2139,28 @@ class _AboutPanelState extends State<_AboutPanel> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('about_interview_667a_7ec3'),
+      title: l10n.get('about_interview_intelligence_training'),
       children: [
         InfoRow(
           icon: Icons.info_outline,
           title: l10n.get('version_010'),
-          subtitle: l10n.get('ai_4e3b_52a8_56de_5fc6_study_5de5_4f5c_53f0'),
+          subtitle: l10n.get('ai_main_dynamic_back_memory_study_work_platform'),
         ),
         InfoRow(
           icon: Icons.cloud_sync_outlined,
           title: l10n.get('local_priority_cloud_sync'),
-          subtitle: l10n.get('4e91_sync_fail_not_4f1a_963b_65ad_study_local_4e8b_4ef6_4f1a'),
+          subtitle: l10n.get(
+            'cloud_sync_fail_not_will_block_break_study_local_matter_condition',
+          ),
         ),
         InkWell(
           onTap: _isChecking ? null : _checkUpdate,
           child: InfoRow(
             icon: Icons.system_update_alt_outlined,
-            title: l10n.get('68c0_67e5_update'),
-            subtitle: _updateMessage ?? l10n.get('70b9_51fb_68c0_67e5_is_or_has_new_version'),
+            title: l10n.get('inspect_check_update'),
+            subtitle:
+                _updateMessage ??
+                l10n.get('point_hit_inspect_check_is_or_has_new_version'),
           ),
         ),
         if (_isChecking)

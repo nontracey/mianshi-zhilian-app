@@ -37,7 +37,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('weakness_training_5305')),
+        title: Text(l10n.get('weakness_training_pack')),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -170,9 +170,9 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
             children: [
               _buildStatItem(l10n.get('total_weaknesses'), '${weakTopics.length}', AppColors.warning),
               const SizedBox(width: 24),
-              _buildStatItem(l10n.get('concept_7f3a_5931'), '${categorized['concept']?.length ?? 0}', AppColors.danger),
+              _buildStatItem(l10n.get('concept_lack_lose'), '${categorized['concept']?.length ?? 0}', AppColors.danger),
               const SizedBox(width: 24),
-              _buildStatItem(l10n.get('6df7_6dc6_not_6e05'), '${categorized['confusion']?.length ?? 0}', AppColors.warning),
+              _buildStatItem(l10n.get('mix_confuse_not_clarify'), '${categorized['confusion']?.length ?? 0}', AppColors.warning),
               const SizedBox(width: 24),
               _buildStatItem(l10n.get('expression_problem'), '${categorized['expression']?.length ?? 0}', AppColors.accent),
             ],
@@ -231,11 +231,11 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
   Widget _buildCategoryFilter(BuildContext context, Map<String, List<Topic>> categorized, bool isDark) {
     final categories = [
       ('all', l10n.get('all'), Icons.all_inclusive),
-      ('concept', l10n.get('concept_7f3a_5931'), Icons.lightbulb_outline),
-      ('confusion', l10n.get('6df7_6dc6_not_6e05'), Icons.compare_arrows),
+      ('concept', l10n.get('concept_lack_lose'), Icons.lightbulb_outline),
+      ('confusion', l10n.get('mix_confuse_not_clarify'), Icons.compare_arrows),
       ('expression', l10n.get('expression_problem'), Icons.record_voice_over),
-      ('depth', l10n.get('depth_not_8db3'), Icons.layers),
-      ('code', l10n.get('code_8fb9_754c'), Icons.code),
+      ('depth', l10n.get('depth_not_enough'), Icons.layers),
+      ('code', l10n.get('code_edge_boundary'), Icons.code),
     ];
 
     return Container(
@@ -494,7 +494,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      '${l10n.get('practice')} ${attempts.length} ${l10n.get('6b21')} · ${topic.domain}',
+                      '${l10n.get('practice')} ${attempts.length} ${l10n.get('round')} · ${topic.domain}',
                       style: TextStyle(
                         fontSize: 11,
                         color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -561,7 +561,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('weakness_training_6307_5357')),
+        title: Text(l10n.get('weakness_training_finger_south')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,11 +569,11 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
             children: [
               Text(l10n.get('wrong_type_description'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              Text('• ${l10n.get('concept_7f3a_5931')}：${l10n.get('weakness_concept_missing')}'),
-              Text('• ${l10n.get('6df7_6dc6_not_6e05')}：${l10n.get('weakness_confusion')}'),
+              Text('• ${l10n.get('concept_lack_lose')}：${l10n.get('weakness_concept_missing')}'),
+              Text('• ${l10n.get('mix_confuse_not_clarify')}：${l10n.get('weakness_confusion')}'),
               Text('• ${l10n.get('expression_problem')}：${l10n.get('weakness_expression')}'),
-              Text('• ${l10n.get('depth_not_8db3')}：${l10n.get('weakness_insufficient_depth')}'),
-              Text('• ${l10n.get('code_8fb9_754c')}：${l10n.get('weakness_code_boundary')}'),
+              Text('• ${l10n.get('depth_not_enough')}：${l10n.get('weakness_insufficient_depth')}'),
+              Text('• ${l10n.get('code_edge_boundary')}：${l10n.get('weakness_code_boundary')}'),
               const SizedBox(height: 16),
               Text(l10n.get('training_suggestion'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -587,7 +587,7 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('77e5_9053_4e86')),
+            child: Text(l10n.get('known_channel')),
           ),
         ],
       ),

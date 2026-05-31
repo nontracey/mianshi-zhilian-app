@@ -48,21 +48,23 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
   FollowUpQuestion? _getCurrentFollowUp() {
     final topic = _getCurrentTopic();
     if (topic == null || topic.followUps.isEmpty) return null;
-    if (_currentFollowUpIndex < 0 || _currentFollowUpIndex >= topic.followUps.length) return null;
+    if (_currentFollowUpIndex < 0 ||
+        _currentFollowUpIndex >= topic.followUps.length)
+      return null;
     return topic.followUps[_currentFollowUpIndex];
   }
 
   String _getCurrentQuestion() {
     final topic = _getCurrentTopic();
     if (topic == null) return '';
-    
+
     if (_currentFollowUpIndex < 0) {
       // 初始问题
       return topic.recallPrompts.isNotEmpty
           ? topic.recallPrompts.first.prompt
           : topic.title;
     }
-    
+
     final followUp = _getCurrentFollowUp();
     return followUp?.question ?? '';
   }
@@ -121,11 +123,11 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
   String _getProgressiveHint() {
     switch (_hintLevel) {
       case 1:
-        return '试着从核心概念入手，解释它的基本原理';
+        return l10n.get('progressive_hint_core_concept');
       case 2:
-        return '可以考虑：定义、特点、使用场景、优缺点';
+        return l10n.get('progressive_hint_definition_features');
       case 3:
-        return '建议结构：\n1. 概念定义\n2. 核心原理\n3. 实际应用\n4. 注意事项';
+        return l10n.get('progressive_hint_answer_structure');
       default:
         return '';
     }
@@ -135,7 +137,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('8bf7_5148_input_4f60_7684_answer'))),
+        SnackBar(content: Text(l10n.get('please_first_input_your_answer'))),
       );
       return;
     }
@@ -152,7 +154,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     try {
       final question = _getCurrentQuestion();
       final topic = _getCurrentTopic();
-      
+
       final result = await aiProvider.evaluateAnswer(
         topicId: topic?.id ?? '',
         question: question,
@@ -176,7 +178,11 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('evaluation_fail_{error}', {'error': '$e'}))),
+          SnackBar(
+            content: Text(
+              l10n.getp('evaluation_fail_error_2', {'error': '$e'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -197,10 +203,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         'isFollowUp': _currentFollowUpIndex >= 0,
         'followUpIndex': _currentFollowUpIndex,
       });
-      _evaluationResult = {
-        'local': true,
-        'message': '已保存为本地练习',
-      };
+      _evaluationResult = {'local': true, 'message': '已保存为本地练习'};
     });
   }
 
@@ -214,7 +217,9 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     if (topic == null) {
       return Scaffold(
         appBar: AppBar(title: Text(l10n.get('follow_up_training'))),
-        body: Center(child: Text(l10n.get('6ca1_has_53ef_practice_7684_knowledge_point'))),
+        body: Center(
+          child: Text(l10n.get('not_has_optional_practice_knowledge_point')),
+        ),
       );
     }
 
@@ -317,10 +322,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
       children: [
         _buildQuestionCard(context, topic),
         const SizedBox(height: 12),
-        if (_showHint) ...[
-          _buildHintCard(context),
-          const SizedBox(height: 12),
-        ],
+        if (_showHint) ...[_buildHintCard(context), const SizedBox(height: 12)],
         _buildInputSection(context),
         if (_evaluationResult != null) ...[
           const SizedBox(height: 16),
@@ -353,7 +355,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isFollowUp
                         ? AppColors.accent.withValues(alpha: 0.1)
@@ -361,7 +366,9 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    isFollowUp ? l10n.get('follow_up') : l10n.get('main_question'),
+                    isFollowUp
+                        ? l10n.get('follow_up')
+                        : l10n.get('main_question'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -405,7 +412,13 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
   }
 
   Widget _buildDifficultyTag(int difficulty) {
-    final labels = {1: l10n.get('beginner'), 2: l10n.get('basic'), 3: l10n.get('medium'), 4: l10n.get('8f83_96be'), 5: l10n.get('hard')};
+    final labels = {
+      1: l10n.get('beginner'),
+      2: l10n.get('basic'),
+      3: l10n.get('medium'),
+      4: l10n.get('compare_difficult'),
+      5: l10n.get('hard'),
+    };
     final colors = {
       1: const Color(0xFF10B981),
       2: const Color(0xFF00CCF9),
@@ -421,7 +434,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        labels[difficulty] ?? l10n.get('un_77e5'),
+        labels[difficulty] ?? l10n.get('un_known'),
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
@@ -446,23 +459,32 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.get('8bc4_5206_standard'),
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
+              l10n.get('evaluation_score_standard'),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
             const SizedBox(height: 12),
             if (rubric.mustHave.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('must_include'), rubric.mustHave, AppColors.danger),
+              _buildRubricSection(
+                l10n.get('must_include'),
+                rubric.mustHave,
+                AppColors.danger,
+              ),
               const SizedBox(height: 8),
             ],
             if (rubric.goodToHave.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('52a0_5206_9879'), rubric.goodToHave, AppColors.success),
+              _buildRubricSection(
+                l10n.get('plus_score_item'),
+                rubric.goodToHave,
+                AppColors.success,
+              ),
               const SizedBox(height: 8),
             ],
             if (rubric.commonMistakes.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('common_wrong'), rubric.commonMistakes, AppColors.warning),
+              _buildRubricSection(
+                l10n.get('common_wrong'),
+                rubric.commonMistakes,
+                AppColors.warning,
+              ),
             ],
           ],
         ),
@@ -496,21 +518,23 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           ],
         ),
         const SizedBox(height: 4),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(left: 10, bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('• ', style: TextStyle(color: color, fontSize: 12)),
-              Expanded(
-                child: Text(
-                  item,
-                  style: const TextStyle(fontSize: 12, height: 1.4),
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(left: 10, bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• ', style: TextStyle(color: color, fontSize: 12)),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(fontSize: 12, height: 1.4),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -530,9 +554,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
       color: AppColors.warning.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.warning.withValues(alpha: 0.2),
-        ),
+        side: BorderSide(color: AppColors.warning.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -558,13 +580,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              hintText,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.5,
-              ),
-            ),
+            Text(hintText, style: const TextStyle(fontSize: 13, height: 1.5)),
           ],
         ),
       ),
@@ -584,7 +600,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             const Icon(Icons.edit_outlined, size: 16, color: AppColors.accent),
             const SizedBox(width: 6),
             Text(
-              l10n.get('4f60_7684_answer'),
+              l10n.get('your_answer'),
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -596,7 +612,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             TextButton.icon(
               onPressed: _showNextHint,
               icon: const Icon(Icons.lightbulb_outline, size: 14),
-              label: Text(l10n.get('hint'), style: const TextStyle(fontSize: 12)),
+              label: Text(
+                l10n.get('hint'),
+                style: const TextStyle(fontSize: 12),
+              ),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
@@ -610,10 +629,8 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           maxLines: 8,
           minLines: 4,
           decoration: InputDecoration(
-            hintText: l10n.get('input_4f60_7684_answer'),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            hintText: l10n.get('input_your_answer'),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.all(14),
           ),
           onChanged: (_) => setState(() {}),
@@ -633,10 +650,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 : const Icon(Icons.auto_awesome),
             label: Text(
               _isEvaluating
-                  ? l10n.get('evaluation_4e2d')
+                  ? l10n.get('evaluation_in')
                   : hasAi
-                      ? l10n.get('83b7_53d6_ai_evaluation')
-                      : l10n.get('save_local_practice'),
+                  ? l10n.get('gain_fetch_ai_evaluation')
+                  : l10n.get('save_local_practice'),
             ),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -653,7 +670,11 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 14, color: AppColors.warning),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: AppColors.warning,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -676,23 +697,23 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final isLocal = _evaluationResult?['local'] == true;
     final score = _evaluationResult?['score'] ?? 0;
     final summary = _evaluationResult?['summary'] ?? '';
-    final missedPoints = (_evaluationResult?['missedPoints'] as List?)?.cast<String>() ?? [];
-    final wrongPoints = (_evaluationResult?['wrongPoints'] as List?)?.cast<String>() ?? [];
+    final missedPoints =
+        (_evaluationResult?['missedPoints'] as List?)?.cast<String>() ?? [];
+    final wrongPoints =
+        (_evaluationResult?['wrongPoints'] as List?)?.cast<String>() ?? [];
     final improvedAnswer = _evaluationResult?['improvedAnswer'] ?? '';
 
     final scoreColor = score >= 85
         ? AppColors.success
         : score >= 60
-            ? AppColors.warning
-            : AppColors.danger;
+        ? AppColors.warning
+        : AppColors.danger;
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: scoreColor.withValues(alpha: 0.3),
-        ),
+        side: BorderSide(color: scoreColor.withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -712,13 +733,16 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 const Spacer(),
                 if (!isLocal) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: scoreColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      l10n.getp('{score}_5206', {'score': '$score'}),
+                      l10n.getp('score_score_2', {'score': '$score'}),
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -730,7 +754,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // 本地保存提示
             if (isLocal) ...[
               Container(
@@ -741,35 +765,47 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 16,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 8),
-                    Text(l10n.get('already_save_4e3a_local_practice'), style: const TextStyle(fontSize: 13)),
+                    Text(
+                      l10n.get('already_save_as_local_practice'),
+                      style: const TextStyle(fontSize: 13),
+                    ),
                   ],
                 ),
               ),
             ],
-            
+
             // 摘要
             if (summary.isNotEmpty) ...[
-              Text(
-                summary,
-                style: const TextStyle(fontSize: 13, height: 1.5),
-              ),
+              Text(summary, style: const TextStyle(fontSize: 13, height: 1.5)),
               const SizedBox(height: 12),
             ],
-            
+
             // 遗漏点
             if (missedPoints.isNotEmpty) ...[
-              _buildPointsSection(l10n.get('missed_70b9'), missedPoints, AppColors.warning),
+              _buildPointsSection(
+                l10n.get('missed_point'),
+                missedPoints,
+                AppColors.warning,
+              ),
               const SizedBox(height: 8),
             ],
-            
+
             // 错误点
             if (wrongPoints.isNotEmpty) ...[
-              _buildPointsSection(l10n.get('wrong_70b9'), wrongPoints, AppColors.danger),
+              _buildPointsSection(
+                l10n.get('wrong_point'),
+                wrongPoints,
+                AppColors.danger,
+              ),
               const SizedBox(height: 8),
             ],
-            
+
             // 优化回答
             if (improvedAnswer.isNotEmpty) ...[
               Text(
@@ -796,7 +832,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 16),
             // 下一步按钮
             SizedBox(
@@ -829,21 +865,23 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           ),
         ),
         const SizedBox(height: 4),
-        ...points.map((point) => Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('• ', style: TextStyle(color: color, fontSize: 12)),
-              Expanded(
-                child: Text(
-                  point,
-                  style: const TextStyle(fontSize: 12, height: 1.4),
+        ...points.map(
+          (point) => Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• ', style: TextStyle(color: color, fontSize: 12)),
+                Expanded(
+                  child: Text(
+                    point,
+                    style: const TextStyle(fontSize: 12, height: 1.4),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -852,7 +890,8 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final totalQuestions = _answers.length;
     final scoredAnswers = _answers.where((a) => a['score'] != null).toList();
     final avgScore = scoredAnswers.isNotEmpty
-        ? scoredAnswers.fold<int>(0, (sum, a) => sum + (a['score'] as int)) ~/ scoredAnswers.length
+        ? scoredAnswers.fold<int>(0, (sum, a) => sum + (a['score'] as int)) ~/
+              scoredAnswers.length
         : 0;
     final followUpCount = _answers.where((a) => a['isFollowUp'] == true).length;
 
@@ -865,9 +904,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.success.withValues(alpha: 0.2),
-            ),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -891,10 +928,13 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildStatItem(l10n.get('603b_question_count_6570'), '$totalQuestions'),
+                  _buildStatItem(
+                    l10n.get('total_question_count'),
+                    '$totalQuestions',
+                  ),
                   _buildStatItem(l10n.get('follow_up_count'), '$followUpCount'),
                   if (scoredAnswers.isNotEmpty)
-                    _buildStatItem(l10n.get('5e73_5747_5206'), '$avgScore'),
+                    _buildStatItem(l10n.get('flat_average_score'), '$avgScore'),
                 ],
               ),
               const SizedBox(height: 32),
@@ -943,10 +983,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
       ],
     );

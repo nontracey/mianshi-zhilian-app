@@ -624,10 +624,12 @@ sequenceDiagram
 
 ### L10n 静态类 (`lib/l10n/l10n.dart`)
 
-- `_zh` (876 条): 中文键 → 中文值。新 UI 键 (英文) → 中文值，兼容原硬编码中文键。
-- `_en` (1187 条): 中文键 → 英文值 (向后兼容)；新 UI 键 (英文) → 英文值；AI 提示词翻译。
-- `get(key, language)`: 按语言查找，未命中返回 key 本身。
+- 默认语言为中文 (`zh`)。
+- `_zh` / `_en` 使用同一组英文 `snake_case` key，当前由检查脚本保证 key 不重复、语言 map 同步，并拦截常见 UI 硬编码中文。
+- key 是稳定英文标识符，不能使用中文、拼音、Unicode/hex 中文、参数占位符或任意显示文本。
+- `get(key, language)`: 按语言查找，未命中时依次 fallback 到中文、英文、key 本身。
 - `getp(key, language, params)`: 模板插值，支持 `{param}` 替换。
+- 新增语言时只需要新增完整语言 map 并注册到 `_localizedValues`，UI 调用处不需要调整。
 
 ### LocalizationProvider (`lib/providers/localization_provider.dart`)
 
@@ -638,21 +640,33 @@ sequenceDiagram
 
 ### 维护脚本
 
-`apps/client/` 下包含多个 Python 辅助脚本：
+国际化只保留一个规则门禁脚本：
 
-| 脚本 | 功能 |
-|------|------|
-| `_translate_en.py` | 将自动生成的占位符替换为专业英文翻译 |
-| `_final_rebuild.py` | 从当前文件重建 _zh/_en 结构，排序、去重、补缺失键 |
-| `_quality_check.py` | 质检：统计自动生成条目数、中文值、缺失键 |
-| `_check_l10n.py` | 统计 _zh/_en 中中英文占比 |
-| `_find_key.py` | 在 _zh 中搜索指定键 |
+```bash
+cd apps/client
+python3 lib/l10n/check_l10n_keys.py
+```
+
+该脚本检测：
+
+1. key 必须是英文 `snake_case`，且以英文字母开头。
+2. key 不能包含中文、Unicode/hex 中文、参数占位符或标点。
+3. 各语言 map 不能有重复 key，且 key 集合必须完全一致。
+4. 调用处 `l10n.get()` / `l10n.getp()` 必须引用已定义 key。
+5. `getp()` 的 `{param}` 占位符在各语言 value 中必须一致。
+6. 常见 UI 展示入口不能硬编码中文，例如 `Text('中文')`、`SnackBar(content: Text('中文'))`、`labelText`、`hintText`、`tooltip`。
+7. `titleKey`、`descKey`、`nameKey`、`labelKey`、`phaseKey` 等配置字段必须保存英文 key，不能保存中文展示文本。
+8. label/title/name/description/frequency 类 getter 不能直接返回中文展示文本；应返回英文 key，由 UI 层调用 l10n 翻译。
+
+历史 l10n 迁移、诊断、修复脚本已清理，避免后续误用。
 
 需要国际化的内容：
 
 1. UI 文案：按钮、导航、提示、状态。
 2. 知识点标题和摘要：可先只做中文，英文为后续扩展。
 3. AI 评估 Prompt：需要中英文两套提示词。
+
+允许保留为数据或常量的内容：用户输入、知识库正文、题目内容、URL、模型名、品牌名、`API Key` 等技术常量，以及不会直接展示给用户的 AI 内部上下文标记。只要它变成 UI chrome，就必须进入 l10n。
 
 内容策略：
 

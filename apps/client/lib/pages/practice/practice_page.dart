@@ -8,7 +8,6 @@ import 'package:mianshi_zhilian/pages/practice/weakness_training_page.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class PracticePage extends StatelessWidget {
@@ -43,7 +42,10 @@ class PracticePage extends StatelessWidget {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text(l10n.get('6b63_5728_loading_knowledge_point'), style: TextStyle(color: Colors.grey.shade500)),
+            Text(
+              l10n.get('loading_knowledge_point'),
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
           ],
         ),
       );
@@ -59,7 +61,7 @@ class PracticePage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         Text(
-          l10n.get('select_practice_6a21_5f0f'),
+          l10n.get('select_practice_mode'),
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -71,7 +73,7 @@ class PracticePage extends StatelessWidget {
                 ? (constraints.maxWidth - 32) / 3
                 : constraints.maxWidth;
 
-              return Wrap(
+            return Wrap(
               spacing: 16,
               runSpacing: 16,
               children: [
@@ -79,8 +81,11 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.today_outlined,
-                    title: l10n.get('4eca_day_review'),
-                    subtitle: l10n.getp('based_on_forgetting_curve_4eca_day_has_{count}_4e2a_knowledg', {'count': reviewCount}),
+                    title: l10n.get('today_day_review'),
+                    subtitle: l10n.getp(
+                      'based_on_forgetting_curve_today_day_has_count_knowledg_2',
+                      {'count': reviewCount},
+                    ),
                     color: AppColors.accent,
                     onTap: onDailyReview,
                   ),
@@ -89,8 +94,10 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.casino_outlined,
-                    title: l10n.get('968f_673a_62bd_95ee'),
-                    subtitle: l10n.get('select_domain_540e_968f_673a_62bd_53d6_knowledge_point_8fdb'),
+                    title: l10n.get('random_machine_question'),
+                    subtitle: l10n.get(
+                      'select_domain_after_random_machine_fetch_knowledge_point_progress',
+                    ),
                     color: AppColors.success,
                     onTap: () => _showDomainPicker(context, domains),
                   ),
@@ -100,7 +107,9 @@ class PracticePage extends StatelessWidget {
                   child: _PracticeModeCard(
                     icon: Icons.question_answer_outlined,
                     title: l10n.get('follow_up_training'),
-                    subtitle: l10n.get('6a21_62df_interview_5b98_follow_up_6df1_5165_practice_knowle'),
+                    subtitle: l10n.get(
+                      'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
+                    ),
                     color: AppColors.categoryPurple,
                     onTap: () => _startFollowUpTraining(context, domainTopics),
                   ),
@@ -109,8 +118,10 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.trending_down_outlined,
-                    title: l10n.get('weakness_training_5305'),
-                    subtitle: l10n.get('9488_5bf9_weak_knowledge_point_8fdb_884c_4e13_9879_training'),
+                    title: l10n.get('weakness_training_pack'),
+                    subtitle: l10n.get(
+                      'needle_peer_weak_knowledge_point_progress_action_specialized_item_training',
+                    ),
                     color: AppColors.danger,
                     onTap: () => _startWeaknessTraining(context),
                   ),
@@ -120,9 +131,12 @@ class PracticePage extends StatelessWidget {
                   child: _PracticeModeCard(
                     icon: Icons.local_fire_department_outlined,
                     title: l10n.get('high_freq_sprint'),
-                    subtitle: l10n.get('9488_5bf9_high_freq_interview_question_count_8fdb_884c_5f3a'),
+                    subtitle: l10n.get(
+                      'needle_peer_high_freq_interview_question_count_progress_action_accent',
+                    ),
                     color: AppColors.warning,
-                    onTap: () => _startHighFrequencyTraining(context, domainTopics),
+                    onTap: () =>
+                        _startHighFrequencyTraining(context, domainTopics),
                   ),
                 ),
                 SizedBox(
@@ -130,7 +144,9 @@ class PracticePage extends StatelessWidget {
                   child: _PracticeModeCard(
                     icon: Icons.work_outline,
                     title: l10n.get('project_deep_dig'),
-                    subtitle: l10n.get('star_6cd5_5219_practice_6df1_5165_project_7ec6_8282'),
+                    subtitle: l10n.get(
+                      'star_rule_practice_deep_enter_project_detail_festival',
+                    ),
                     color: AppColors.categoryGreen,
                     onTap: () => _startProjectDig(context),
                   ),
@@ -149,8 +165,10 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.groups_outlined,
-                    title: l10n.get('6a21_62df_interview'),
-                    subtitle: l10n.get('streak_591a_question_count_6a21_5f0f_6a21_62df_771f_5b9e_int'),
+                    title: l10n.get('mode_mock_interview'),
+                    subtitle: l10n.get(
+                      'streak_multi_question_count_mode_mock_real_actual_int',
+                    ),
                     color: AppColors.categoryRed,
                     onTap: onMockInterview,
                   ),
@@ -189,11 +207,17 @@ class PracticePage extends StatelessWidget {
     final topicsWithFollowUps = domainTopics
         .where((topic) => topic.followUps.isNotEmpty)
         .toList();
-    
+
     if (topicsWithFollowUps.isEmpty) {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('current_domain_6ca1_has_53ef_follow_up_7684_knowledge_point'))),
+        SnackBar(
+          content: Text(
+            l10n.get(
+              'current_domain_not_has_optional_follow_up_knowledge_point',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -223,11 +247,15 @@ class PracticePage extends StatelessWidget {
     final highFrequencyTopics = domainTopics
         .where((topic) => topic.highFrequency)
         .toList();
-    
+
     if (highFrequencyTopics.isEmpty) {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('current_domain_6ca1_has_high_freq_knowledge_point'))),
+        SnackBar(
+          content: Text(
+            l10n.get('current_domain_not_has_high_freq_knowledge_point'),
+          ),
+        ),
       );
       return;
     }
@@ -237,27 +265,21 @@ class PracticePage extends StatelessWidget {
     final selectedTopics = shuffled.take(10).toList();
     final topicIds = selectedTopics.map((t) => t.id as String).toList();
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RecallPage(topicIds: topicIds),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => RecallPage(topicIds: topicIds)));
   }
 
   void _startProjectDig(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ProjectDigPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProjectDigPage()));
   }
 
   void _startSystemDesign(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SystemDesignPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SystemDesignPage()));
   }
 }
 
@@ -299,12 +321,14 @@ class _EmptyPracticeState extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              l10n.get('6682_no_53ef_practice_7684_knowledge_point'),
+              l10n.get('temporary_no_optional_practice_knowledge_point'),
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('knowledge_point_6b63_5728_loading_4e2d_8bf7_7a0d_7b49_7247_5'),
+              l10n.get(
+                'knowledge_point_correct_at_loading_in_please_slightly_wait_picture_5',
+              ),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -312,7 +336,7 @@ class _EmptyPracticeState extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: Text(l10n.get('91cd_new_loading')),
+              label: Text(l10n.get('restart_new_loading')),
             ),
           ],
         ),

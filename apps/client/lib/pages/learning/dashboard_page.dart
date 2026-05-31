@@ -124,8 +124,9 @@ class DashboardPage extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 1200;
-          final isMedium = constraints.maxWidth >= 800 && constraints.maxWidth < 1200;
-          
+          final isMedium =
+              constraints.maxWidth >= 800 && constraints.maxWidth < 1200;
+
           if (isWide) {
             // 三栏布局
             return Row(
@@ -291,16 +292,12 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // ── 下一步最佳行动组件 ──────────────────────────────────────────────
 
 class _NextBestAction extends StatelessWidget {
-  const _NextBestAction({
-    required this.weakTopics,
-    required this.onTopicTap,
-  });
+  const _NextBestAction({required this.weakTopics, required this.onTopicTap});
 
   final List<Topic> weakTopics;
   final ValueChanged<String> onTopicTap;
@@ -309,7 +306,7 @@ class _NextBestAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return _EmptyState(message: l10n.get('6682_no_recommend_action'));
+      return _EmptyState(message: l10n.get('temporary_no_recommend_action'));
     }
 
     final nextTopic = weakTopics.first;
@@ -318,11 +315,7 @@ class _NextBestAction extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.lightbulb_outline,
-              size: 16,
-              color: AppColors.accent,
-            ),
+            Icon(Icons.lightbulb_outline, size: 16, color: AppColors.accent),
             const SizedBox(width: 8),
             Text(
               l10n.get('recommend_task'),
@@ -341,7 +334,9 @@ class _NextBestAction extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: AppColors.accent.withValues(alpha: 0.2),
@@ -370,12 +365,12 @@ class _NextBestAction extends StatelessWidget {
                   children: [
                     _ActionTag(
                       icon: Icons.access_time,
-                      text: l10n.get('9884_8ba1_7528_65f6_25_min'),
+                      text: l10n.get('pre_plan_use_time_25_min'),
                     ),
                     const SizedBox(width: 12),
                     _ActionTag(
                       icon: Icons.quiz_outlined,
-                      text: l10n.get('8003_70b9_6_4e2a'),
+                      text: l10n.get('exam_point_6'),
                     ),
                   ],
                 ),
@@ -401,10 +396,7 @@ class _NextBestAction extends StatelessWidget {
 }
 
 class _ActionTag extends StatelessWidget {
-  const _ActionTag({
-    required this.icon,
-    required this.text,
-  });
+  const _ActionTag({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
@@ -435,9 +427,7 @@ class _ActionTag extends StatelessWidget {
 // ── AI反馈组件 ──────────────────────────────────────────────
 
 class _AIFeedbackItem extends StatelessWidget {
-  const _AIFeedbackItem({
-    required this.attempt,
-  });
+  const _AIFeedbackItem({required this.attempt});
 
   final PracticeAttempt attempt;
 
@@ -446,10 +436,10 @@ class _AIFeedbackItem extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final score = attempt.score ?? 0;
     final feedbackType = score >= 85
-        ? l10n.get('8868_73b0_4f18_79c0')
+        ? l10n.get('surface_current_excellent')
         : score >= 60
-        ? l10n.get('89e3_question_count_601d_8def_5f85_optimize')
-        : l10n.get('knowledge_point_mastery_not_8db3');
+        ? l10n.get('understand_question_count_thinking_road_pending_optimize')
+        : l10n.get('knowledge_point_mastery_not_enough');
     final feedbackColor = score >= 85
         ? AppColors.success
         : score >= 60
@@ -472,11 +462,7 @@ class _AIFeedbackItem extends StatelessWidget {
               color: feedbackColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              feedbackIcon,
-              size: 16,
-              color: feedbackColor,
-            ),
+            child: Icon(feedbackIcon, size: 16, color: feedbackColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -492,7 +478,9 @@ class _AIFeedbackItem extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  attempt.question.isNotEmpty ? attempt.question : attempt.topicId,
+                  attempt.question.isNotEmpty
+                      ? attempt.question
+                      : attempt.topicId,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -517,10 +505,13 @@ class _AIFeedbackItem extends StatelessWidget {
 
   String _timeAgo(DateTime dateTime, LocalizationProvider l10n) {
     final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return l10n.get('521a_521a');
-    if (diff.inMinutes < 60) return l10n.getp('{minutes}_min_524d', {'minutes': diff.inMinutes});
-    if (diff.inHours < 24) return l10n.getp('{hours}_hour_524d', {'hours': diff.inHours});
-    if (diff.inDays < 7) return l10n.getp('{days}_day_524d', {'days': diff.inDays});
+    if (diff.inMinutes < 1) return l10n.get('just');
+    if (diff.inMinutes < 60)
+      return l10n.getp('minutes_min_ago_2', {'minutes': diff.inMinutes});
+    if (diff.inHours < 24)
+      return l10n.getp('hours_hour_ago_2', {'hours': diff.inHours});
+    if (diff.inDays < 7)
+      return l10n.getp('days_day_ago_2', {'days': diff.inDays});
     return '${dateTime.month}/${dateTime.day}';
   }
 }
@@ -545,7 +536,9 @@ class _DomainDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5),
+        color: isDark
+            ? AppColors.borderMidnightSubtle
+            : const Color(0xFFF0F2F5),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isDark ? AppColors.borderMidnight : const Color(0xFFE0E0E0),
@@ -564,10 +557,9 @@ class _DomainDropdown extends StatelessWidget {
             fontSize: 12,
             color: isDark ? Colors.white70 : AppColors.textSecondary,
           ),
-          items: domains.map((d) => DropdownMenuItem(
-            value: d.id,
-            child: Text(d.title),
-          )).toList(),
+          items: domains
+              .map((d) => DropdownMenuItem(value: d.id, child: Text(d.title)))
+              .toList(),
           onChanged: (value) {
             if (value != null) onChanged(value);
           },
@@ -646,13 +638,13 @@ class _MasteryOverview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MasteryStatItem(
-                label: l10n.get('719f_7ec3'),
+                label: l10n.get('skilled_training'),
                 value: '$masteredPercent%',
                 color: AppColors.success,
               ),
               const SizedBox(height: 8),
               _MasteryStatItem(
-                label: l10n.get('study_4e2d'),
+                label: l10n.get('study_in'),
                 value: '$learningPercent%',
                 color: AppColors.accent,
               ),
@@ -673,7 +665,7 @@ class _MasteryOverview extends StatelessWidget {
 class CategoryMastery {
   final String name;
   final int masteryPercent;
-  
+
   const CategoryMastery({required this.name, required this.masteryPercent});
 }
 
@@ -725,9 +717,7 @@ class _MasteryStatItem extends StatelessWidget {
 // ── 掌握度统计组件 ──────────────────────────────────────────────
 
 class _MasteryStats extends StatelessWidget {
-  const _MasteryStats({
-    required this.categories,
-  });
+  const _MasteryStats({required this.categories});
 
   final List<CategoryMastery> categories;
 
@@ -737,11 +727,8 @@ class _MasteryStats extends StatelessWidget {
     if (categories.isEmpty) {
       return Center(
         child: Text(
-          l10n.get('6682_no_5206_7c7b_data'),
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade500,
-          ),
+          l10n.get('temporary_no_score_category_data'),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
         ),
       );
     }
@@ -756,10 +743,10 @@ class _MasteryStats extends StatelessWidget {
             final color = cat.masteryPercent >= 85
                 ? AppColors.success
                 : cat.masteryPercent >= 60
-                    ? AppColors.accent
-                    : cat.masteryPercent > 0
-                        ? AppColors.warning
-                        : Colors.grey;
+                ? AppColors.accent
+                : cat.masteryPercent > 0
+                ? AppColors.warning
+                : Colors.grey;
             return SizedBox(
               width: cardWidth,
               child: _MasteryStatCard(
@@ -791,7 +778,9 @@ class _MasteryStatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -852,7 +841,7 @@ class _DomainKnowledgeCard extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final domainColor = domain.color;
-    final status = getMasteryLabel(masteryPercent);
+    final status = l10n.get(getMasteryLabelKey(masteryPercent));
     final statusColor = getMasteryColor(masteryPercent);
 
     final domainIcon = _getDomainIcon(domain.id);
@@ -862,14 +851,16 @@ class _DomainKnowledgeCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        hoverColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+        hoverColor: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.03),
         splashColor: domainColor.withValues(alpha: 0.08),
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDark 
+              color: isDark
                   ? Colors.white.withValues(alpha: 0.08)
                   : Colors.black.withValues(alpha: 0.08),
               width: 1,
@@ -901,13 +892,19 @@ class _DomainKnowledgeCard extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1A1A1A),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.9)
+                              : const Color(0xFF1A1A1A),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: 16, color: isDark ? Colors.white24 : Colors.grey.shade400),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: isDark ? Colors.white24 : Colors.grey.shade400,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -928,7 +925,9 @@ class _DomainKnowledgeCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
                           value: masteryPercent / 100,
-                          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200,
+                          backgroundColor: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.grey.shade200,
                           color: domainColor,
                           minHeight: 4,
                         ),
@@ -936,14 +935,23 @@ class _DomainKnowledgeCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: isDark ? 0.15 : 0.1),
+                        color: statusColor.withValues(
+                          alpha: isDark ? 0.15 : 0.1,
+                        ),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(
                         status,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
                       ),
                     ),
                   ],
@@ -953,13 +961,21 @@ class _DomainKnowledgeCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      l10n.getp('{count}_8003_70b9', {'count': domain.topicCount}),
-                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
+                      l10n.getp('count_exam_point_2', {
+                        'count': domain.topicCount,
+                      }),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.white38 : Colors.grey.shade500,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      l10n.getp('{count}_practice', {'count': practiceCount}),
-                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
+                      l10n.getp('count_practice_2', {'count': practiceCount}),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.white38 : Colors.grey.shade500,
+                      ),
                     ),
                   ],
                 ),
@@ -1009,7 +1025,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
     final status = level == MasteryLevel.mastered
         ? l10n.get('already_complete')
         : level == MasteryLevel.learning
-        ? l10n.get('8fdb_884c_4e2d')
+        ? l10n.get('progress_action_in')
         : l10n.get('un_start');
     final statusColor = getMasteryColor(widget.masteryPercent);
 
@@ -1043,7 +1059,9 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     decoration: BoxDecoration(
                       color: widget.isSelected
                           ? AppColors.accent
-                          : (isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5)),
+                          : (isDark
+                                ? AppColors.borderMidnightSubtle
+                                : const Color(0xFFF0F2F5)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
@@ -1052,7 +1070,11 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: widget.isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+                          color: widget.isSelected
+                              ? Colors.white
+                              : (isDark
+                                    ? Colors.white70
+                                    : Colors.grey.shade700),
                         ),
                       ),
                     ),
@@ -1071,7 +1093,9 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1079,7 +1103,10 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
@@ -1099,7 +1126,9 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                         Row(
                           children: [
                             Text(
-                              l10n.getp('progress_{percent}', {'percent': widget.masteryPercent}),
+                              l10n.getp('progress_percent_2', {
+                                'percent': widget.masteryPercent,
+                              }),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1107,7 +1136,9 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              l10n.getp('8003_70b9_{count}', {'count': widget.domain.topicCount}),
+                              l10n.getp('exam_point_count_2', {
+                                'count': widget.domain.topicCount,
+                              }),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1124,7 +1155,9 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       child: Icon(
-                        _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         size: 20,
                         color: isDark ? Colors.white54 : Colors.grey,
                       ),
@@ -1177,7 +1210,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.category_outlined,
-                        label: l10n.get('5206_7c7b'),
+                        label: l10n.get('score_category'),
                         value: '${widget.domain.categories.length}',
                         isDark: isDark,
                       ),
@@ -1201,7 +1234,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     child: OutlinedButton.icon(
                       onPressed: widget.onViewCatalog ?? widget.onTap,
                       icon: const Icon(Icons.open_in_new, size: 16),
-                      label: Text(l10n.get('67e5_770b_knowledge_catalog')),
+                      label: Text(l10n.get('check_view_knowledge_catalog')),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
@@ -1218,7 +1251,8 @@ class _LearningPathItemState extends State<_LearningPathItem> {
     );
   }
 
-  Widget _buildStatItem(BuildContext context, {
+  Widget _buildStatItem(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
@@ -1341,7 +1375,10 @@ class _WeakTopicItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),
-              child: Text(l10n.get('53bb_practice'), style: TextStyle(fontSize: 11)),
+              child: Text(
+                l10n.get('go_practice'),
+                style: TextStyle(fontSize: 11),
+              ),
             ),
           ],
         ),
@@ -1380,22 +1417,34 @@ class _ReviewItem extends StatelessWidget {
     if (nextReviewAt != null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final reviewDate = DateTime(nextReviewAt!.year, nextReviewAt!.month, nextReviewAt!.day);
+      final reviewDate = DateTime(
+        nextReviewAt!.year,
+        nextReviewAt!.month,
+        nextReviewAt!.day,
+      );
       final isToday = reviewDate.isAtSameMomentAs(today);
-      final isTomorrow = reviewDate.isAtSameMomentAs(today.add(const Duration(days: 1)));
-      
+      final isTomorrow = reviewDate.isAtSameMomentAs(
+        today.add(const Duration(days: 1)),
+      );
+
       if (isToday) {
-        timeText = l10n.getp('4eca_day_{hour}_{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
+        timeText = l10n.getp('today_day_hour_minute_2', {
+          'hour': nextReviewAt!.hour,
+          'minute': nextReviewAt!.minute.toString().padLeft(2, '0'),
+        });
         timeColor = AppColors.danger;
       } else if (isTomorrow) {
-        timeText = l10n.getp('660e_day_{hour}_{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
+        timeText = l10n.getp('clear_day_hour_minute_2', {
+          'hour': nextReviewAt!.hour,
+          'minute': nextReviewAt!.minute.toString().padLeft(2, '0'),
+        });
         timeColor = AppColors.textSecondary;
       } else {
         timeText = '${nextReviewAt!.month}/${nextReviewAt!.day}';
         timeColor = AppColors.textSecondary;
       }
     } else {
-      timeText = l10n.get('5f85_5b89_6392');
+      timeText = l10n.get('pending_arrange_rank');
       timeColor = AppColors.textTertiary;
     }
 
@@ -1510,16 +1559,13 @@ class _PanelCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = Theme.of(context).colorScheme.surface;
     final borderColor = Theme.of(context).colorScheme.outline;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: borderColor,
-          width: 1,
-        ),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
             color: isDark ? AppColors.cardShadowDark : AppColors.cardShadow,
@@ -1534,11 +1580,7 @@ class _PanelCard extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 18,
-                  color: AppColors.accent,
-                ),
+                Icon(icon, size: 18, color: AppColors.accent),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -1559,7 +1601,10 @@ class _PanelCard extends StatelessWidget {
                 GestureDetector(
                   onTap: onTrailingTap,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -1642,17 +1687,17 @@ class _LeftPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 今日复习队列
         _PanelCard(
-          title: l10n.get('4eca_day_review_queue'),
+          title: l10n.get('today_day_review_queue'),
           icon: Icons.replay_outlined,
           trailing: '${dueTopics.length}',
           headerTrailing: Text(
-            l10n.get('5230_671f_time'),
+            l10n.get('to_day_time'),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white38 : AppColors.textTertiary,
@@ -1661,7 +1706,7 @@ class _LeftPanel extends StatelessWidget {
           child: Column(
             children: [
               if (dueTopics.isEmpty)
-                _EmptyState(message: l10n.get('6682_no_5230_671f_content'))
+                _EmptyState(message: l10n.get('temporary_no_to_day_content'))
               else
                 ...dueTopics.take(5).map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1677,7 +1722,7 @@ class _LeftPanel extends StatelessWidget {
               if (dueTopics.length > 5)
                 TextButton(
                   onPressed: onReview,
-                  child: Text(l10n.get('67e5_770b_all_review')),
+                  child: Text(l10n.get('check_view_all_review')),
                 ),
             ],
           ),
@@ -1691,7 +1736,7 @@ class _LeftPanel extends StatelessWidget {
           child: Column(
             children: [
               if (weakTopics.isEmpty)
-                _EmptyState(message: l10n.get('6682_no_weak_9879'))
+                _EmptyState(message: l10n.get('temporary_no_weak_item'))
               else
                 ...weakTopics.map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1778,28 +1823,40 @@ class _CenterPanelState extends State<_CenterPanel> {
     if (routeId != null && mounted) {
       // 加载自定义路线
       final customData = await _storage.loadJsonList('custom_routes');
-      final customRoutes = customData.map((e) => LearningRoute.fromJson(e)).toList();
+      final customRoutes = customData
+          .map((e) => LearningRoute.fromJson(e))
+          .toList();
 
       // 默认路线
       final defaultRoutes = [
         LearningRoute(
           id: 'java',
           name: l10n.get('java_backend_dev'),
-          description: l10n.get('java_core_jvm_concurrent_spring_database_4e2d_95f4_4ef6_syst'),
-          domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
+          description: l10n.get(
+            'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
+          ),
+          domainIds: [
+            'java',
+            'architecture',
+            'design-pattern',
+            'network',
+            'os',
+          ],
           isDefault: true,
         ),
         LearningRoute(
           id: 'frontend',
           name: l10n.get('frontend_dev'),
-          description: l10n.get('javascript_typescript_react_vue_frontend_engineering_5316'),
+          description: l10n.get(
+            'javascript_typescript_react_vue_frontend_engineering_transform',
+          ),
           domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'agent',
           name: l10n.get('agent_dev'),
-          description: l10n.get('text_cbc3c2e6'),
+          description: l10n.get('ai_tech_stack_description'),
           domainIds: ['agent', 'algorithm', 'architecture', 'network'],
           isDefault: true,
         ),
@@ -1826,13 +1883,20 @@ class _CenterPanelState extends State<_CenterPanel> {
   }
 
   List<Domain> get _domains {
-    var domains = widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+    var domains = widget.allDomains
+        .where((d) => !_disabledIds.contains(d.id))
+        .toList();
 
     // 如果选中了路线，按路线顺序过滤
     if (_selectedRoute != null && _selectedRoute!.domainIds.isNotEmpty) {
-      domains = domains.where((d) => _selectedRoute!.domainIds.contains(d.id)).toList();
-      domains.sort((a, b) =>
-        _selectedRoute!.domainIds.indexOf(a.id).compareTo(_selectedRoute!.domainIds.indexOf(b.id)));
+      domains = domains
+          .where((d) => _selectedRoute!.domainIds.contains(d.id))
+          .toList();
+      domains.sort(
+        (a, b) => _selectedRoute!.domainIds
+            .indexOf(a.id)
+            .compareTo(_selectedRoute!.domainIds.indexOf(b.id)),
+      );
     }
 
     return domains;
@@ -1840,7 +1904,9 @@ class _CenterPanelState extends State<_CenterPanel> {
 
   // 所有未禁用的领域（不受路线选择影响）
   List<Domain> get _allEnabledDomains {
-    return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+    return widget.allDomains
+        .where((d) => !_disabledIds.contains(d.id))
+        .toList();
   }
 
   // 从内容仓库的 learningPaths 生成学习路线
@@ -1848,13 +1914,15 @@ class _CenterPanelState extends State<_CenterPanel> {
     final routes = <LearningRoute>[];
     for (final domain in widget.allDomains) {
       for (final path in domain.learningPaths) {
-        routes.add(LearningRoute(
-          id: '${domain.id}_${path.id}',
-          name: path.title,
-          description: path.description,
-          domainIds: [domain.id],
-          isDefault: false,
-        ));
+        routes.add(
+          LearningRoute(
+            id: '${domain.id}_${path.id}',
+            name: path.title,
+            description: path.description,
+            domainIds: [domain.id],
+            isDefault: false,
+          ),
+        );
       }
     }
     return routes;
@@ -1873,12 +1941,12 @@ class _CenterPanelState extends State<_CenterPanel> {
         _PanelCard(
           title: l10n.get('current_study_route'),
           icon: Icons.route_outlined,
-          trailing: l10n.get('5207_6362_route'),
+          trailing: l10n.get('toggle_switch_route'),
           onTrailingTap: () => _showRouteSelector(context),
           child: Column(
             children: [
               if (domains.isEmpty)
-                _EmptyState(message: l10n.get('6682_no_study_route'))
+                _EmptyState(message: l10n.get('temporary_no_study_route'))
               else
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
@@ -1894,13 +1962,19 @@ class _CenterPanelState extends State<_CenterPanel> {
                     isSelected: domain.id == widget.currentDomainId,
                     onTap: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                     },
                     onViewCatalog: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                       widget.onViewDomainCatalog(domain.id);
@@ -1920,16 +1994,18 @@ class _CenterPanelState extends State<_CenterPanel> {
           child: Column(
             children: [
               if (allEnabledDomains.isEmpty)
-                _EmptyState(message: l10n.get('6682_no_domain_data'))
+                _EmptyState(message: l10n.get('temporary_no_domain_data'))
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
                     // 根据宽度决定每行几个卡片
                     final cardWidth = constraints.maxWidth > 900
-                        ? (constraints.maxWidth - 36) / 4  // 一行4个
+                        ? (constraints.maxWidth - 36) /
+                              4 // 一行4个
                         : constraints.maxWidth > 600
-                            ? (constraints.maxWidth - 24) / 3  // 一行3个
-                            : (constraints.maxWidth - 12) / 2;  // 一行2个
+                        ? (constraints.maxWidth - 24) /
+                              3 // 一行3个
+                        : (constraints.maxWidth - 12) / 2; // 一行2个
 
                     return Wrap(
                       spacing: 12,
@@ -1939,10 +2015,11 @@ class _CenterPanelState extends State<_CenterPanel> {
                           domain.id,
                           widget.contentProvider.topics.values.toList(),
                         );
-                        final practiceCount = widget.progressProvider.getDomainPracticeCount(
-                          domain.id,
-                          widget.contentProvider.topics.values.toList(),
-                        );
+                        final practiceCount = widget.progressProvider
+                            .getDomainPracticeCount(
+                              domain.id,
+                              widget.contentProvider.topics.values.toList(),
+                            );
                         return SizedBox(
                           width: cardWidth,
                           child: _DomainKnowledgeCard(
@@ -1951,8 +2028,13 @@ class _CenterPanelState extends State<_CenterPanel> {
                             practiceCount: practiceCount,
                             onTap: () {
                               widget.onDomainChanged(domain.id);
-                              if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
-                                widget.contentProvider.loadDomainTopics(domain.id);
+                              if (widget.contentProvider.getLoadedTopicCount(
+                                    domain.id,
+                                  ) ==
+                                  0) {
+                                widget.contentProvider.loadDomainTopics(
+                                  domain.id,
+                                );
                               }
                               widget.onViewDomainCatalog(domain.id);
                             },
@@ -1975,21 +2057,25 @@ class _CenterPanelState extends State<_CenterPanel> {
       LearningRoute(
         id: 'java',
         name: l10n.get('java_backend_dev'),
-        description: l10n.get('java_core_jvm_concurrent_spring_database_4e2d_95f4_4ef6_syst'),
+        description: l10n.get(
+          'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
+        ),
         domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'frontend',
         name: l10n.get('frontend_dev'),
-        description: l10n.get('javascript_typescript_react_vue_frontend_engineering_5316'),
+        description: l10n.get(
+          'javascript_typescript_react_vue_frontend_engineering_transform',
+        ),
         domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'agent',
         name: l10n.get('agent_dev'),
-        description: l10n.get('text_cbc3c2e6'),
+        description: l10n.get('ai_tech_stack_description'),
         domainIds: ['agent', 'algorithm', 'architecture', 'network'],
         isDefault: true,
       ),
@@ -2073,8 +2159,10 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
   Future<void> _loadRoutes() async {
     // 加载自定义路线
     final customData = await _storage.loadJsonList('custom_routes');
-    final customRoutes = customData.map((e) => LearningRoute.fromJson(e)).toList();
-    
+    final customRoutes = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .toList();
+
     setState(() {
       _routes = [...widget.routes, ...customRoutes];
     });
@@ -2121,13 +2209,19 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               children: [
                 const Icon(Icons.route, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text(l10n.get('select_study_route'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(
+                  l10n.get('select_study_route'),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // 路线列表
             SizedBox(
               height: 300,
@@ -2149,12 +2243,16 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.accent.withValues(alpha: 0.08) : Colors.transparent,
+                            color: isSelected
+                                ? AppColors.accent.withValues(alpha: 0.08)
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.accent
-                                  : (isDark ? AppColors.borderMidnight : const Color(0xFFE0E0E0)),
+                                  : (isDark
+                                        ? AppColors.borderMidnight
+                                        : const Color(0xFFE0E0E0)),
                             ),
                           ),
                           child: Row(
@@ -2165,16 +2263,35 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(route.name, style: TextStyle(fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : null)),
+                                        Text(
+                                          route.name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: isSelected
+                                                ? AppColors.accent
+                                                : null,
+                                          ),
+                                        ),
                                         if (!route.isDefault) ...[
                                           const SizedBox(width: 6),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.accent.withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(3),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 1,
                                             ),
-                                            child: Text(l10n.get('custom'), style: TextStyle(fontSize: 9, color: AppColors.accent)),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accent
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                            ),
+                                            child: Text(
+                                              l10n.get('custom'),
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: AppColors.accent,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ],
@@ -2182,7 +2299,15 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                     if (route.description.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 2),
-                                        child: Text(route.description, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey)),
+                                        child: Text(
+                                          route.description,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? Colors.white54
+                                                : Colors.grey,
+                                          ),
+                                        ),
                                       ),
                                   ],
                                 ),
@@ -2194,13 +2319,21 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                 onPressed: () {
                                   Navigator.pop(context);
                                   final enabledDomains = widget.availableDomains
-                                      .where((d) => !widget.disabledDomainIds.contains(d.id))
+                                      .where(
+                                        (d) => !widget.disabledDomainIds
+                                            .contains(d.id),
+                                      )
                                       .toList();
                                   showDialog(
                                     context: context,
                                     builder: (ctx) => RouteEditorDialog(
                                       availableDomains: enabledDomains
-                                          .map((d) => DomainItem(id: d.id, title: d.title))
+                                          .map(
+                                            (d) => DomainItem(
+                                              id: d.id,
+                                              title: d.title,
+                                            ),
+                                          )
                                           .toList(),
                                       existingRoute: route,
                                       onSave: (updatedRoute) {
@@ -2216,11 +2349,18 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                               // 删除按钮（仅自定义路线）
                               if (!route.isDefault)
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                  ),
                                   color: Colors.red.shade300,
                                   onPressed: () => _deleteRoute(route.id),
                                 ),
-                              if (isSelected) const Icon(Icons.check_circle, color: AppColors.accent),
+                              if (isSelected)
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: AppColors.accent,
+                                ),
                             ],
                           ),
                         ),
@@ -2230,9 +2370,9 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // 创建自定义路线
             SizedBox(
               width: double.infinity,
@@ -2252,7 +2392,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                   );
                 },
                 icon: const Icon(Icons.add),
-                label: Text(l10n.get('521b_5efa_custom_route')),
+                label: Text(l10n.get('create_build_custom_route')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -2310,18 +2450,27 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
               children: [
                 const Icon(Icons.school_outlined, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text(l10n.get('management_domain'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(
+                  l10n.get('management_domain'),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('5207_6362_5f00_5173_6765_enable_disable_domain'),
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.grey),
+              l10n.get('toggle_switch_open_close_come_enable_disable_domain'),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white54 : Colors.grey,
+              ),
             ),
             const SizedBox(height: 16),
-            
+
             // 领域列表
             SizedBox(
               height: 300,
@@ -2331,16 +2480,27 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                     final isDisabled = _disabledIds.contains(domain.id);
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: isDisabled
-                            ? (isDark ? AppColors.surfaceDark : Colors.grey.shade100)
-                            : (isDark ? AppColors.surfaceMidnight : Colors.white),
+                            ? (isDark
+                                  ? AppColors.surfaceDark
+                                  : Colors.grey.shade100)
+                            : (isDark
+                                  ? AppColors.surfaceMidnight
+                                  : Colors.white),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isDisabled
-                              ? (isDark ? AppColors.borderDarkSubtle : Colors.grey.shade200)
-                              : (isDark ? AppColors.borderMidnight : AppColors.borderLight),
+                              ? (isDark
+                                    ? AppColors.borderDarkSubtle
+                                    : Colors.grey.shade200)
+                              : (isDark
+                                    ? AppColors.borderMidnight
+                                    : AppColors.borderLight),
                         ),
                       ),
                       child: Row(
@@ -2355,14 +2515,22 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                                     fontWeight: FontWeight.w600,
                                     color: isDisabled
                                         ? Colors.grey
-                                        : (isDark ? Colors.white : AppColors.textPrimary),
+                                        : (isDark
+                                              ? Colors.white
+                                              : AppColors.textPrimary),
                                   ),
                                 ),
                                 Text(
-                                  l10n.getp('{count}_4e2a_knowledge_point', {'count': domain.topicCount}),
+                                  l10n.getp('count_knowledge_point_2', {
+                                    'count': domain.topicCount,
+                                  }),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDisabled ? Colors.grey : (isDark ? Colors.white54 : Colors.grey),
+                                    color: isDisabled
+                                        ? Colors.grey
+                                        : (isDark
+                                              ? Colors.white54
+                                              : Colors.grey),
                                   ),
                                 ),
                               ],
@@ -2388,9 +2556,9 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // 说明
             Container(
               padding: const EdgeInsets.all(12),
@@ -2400,12 +2568,21 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: AppColors.accent,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.get('disable_7684_domain_not_4f1a_5728_9996_9875_show_4f46_conten'),
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.grey.shade700),
+                      l10n.get(
+                        'disable_domain_not_will_at_first_page_show_but_conten',
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],
@@ -2450,16 +2627,16 @@ class _RightPanel extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     // 获取掌握度趋势数据
     final trendData = progressProvider.getMasteryTrend();
-    
+
     // 计算当前领域的分类掌握度
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
-    
+
     // 按分类计算掌握度
     final categoryMap = <String, List<Topic>>{};
     for (final topic in domainTopics) {
       categoryMap.putIfAbsent(topic.category, () => []).add(topic);
     }
-    
+
     final categories = categoryMap.entries.map((entry) {
       final topics = entry.value;
       int totalScore = 0;
@@ -2474,15 +2651,14 @@ class _RightPanel extends StatelessWidget {
       // 没有学习过的分类，掌握度为0
       final avgScore = learnedCount == 0 ? 0 : totalScore ~/ learnedCount;
       return CategoryMastery(name: entry.key, masteryPercent: avgScore);
-    }).toList()
-      ..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
-    
+    }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
+
     // 计算掌握程度百分比
     int totalTopics = domainTopics.length;
     int masteredCount = 0;
     int learningCount = 0;
     int newCount = 0;
-    
+
     for (final topic in domainTopics) {
       final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
       if (score >= 85) {
@@ -2493,9 +2669,13 @@ class _RightPanel extends StatelessWidget {
         newCount++;
       }
     }
-    
-    final masteredPercent = totalTopics == 0 ? 0 : (masteredCount * 100 ~/ totalTopics);
-    final learningPercent = totalTopics == 0 ? 0 : (learningCount * 100 ~/ totalTopics);
+
+    final masteredPercent = totalTopics == 0
+        ? 0
+        : (masteredCount * 100 ~/ totalTopics);
+    final learningPercent = totalTopics == 0
+        ? 0
+        : (learningCount * 100 ~/ totalTopics);
     final newPercent = totalTopics == 0 ? 0 : (newCount * 100 ~/ totalTopics);
 
     return Column(
@@ -2503,7 +2683,7 @@ class _RightPanel extends StatelessWidget {
       children: [
         // 掌握度概览
         _PanelCard(
-          title: l10n.get('mastery_6982_89c8'),
+          title: l10n.get('mastery_overview_browse'),
           icon: Icons.pie_chart_outline,
           headerTrailing: _DomainDropdown(
             currentDomainId: currentDomainId,
@@ -2519,23 +2699,21 @@ class _RightPanel extends StatelessWidget {
                 newPercent: newPercent,
               ),
               const SizedBox(height: 16),
-              _MasteryStats(
-                categories: categories.take(4).toList(),
-              ),
+              _MasteryStats(categories: categories.take(4).toList()),
             ],
           ),
         ),
         const SizedBox(height: 16),
         // 掌握度趋势
         _PanelCard(
-          title: l10n.get('mastery_8d8b_52bf_8fd1_7_day'),
+          title: l10n.get('mastery_trend_recent_7_day'),
           icon: Icons.trending_up_outlined,
           child: _MasteryTrendChart(trendData: trendData),
         ),
         const SizedBox(height: 16),
         // 下一步最佳行动
         _PanelCard(
-          title: l10n.get('next_6b65_best_action'),
+          title: l10n.get('next_step_best_action'),
           icon: Icons.lightbulb_outline,
           child: _NextBestAction(
             weakTopics: weakTopics,
@@ -2545,7 +2723,7 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 备选行动
         _PanelCard(
-          title: l10n.get('5907_9009_action'),
+          title: l10n.get('alternate_select_action'),
           icon: Icons.list_alt_outlined,
           child: _AlternativeActions(
             weakTopics: weakTopics,
@@ -2557,16 +2735,14 @@ class _RightPanel extends StatelessWidget {
         _PanelCard(
           title: l10n.get('recent_ai_feedback'),
           icon: Icons.auto_awesome_outlined,
-          trailing: l10n.get('67e5_770b_all'),
+          trailing: l10n.get('check_view_all'),
           child: Column(
             children: [
               if (recentAttempts.isEmpty)
-                _EmptyState(message: l10n.get('6682_no_feedback_8bb0_5f55'))
+                _EmptyState(message: l10n.get('temporary_no_feedback_record'))
               else
                 ...recentAttempts.take(3).map((attempt) {
-                  return _AIFeedbackItem(
-                    attempt: attempt,
-                  );
+                  return _AIFeedbackItem(attempt: attempt);
                 }),
             ],
           ),
@@ -2602,31 +2778,35 @@ class _MasteryTrendChart extends StatelessWidget {
         SizedBox(
           height: 120,
           child: hasData
-            ? CustomPaint(
-                size: const Size(double.infinity, 120),
-                painter: _LineChartPainter(data: trendData),
-              )
-            : Center(
-                child: Text(
-                  l10n.get('start_study_540e_5c06_5c55_793a_8d8b_52bf'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ? CustomPaint(
+                  size: const Size(double.infinity, 120),
+                  painter: _LineChartPainter(data: trendData),
+                )
+              : Center(
+                  child: Text(
+                    l10n.get('start_study_after_will_expand_show_trend'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
         ),
         const SizedBox(height: 8),
         // X轴标签
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: dates.map((date) => Text(
-            date,
-            style: TextStyle(
-              fontSize: 10,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          )).toList(),
+          children: dates
+              .map(
+                (date) => Text(
+                  date,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -2707,7 +2887,9 @@ class _AlternativeActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return _EmptyState(message: l10n.get('6682_no_5907_9009_action'));
+      return _EmptyState(
+        message: l10n.get('temporary_no_alternate_select_action'),
+      );
     }
 
     // 取第2-4个薄弱知识点作为备选
@@ -2723,14 +2905,16 @@ class _AlternativeActions extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   Icon(
-                    topic.id.contains('review') 
-                        ? Icons.replay_outlined 
+                    topic.id.contains('review')
+                        ? Icons.replay_outlined
                         : Icons.school_outlined,
                     size: 16,
                     color: AppColors.accent,
@@ -2741,7 +2925,12 @@ class _AlternativeActions extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.getp('{type}：{title}', {'type': topic.id.contains('review') ? l10n.get('review') : l10n.get('study'), 'title': topic.title}),
+                          l10n.getp('type_title', {
+                            'type': topic.id.contains('review')
+                                ? l10n.get('review')
+                                : l10n.get('study'),
+                            'title': topic.title,
+                          }),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -2753,7 +2942,9 @@ class _AlternativeActions extends StatelessWidget {
                           topic.domain,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -2773,5 +2964,3 @@ class _AlternativeActions extends StatelessWidget {
     );
   }
 }
-
-

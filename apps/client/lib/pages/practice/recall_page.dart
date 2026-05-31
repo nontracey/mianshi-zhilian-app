@@ -14,7 +14,6 @@ import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class RecallPage extends StatefulWidget {
@@ -38,7 +37,7 @@ class _RecallPageState extends State<RecallPage> {
   String? _selectedImageName;
   bool _voiceTranscribed = false;
   final _voiceTranscriptController = TextEditingController();
-  
+
   // 流式输出相关
   String _streamingContent = '';
   bool _isStreaming = false;
@@ -54,7 +53,9 @@ class _RecallPageState extends State<RecallPage> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (widget.topicIds.isEmpty) {
-      return Center(child: Text(l10n.get('6ca1_has_53ef_practice_7684_knowledge_point')));
+      return Center(
+        child: Text(l10n.get('not_has_optional_practice_knowledge_point')),
+      );
     }
 
     final contentProvider = context.watch<ContentProvider>();
@@ -62,7 +63,7 @@ class _RecallPageState extends State<RecallPage> {
     final topic = contentProvider.findTopic(widget.topicIds[_currentIndex]);
 
     if (topic == null) {
-      return Center(child: Text(l10n.get('knowledge_point_un_627e_5230')));
+      return Center(child: Text(l10n.get('knowledge_point_un_find_to')));
     }
 
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -189,13 +190,14 @@ class _RecallPageState extends State<RecallPage> {
 
   // ── 输入区域（共享） ──
   Widget _buildInputSection(BuildContext context, AiProvider aiProvider) {
-    final selectedConfigId = _selectedAiConfigId ??
+    final selectedConfigId =
+        _selectedAiConfigId ??
         aiProvider.defaultConfig?.id ??
         aiProvider.enabledConfigs.firstOrNull?.id;
     final selectedConfig = selectedConfigId != null
         ? aiProvider.enabledConfigs
-            .where((c) => c.id == selectedConfigId)
-            .firstOrNull
+              .where((c) => c.id == selectedConfigId)
+              .firstOrNull
         : null;
     final supportsImage = selectedConfig?.supportsImageInput ?? false;
     final supportsAudio = selectedConfig?.supportsAudioInput ?? false;
@@ -212,10 +214,12 @@ class _RecallPageState extends State<RecallPage> {
             final config = aiProvider.enabledConfigs
                 .where((c) => c.id == id)
                 .firstOrNull;
-            if (_inputMode == 'image' && !(config?.supportsImageInput ?? false)) {
+            if (_inputMode == 'image' &&
+                !(config?.supportsImageInput ?? false)) {
               _inputMode = 'text';
             }
-            if (_inputMode == 'voice' && !(config?.supportsAudioInput ?? false)) {
+            if (_inputMode == 'voice' &&
+                !(config?.supportsAudioInput ?? false)) {
               _inputMode = 'text';
             }
           }),
@@ -225,8 +229,9 @@ class _RecallPageState extends State<RecallPage> {
         // 输入模式切换（根据模型能力动态启用/禁用）
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.5),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(10),
           ),
           padding: const EdgeInsets.all(4),
@@ -234,18 +239,20 @@ class _RecallPageState extends State<RecallPage> {
             children: [
               _InputModeTab(
                 icon: Icons.notes_outlined,
-                label: l10n.get('6587_672c'),
+                label: l10n.get('text_local'),
                 value: 'text',
                 selected: _inputMode == 'text',
                 onTap: () => setState(() => _inputMode = 'text'),
               ),
               _InputModeTab(
                 icon: Icons.mic_outlined,
-                label: l10n.get('8bed_97f3'),
+                label: l10n.get('speech_voice'),
                 value: 'voice',
                 selected: _inputMode == 'voice',
                 enabled: supportsAudio,
-                disabledTooltip: l10n.get('current_6a21_578b_not_652f_6301_8bed_97f3_input'),
+                disabledTooltip: l10n.get(
+                  'current_mode_type_not_support_long_speech_voice_input',
+                ),
                 onTap: () => setState(() {
                   _inputMode = 'voice';
                   _voiceTranscribed = false;
@@ -253,11 +260,13 @@ class _RecallPageState extends State<RecallPage> {
               ),
               _InputModeTab(
                 icon: Icons.image_outlined,
-                label: l10n.get('56fe_7247'),
+                label: l10n.get('image_picture'),
                 value: 'image',
                 selected: _inputMode == 'image',
                 enabled: supportsImage,
-                disabledTooltip: l10n.get('current_6a21_578b_not_652f_6301_56fe_7247_input'),
+                disabledTooltip: l10n.get(
+                  'current_mode_type_not_support_long_image_picture_input',
+                ),
                 onTap: () => setState(() => _inputMode = 'image'),
               ),
               _InputModeTab(
@@ -300,10 +309,10 @@ class _RecallPageState extends State<RecallPage> {
                   : const Icon(Icons.auto_awesome),
               label: Text(
                 _isEvaluating
-                    ? l10n.get('evaluation_4e2d')
+                    ? l10n.get('evaluation_in')
                     : aiProvider.enabledConfigs.isEmpty
                     ? l10n.get('save_local_practice')
-                    : l10n.get('83b7_53d6_ai_evaluation'),
+                    : l10n.get('gain_fetch_ai_evaluation'),
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -328,7 +337,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.get('un_config_ai_6a21_578b_5c06_save_4e3a_local_practice_config'),
+                    l10n.get('ai_not_configured_save_as_local_practice'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -351,9 +360,7 @@ class _RecallPageState extends State<RecallPage> {
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,9 +376,18 @@ class _RecallPageState extends State<RecallPage> {
                   });
                 },
                 sttMode: context.read<SettingsProvider>().settings.sttMode,
-                whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
-                whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
-                whisperModel: context.read<SettingsProvider>().settings.whisperModel,
+                whisperBaseUrl: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperBaseUrl,
+                whisperApiKey: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperApiKey,
+                whisperModel: context
+                    .read<SettingsProvider>()
+                    .settings
+                    .whisperModel,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -380,15 +396,21 @@ class _RecallPageState extends State<RecallPage> {
                   children: [
                     Text(
                       _voiceTranscribed
-                          ? l10n.get('8bed_97f3_already_8f6c_5199_53ef_edit_540e_add_5230_answer')
-                          : l10n.get('70b9_51fb_9ea6_514b_98ce_start_8bed_97f3_590d_8ff0'),
+                          ? l10n.get(
+                              'speech_voice_already_transfer_write_optional_edit_after_add_to_answer',
+                            )
+                          : l10n.get(
+                              'point_hit_wheat_gram_wind_start_speech_voice_review_narrate',
+                            ),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
                     Text(
-                      l10n.get('8f6c_5199_6587_672c_53ef_72ec_7acb_edit_confirm_540e_add_523'),
+                      l10n.get(
+                        'transfer_write_text_local_optional_independent_establish_edit_confirm_after_add_523',
+                      ),
                       style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -412,12 +434,12 @@ class _RecallPageState extends State<RecallPage> {
                 minLines: 3,
                 maxLines: 8,
                 decoration: InputDecoration(
-                  hintText: l10n.get('8bed_97f3_8f6c_5199_result'),
+                  hintText: l10n.get('speech_voice_transfer_write_result'),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(12),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, size: 18),
-                    tooltip: l10n.get('6e05_7a7a_8f6c_5199'),
+                    tooltip: l10n.get('clarify_empty_transfer_write'),
                     onPressed: () {
                       setState(() {
                         _voiceTranscriptController.clear();
@@ -437,18 +459,24 @@ class _RecallPageState extends State<RecallPage> {
                       final transcript = _voiceTranscriptController.text.trim();
                       if (transcript.isNotEmpty) {
                         setState(() {
-                          final separator = _answerController.text.isNotEmpty ? '\n' : '';
-                          _answerController.text = '${_answerController.text}$separator$transcript';
+                          final separator = _answerController.text.isNotEmpty
+                              ? '\n'
+                              : '';
+                          _answerController.text =
+                              '${_answerController.text}$separator$transcript';
                           _voiceTranscriptController.clear();
                           _voiceTranscribed = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.get('already_add_5230_answer')), duration: Duration(seconds: 1)),
+                          SnackBar(
+                            content: Text(l10n.get('already_add_to_answer')),
+                            duration: Duration(seconds: 1),
+                          ),
                         );
                       }
                     },
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text(l10n.get('add_5230_answer')),
+                    label: Text(l10n.get('add_to_answer')),
                   ),
                 ),
               ],
@@ -467,9 +495,7 @@ class _RecallPageState extends State<RecallPage> {
       decoration: BoxDecoration(
         color: AppColors.success.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,8 +518,13 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '已选择: ${_selectedImageName ?? l10n.get('56fe_7247')}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.success),
+                    l10n.getp('selected_image_name', {
+                      'name': _selectedImageName ?? l10n.get('image_picture'),
+                    }),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.success,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -502,7 +533,10 @@ class _RecallPageState extends State<RecallPage> {
                     _selectedImageBytes = null;
                     _selectedImageName = null;
                   }),
-                  child: Text(l10n.get('79fb_9664'), style: TextStyle(fontSize: 12)),
+                  child: Text(
+                    l10n.get('move_remove'),
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -514,7 +548,9 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    l10n.get('add_622a_56fe_architecture_56fe_7b49_ai_5c06_7ed3_5408_56fe'),
+                    l10n.get(
+                      'add_screenshot_image_architecture_wait_ai_will_result_combine',
+                    ),
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
@@ -527,7 +563,10 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined, size: 16),
-                    label: Text(l10n.get('76f8_518c'), style: TextStyle(fontSize: 12)),
+                    label: Text(
+                      l10n.get('mutual_book'),
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -535,7 +574,10 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                    label: Text(l10n.get('62cd_7167'), style: TextStyle(fontSize: 12)),
+                    label: Text(
+                      l10n.get('photo'),
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ),
               ],
@@ -549,7 +591,11 @@ class _RecallPageState extends State<RecallPage> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final file = await picker.pickImage(source: source, maxWidth: 1920, imageQuality: 85);
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        imageQuality: 85,
+      );
       if (file != null) {
         final bytes = await file.readAsBytes();
         if (mounted) {
@@ -562,7 +608,11 @@ class _RecallPageState extends State<RecallPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('select_56fe_7247_fail_{error}', {'error': e}))),
+          SnackBar(
+            content: Text(
+              l10n.getp('select_image_picture_fail_error_2', {'error': e}),
+            ),
+          ),
         );
       }
     }
@@ -574,9 +624,7 @@ class _RecallPageState extends State<RecallPage> {
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,7 +641,7 @@ class _RecallPageState extends State<RecallPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n.get('ai_6b63_5728_analysis'),
+                l10n.get('ai_analyzing'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -629,8 +677,8 @@ class _RecallPageState extends State<RecallPage> {
     if (_selectedImageBytes != null) {
       final confirmed = await PrivacyService.confirmUpload(
         context: context,
-        dataType: l10n.get('56fe_7247'),
-        dataDescription: l10n.get('4f60_select_7684_56fe_7247_5c06_53d1_9001_7ed9_ai_8fdb_884c'),
+        dataType: l10n.get('image_picture'),
+        dataDescription: l10n.get('selected_image_will_be_sent_to_ai'),
       );
       if (!confirmed) return;
     }
@@ -688,7 +736,11 @@ class _RecallPageState extends State<RecallPage> {
               _isStreaming = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.getp('6d41_5f0f_output_fail_{error}', {'error': error}))),
+              SnackBar(
+                content: Text(
+                  l10n.getp('flow_mode_output_fail_error_2', {'error': error}),
+                ),
+              ),
             );
           }
         },
@@ -768,9 +820,11 @@ class _RecallPageState extends State<RecallPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.getp('evaluation_fail_{error}', {'error': e}))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.getp('evaluation_fail_error_2', {'error': e})),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -785,11 +839,11 @@ class _RecallPageState extends State<RecallPage> {
     final wrong =
         (result['wrongPoints'] ?? result['errorPoints']) as List<dynamic>? ??
         [];
-    if (missed.isNotEmpty) tags.add(l10n.get('concept_7f3a_5931'));
-    if (wrong.isNotEmpty) tags.add(l10n.get('concept_6df7_6dc6'));
+    if (missed.isNotEmpty) tags.add(l10n.get('concept_lack_lose'));
+    if (wrong.isNotEmpty) tags.add(l10n.get('concept_mix_confuse'));
     final summary = (result['summary'] ?? '').toString();
     if (summary.contains('表达') || summary.contains('结构')) {
-      tags.add(l10n.get('expression_not_6e05'));
+      tags.add(l10n.get('expression_not_clarify'));
     }
     return tags;
   }
@@ -834,9 +888,7 @@ class _QuestionPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,7 +931,9 @@ class _QuestionPanel extends StatelessWidget {
           Text(
             topic.recallPrompts.isNotEmpty
                 ? topic.recallPrompts.first.prompt
-                : l10n.getp('8bf7_7528_81ea_5df1_7684_8bdd_explain_{title}_7684_core_cont', {'title': topic.title}),
+                : l10n.getp('please_use_self_word_explain_title_core_cont_2', {
+                    'title': topic.title,
+                  }),
             style: const TextStyle(fontSize: 15, height: 1.6),
           ),
           if (topic.interviewerFocus?.isNotEmpty == true) ...[
@@ -946,33 +1000,35 @@ class _RubricPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.get('8bc4_5206_8981_70b9'),
+            l10n.get('evaluation_score_key_point'),
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           if (mustHave.isNotEmpty) ...[
             const SizedBox(height: 8),
-            ...mustHave.take(4).map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      size: 14,
-                      color: AppColors.success,
+            ...mustHave
+                .take(4)
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          size: 14,
+                          color: AppColors.success,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            item.toString(),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        item.toString(),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
           ],
           if (commonMistakes.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -985,20 +1041,22 @@ class _RubricPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            ...commonMistakes.take(3).map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Text(
-                  '· ${item.toString()}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ...commonMistakes
+                .take(3)
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      '· ${item.toString()}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ),
           ],
         ],
       ),
@@ -1031,12 +1089,20 @@ class _ModelSelector extends StatelessWidget {
           children: [
             const Icon(Icons.hub_outlined, size: 18),
             const SizedBox(width: 8),
-            Expanded(child: Text(l10n.get('un_config_ai_6a21_578b_672c_6b21_4f7f_7528_local_practice_6a'))),
+            Expanded(
+              child: Text(l10n.get('ai_not_configured_using_local_practice')),
+            ),
             TextButton(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.get('8bf7_5230_personal_center_ai_config_add_4f60_7684_6a21_578b'))),
+                SnackBar(
+                  content: Text(
+                    l10n.get(
+                      'please_to_personal_center_ai_config_add_your_mode_type',
+                    ),
+                  ),
+                ),
               ),
-              child: Text(l10n.get('53bb_config')),
+              child: Text(l10n.get('go_config')),
             ),
           ],
         ),
@@ -1050,11 +1116,9 @@ class _ModelSelector extends StatelessWidget {
           ? selected
           : configs.first.id,
       decoration: InputDecoration(
-        labelText: l10n.get('8bc4_5206_6a21_578b'),
+        labelText: l10n.get('evaluation_score_mode_type'),
         isDense: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
       items: configs
           .map(
@@ -1063,10 +1127,7 @@ class _ModelSelector extends StatelessWidget {
               child: Row(
                 children: [
                   Flexible(
-                    child: Text(
-                      config.name,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: Text(config.name, overflow: TextOverflow.ellipsis),
                   ),
                   const SizedBox(width: 8),
                   _CapabilityTags(config: config),
@@ -1092,13 +1153,13 @@ class _CapabilityTags extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final tags = <Widget>[];
     if (config.supportsTextInput == true) {
-      tags.add(_tag(l10n.get('6587_672c'), AppColors.accent));
+      tags.add(_tag(l10n.get('text_local'), AppColors.accent));
     }
     if (config.supportsImageInput == true) {
-      tags.add(_tag(l10n.get('56fe_7247'), AppColors.success));
+      tags.add(_tag(l10n.get('image_picture'), AppColors.success));
     }
     if (config.supportsAudioInput == true) {
-      tags.add(_tag(l10n.get('8bed_97f3'), AppColors.warning));
+      tags.add(_tag(l10n.get('speech_voice'), AppColors.warning));
     }
     if (tags.isEmpty) return const SizedBox();
     return Row(mainAxisSize: MainAxisSize.min, children: tags);
@@ -1149,8 +1210,8 @@ class _InputModeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveColor = enabled
         ? (selected
-            ? AppColors.accent
-            : Theme.of(context).colorScheme.onSurfaceVariant)
+              ? AppColors.accent
+              : Theme.of(context).colorScheme.onSurfaceVariant)
         : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3);
 
     return Expanded(
@@ -1223,14 +1284,18 @@ class _AnswerInputField extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         hintText: switch (inputMode) {
-          'code' => l10n.get('5199_4e0b_601d_8def_complexity_8fb9_754c_6761_4ef6_6216_code'),
-          'image' => l10n.get('description_56fe_7247_architecture_56fe_624b_5199_note_4e2d'),
-          'voice' => l10n.get('8bed_97f3_8f6c_5199_6587_672c_4f1a_51fa_73b0_5728_4e0a_65b9'),
-          _ => l10n.get('5728_8fd9_91cc_input_4f60_7684_590d_8ff0_answer'),
+          'code' => l10n.get(
+            'write_lower_thinking_road_complexity_edge_boundary_item_condition_or_code',
+          ),
+          'image' => l10n.get(
+            'description_image_picture_architecture_hand_write_note_in',
+          ),
+          'voice' => l10n.get(
+            'speech_voice_transfer_write_text_local_will_output_current_at_upper_method',
+          ),
+          _ => l10n.get('input_your_recall_answer_here'),
         },
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         filled: true,
       ),
       onChanged: (_) => onChanged?.call(),
@@ -1254,7 +1319,10 @@ class _ProgressIndicator extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            l10n.getp('7b2c_{current}_{total}_question_count', {'current': current, 'total': total}),
+            l10n.getp('current_total_question_count_2', {
+              'current': current,
+              'total': total,
+            }),
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           const SizedBox(width: 16),
@@ -1329,15 +1397,15 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
           Row(
             children: [
               Icon(
-                aiUnavailable
-                    ? Icons.save_outlined
-                    : Icons.assessment_outlined,
+                aiUnavailable ? Icons.save_outlined : Icons.assessment_outlined,
                 size: 18,
                 color: aiUnavailable ? Colors.grey : AppColors.accent,
               ),
               const SizedBox(width: 8),
               Text(
-                aiUnavailable ? l10n.get('local_practice_already_save') : l10n.get('ai_evaluation_result'),
+                aiUnavailable
+                    ? l10n.get('local_practice_already_save')
+                    : l10n.get('ai_evaluation_result'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -1359,15 +1427,27 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 final tags = <(String, IconData, Color)>[];
                 if (missed.isNotEmpty) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('concept_7f3a_5931'), Icons.visibility_off_outlined, AppColors.warning));
+                  tags.add((
+                    l10n.get('concept_lack_lose'),
+                    Icons.visibility_off_outlined,
+                    AppColors.warning,
+                  ));
                 }
                 if (errors.isNotEmpty) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('concept_6df7_6dc6'), Icons.swap_horiz, AppColors.danger));
+                  tags.add((
+                    l10n.get('concept_mix_confuse'),
+                    Icons.swap_horiz,
+                    AppColors.danger,
+                  ));
                 }
                 if (summary.contains('表达') || summary.contains('结构')) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('expression_not_6e05'), Icons.chat_bubble_outline, AppColors.info));
+                  tags.add((
+                    l10n.get('expression_not_clarify'),
+                    Icons.chat_bubble_outline,
+                    AppColors.info,
+                  ));
                 }
                 if (tags.isEmpty) return const SizedBox.shrink();
                 return Padding(
@@ -1377,11 +1457,16 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                     runSpacing: 6,
                     children: tags.map((t) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: t.$3.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: t.$3.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: t.$3.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1434,7 +1519,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            l10n.get('67e5_770b_reference_answer'),
+                            l10n.get('check_view_reference_answer'),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -1469,24 +1554,23 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest
-                    .withValues(alpha: 0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.get('81ea_8bc4_mastery_7a0b_5ea6'),
+                    l10n.get('self_evaluation_mastery_process_degree'),
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       _SelfEvalChip(
-                        label: l10n.get('not_592a_7406_89e3'),
+                        label: l10n.get('not_too_principle_understand'),
                         icon: Icons.sentiment_dissatisfied,
                         color: AppColors.danger,
                         selected: _selfScore == 0,
@@ -1494,7 +1578,9 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: l10n.get('90e8_5206_7406_89e3'),
+                        label: l10n.get(
+                          'department_score_principle_understand',
+                        ),
                         icon: Icons.sentiment_neutral,
                         color: AppColors.warning,
                         selected: _selfScore == 1,
@@ -1502,7 +1588,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: l10n.get('7406_89e3_826f_597d'),
+                        label: l10n.get('principle_understand_good'),
                         icon: Icons.sentiment_satisfied,
                         color: AppColors.success,
                         selected: _selfScore == 2,
@@ -1520,15 +1606,13 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.tips_and_updates_outlined,
-              label: l10n.get('missed_70b9'),
+              label: l10n.get('missed_point'),
               color: AppColors.warning,
             ),
             const SizedBox(height: 8),
             ...missed.map(
-              (item) => _BulletPoint(
-                text: item.toString(),
-                color: AppColors.warning,
-              ),
+              (item) =>
+                  _BulletPoint(text: item.toString(), color: AppColors.warning),
             ),
           ],
           // 错误点
@@ -1536,15 +1620,13 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.cancel_outlined,
-              label: l10n.get('wrong_70b9'),
+              label: l10n.get('wrong_point'),
               color: AppColors.danger,
             ),
             const SizedBox(height: 8),
             ...errors.map(
-              (item) => _BulletPoint(
-                text: item.toString(),
-                color: AppColors.danger,
-              ),
+              (item) =>
+                  _BulletPoint(text: item.toString(), color: AppColors.danger),
             ),
           ],
           // 优化回答
@@ -1614,7 +1696,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 );
               },
               icon: const Icon(Icons.library_books_outlined, size: 16),
-              label: Text(l10n.get('67e5_770b_answer_version_5e93')),
+              label: Text(l10n.get('check_view_answer_version_library')),
             ),
           ],
         ],
@@ -1646,10 +1728,14 @@ class _SelfEvalChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+            color: selected
+                ? color.withValues(alpha: 0.15)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? color : Theme.of(context).dividerColor.withValues(alpha: 0.3),
+              color: selected
+                  ? color
+                  : Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -1719,10 +1805,7 @@ class _BulletPoint extends StatelessWidget {
             margin: const EdgeInsets.only(top: 6),
             width: 5,
             height: 5,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: const TextStyle(height: 1.4))),
@@ -1758,12 +1841,12 @@ class _NavigationButtons extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: hasPrevious ? onPrevious : null,
             icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text(l10n.get('prev_4e2a')),
+            label: Text(l10n.get('prev')),
           ),
           FilledButton.icon(
             onPressed: hasNext ? onNext : null,
             icon: const Icon(Icons.arrow_forward, size: 18),
-            label: Text(l10n.get('next_4e2a')),
+            label: Text(l10n.get('next')),
           ),
         ],
       ),
@@ -1845,7 +1928,7 @@ class _BottomActionBar extends StatelessWidget {
                     : const Icon(Icons.auto_awesome, size: 18),
                 label: Text(
                   isEvaluating
-                      ? l10n.get('evaluation_4e2d')
+                      ? l10n.get('evaluation_in')
                       : hasAi
                       ? l10n.get('ai_evaluation')
                       : l10n.get('save_practice'),

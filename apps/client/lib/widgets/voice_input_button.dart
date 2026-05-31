@@ -183,7 +183,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       widget.onListeningChanged?.call(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('5f55_97f3_fail', {'error': '$e'}))),
+          SnackBar(
+            content: Text(l10n.getp('record_voice_fail', {'error': '$e'})),
+          ),
         );
       }
     }
@@ -238,7 +240,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp(l10n.get('voice_recognize_failed'), {'error': '$e'}))),
+          SnackBar(
+            content: Text(l10n.getp('voice_recognize_failed', {'error': '$e'})),
+          ),
         );
       }
     }
@@ -262,7 +266,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       ),
       tooltip: _isListening
           ? l10n.get('voice_stop_recording')
-          : (widget.sttMode == 'whisper' ? l10n.get('voice_whisper_input') : l10n.get('voice_input')),
+          : (widget.sttMode == 'whisper'
+                ? l10n.get('voice_whisper_input')
+                : l10n.get('voice_input')),
     );
   }
 }

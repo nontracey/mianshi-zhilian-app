@@ -34,7 +34,7 @@ class TopicRow extends StatelessWidget {
         trailing: Wrap(
           spacing: 8,
           children: [
-            OutlinedButton(onPressed: onDetail, child: Text(l10n.get('knowledge_67e5_9605'))),
+            OutlinedButton(onPressed: onDetail, child: Text(l10n.get('knowledge_check_read'))),
             FilledButton(onPressed: onLearn, child: Text(l10n.get('learning_mode'))),
           ],
         ),

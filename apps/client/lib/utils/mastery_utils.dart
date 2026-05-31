@@ -20,13 +20,13 @@ Color getMasteryColor(int score) {
   }
 }
 
-String getMasteryLabel(int score) {
+String getMasteryLabelKey(int score) {
   switch (getMasteryLevel(score)) {
     case MasteryLevel.mastered:
-      return '熟练';
+      return 'mastery_skilled';
     case MasteryLevel.learning:
-      return '不熟练';
+      return 'mastery_learning';
     case MasteryLevel.unknown:
-      return '未掌握';
+      return 'un_mastery';
   }
 }

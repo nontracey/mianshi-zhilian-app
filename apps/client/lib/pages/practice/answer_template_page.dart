@@ -35,7 +35,7 @@ class AnswerTemplatePage extends StatelessWidget {
           // 问题卡片
           _QuestionCard(topicTitle: topicTitle, question: question),
           const SizedBox(height: 16),
-          
+
           // 模板说明
           Container(
             padding: const EdgeInsets.all(12),
@@ -45,52 +45,81 @@ class AnswerTemplatePage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.accent),
+                const Icon(
+                  Icons.lightbulb_outline,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     l10n.get('choose_template_guide'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.accent,
-                    ),
+                    style: TextStyle(fontSize: 12, color: AppColors.accent),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // 简短版模板
           _TemplateCard(
-            title: l10n.get('7b80_77ed_7248'),
-            subtitle: l10n.get('9002_5408_7535_8bdd_interview_5feb_901f_answer'),
+            title: l10n.get('simple_short_version'),
+            subtitle: l10n.get(
+              'suitable_combine_electric_word_interview_fast_speed_answer',
+            ),
             icon: Icons.short_text,
             color: const Color(0xFF10B981),
             duration: l10n.get('time_30sec_to_1min'),
             structure: [
-              _TemplateSection(nameKey: '核心定义', descKey: '一句话解释概念'),
-              _TemplateSection(nameKey: '关键特点', descKey: '2_3个核心要点'),
-              _TemplateSection(nameKey: '应用场景', descKey: '1个实际例子'),
+              _TemplateSection(
+                nameKey: 'core_definition',
+                descKey: 'one_sentence_explain_concept',
+              ),
+              _TemplateSection(
+                nameKey: 'key_feature',
+                descKey: 'two_three_core_points',
+              ),
+              _TemplateSection(
+                nameKey: 'actual_application',
+                descKey: 'step_1_actual_example_2',
+              ),
             ],
             example: _getShortExample(l10n),
             onSelect: () => onSelectTemplate?.call('short'),
           ),
           const SizedBox(height: 12),
-          
+
           // 标准版模板
           _TemplateCard(
-            title: l10n.get('standard_7248'),
-            subtitle: l10n.get('9002_5408_5927_591a_6570_tech_interview'),
+            title: l10n.get('standard_version'),
+            subtitle: l10n.get(
+              'suitable_combine_large_multi_count_tech_interview',
+            ),
             icon: Icons.article_outlined,
             color: AppColors.accent,
             duration: l10n.get('time_2to3min'),
             structure: [
-              _TemplateSection(nameKey: '概念定义', descKey: '清晰解释是什么'),
-              _TemplateSection(nameKey: '核心原理', descKey: '工作原理和机制'),
-              _TemplateSection(nameKey: '特点对比', descKey: '优缺点或与其他方案对比'),
-              _TemplateSection(nameKey: '实际应用', descKey: '项目中的使用场景'),
-              _TemplateSection(nameKey: '注意事项', descKey: '常见坑点和最佳实践'),
+              _TemplateSection(
+                nameKey: 'concept_definition',
+                descKey: 'clarify_clear_explain_is_what',
+              ),
+              _TemplateSection(
+                nameKey: 'core_principle',
+                descKey: 'working_principle_and_mechanism',
+              ),
+              _TemplateSection(
+                nameKey: 'comparison_analysis',
+                descKey: 'pros_cons_or_comparison',
+              ),
+              _TemplateSection(
+                nameKey: 'actual_application',
+                descKey: 'project_in_use_scenario',
+              ),
+              _TemplateSection(
+                nameKey: 'note_intention_matter_item',
+                descKey: 'common_pitfall_and_best_practice',
+              ),
             ],
             example: _getStandardExample(l10n),
             onSelect: () => onSelectTemplate?.call('standard'),
@@ -99,19 +128,42 @@ class AnswerTemplatePage extends StatelessWidget {
 
           // 深入版模板
           _TemplateCard(
-            title: l10n.get('6df1_5165_7248'),
-            subtitle: l10n.get('9002_5408_6df1_5165_63a2_8ba8_senior_position'),
+            title: l10n.get('deep_enter_version'),
+            subtitle: l10n.get(
+              'suitable_combine_deep_enter_probe_discuss_senior_position',
+            ),
             icon: Icons.psychology_outlined,
             color: const Color(0xFF8B5CF6),
             duration: l10n.get('time_3to5min'),
             structure: [
-              _TemplateSection(nameKey: '概念定义', descKey: '清晰解释是什么'),
-              _TemplateSection(nameKey: '底层原理', descKey: '深入工作原理'),
-              _TemplateSection(nameKey: '源码分析', descKey: '关键实现细节'),
-              _TemplateSection(nameKey: '性能分析', descKey: '时间_空间复杂度'),
-              _TemplateSection(nameKey: '设计模式', descKey: '涉及的设计思想'),
-              _TemplateSection(nameKey: '实际案例', descKey: '项目中的应用'),
-              _TemplateSection(nameKey: '扩展思考', descKey: '相关技术延伸'),
+              _TemplateSection(
+                nameKey: 'concept_definition',
+                descKey: 'clarify_clear_explain_is_what',
+              ),
+              _TemplateSection(
+                nameKey: 'underlying_layer_principle',
+                descKey: 'deep_enter_working_principle',
+              ),
+              _TemplateSection(
+                nameKey: 'source_code_analysis',
+                descKey: 'key_implementation_detail',
+              ),
+              _TemplateSection(
+                nameKey: 'performance_analysis',
+                descKey: 'time_space_complexity',
+              ),
+              _TemplateSection(
+                nameKey: 'design_pattern',
+                descKey: 'involve_and_design_thinking_want',
+              ),
+              _TemplateSection(
+                nameKey: 'actual_case',
+                descKey: 'project_in_application',
+              ),
+              _TemplateSection(
+                nameKey: 'optional_extension_capability_design',
+                descKey: 'mutual_close_tech_extension',
+              ),
             ],
             example: _getDeepExample(l10n),
             onSelect: () => onSelectTemplate?.call('deep'),
@@ -135,16 +187,28 @@ class AnswerTemplatePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.get('select_suitable_template'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('select_suitable_template'),
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               Text(l10n.get('choose_template_by_scenario')),
               SizedBox(height: 12),
-              Text(l10n.get('personalized_adjustment'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('personalized_adjustment'),
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               Text(l10n.get('template_is_just_framework')),
               SizedBox(height: 12),
-              Text(l10n.get('combine_actual_experience'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('combine_actual_experience'),
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               Text(l10n.get('use_real_cases')),
               SizedBox(height: 12),
-              Text(l10n.get('practice_expression'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('practice_expression'),
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               Text(l10n.get('remember_and_practice_fluent_expression')),
             ],
           ),
@@ -152,7 +216,7 @@ class AnswerTemplatePage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('77e5_9053_4e86')),
+            child: Text(l10n.get('known_channel')),
           ),
         ],
       ),
@@ -174,18 +238,30 @@ class AnswerTemplatePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.get('answer_6280_5de7'),
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
+              l10n.get('answer_tech_skill'),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
             const SizedBox(height: 12),
-            _buildTipItem(l10n.get('star_6cd5_5219_1'), l10n.get('star_6cd5_5219_description')),
-            _buildTipItem(l10n.get('comparison_analysis'), l10n.get('4e0e_5176_4ed6_solution_comparison')),
-            _buildTipItem(l10n.get('actual_case'), l10n.get('7528_project_experience_652f_6491')),
-            _buildTipItem(l10n.get('6df1_5165_principle'), l10n.get('5c55_793a_5e95_5c42_7406_89e3')),
-            _buildTipItem(l10n.get('summary_5347_534e'), l10n.get('6700_540e_summary_8981_70b9')),
+            _buildTipItem(
+              l10n.get('star_rule_1'),
+              l10n.get('star_rule_description'),
+            ),
+            _buildTipItem(
+              l10n.get('comparison_analysis'),
+              l10n.get('comparison_with_other_solutions'),
+            ),
+            _buildTipItem(
+              l10n.get('actual_case'),
+              l10n.get('use_project_experience_support'),
+            ),
+            _buildTipItem(
+              l10n.get('deep_enter_principle'),
+              l10n.get('show_underlying_principle_understanding'),
+            ),
+            _buildTipItem(
+              l10n.get('summary_upgrade_hua'),
+              l10n.get('most_after_summary_key_point'),
+            ),
           ],
         ),
       ),
@@ -220,10 +296,7 @@ class AnswerTemplatePage extends StatelessWidget {
                 ),
                 Text(
                   description,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -247,14 +320,11 @@ class AnswerTemplatePage extends StatelessWidget {
 }
 
 class _QuestionCard extends StatelessWidget {
-  const _QuestionCard({
-    required this.topicTitle,
-    required this.question,
-  });
+  const _QuestionCard({required this.topicTitle, required this.question});
 
   final String topicTitle;
   final String question;
-    
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -262,9 +332,7 @@ class _QuestionCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.accent.withValues(alpha: 0.3),
-        ),
+        side: BorderSide(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -274,7 +342,10 @@ class _QuestionCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -322,10 +393,7 @@ class _TemplateSection {
   final String nameKey;
   final String descKey;
 
-  const _TemplateSection({
-    required this.nameKey,
-    required this.descKey,
-  });
+  const _TemplateSection({required this.nameKey, required this.descKey});
 }
 
 class _TemplateCard extends StatelessWidget {
@@ -356,9 +424,7 @@ class _TemplateCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: color.withValues(alpha: 0.3),
-        ),
+        side: BorderSide(color: color.withValues(alpha: 0.3)),
       ),
       child: ExpansionTile(
         leading: Container(
@@ -372,17 +438,11 @@ class _TemplateCard extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w700, color: color),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -474,12 +534,12 @@ class _TemplateCard extends StatelessWidget {
                   );
                 }),
                 const SizedBox(height: 12),
-                
+
                 // 示例
                 Row(
                   children: [
                     Text(
-                      l10n.get('793a_4f8b_answer'),
+                      l10n.get('show_example_answer'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -490,13 +550,23 @@ class _TemplateCard extends StatelessWidget {
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: example));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.get('already_590d_5236_793a_4f8b'))),
+                          SnackBar(
+                            content: Text(
+                              l10n.get('already_review_control_show_example'),
+                            ),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.copy, size: 14),
-                      label: Text(l10n.get('590d_5236'), style: const TextStyle(fontSize: 11)),
+                      label: Text(
+                        l10n.get('review_control'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                       ),
                     ),
                   ],
@@ -519,7 +589,7 @@ class _TemplateCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // 使用按钮
                 SizedBox(
                   width: double.infinity,

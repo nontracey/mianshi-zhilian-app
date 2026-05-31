@@ -18,14 +18,14 @@ enum ContentEnv {
   }
 
   /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
-  String get label {
+  String get labelKey {
     switch (this) {
       case ContentEnv.test:
-        return '测试版';
+        return 'test_version';
       case ContentEnv.draft:
-        return '草稿版';
+        return 'draft_version';
       case ContentEnv.production:
-        return '发布版';
+        return 'publish_version';
     }
   }
 
@@ -56,16 +56,16 @@ enum AppThemeType {
   }
 
   /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
-  String get label {
+  String get labelKey {
     switch (this) {
       case AppThemeType.system:
-        return '跟随系统';
+        return 'follow_system';
       case AppThemeType.elegantWhite:
-        return '典雅白';
+        return 'classic_elegant_white';
       case AppThemeType.qualityBlack:
-        return '气质黑';
+        return 'gas_quality_dark';
       case AppThemeType.midnightBlue:
-        return '午夜蓝';
+        return 'noon_night_blue';
     }
   }
 
@@ -73,11 +73,12 @@ enum AppThemeType {
     (e) => e.key == key,
     orElse: () => AppThemeType.system,
   );
-  
+
   /// 获取实际的亮度（用于跟随系统）
   Brightness get resolvedBrightness {
     if (this == AppThemeType.elegantWhite) return Brightness.light;
-    if (this == AppThemeType.qualityBlack || this == AppThemeType.midnightBlue) return Brightness.dark;
+    if (this == AppThemeType.qualityBlack || this == AppThemeType.midnightBlue)
+      return Brightness.dark;
     return Brightness.light; // system 默认，实际由系统决定
   }
 }
@@ -244,12 +245,15 @@ class AppSettings {
   }
 
   /// 从旧的 themeMode 字符串转换为 AppThemeType
-  static AppThemeType _parseThemeType(dynamic themeTypeJson, dynamic themeModeJson) {
+  static AppThemeType _parseThemeType(
+    dynamic themeTypeJson,
+    dynamic themeModeJson,
+  ) {
     // 优先使用新的 themeType 字段
     if (themeTypeJson != null) {
       return AppThemeType.fromKey(themeTypeJson as String);
     }
-    
+
     // 兼容旧的 themeMode 字段
     if (themeModeJson != null) {
       final themeModeStr = themeModeJson as String;
@@ -262,7 +266,7 @@ class AppSettings {
       if (themeModeStr == 'light') return AppThemeType.elegantWhite;
       if (themeModeStr == 'system') return AppThemeType.system;
     }
-    
+
     return AppThemeType.system;
   }
 

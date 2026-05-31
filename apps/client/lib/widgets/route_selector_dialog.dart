@@ -139,7 +139,7 @@ class RouteSelectorDialog extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onCreateRoute,
                 icon: const Icon(Icons.add),
-                label: Text(l10n.get('521b_5efa_custom_route')),
+                label: Text(l10n.get('create_build_custom_route')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),

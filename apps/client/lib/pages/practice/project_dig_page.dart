@@ -20,26 +20,45 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   final _resultController = TextEditingController();
   final _difficultyController = TextEditingController();
   final _storage = StorageService();
-  
+
   String _selectedRole = 'developer';
   String _selectedScale = 'medium';
   final List<String> _selectedTechStack = [];
   final List<Map<String, dynamic>> _savedProjects = [];
-  
-  
+
   final List<String> _techStackOptions = [
-    'Java', 'Python', 'Go', 'JavaScript', 'TypeScript',
-    'Spring', 'Spring Boot', 'MyBatis', 'React', 'Vue',
-    'MySQL', 'Redis', 'MongoDB', 'Kafka', 'RabbitMQ',
-    'Docker', 'Kubernetes', 'AWS', '微服务', '分布式',
-    'Elasticsearch', 'Nginx', 'Linux', 'Git', 'Jenkins',
+    'Java',
+    'Python',
+    'Go',
+    'JavaScript',
+    'TypeScript',
+    'Spring',
+    'Spring Boot',
+    'MyBatis',
+    'React',
+    'Vue',
+    'MySQL',
+    'Redis',
+    'MongoDB',
+    'Kafka',
+    'RabbitMQ',
+    'Docker',
+    'Kubernetes',
+    'AWS',
+    'microservice',
+    'distributed',
+    'Elasticsearch',
+    'Nginx',
+    'Linux',
+    'Git',
+    'Jenkins',
   ];
 
-  final List<String> _starTemplate = [
-    'Situation（背景）：项目背景、业务场景、面临的问题',
-    'Task（任务）：你的职责、需要达成的目标',
-    'Action（行动）：你采取的技术方案、具体实现',
-    'Result（结果）：取得的成果、数据指标、经验总结',
+  List<({String code, String textKey})> get _starTemplate => [
+    (code: 'Situation', textKey: 'star_situation_summary'),
+    (code: 'Task', textKey: 'star_task_summary'),
+    (code: 'Action', textKey: 'star_action_summary'),
+    (code: 'Result', textKey: 'star_result_summary'),
   ];
 
   @override
@@ -73,7 +92,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.get('project_deep_dig_training')),
@@ -90,26 +109,31 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           // STAR 模板说明
           _buildSTARGuide(context, isDark),
           const SizedBox(height: 20),
-          
+
           // 项目信息表单
           _buildProjectForm(context, isDark),
           const SizedBox(height: 20),
-          
+
           // 常见深挖问题
           _buildCommonQuestions(context, isDark),
           const SizedBox(height: 20),
-          
+
           // 已保存的项目
           if (_savedProjects.isNotEmpty) ...[
             _buildSavedProjects(context, isDark),
             const SizedBox(height: 20),
           ],
-          
+
           // AI 深挖练习按钮
           _buildStartButton(context),
         ],
       ),
     );
+  }
+
+  String _techStackLabel(String tech) {
+    const localizedTechKeys = {'microservice', 'distributed'};
+    return localizedTechKeys.contains(tech) ? l10n.get(tech) : tech;
   }
 
   Widget _buildSTARGuide(BuildContext context, bool isDark) {
@@ -118,19 +142,21 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.school_outlined, size: 20, color: AppColors.accent),
+              const Icon(
+                Icons.school_outlined,
+                size: 20,
+                color: AppColors.accent,
+              ),
               const SizedBox(width: 8),
               Text(
-                l10n.get('star_6cd5_5219'),
+                l10n.get('star_rule'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
@@ -140,41 +166,46 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
               const Spacer(),
               TextButton(
                 onPressed: () => _showSTARGuide(context),
-                child: Text(l10n.get('detail_6307_5357')),
+                child: Text(l10n.get('detail_finger_south')),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._starTemplate.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    item.substring(0, item.indexOf('（')),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+          ..._starTemplate.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      item.code,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item.substring(item.indexOf('（')),
-                    style: const TextStyle(fontSize: 13, height: 1.4),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.get(item.textKey),
+                      style: const TextStyle(fontSize: 13, height: 1.4),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -186,67 +217,103 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(l10n.get('project_info'), Icons.work_outline, isDark),
+          _buildSectionHeader(
+            l10n.get('project_info'),
+            Icons.work_outline,
+            isDark,
+          ),
           const SizedBox(height: 12),
-          
+
           // 项目名称
           TextFormField(
             controller: _projectNameController,
             decoration: InputDecoration(
               labelText: l10n.get('project_name'),
-              hintText: l10n.get('4f8b_5982_7535_5546_79d2_6740_system_distributed_cache_solut'),
+              hintText: l10n.get(
+                'example_if_electric_commerce_second_kill_system_distributed_cache_solut',
+              ),
               prefixIcon: const Icon(Icons.folder_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            validator: (v) => v?.trim().isEmpty == true ? l10n.get('8bf7_input_project_name') : null,
+            validator: (v) => v?.trim().isEmpty == true
+                ? l10n.get('please_input_project_name')
+                : null,
           ),
           const SizedBox(height: 16),
-          
+
           // 你的角色
-          _buildSectionHeader(l10n.get('4f60_7684_role'), Icons.person_outline, isDark),
+          _buildSectionHeader(
+            l10n.get('your_role'),
+            Icons.person_outline,
+            isDark,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              ('developer', l10n.get('dev_engineer')),
-              ('tech_lead', l10n.get('tech_lead')),
-              ('architect', l10n.get('architect')),
-              ('pm', l10n.get('project_manager')),
-            ].map((role) => ChoiceChip(
-              label: Text(role.$2),
-              selected: _selectedRole == role.$1,
-              onSelected: (_) => setState(() => _selectedRole = role.$1),
-              backgroundColor: isDark ? const Color(0xFF1A2332) : Colors.white,
-              selectedColor: AppColors.accent.withValues(alpha: 0.2),
-            )).toList(),
+            children:
+                [
+                      ('developer', l10n.get('dev_engineer')),
+                      ('tech_lead', l10n.get('tech_lead')),
+                      ('architect', l10n.get('architect')),
+                      ('pm', l10n.get('project_manager')),
+                    ]
+                    .map(
+                      (role) => ChoiceChip(
+                        label: Text(role.$2),
+                        selected: _selectedRole == role.$1,
+                        onSelected: (_) =>
+                            setState(() => _selectedRole = role.$1),
+                        backgroundColor: isDark
+                            ? const Color(0xFF1A2332)
+                            : Colors.white,
+                        selectedColor: AppColors.accent.withValues(alpha: 0.2),
+                      ),
+                    )
+                    .toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // 项目规模
-          _buildSectionHeader(l10n.get('project_89c4_6a21'), Icons.scale_outlined, isDark),
+          _buildSectionHeader(
+            l10n.get('project_plan_mode'),
+            Icons.scale_outlined,
+            isDark,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              ('small', l10n.get('5c0f_578b_1_3_4eba')),
-              ('medium', l10n.get('4e2d_578b_4_10_4eba')),
-              ('large', l10n.get('5927_578b_10_4eba_4ee5_4e0a')),
-            ].map((scale) => ChoiceChip(
-              label: Text(scale.$2),
-              selected: _selectedScale == scale.$1,
-              onSelected: (_) => setState(() => _selectedScale = scale.$1),
-              backgroundColor: isDark ? const Color(0xFF1A2332) : Colors.white,
-              selectedColor: AppColors.accent.withValues(alpha: 0.2),
-            )).toList(),
+            children:
+                [
+                      ('small', l10n.get('small_type_1_3_people')),
+                      ('medium', l10n.get('in_type_4_10_people')),
+                      ('large', l10n.get('large_type_10_people_by_upper')),
+                    ]
+                    .map(
+                      (scale) => ChoiceChip(
+                        label: Text(scale.$2),
+                        selected: _selectedScale == scale.$1,
+                        onSelected: (_) =>
+                            setState(() => _selectedScale = scale.$1),
+                        backgroundColor: isDark
+                            ? const Color(0xFF1A2332)
+                            : Colors.white,
+                        selectedColor: AppColors.accent.withValues(alpha: 0.2),
+                      ),
+                    )
+                    .toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // 技术栈
-          _buildSectionHeader(l10n.get('tech_6808'), Icons.code_outlined, isDark),
+          _buildSectionHeader(
+            l10n.get('tech_stack'),
+            Icons.code_outlined,
+            isDark,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -254,7 +321,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             children: _techStackOptions.map((tech) {
               final isSelected = _selectedTechStack.contains(tech);
               return FilterChip(
-                label: Text(tech),
+                label: Text(_techStackLabel(tech)),
                 selected: isSelected,
                 onSelected: (selected) {
                   setState(() {
@@ -265,67 +332,77 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
                     }
                   });
                 },
-                backgroundColor: isDark ? const Color(0xFF1A2332) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF1A2332)
+                    : Colors.white,
                 selectedColor: AppColors.accent.withValues(alpha: 0.2),
                 checkmarkColor: AppColors.accent,
               );
             }).toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // STAR 详细描述
-          _buildSectionHeader(l10n.get('star_detail_description'), Icons.description_outlined, isDark),
+          _buildSectionHeader(
+            l10n.get('star_detail_description'),
+            Icons.description_outlined,
+            isDark,
+          ),
           const SizedBox(height: 8),
-          
+
           // Situation - 背景
           TextFormField(
             controller: _backgroundController,
             maxLines: 3,
             decoration: InputDecoration(
               labelText: l10n.get('situation_background'),
-              hintText: l10n.get('project_background_4e1a_52a1_scenario_9762_4e34_7684_problem'),
+              hintText: l10n.get(
+                'project_background_business_service_scenario_aspect_interim_problem',
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Task - 任务
           TextFormField(
             controller: _techDecisionController,
             maxLines: 3,
             decoration: InputDecoration(
               labelText: l10n.get('task_task'),
-              hintText: l10n.get('4f60_7684_804c_8d23_9700_8981_8fbe_6210_7684_goal'),
+              hintText: l10n.get('your_role_responsibility_goal'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Action - 行动
           TextFormField(
             controller: _difficultyController,
             maxLines: 4,
             decoration: InputDecoration(
               labelText: l10n.get('action_action'),
-              hintText: l10n.get('tech_solution_5177_4f53_implementation_9047_5230_7684_96be_7'),
+              hintText: l10n.get(
+                'tech_solution_tool_body_implementation_encounter_to_difficult_7',
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Result - 结果
           TextFormField(
             controller: _resultController,
             maxLines: 3,
             decoration: InputDecoration(
               labelText: l10n.get('result_result'),
-              hintText: l10n.get('53d6_5f97_7684_6210_679c_data_6307_6807_experience_summary'),
+              hintText: l10n.get('achieved_results_data_metrics_experience'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -355,56 +432,79 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
 
   Widget _buildCommonQuestions(BuildContext context, bool isDark) {
     final questions = [
-      (l10n.get('tech_decision'), '为什么选择这个技术方案？考虑过哪些替代方案？'),
-      (l10n.get('96be_70b9_653b_514b'), '项目中遇到的最大技术难点是什么？如何解决的？'),
-      (l10n.get('performance_optimize'), '做过哪些性能优化？效果如何？'),
-      (l10n.get('6545_969c_5904_7406'), '线上出过什么故障？如何排查和解决的？'),
-      (l10n.get('architecture_design'), '系统的整体架构是怎样的？为什么这样设计？'),
-      (l10n.get('team_collaboration'), '如何协调团队成员？遇到分歧怎么处理？'),
+      (l10n.get('tech_decision'), l10n.get('project_question_tech_decision')),
+      (
+        l10n.get('difficult_point_attack_gram'),
+        l10n.get('project_question_biggest_challenge'),
+      ),
+      (
+        l10n.get('performance_optimize'),
+        l10n.get('project_question_performance_optimization'),
+      ),
+      (
+        l10n.get('fault_trouble_handle_principle'),
+        l10n.get('project_question_incident_handling'),
+      ),
+      (
+        l10n.get('architecture_design'),
+        l10n.get('project_question_architecture_design'),
+      ),
+      (
+        l10n.get('team_collaboration'),
+        l10n.get('project_question_team_collaboration'),
+      ),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(l10n.get('common_deep_dig_problem'), Icons.help_outline, isDark),
+        _buildSectionHeader(
+          l10n.get('common_deep_dig_problem'),
+          Icons.help_outline,
+          isDark,
+        ),
         const SizedBox(height: 12),
-        ...questions.map((q) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF15202E) : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+        ...questions.map(
+          (q) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF15202E) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF263238)
+                    : const Color(0xFFE8E8E8),
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  q.$1,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.warning,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    q.$1,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warning,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  q.$2,
-                  style: const TextStyle(fontSize: 13),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(q.$2, style: const TextStyle(fontSize: 13)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -413,47 +513,60 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(l10n.get('already_save_project'), Icons.folder_outlined, isDark),
+        _buildSectionHeader(
+          l10n.get('already_save_project'),
+          Icons.folder_outlined,
+          isDark,
+        ),
         const SizedBox(height: 12),
-        ..._savedProjects.map((project) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF15202E) : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? const Color(0xFF263238) : const Color(0xFFE8E8E8),
+        ..._savedProjects.map(
+          (project) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF15202E) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF263238)
+                    : const Color(0xFFE8E8E8),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.folder, color: AppColors.accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        project['name'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        project['techStack'] ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? Colors.white54
+                              : const Color(0xFF666666),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.play_circle_outline,
+                    color: AppColors.accent,
+                  ),
+                  onPressed: () => _startDigPractice(project),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.folder, color: AppColors.accent),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      project['name'] ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      project['techStack'] ?? '',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white54 : const Color(0xFF666666),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.play_circle_outline, color: AppColors.accent),
-                onPressed: () => _startDigPractice(project),
-              ),
-            ],
-          ),
-        )),
+        ),
       ],
     );
   }
@@ -466,7 +579,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           child: FilledButton.icon(
             onPressed: _saveAndPractice,
             icon: const Icon(Icons.save_outlined),
-            label: Text(l10n.get('save_5e76_start_deep_dig_practice')),
+            label: Text(l10n.get('save_and_start_deep_dig_practice')),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -478,7 +591,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           child: OutlinedButton.icon(
             onPressed: () => _startRandomDig(context),
             icon: const Icon(Icons.shuffle),
-            label: Text(l10n.get('968f_673a_project_deep_dig_practice')),
+            label: Text(l10n.get('random_machine_project_deep_dig_practice')),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -492,36 +605,51 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('star_6cd5_5219_8be6_89e3')),
-        content: const SingleChildScrollView(
+        title: Text(l10n.get('star_rule_detail_understand')),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('S - Situation（背景）', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('描述项目的背景和业务场景，让面试官理解项目的上下文。'),
+              Text(
+                l10n.get('star_situation_title'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('star_situation_desc')),
               SizedBox(height: 12),
-              Text('T - Task（任务）', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('说明你在项目中的角色和职责，需要达成什么目标。'),
+              Text(
+                l10n.get('star_task_title'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('star_task_desc')),
               SizedBox(height: 12),
-              Text('A - Action（行动）', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('详细描述你采取的技术方案、具体实现步骤、遇到的难点及解决方案。'),
+              Text(
+                l10n.get('star_action_title'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('star_action_desc')),
               SizedBox(height: 12),
-              Text('R - Result（结果）', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('总结项目的成果、量化指标、个人收获和经验教训。'),
+              Text(
+                l10n.get('star_result_title'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('star_result_desc')),
               SizedBox(height: 16),
-              Text('回答技巧：', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('1. 用数据说话：性能提升XX%、响应时间降低XXms'),
-              Text('2. 突出个人贡献：我负责、我设计、我实现'),
-              Text('3. 展示思考过程：为什么选择这个方案'),
-              Text('4. 总结经验教训：学到了什么、可以改进什么'),
+              Text(
+                l10n.get('answer_tips'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('project_answer_tip_data')),
+              Text(l10n.get('project_answer_tip_contribution')),
+              Text(l10n.get('project_answer_tip_reasoning')),
+              Text(l10n.get('project_answer_tip_retrospective')),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('77e5_9053_4e86')),
+            child: Text(l10n.get('known_channel')),
           ),
         ],
       ),
@@ -542,13 +670,13 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         'result': _resultController.text,
         'createdAt': DateTime.now().toIso8601String(),
       };
-      
+
       setState(() {
         _savedProjects.add(project);
       });
-      
+
       await _saveProjects();
-      
+
       // 返回项目数据给调用方
       if (mounted) {
         Navigator.of(context).pop(project);
@@ -558,12 +686,14 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
 
   void _startDigPractice(Map<String, dynamic> project) {
     final questions = [
-      '这个项目的核心技术难点是什么？',
-      '为什么选择 ${project['techStack']} 技术栈？',
-      '遇到过什么线上问题？如何解决的？',
-      '如果重新设计，你会怎么改进？',
-      '你在项目中的最大贡献是什么？',
-      '这个项目的性能指标是多少？如何优化的？',
+      l10n.get('project_question_core_challenge'),
+      l10n.getp('project_question_why_tech_stack', {
+        'techStack': project['techStack'],
+      }),
+      l10n.get('project_question_incident_resolution'),
+      l10n.get('project_question_redesign'),
+      l10n.get('project_question_personal_contribution'),
+      l10n.get('project_question_metrics_optimization'),
     ];
 
     showDialog(
@@ -575,9 +705,15 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.getp('project_{name}', {'name': project['name']}), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                l10n.getp('project_name_3', {'name': project['name']}),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 16),
-              Text(l10n.get('interview_5b98_53ef_80fd_4f1a_95ee'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('interview_official_optional_enable_will_question'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               ...questions.map((q) => _buildDigQuestion(q)),
             ],
@@ -586,7 +722,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('5173_95ed')),
+            child: Text(l10n.get('close')),
           ),
           FilledButton(
             onPressed: () {
@@ -617,7 +753,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   void _startRandomDig(BuildContext context) {
     if (_savedProjects.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('8bf7_5148_add_project'))),
+        SnackBar(content: Text(l10n.get('please_first_add_project'))),
       );
       return;
     }
@@ -625,11 +761,15 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
     // 随机选择一个项目
     final random = _savedProjects.toList()..shuffle();
     final project = random.first;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${l10n.get('already_select_project')}：${project['name']}')),
+      SnackBar(
+        content: Text(
+          '${l10n.get('already_select_project')}：${project['name']}',
+        ),
+      ),
     );
-    
+
     _startDigPractice(project);
   }
 }

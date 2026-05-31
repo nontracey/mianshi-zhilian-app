@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class SystemDesignPage extends StatefulWidget {
@@ -21,38 +20,64 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
   List<Map<String, dynamic>> get _fallbackTopics => [
     {
       'id': 'url_shortener',
-      'title': l10n.get('77ed_link_system'),
+      'title': l10n.get('short_link_system'),
       'category': l10n.get('basic'),
       'difficulty': 2,
-      'description': l10n.get('design_4e00_4e2a_77ed_link_751f_6210_548c_8df3_8f6c_670d_52a'),
-      'keyPoints': [l10n.get('hash_algorithm'), l10n.get('database_design'), l10n.get('cache_strategy'), l10n.get('91cd_5b9a_5411_mechanism')],
+      'description': l10n.get(
+        'design_one_short_link_life_achievement_and_skip_transfer_service_52a',
+      ),
+      'keyPoints': [
+        l10n.get('hash_algorithm'),
+        l10n.get('database_design'),
+        l10n.get('cache_strategy'),
+        l10n.get('restart_fixed_direction_mechanism'),
+      ],
       'estimatedMinutes': 30,
     },
     {
       'id': 'feed_system',
-      'title': l10n.get('info_6d41_system'),
+      'title': l10n.get('info_flow_system'),
       'category': l10n.get('social'),
       'difficulty': 3,
-      'description': l10n.get('design_social_5a92_4f53_7684_info_6d41_63a8_9001_system'),
-      'keyPoints': [l10n.get('63a8_62c9_6a21_5f0f'), l10n.get('time_7ebf_sort'), l10n.get('cache_strategy'), l10n.get('5206_9875_loading')],
+      'description': l10n.get(
+        'design_social_media_body_info_flow_push_send_system',
+      ),
+      'keyPoints': [
+        l10n.get('push_pull_mode'),
+        l10n.get('time_line_sort'),
+        l10n.get('cache_strategy'),
+        l10n.get('score_page_loading'),
+      ],
       'estimatedMinutes': 45,
     },
     {
       'id': 'chat_system',
-      'title': l10n.get('5373_65f6_communication_system'),
+      'title': l10n.get('instant_time_communication_system'),
       'category': l10n.get('communication'),
       'difficulty': 3,
-      'description': l10n.get('design_4e00_4e2a_652f_6301_5355_804a_548c_7fa4_804a_7684_537'),
-      'keyPoints': ['WebSocket', l10n.get('message_queue'), l10n.get('offline_message'), l10n.get('already_8bfb_status')],
+      'description': l10n.get(
+        'design_one_support_long_single_chat_and_group_537',
+      ),
+      'keyPoints': [
+        'WebSocket',
+        l10n.get('message_queue'),
+        l10n.get('offline_message'),
+        l10n.get('already_read_status'),
+      ],
       'estimatedMinutes': 45,
     },
     {
       'id': 'search_engine',
-      'title': l10n.get('search_5f15_64ce'),
+      'title': l10n.get('search_engine'),
       'category': l10n.get('search'),
       'difficulty': 4,
-      'description': l10n.get('design_4e00_4e2a_5168_6587_search_5f15_64ce'),
-      'keyPoints': [l10n.get('inverted_index'), l10n.get('5206_8bcd_5668'), l10n.get('76f8_5173_6027_sort'), l10n.get('distributed_search')],
+      'description': l10n.get('design_one_all_text_search_engine'),
+      'keyPoints': [
+        l10n.get('inverted_index'),
+        l10n.get('score_term_device'),
+        l10n.get('mutual_close_capability_sort'),
+        l10n.get('distributed_search'),
+      ],
       'estimatedMinutes': 60,
     },
     {
@@ -60,8 +85,15 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       'title': l10n.get('payment_system'),
       'category': l10n.get('finance'),
       'difficulty': 4,
-      'description': l10n.get('design_4e00_4e2a_security_53ef_9760_7684_payment_system'),
-      'keyPoints': [l10n.get('transaction_consistency'), l10n.get('idempotent_6027'), l10n.get('5bf9_8d26_mechanism'), l10n.get('98ce_63a7_strategy')],
+      'description': l10n.get(
+        'design_one_security_optional_depend_payment_system',
+      ),
+      'keyPoints': [
+        l10n.get('transaction_consistency'),
+        l10n.get('idempotent_capability'),
+        l10n.get('peer_accounting_mechanism'),
+        l10n.get('wind_control_strategy'),
+      ],
       'estimatedMinutes': 60,
     },
     {
@@ -69,44 +101,73 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       'title': l10n.get('recommend_system'),
       'category': 'AI',
       'difficulty': 4,
-      'description': l10n.get('design_4e00_4e2a_4e2a_6027_5316_content_recommend_system'),
-      'keyPoints': [l10n.get('534f_540c_8fc7_6ee4'), l10n.get('content_recommend'), l10n.get('realtime_7279_5f81'), l10n.get('ab_test')],
+      'description': l10n.get(
+        'design_one_capability_transform_content_recommend_system',
+      ),
+      'keyPoints': [
+        l10n.get('coordinate_same_pass_filter'),
+        l10n.get('content_recommend'),
+        l10n.get('realtime_feature_characteristic'),
+        l10n.get('ab_test'),
+      ],
       'estimatedMinutes': 60,
     },
     {
       'id': 'distributed_cache',
       'title': l10n.get('distributed_cache'),
-      'category': l10n.get('basic_8bbe_65bd'),
+      'category': l10n.get('basic_design_implement'),
       'difficulty': 3,
-      'description': l10n.get('design_4e00_4e2a_distributed_cache_system'),
-      'keyPoints': [l10n.get('consistency_hash'), l10n.get('cache_7a7f_900f'), l10n.get('cache_96ea_5d29'), l10n.get('data_sync')],
+      'description': l10n.get('design_one_distributed_cache_system'),
+      'keyPoints': [
+        l10n.get('consistency_hash'),
+        l10n.get('cache_cross_transparent'),
+        l10n.get('cache_snow_crash'),
+        l10n.get('data_sync'),
+      ],
       'estimatedMinutes': 45,
     },
     {
       'id': 'message_queue',
       'title': l10n.get('message_queue'),
-      'category': l10n.get('basic_8bbe_65bd'),
+      'category': l10n.get('basic_design_implement'),
       'difficulty': 4,
-      'description': l10n.get('design_4e00_4e2a_ha_7684_message_queue_system'),
-      'keyPoints': [l10n.get('6301_4e45_5316'), l10n.get('6d88_8d39_confirm'), l10n.get('987a_5e8f_message'), l10n.get('6b7b_4fe1_queue')],
+      'description': l10n.get('design_one_ha_message_queue_system'),
+      'keyPoints': [
+        l10n.get('long_long_term_transform'),
+        l10n.get('expire_cost_confirm'),
+        l10n.get('smooth_sequence_message'),
+        l10n.get('dead_trust_queue'),
+      ],
       'estimatedMinutes': 60,
     },
     {
       'id': 'rate_limiter',
       'title': l10n.get('rate_limit_system'),
-      'category': l10n.get('basic_8bbe_65bd'),
+      'category': l10n.get('basic_design_implement'),
       'difficulty': 2,
-      'description': l10n.get('design_4e00_4e2a_api_rate_limit_system'),
-      'keyPoints': [l10n.get('4ee4_724c_6876'), l10n.get('6ed1_52a8_7a97_53e3'), l10n.get('distributed_rate_limit'), l10n.get('degrade_strategy')],
+      'description': l10n.get('design_one_api_rate_limit_system'),
+      'keyPoints': [
+        l10n.get('order_token_bucket'),
+        l10n.get('slide_dynamic_window_port'),
+        l10n.get('distributed_rate_limit'),
+        l10n.get('degrade_strategy'),
+      ],
       'estimatedMinutes': 30,
     },
     {
       'id': 'task_scheduler',
-      'title': l10n.get('task_8c03_5ea6_system'),
-      'category': l10n.get('basic_8bbe_65bd'),
+      'title': l10n.get('task_schedule_degree_system'),
+      'category': l10n.get('basic_design_implement'),
       'difficulty': 3,
-      'description': l10n.get('design_4e00_4e2a_distributed_task_8c03_5ea6_system'),
-      'keyPoints': [l10n.get('5b9a_65f6_task'), l10n.get('task_4f9d_8d56'), l10n.get('fail_retry'), l10n.get('load_balance')],
+      'description': l10n.get(
+        'design_one_distributed_task_schedule_degree_system',
+      ),
+      'keyPoints': [
+        l10n.get('fixed_time_task'),
+        l10n.get('task_according_depend'),
+        l10n.get('fail_retry'),
+        l10n.get('load_balance'),
+      ],
       'estimatedMinutes': 45,
     },
   ];
@@ -124,23 +185,31 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       final tags = t.tags.map((e) => e.toLowerCase()).toList();
       return cat.contains('系统设计') ||
           cat.contains('架构') ||
-          tags.any((e) =>
-              e.contains('系统设计') ||
-              e.contains('架构') ||
-              e.contains('system-design'));
+          tags.any(
+            (e) =>
+                e.contains('系统设计') ||
+                e.contains('架构') ||
+                e.contains('system-design'),
+          );
     }).toList();
 
     if (systemDesignTopics.isEmpty) return _fallbackTopics;
 
-    return systemDesignTopics.map((t) => <String, dynamic>{
-      'id': t.id,
-      'title': t.title,
-      'category': t.category.isEmpty ? l10n.get('901a_7528') : t.category,
-      'difficulty': t.difficulty,
-      'description': t.summary,
-      'keyPoints': t.tags.isEmpty ? [l10n.get('system_design')] : t.tags.take(4).toList(),
-      'estimatedMinutes': t.estimatedMinutes,
-    }).toList();
+    return systemDesignTopics
+        .map(
+          (t) => <String, dynamic>{
+            'id': t.id,
+            'title': t.title,
+            'category': t.category.isEmpty ? l10n.get('open_use') : t.category,
+            'difficulty': t.difficulty,
+            'description': t.summary,
+            'keyPoints': t.tags.isEmpty
+                ? [l10n.get('system_design')]
+                : t.tags.take(4).toList(),
+            'estimatedMinutes': t.estimatedMinutes,
+          },
+        )
+        .toList();
   }
 
   @override
@@ -149,7 +218,9 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     final designTopics = _getContentTopics(context);
     final filteredTopics = _selectedCategory == 'all'
         ? designTopics
-        : designTopics.where((t) => t['category'] == _selectedCategory).toList();
+        : designTopics
+              .where((t) => t['category'] == _selectedCategory)
+              .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -168,7 +239,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
 
           // 分类筛选
           _buildCategoryFilter(context, isDark, designTopics),
-          
+
           // 题目列表
           Expanded(
             child: ListView.builder(
@@ -184,7 +255,11 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     );
   }
 
-  Widget _buildStatsHeader(BuildContext context, bool isDark, List<Map<String, dynamic>> topics) {
+  Widget _buildStatsHeader(
+    BuildContext context,
+    bool isDark,
+    List<Map<String, dynamic>> topics,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -198,9 +273,21 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(l10n.get('603b_question_count_6570'), '${topics.length}', AppColors.accent),
-          _buildStatItem(l10n.get('already_practice'), '${_savedDesigns.length}', AppColors.success),
-          _buildStatItem(l10n.get('5f85_practice'), '${topics.length - _savedDesigns.length}', AppColors.warning),
+          _buildStatItem(
+            l10n.get('total_question_count'),
+            '${topics.length}',
+            AppColors.accent,
+          ),
+          _buildStatItem(
+            l10n.get('already_practice'),
+            '${_savedDesigns.length}',
+            AppColors.success,
+          ),
+          _buildStatItem(
+            l10n.get('pending_practice'),
+            '${topics.length - _savedDesigns.length}',
+            AppColors.warning,
+          ),
         ],
       ),
     );
@@ -219,19 +306,21 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
         ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
       ],
     );
   }
 
-  Widget _buildCategoryFilter(BuildContext context, bool isDark, List<Map<String, dynamic>> topics) {
-    final dynamicCategories = topics.map((t) => t['category'] as String).toSet().toList()..sort();
+  Widget _buildCategoryFilter(
+    BuildContext context,
+    bool isDark,
+    List<Map<String, dynamic>> topics,
+  ) {
+    final dynamicCategories =
+        topics.map((t) => t['category'] as String).toSet().toList()..sort();
     final categories = ['all', ...dynamicCategories];
-    
+
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -251,7 +340,9 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
               side: BorderSide(
                 color: isSelected
                     ? AppColors.accent
-                    : (isDark ? const Color(0xFF263238) : const Color(0xFFE0E0E0)),
+                    : (isDark
+                          ? const Color(0xFF263238)
+                          : const Color(0xFFE0E0E0)),
               ),
             ),
           );
@@ -260,9 +351,19 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     );
   }
 
-  Widget _buildDesignCard(BuildContext context, Map<String, dynamic> topic, bool isDark) {
+  Widget _buildDesignCard(
+    BuildContext context,
+    Map<String, dynamic> topic,
+    bool isDark,
+  ) {
     final difficulty = topic['difficulty'] as int;
-    final difficultyLabels = {1: l10n.get('beginner'), 2: l10n.get('basic'), 3: l10n.get('medium'), 4: l10n.get('8f83_96be'), 5: l10n.get('hard')};
+    final difficultyLabels = {
+      1: l10n.get('beginner'),
+      2: l10n.get('basic'),
+      3: l10n.get('medium'),
+      4: l10n.get('compare_difficult'),
+      5: l10n.get('hard'),
+    };
     final difficultyColors = {
       1: const Color(0xFF10B981),
       2: const Color(0xFF00CCF9),
@@ -301,13 +402,17 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: (difficultyColors[difficulty] ?? Colors.grey).withValues(alpha: 0.1),
+                      color: (difficultyColors[difficulty] ?? Colors.grey)
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      difficultyLabels[difficulty] ?? l10n.get('un_77e5'),
+                      difficultyLabels[difficulty] ?? l10n.get('un_known'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -318,7 +423,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              
+
               // 描述
               Text(
                 topic['description'],
@@ -328,14 +433,17 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // 关键点
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: (topic['keyPoints'] as List<String>).map((point) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
@@ -351,7 +459,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 }).toList(),
               ),
               const SizedBox(height: 12),
-              
+
               // 底部信息
               Row(
                 children: [
@@ -362,7 +470,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '${l10n.get('9884_8ba1')} ${topic['estimatedMinutes']} ${l10n.get('min')}',
+                    '${l10n.get('pre_plan')} ${topic['estimatedMinutes']} ${l10n.get('min')}',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -374,7 +482,10 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: Text(l10n.get('start_practice')),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                     ),
                   ),
                 ],
@@ -398,11 +509,8 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         expand: false,
-        builder: (ctx, scrollController) => _buildDesignPracticeSheet(
-          ctx,
-          topic,
-          scrollController,
-        ),
+        builder: (ctx, scrollController) =>
+            _buildDesignPracticeSheet(ctx, topic, scrollController),
       ),
     );
   }
@@ -429,64 +537,60 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // 标题
           Text(
             topic['title'],
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
           ),
           const SizedBox(height: 8),
           Text(
             topic['description'],
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
-          
+
           // 设计步骤
-          _buildDesignStep(l10n.get('1_9700_6c42_6f84_6e05'), [
-            l10n.get('confirm_feature_8303_56f4_548c_975e_feature_9700_6c42'),
-            l10n.get('660e_786e_user_89c4_6a21_548c_6d41_91cf_9884_4f30'),
-            l10n.get('786e_5b9a_data_consistency_8981_6c42'),
-            l10n.get('8bc6_522b_core_feature_548c_secondary_feature'),
+          _buildDesignStep(l10n.get('step_1_requirement_clarify'), [
+            l10n.get('confirm_feature_scope_and_non_demand_requirement'),
+            l10n.get(
+              'clear_confirm_user_plan_mode_and_flow_volume_pre_estimate',
+            ),
+            l10n.get('confirm_fixed_data_consistency_key_requirement'),
+            l10n.get('identify_distinct_core_feature_and_secondary'),
           ]),
-          _buildDesignStep(l10n.get('2_5bb9_91cf_4f30_7b97'), [
-            l10n.get('day_6d3b_user_6570_dau'),
-            l10n.get('6bcf_user_daily_8bf7_6c42_6570_qps'),
-            l10n.get('5b58_50a8_5bb9_91cf_4f30_7b97'),
-            l10n.get('5e26_5bbd_9700_6c42_4f30_7b97'),
+          _buildDesignStep(l10n.get('step_2_capacity_estimation'), [
+            l10n.get('day_live_user_count_dau'),
+            l10n.get('per_user_daily_please_requirement_count_qps'),
+            l10n.get('storage_capacity_estimation'),
+            l10n.get('bandwidth_requirement_estimation'),
           ]),
-          _buildDesignStep(l10n.get('3_system_architecture'), [
-            l10n.get('6574_4f53_architecture_56fe_design'),
-            l10n.get('core_7ec4_4ef6_5212_5206'),
-            l10n.get('data_6d41_5411_design'),
+          _buildDesignStep(l10n.get('step_3_system_architecture_2'), [
+            l10n.get('overall_architecture_design'),
+            l10n.get('core_group_condition_plan_score'),
+            l10n.get('data_flow_direction_design'),
             l10n.get('interface_design'),
           ]),
-          _buildDesignStep(l10n.get('4_data_5b58_50a8'), [
-            l10n.get('database_9009_578b_sql_nosql'),
-            l10n.get('8868_structure_design'),
+          _buildDesignStep(l10n.get('step_4_data_storage'), [
+            l10n.get('database_select_type_sql_nosql'),
+            l10n.get('surface_structure_design'),
             l10n.get('index_design'),
-            l10n.get('5206_5e93_5206_8868_strategy'),
+            l10n.get('score_library_surface_strategy'),
           ]),
-          _buildDesignStep(l10n.get('5_core_design'), [
-            l10n.get('key_4e1a_52a1_6d41_7a0b'),
-            l10n.get('concurrent_5904_7406_solution'),
+          _buildDesignStep(l10n.get('step_5_core_design_2'), [
+            l10n.get('key_business_service_flow_process'),
+            l10n.get('concurrent_handle_principle_solution'),
             l10n.get('cache_strategy'),
-            l10n.get('message_queue_4f7f_7528'),
+            l10n.get('message_queue_use'),
           ]),
-          _buildDesignStep(l10n.get('6_extension_optimize'), [
-            l10n.get('performance_74f6_9888_analysis'),
-            l10n.get('53ef_extension_6027_design'),
+          _buildDesignStep(l10n.get('step_6_extension_optimize_2'), [
+            l10n.get('performance_bottleneck_neck_analysis'),
+            l10n.get('optional_extension_capability_design'),
             l10n.get('ha_solution'),
             l10n.get('monitor_alert'),
           ]),
           const SizedBox(height: 20),
-          
+
           // 开始练习按钮
           Row(
             children: [
@@ -494,7 +598,7 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: Text(l10n.get('5173_95ed')),
+                  label: Text(l10n.get('close')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -530,30 +634,29 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
           ),
           const SizedBox(height: 8),
-          ...points.map((point) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('• ', style: TextStyle(color: Colors.grey.shade600)),
-                Expanded(
-                  child: Text(
-                    point,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
+          ...points.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• ', style: TextStyle(color: Colors.grey.shade600)),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -563,37 +666,50 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('system_design_interview_6307_5357')),
+        title: Text(l10n.get('system_design_interview_finger_south')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.get('interview_6d41_7a0b'), style: TextStyle(fontWeight: FontWeight.w700)),
-              Text(l10n.get('1_9700_6c42_6f84_6e05_5_min')),
-              Text(l10n.get('2_5bb9_91cf_4f30_7b97_5_min')),
-              Text(l10n.get('3_system_architecture_15_min')),
-              Text(l10n.get('4_core_design_15_min')),
-              Text(l10n.get('5_extension_optimize_10_min')),
+              Text(
+                l10n.get('interview_flow_process'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('step_1_requirement_clarify_5_min')),
+              Text(l10n.get('step_2_capacity_estimation_5_min')),
+              Text(l10n.get('time_3_system_architecture_15_min_2')),
+              Text(l10n.get('time_4_core_design_15_min_2')),
+              Text(l10n.get('time_5_extension_optimize_10_min_2')),
               SizedBox(height: 16),
-              Text(l10n.get('8bc4_5206_7ef4_5ea6'), style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                l10n.get('evaluation_score_dimension_degree'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               Text(l10n.get('problem_analysis_ability')),
               Text(l10n.get('architecture_design_ability')),
               Text(l10n.get('tech_depth')),
               Text(l10n.get('communication_expression_ability')),
               SizedBox(height: 16),
-              Text(l10n.get('6ce8_610f_4e8b_9879'), style: TextStyle(fontWeight: FontWeight.w700)),
-              Text(l10n.get('5148_confirm_9700_6c42_518d_design_solution')),
-              Text(l10n.get('4ece_9ad8_5c42_design_9010_6b65_6df1_5165')),
-              Text(l10n.get('4e3b_52a8_8ba8_8bba_tradeoff')),
-              Text(l10n.get('8003_8651_8fb9_754c_60c5_51b5_548c_5f02_5e38_5904_7406')),
+              Text(
+                l10n.get('note_intention_matter_item'),
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(l10n.get('confirm_requirement_before_design')),
+              Text(l10n.get('top_down_design_approach')),
+              Text(l10n.get('proactive_tradeoff_discussion')),
+              Text(
+                l10n.get(
+                  'exam_consider_edge_boundary_context_situation_and_abnormal_often_handle_principle',
+                ),
+              ),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('77e5_9053_4e86')),
+            child: Text(l10n.get('known_channel')),
           ),
         ],
       ),
@@ -602,30 +718,38 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
 
   void _showPracticeGuide(BuildContext context, Map<String, dynamic> topic) {
     final keyPoints = topic['keyPoints'] as List<String>? ?? [];
-    
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.getp('practice_{title}', {'title': topic['title']})),
+        title: Text(l10n.getp('practice_title_3', {'title': topic['title']})),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(topic['description'] ?? '', style: TextStyle(color: Colors.grey.shade600)),
+              Text(
+                topic['description'] ?? '',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
               const SizedBox(height: 16),
-              Text(l10n.get('key_knowledge_point'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('key_knowledge_point'),
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
-              ...keyPoints.map((point) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('• '),
-                    Expanded(child: Text(point)),
-                  ],
+              ...keyPoints.map(
+                (point) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('• '),
+                      Expanded(child: Text(point)),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -636,12 +760,30 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.get('practice_suggestion'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text(
+                      l10n.get('practice_suggestion'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text(l10n.get('1_6309_7167_9700_6c42_6f84_6e05_5bb9_91cf_4f30_7b97_architec'), style: TextStyle(fontSize: 12)),
-                    Text(l10n.get('2_7528_7eb8_7b14_753b_51fa_architecture_56fe'), style: TextStyle(fontSize: 12)),
-                    Text(l10n.get('3_8bb0_5f55_key_decision_548c_tradeoff'), style: TextStyle(fontSize: 12)),
-                    Text(l10n.get('4_63a7_5236_time_5728_3045_min_5185'), style: TextStyle(fontSize: 12)),
+                    Text(
+                      l10n.get('system_design_steps'),
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      l10n.get('step_2_draw_architecture'),
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      l10n.get('step_3_record_key_decision_tradeoff'),
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      l10n.get('step_4_control_time_30_45_min'),
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -651,14 +793,18 @@ class _SystemDesignPageState extends State<SystemDesignPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('5173_95ed')),
+            child: Text(l10n.get('close')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(l10n.get('start_8ba1_65f6_6309_6b65_9aa4_complete_system_design')),
+                  content: Text(
+                    l10n.get(
+                      'start_plan_time_press_step_complete_system_design',
+                    ),
+                  ),
                   duration: Duration(seconds: 3),
                 ),
               );

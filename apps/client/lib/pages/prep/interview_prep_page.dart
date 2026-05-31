@@ -7,7 +7,6 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class InterviewPrepPage extends StatelessWidget {
@@ -41,11 +40,19 @@ class InterviewPrepPage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         WorkPanel(
-          title: plan.hasTarget ? l10n.getp('interview_preparation_{role}', {'role': plan.targetRole}) : l10n.get('901a_7528_tech_interview_preparation'),
+          title: plan.hasTarget
+              ? l10n.getp('interview_preparation_role_2', {
+                  'role': plan.targetRole,
+                })
+              : l10n.get('open_use_tech_interview_preparation'),
           trailing: FilledButton.tonalIcon(
             onPressed: () => _showPlanDialog(context, progress, plan, l10n),
             icon: const Icon(Icons.tune_outlined),
-            label: Text(plan.hasTarget ? l10n.get('8c03_6574_goal') : l10n.get('settings_goal')),
+            label: Text(
+              plan.hasTarget
+                  ? l10n.get('schedule_overall_goal')
+                  : l10n.get('settings_goal'),
+            ),
           ),
           children: [
             LayoutBuilder(
@@ -59,21 +66,21 @@ class InterviewPrepPage extends StatelessWidget {
                     color: _scoreColor(readiness),
                   ),
                   _PrepMetric(
-                    label: l10n.get('4eca_day_5f85_review'),
+                    label: l10n.get('today_day_pending_review'),
                     value: '$reviewCount',
-                    suffix: l10n.get('9879'),
+                    suffix: l10n.get('item'),
                     color: AppColors.warning,
                   ),
                   _PrepMetric(
                     label: l10n.get('high_freq_unstable'),
                     value: '$highFrequencyUnmastered',
-                    suffix: l10n.get('9879'),
+                    suffix: l10n.get('item'),
                     color: AppColors.accent,
                   ),
                   _PrepMetric(
-                    label: l10n.get('4f4e_5206_56de_6d41'),
+                    label: l10n.get('low_score_back_flow'),
                     value: '$lowScoreCount',
-                    suffix: l10n.get('6b21'),
+                    suffix: l10n.get('round'),
                     color: AppColors.danger,
                   ),
                 ];
@@ -97,7 +104,9 @@ class InterviewPrepPage extends StatelessWidget {
             Text(
               plan.hasTarget
                   ? _targetDescription(context, plan)
-                  : l10n.get('un_settings_goal_position_4e5f_53ef_4ee5_76f4_63a5_4f7f_7528'),
+                  : l10n.get(
+                      'un_settings_goal_position_also_optional_by_direct_connect_use',
+                    ),
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -110,12 +119,12 @@ class InterviewPrepPage extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onStartPractice,
                   icon: const Icon(Icons.today_outlined),
-                  label: Text(l10n.get('start_4eca_day_practice')),
+                  label: Text(l10n.get('start_today_day_practice')),
                 ),
                 OutlinedButton.icon(
                   onPressed: onStartMock,
                   icon: const Icon(Icons.record_voice_over_outlined),
-                  label: Text(l10n.get('6765_4e00_573a_6a21_62df_interview')),
+                  label: Text(l10n.get('come_one_round_mode_mock_interview')),
                 ),
               ],
             ),
@@ -131,7 +140,7 @@ class InterviewPrepPage extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         WorkPanel(
-          title: l10n.get('next_6b65_suggestion'),
+          title: l10n.get('next_step_suggestion'),
           children: _buildActions(
             context,
             readiness: readiness,
@@ -142,19 +151,23 @@ class InterviewPrepPage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         WorkPanel(
-          title: l10n.get('privacy_4e0e_degrade'),
+          title: l10n.get('privacy_and_degrade'),
           children: [
             InfoLine(
               icon: Icons.lock_outline,
-              text: l10n.get('goal_position_jd_project_7d20_6750_548c_answer_8349_7a3f_def'),
+              text: l10n.get(
+                'goal_position_jd_project_element_material_and_answer_draft_def',
+              ),
             ),
             InfoLine(
               icon: Icons.person_outline,
-              text: l10n.get('not_login_4e5f_80fd_5b8c_6574_practice_login_53ea_7528_4e8e'),
+              text: l10n.get(
+                'not_login_also_enable_complete_overall_practice_only_use_in',
+              ),
             ),
             InfoLine(
               icon: Icons.hub_outlined,
-              text: l10n.get('un_config_ai_6a21_578b_65f6_practice_4f1a_degrade_4e3a_local'),
+              text: l10n.get('ai_not_configured_practice_falls_back_to_local'),
             ),
           ],
         ),
@@ -173,14 +186,19 @@ class InterviewPrepPage extends StatelessWidget {
     final actions = <Widget>[];
     if (reviewCount > 0) {
       actions.add(
-        InfoLine(icon: Icons.replay_outlined, text: l10n.get('5148_6e05_4eca_day_review_907f_514d_5230_671f_content_7ee7_7')),
+        InfoLine(
+          icon: Icons.replay_outlined,
+          text: l10n.get('clear_today_review_first_avoid_overflow'),
+        ),
       );
     }
     if (highFrequencyUnmastered > 0) {
       actions.add(
         InfoLine(
           icon: Icons.local_fire_department_outlined,
-          text: l10n.get('priority_sprint_high_freq_unstable_knowledge_point_9002_5408'),
+          text: l10n.get(
+            'priority_sprint_high_freq_unstable_knowledge_point_suitable_combine',
+          ),
         ),
       );
     }
@@ -188,14 +206,18 @@ class InterviewPrepPage extends StatelessWidget {
       actions.add(
         InfoLine(
           icon: Icons.construction_outlined,
-          text: l10n.get('readiness_504f_4f4e_suggestion_5148_4f4e_5206_56de_6d41_518d'),
+          text: l10n.get(
+            'readiness_bias_low_suggestion_first_score_back_flow_again',
+          ),
         ),
       );
     } else {
       actions.add(
         InfoLine(
           icon: Icons.groups_outlined,
-          text: l10n.get('53ef_4ee5_8fdb_5165_6b63_5f0f_6a21_62df_6a21_5f0f_end_540e_7'),
+          text: l10n.get(
+            'optional_by_progress_enter_correct_mode_mock_end_after_7',
+          ),
         ),
       );
     }
@@ -203,7 +225,9 @@ class InterviewPrepPage extends StatelessWidget {
       actions.add(
         InfoLine(
           icon: Icons.flag_outlined,
-          text: l10n.get('settings_goal_position_6216_paste_jd_540e_53ef_83b7_5f97_66f'),
+          text: l10n.get(
+            'settings_goal_position_or_paste_jd_after_optional_gain_get_66f',
+          ),
         ),
       );
     }
@@ -213,13 +237,29 @@ class InterviewPrepPage extends StatelessWidget {
   String _targetDescription(BuildContext context, PrepPlan plan) {
     final l10n = context.watch<LocalizationProvider>();
     final parts = <String>[];
-    if (plan.techStack.isNotEmpty) parts.add(l10n.getp('tech_6808_{techstack}', {'techStack': plan.techStack}));
-    if (plan.dailyMinutes > 0) parts.add(l10n.getp('daily_{minutes}_min', {'minutes': plan.dailyMinutes}));
+    if (plan.techStack.isNotEmpty)
+      parts.add(
+        l10n.getp('tech_stack_techstack_2', {'techStack': plan.techStack}),
+      );
+    if (plan.dailyMinutes > 0)
+      parts.add(
+        l10n.getp('daily_minutes_min_2', {'minutes': plan.dailyMinutes}),
+      );
     if (plan.interviewDate != null) {
       final days = plan.interviewDate!.difference(DateTime.now()).inDays + 1;
-      parts.add(days > 0 ? '距离面试 $days 天' : l10n.get('interview_day_671f_already_5230'));
+      parts.add(
+        days > 0
+            ? l10n.getp('distance_offline_interview_still_has_days_day_2', {
+                'days': days,
+              })
+            : l10n.get('interview_day_already_to'),
+      );
     }
-    return parts.isEmpty ? l10n.get('goal_already_settings_app_4f1a_589e_5f3a_recommend_6743_91cd') : parts.join(' · ');
+    return parts.isEmpty
+        ? l10n.get(
+            'goal_already_settings_app_will_increase_accent_recommend_rights_restart',
+          )
+        : parts.join(' · ');
   }
 
   Color _scoreColor(int score) {
@@ -254,22 +294,30 @@ class InterviewPrepPage extends StatelessWidget {
                   TextField(
                     controller: roleController,
                     decoration: InputDecoration(
-                      labelText: l10n.get('goal_position_53ef_9009'),
-                      hintText: l10n.get('java_backend_ai_engineering_5316_architect'),
+                      labelText: l10n.get('goal_position_optional_select'),
+                      hintText: l10n.get(
+                        'java_backend_ai_engineering_transform_architect',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: stackController,
                     decoration: InputDecoration(
-                      labelText: l10n.get('tech_6808_53ef_9009'),
+                      labelText: l10n.get('tech_stack_optional_select'),
                       hintText: 'Spring Cloud, Redis, RAG...',
                     ),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: Text(l10n.getp('daily_6295_5165_{minutes}_min', {'minutes': dailyMinutes}))),
+                      Expanded(
+                        child: Text(
+                          l10n.getp('daily_send_enter_minutes_min_2', {
+                            'minutes': dailyMinutes,
+                          }),
+                        ),
+                      ),
                       IconButton(
                         onPressed: dailyMinutes > 15
                             ? () => setDialogState(() => dailyMinutes -= 15)
@@ -303,8 +351,12 @@ class InterviewPrepPage extends StatelessWidget {
                     icon: const Icon(Icons.event_outlined),
                     label: Text(
                       interviewDate == null
-                          ? l10n.get('select_interview_day_671f_53ef_9009')
-                          : l10n.getp('interview_day_671f_{year}_{month}_{day}', {'year': interviewDate!.year, 'month': interviewDate!.month, 'day': interviewDate!.day}),
+                          ? l10n.get('select_interview_day_optional')
+                          : l10n.getp('interview_day_year_month_day', {
+                              'year': interviewDate!.year,
+                              'month': interviewDate!.month,
+                              'day': interviewDate!.day,
+                            }),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -313,7 +365,9 @@ class InterviewPrepPage extends StatelessWidget {
                     minLines: 4,
                     maxLines: 8,
                     decoration: InputDecoration(
-                      labelText: l10n.get('position_description_jd_53ef_9009_local_save'),
+                      labelText: l10n.get(
+                        'position_description_jd_optional_select_local_save',
+                      ),
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                     ),
@@ -434,22 +488,90 @@ class _JdAnalysisSection extends StatelessWidget {
   final ProgressProvider progress;
 
   static List<String> _techKeywords(LocalizationProvider l10n) => [
-    'java', 'python', 'go', 'golang', 'rust', 'c++', 'javascript', 'typescript',
-    'spring', 'springboot', 'spring cloud', 'mybatis', 'hibernate',
-    'redis', 'mysql', 'postgresql', 'mongodb', 'elasticsearch', 'es',
-    'kafka', 'rabbitmq', 'rocketmq', 'mq',
-    'docker', 'kubernetes', 'k8s', 'linux', 'nginx',
-    l10n.get('microservice'), l10n.get('distributed'), l10n.get('9ad8_concurrent'), l10n.get('ha'), l10n.get('cache'), l10n.get('message_queue'),
-    l10n.get('design_pattern'), l10n.get('data_structure'), l10n.get('algorithm'), l10n.get('system_design'), l10n.get('architecture'),
-    'jvm', 'gc', l10n.get('concurrent'), l10n.get('591a_thread'), l10n.get('thread_6c60'), '锁',
-    l10n.get('network'), 'tcp', 'http', 'https', 'rpc', 'grpc',
-    l10n.get('database'), l10n.get('index'), l10n.get('transaction'), 'mvcc', l10n.get('b_6811'),
-    l10n.get('96c6_5408'), 'hashmap', 'arraylist', l10n.get('94fe_8868'), '树', '图',
-    l10n.get('sort'), l10n.get('4e8c_5206'), l10n.get('52a8_6001_89c4_5212'), l10n.get('8d2a_5fc3'), l10n.get('56de_6eaf'),
-    'react', 'vue', 'flutter', 'android', 'ios',
-    l10n.get('673a_5668_study'), l10n.get('depth_study'), 'llm', 'rag', 'prompt',
-    'ci/cd', 'git', 'jenkins', 'devops',
-    l10n.get('project'), l10n.get('5b9e_4e60'), l10n.get('experience'),
+    'java',
+    'python',
+    'go',
+    'golang',
+    'rust',
+    'c++',
+    'javascript',
+    'typescript',
+    'spring',
+    'springboot',
+    'spring cloud',
+    'mybatis',
+    'hibernate',
+    'redis',
+    'mysql',
+    'postgresql',
+    'mongodb',
+    'elasticsearch',
+    'es',
+    'kafka',
+    'rabbitmq',
+    'rocketmq',
+    'mq',
+    'docker',
+    'kubernetes',
+    'k8s',
+    'linux',
+    'nginx',
+    l10n.get('microservice'),
+    l10n.get('distributed'),
+    l10n.get('high_concurrent'),
+    l10n.get('ha'),
+    l10n.get('cache'),
+    l10n.get('message_queue'),
+    l10n.get('design_pattern'),
+    l10n.get('data_structure'),
+    l10n.get('algorithm'),
+    l10n.get('system_design'),
+    l10n.get('architecture'),
+    'jvm',
+    'gc',
+    l10n.get('concurrent'),
+    l10n.get('multi_thread'),
+    l10n.get('thread_pool'),
+    l10n.get('lock'),
+    l10n.get('network'),
+    'tcp',
+    'http',
+    'https',
+    'rpc',
+    'grpc',
+    l10n.get('database'),
+    l10n.get('index'),
+    l10n.get('transaction'),
+    'mvcc',
+    l10n.get('b_tree'),
+    l10n.get('collect_combine'),
+    'hashmap',
+    'arraylist',
+    l10n.get('chain_surface'),
+    l10n.get('tree'),
+    l10n.get('graph'),
+    l10n.get('sort'),
+    l10n.get('two_score'),
+    l10n.get('dynamic_state_plan'),
+    l10n.get('greedy_core'),
+    l10n.get('back_trace'),
+    'react',
+    'vue',
+    'flutter',
+    'android',
+    'ios',
+    l10n.get('machine_device_study'),
+    l10n.get('depth_study'),
+    'llm',
+    'rag',
+    'prompt',
+    'ci/cd',
+    'git',
+    'jenkins',
+    'devops',
+    l10n.get('project'),
+    l10n.get('actual_practice'),
+    l10n.get('experience'),
   ];
 
   List<String> _extractKeywords(String jd, LocalizationProvider l10n) {
@@ -461,9 +583,11 @@ class _JdAnalysisSection extends StatelessWidget {
     if (keywords.isEmpty) return [];
     final matched = <String, Topic>{};
     for (final topic in topics) {
-      final searchText = '${topic.title} ${topic.summary} '
-          '${topic.category} ${topic.tags.join(' ')} '
-          '${topic.rubric?.mustHave.join(' ') ?? ''}'.toLowerCase();
+      final searchText =
+          '${topic.title} ${topic.summary} '
+                  '${topic.category} ${topic.tags.join(' ')} '
+                  '${topic.rubric?.mustHave.join(' ') ?? ''}'
+              .toLowerCase();
       for (final kw in keywords) {
         if (searchText.contains(kw)) {
           matched[topic.id] = topic;
@@ -488,9 +612,9 @@ class _JdAnalysisSection extends StatelessWidget {
     });
 
     return WorkPanel(
-      title: l10n.get('jd_5339_914d_analysis'),
+      title: l10n.get('jd_match_assign_analysis'),
       trailing: Text(
-        l10n.getp('{count}_matches', {'count': matchedTopics.length}),
+        l10n.getp('count_matches_2', {'count': matchedTopics.length}),
         style: TextStyle(
           fontSize: 12,
           color: AppColors.accent,
@@ -499,25 +623,37 @@ class _JdAnalysisSection extends StatelessWidget {
       ),
       children: [
         if (keywords.isEmpty)
-          Text(l10n.get('un_8bc6_522b_5230_key_tech_8bcd_8bf7_68c0_67e5_jd_content'))
+          Text(
+            l10n.get(
+              'un_identify_distinct_to_key_tech_term_please_inspect_check_jd_content',
+            ),
+          )
         else ...[
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: keywords
-                .map((kw) => Chip(
-                      label: Text(kw, style: const TextStyle(fontSize: 11)),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ))
+                .map(
+                  (kw) => Chip(
+                    label: Text(kw, style: const TextStyle(fontSize: 11)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: 12),
           if (matchedTopics.isEmpty)
-            Text(l10n.get('current_content_5e93_4e2d_un_627e_5230_4e0e_jd_5339_914d_768'))
+            Text(
+              l10n.get(
+                'current_content_library_in_un_find_to_and_jd_match_assign_768',
+              ),
+            )
           else ...[
             Text(
-              l10n.get('suggestion_priority_review_6309_mastery_4ece_4f4e_5230_9ad8'),
+              l10n.get(
+                'suggestion_priority_review_press_mastery_from_low_to_high',
+              ),
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -530,8 +666,8 @@ class _JdAnalysisSection extends StatelessWidget {
               final color = score >= 85
                   ? AppColors.success
                   : score >= 60
-                      ? AppColors.warning
-                      : AppColors.danger;
+                  ? AppColors.warning
+                  : AppColors.danger;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
@@ -562,9 +698,9 @@ class _JdAnalysisSection extends StatelessWidget {
                             topic.category,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],

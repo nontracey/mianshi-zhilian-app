@@ -12,7 +12,6 @@ import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class TopicDetailPage extends StatefulWidget {
@@ -93,9 +92,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
           IconButton(
             onPressed: widget.onBack,
             icon: const Icon(Icons.arrow_back, size: 20),
-            style: IconButton.styleFrom(
-              padding: const EdgeInsets.all(8),
-            ),
+            style: IconButton.styleFrom(padding: const EdgeInsets.all(8)),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -118,7 +115,10 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                     if (topic.status != null && topic.status != 'production')
                       Container(
                         margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: topic.status == 'test'
                               ? AppColors.warning.withValues(alpha: 0.1)
@@ -126,7 +126,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          topic.status == 'test' ? l10n.get('test_content') : l10n.get('8349_7a3f_content'),
+                          topic.status == 'test'
+                              ? l10n.get('test_content')
+                              : l10n.get('draft_content'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -157,10 +159,12 @@ class _TopicDetailPageState extends State<TopicDetailPage>
 
   Widget _buildTabToggle(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.borderMidnightSubtle : const Color(0xFFF0F2F5),
+        color: isDark
+            ? AppColors.borderMidnightSubtle
+            : const Color(0xFFF0F2F5),
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(2),
@@ -168,14 +172,14 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         children: [
           _buildTabButton(
             context,
-            label: l10n.get('knowledge_67e5_9605'),
+            label: l10n.get('knowledge_check_read'),
             icon: Icons.menu_book_outlined,
             isSelected: _tabController.index == 0,
             onTap: () => _tabController.animateTo(0),
           ),
           _buildTabButton(
             context,
-            label: l10n.get('590d_8ff0_practice'),
+            label: l10n.get('review_narrate_practice'),
             icon: Icons.record_voice_over_outlined,
             isSelected: _tabController.index == 1,
             onTap: () => _tabController.animateTo(1),
@@ -193,13 +197,15 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     required VoidCallback onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -208,7 +214,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
             Icon(
               icon,
               size: 14,
-              color: isSelected ? Colors.white : (isDark ? Colors.white54 : Colors.grey),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white54 : Colors.grey),
             ),
             const SizedBox(width: 4),
             Text(
@@ -216,7 +224,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? Colors.white : (isDark ? Colors.white54 : Colors.grey),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white54 : Colors.grey),
               ),
             ),
           ],
@@ -230,10 +240,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 左侧：目录与前置知识
-        SizedBox(
-          width: 220,
-          child: _LeftSidebar(topic: topic),
-        ),
+        SizedBox(width: 220, child: _LeftSidebar(topic: topic)),
         const VerticalDivider(width: 1),
         // 右侧：Tab 内容
         Expanded(
@@ -283,17 +290,19 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   Future<void> _handleEvaluate() async {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_input_4f60_7684_answer'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('please_first_input_your_answer'))),
+      );
       return;
     }
 
     final aiProvider = context.read<AiProvider>();
     if (aiProvider.defaultConfig == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_5728_personal_center_config_ai'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.get('please_first_at_personal_center_config_ai')),
+        ),
+      );
       return;
     }
 
@@ -320,8 +329,13 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.getp('ai_evaluation_fail_{error}', {'error': e})),
-            action: SnackBarAction(label: l10n.get('retry'), onPressed: _handleEvaluate),
+            content: Text(
+              l10n.getp('ai_evaluation_fail_error_2', {'error': e}),
+            ),
+            action: SnackBarAction(
+              label: l10n.get('retry'),
+              onPressed: _handleEvaluate,
+            ),
           ),
         );
       }
@@ -362,10 +376,14 @@ class _LeftSidebar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.visibility_outlined, size: 14, color: AppColors.accent),
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 14,
+                      color: AppColors.accent,
+                    ),
                     SizedBox(width: 6),
                     Text(
-                      l10n.get('interview_5b98_5173_6ce8_70b9'),
+                      l10n.get('interview_official_close_note_point'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -387,9 +405,9 @@ class _LeftSidebar extends StatelessWidget {
         // 知识卡片目录
         Text(
           l10n.get('knowledge_catalog'),
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         ...topic.learningCards.asMap().entries.map((entry) {
@@ -429,9 +447,9 @@ class _LeftSidebar extends StatelessWidget {
           const Divider(height: 24),
           Text(
             l10n.get('prerequisite_knowledge'),
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           ...topic.prerequisites.map((prereq) {
@@ -439,7 +457,7 @@ class _LeftSidebar extends StatelessWidget {
             final contentProvider = context.read<ContentProvider>();
             final prereqTopic = contentProvider.findTopic(prereq);
             final displayName = prereqTopic?.title ?? prereq;
-            
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: InkWell(
@@ -459,15 +477,23 @@ class _LeftSidebar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
                 child: Row(
                   children: [
-                    const Icon(Icons.arrow_right, size: 16, color: AppColors.warning),
+                    const Icon(
+                      Icons.arrow_right,
+                      size: 16,
+                      color: AppColors.warning,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         displayName,
                         style: TextStyle(
                           fontSize: 12,
-                          color: prereqTopic != null ? AppColors.accent : AppColors.warning,
-                          decoration: prereqTopic != null ? TextDecoration.underline : null,
+                          color: prereqTopic != null
+                              ? AppColors.accent
+                              : AppColors.warning,
+                          decoration: prereqTopic != null
+                              ? TextDecoration.underline
+                              : null,
                         ),
                       ),
                     ),
@@ -484,7 +510,10 @@ class _LeftSidebar extends StatelessWidget {
             dense: true,
             visualDensity: VisualDensity.compact,
             leading: const Icon(Icons.code, size: 16, color: AppColors.success),
-            title: Text(l10n.get('leetcode_practice'), style: TextStyle(fontSize: 13)),
+            title: Text(
+              l10n.get('leetcode_practice'),
+              style: TextStyle(fontSize: 13),
+            ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 8),
             minLeadingWidth: 24,
           ),
@@ -508,9 +537,9 @@ class _TopicHeader extends StatelessWidget {
       1 => l10n.get('beginner'),
       2 => l10n.get('basic'),
       3 => l10n.get('medium'),
-      4 => l10n.get('8f83_96be'),
+      4 => l10n.get('compare_difficult'),
       5 => l10n.get('hard'),
-      _ => l10n.get('un_77e5'),
+      _ => l10n.get('un_known'),
     };
 
     final difficultyColor = switch (topic.difficulty) {
@@ -549,7 +578,7 @@ class _TopicHeader extends StatelessWidget {
           ),
           Chip(
             label: Text(
-              l10n.getp('{minutes}_min', {'minutes': topic.estimatedMinutes}),
+              l10n.getp('minutes_min_2', {'minutes': topic.estimatedMinutes}),
               style: const TextStyle(fontSize: 12),
             ),
             avatar: const Icon(Icons.timer_outlined, size: 14),
@@ -628,7 +657,7 @@ class _KnowledgeTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.get('interview_5b98_5173_6ce8_70b9'),
+                        l10n.get('interview_official_close_note_point'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -804,18 +833,26 @@ class _ExplainCard extends StatelessWidget {
     if (trimmed.startsWith('>')) return true;
 
     // 表格行：| col1 | col2 |
-    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
+    if (trimmed.startsWith('|') &&
+        trimmed.endsWith('|') &&
+        trimmed.length > 2) {
       return true;
     }
 
     // 表格分隔行：| --- | --- |
-    if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) { return true; }
+    if (RegExp(r'^\|[\s\-:|]+\|$').hasMatch(trimmed)) {
+      return true;
+    }
 
     // 分隔线：--- 或 *** 或 ___
-    if (RegExp(r'^[-*_]{3,}\s*$').hasMatch(trimmed)) { return true; }
+    if (RegExp(r'^[-*_]{3,}\s*$').hasMatch(trimmed)) {
+      return true;
+    }
 
     // 粗体开头：**text**
-    if (trimmed.startsWith('**') && trimmed.contains('**')) { return true; }
+    if (trimmed.startsWith('**') && trimmed.contains('**')) {
+      return true;
+    }
 
     // 斜体开头：*text*（但不是列表）
     if (trimmed.startsWith('*') &&
@@ -826,10 +863,14 @@ class _ExplainCard extends StatelessWidget {
     }
 
     // 链接：[text](url)
-    if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) { return true; }
+    if (RegExp(r'^\[.*\]\(.*\)').hasMatch(trimmed)) {
+      return true;
+    }
 
     // 图片：![alt](url)
-    if (trimmed.startsWith('![')) { return true; }
+    if (trimmed.startsWith('![')) {
+      return true;
+    }
 
     return false;
   }
@@ -869,13 +910,18 @@ class _ExplainCard extends StatelessWidget {
     }
 
     // 行尾有分号（代码特征）
-    if (trimmed.endsWith(';') && !trimmed.startsWith('|')) { return true; }
+    if (trimmed.endsWith(';') && !trimmed.startsWith('|')) {
+      return true;
+    }
 
     // 花括号单独成行
-    if (trimmed == '{' || trimmed == '}' || trimmed == '};') { return true; }
+    if (trimmed == '{' || trimmed == '}' || trimmed == '};') {
+      return true;
+    }
 
     // 赋值语句：Type var = value;
-    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) && trimmed.endsWith(';')) {
+    if (RegExp(r'^\w+\s+\w+\s*=\s*').hasMatch(trimmed) &&
+        trimmed.endsWith(';')) {
       return true;
     }
 
@@ -1548,7 +1594,7 @@ class _DiagramCard extends StatelessWidget {
                     svgUrl,
                     width: double.infinity,
                     errorBuilder: (ctx, err, stack) => Text(
-                      card.fallback ?? l10n.get('56fe_7247_loading_fail'),
+                      card.fallback ?? l10n.get('image_picture_loading_fail'),
                       style: TextStyle(color: AppColors.warning, fontSize: 13),
                     ),
                   ),
@@ -1696,10 +1742,26 @@ class _SmartDiagram extends StatelessWidget {
 
   Widget _buildTypeTag(_DiagramType type, LocalizationProvider l10n) {
     final (icon, label, color) = switch (type) {
-      _DiagramType.flow => (Icons.linear_scale, l10n.get('6d41_7a0b_56fe'), AppColors.accent),
-      _DiagramType.hierarchy => (Icons.account_tree, l10n.get('structure_56fe'), AppColors.success),
-      _DiagramType.compare => (Icons.compare_arrows, l10n.get('comparison_56fe'), AppColors.warning),
-      _DiagramType.cycle => (Icons.autorenew, l10n.get('5faa_73af_56fe'), AppColors.categoryPurple),
+      _DiagramType.flow => (
+        Icons.linear_scale,
+        l10n.get('flow_process_image'),
+        AppColors.accent,
+      ),
+      _DiagramType.hierarchy => (
+        Icons.account_tree,
+        l10n.get('structure_image'),
+        AppColors.success,
+      ),
+      _DiagramType.compare => (
+        Icons.compare_arrows,
+        l10n.get('comparison_image'),
+        AppColors.warning,
+      ),
+      _DiagramType.cycle => (
+        Icons.autorenew,
+        l10n.get('cycle_link_image'),
+        AppColors.categoryPurple,
+      ),
     };
 
     return Container(
@@ -1887,11 +1949,19 @@ class _SmartDiagram extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _buildCompareColumn(l10n.get('solution_a'), leftItems, AppColors.accent),
+          child: _buildCompareColumn(
+            l10n.get('solution_a'),
+            leftItems,
+            AppColors.accent,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildCompareColumn(l10n.get('solution_b'), rightItems, AppColors.warning),
+          child: _buildCompareColumn(
+            l10n.get('solution_b'),
+            rightItems,
+            AppColors.warning,
+          ),
         ),
       ],
     );
@@ -1971,7 +2041,7 @@ class _SmartDiagram extends StatelessWidget {
               Icon(Icons.refresh, size: 18, color: AppColors.categoryPurple),
               const SizedBox(width: 8),
               Text(
-                l10n.get('5faa_73af_6267_884c'),
+                l10n.get('cycle_link_execute_action'),
                 style: TextStyle(
                   color: AppColors.categoryPurple,
                   fontWeight: FontWeight.w600,
@@ -2158,7 +2228,8 @@ class _SvgDiagramCard extends StatelessWidget {
                   height: 120,
                   alignment: Alignment.center,
                   child: Text(
-                    card.fallback ?? l10n.get('6682_no_56fe_89e3_content'),
+                    card.fallback ??
+                        l10n.get('temporary_no_image_understand_content'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 13,
@@ -2196,7 +2267,7 @@ class _FollowUpSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          l10n.getp('{count}_question_count', {'count': followUps.length}),
+          l10n.getp('count_question_count_2', {'count': followUps.length}),
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -2244,7 +2315,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
       1 => l10n.get('beginner'),
       2 => l10n.get('basic'),
       3 => l10n.get('medium'),
-      4 => l10n.get('8f83_96be'),
+      4 => l10n.get('compare_difficult'),
       5 => l10n.get('hard'),
       _ => '',
     };
@@ -2422,7 +2493,11 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(l10n.get('already_590d_5236_5230_526a_8d34_677f')),
+                                    content: Text(
+                                      l10n.get(
+                                        'already_review_control_to_clip_clipboard_board',
+                                      ),
+                                    ),
                                     duration: Duration(seconds: 1),
                                   ),
                                 );
@@ -2986,11 +3061,11 @@ class _RubricSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('8bc4_5206_standard'),
+      title: l10n.get('evaluation_score_standard'),
       children: [
         // 必须覆盖的关键点
         Text(
-          l10n.get('5fc5_987b_8986_76d6_7684_key_70b9'),
+          l10n.get('must_cover_key_points'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: AppColors.success,
@@ -3018,7 +3093,7 @@ class _RubricSection extends StatelessWidget {
         if (rubric.goodToHave.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
-            l10n.get('52a0_5206_9879'),
+            l10n.get('plus_score_item'),
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: AppColors.accent,
@@ -3177,7 +3252,7 @@ class _PromptPanel extends StatelessWidget {
                   const Icon(Icons.quiz_outlined, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    l10n.get('590d_8ff0_question'),
+                    l10n.get('review_narrate_question'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -3233,7 +3308,13 @@ class _PromptPanel extends StatelessWidget {
                         color: AppColors.warning,
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(l10n.get('7528_81ea_5df1_7684_8bdd_explain_8fd9_4e2a_knowledge_point_7'))),
+                      Expanded(
+                        child: Text(
+                          l10n.get(
+                            'use_self_word_explain_this_knowledge_point_7',
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -3263,7 +3344,7 @@ class _PromptPanel extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      l10n.get('5fc5_987b_8bf4_5230_7684_key_70b9'),
+                      l10n.get('must_mention_key_points'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -3396,14 +3477,16 @@ class _AnswerPanel extends StatelessWidget {
                   const Icon(Icons.edit_note_outlined, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    l10n.get('4f60_7684_answer'),
+                    l10n.get('your_answer'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    l10n.getp('{count}_5b57', {'count': answerController.text.length}),
+                    l10n.getp('count_char_2', {
+                      'count': answerController.text.length,
+                    }),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
@@ -3414,14 +3497,19 @@ class _AnswerPanel extends StatelessWidget {
                 minLines: 8,
                 maxLines: 16,
                 decoration: InputDecoration(
-                  hintText: l10n.get('5728_8fd9_91cc_input_4f60_7684_590d_8ff0_answer_nn_suggestio'),
+                  hintText: l10n.get(
+                    'input_your_recall_answer_here_suggestion',
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   suffixIcon: VoiceInputButton(
                     onResult: (text) {
                       final current = answerController.text;
-                      final separator = current.isNotEmpty && !current.endsWith(' ') ? ' ' : '';
+                      final separator =
+                          current.isNotEmpty && !current.endsWith(' ')
+                          ? ' '
+                          : '';
                       final newValue = '$current$separator$text';
                       answerController.text = newValue;
                       answerController.selection = TextSelection.fromPosition(
@@ -3429,9 +3517,18 @@ class _AnswerPanel extends StatelessWidget {
                       );
                     },
                     sttMode: context.read<SettingsProvider>().settings.sttMode,
-                    whisperBaseUrl: context.read<SettingsProvider>().settings.whisperBaseUrl,
-                    whisperApiKey: context.read<SettingsProvider>().settings.whisperApiKey,
-                    whisperModel: context.read<SettingsProvider>().settings.whisperModel,
+                    whisperBaseUrl: context
+                        .read<SettingsProvider>()
+                        .settings
+                        .whisperBaseUrl,
+                    whisperApiKey: context
+                        .read<SettingsProvider>()
+                        .settings
+                        .whisperApiKey,
+                    whisperModel: context
+                        .read<SettingsProvider>()
+                        .settings
+                        .whisperModel,
                   ),
                 ),
               ),
@@ -3447,7 +3544,11 @@ class _AnswerPanel extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_awesome),
-                  label: Text(isEvaluating ? l10n.get('ai_evaluation_4e2d') : l10n.get('83b7_53d6_ai_depth_evaluation')),
+                  label: Text(
+                    isEvaluating
+                        ? l10n.get('ai_evaluation_in')
+                        : l10n.get('gain_fetch_ai_depth_evaluation'),
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -3556,7 +3657,7 @@ class _EvaluationResultPanel extends StatelessWidget {
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              l10n.get('missed_70b9'),
+              l10n.get('missed_point'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.warning,
@@ -3585,7 +3686,7 @@ class _EvaluationResultPanel extends StatelessWidget {
           if (errors.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              l10n.get('wrong_70b9'),
+              l10n.get('wrong_point'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.danger,
@@ -3694,7 +3795,7 @@ class _ScoreRing extends StatelessWidget {
                 ),
               ),
               Text(
-                l10n.get('5206'),
+                l10n.get('score'),
                 style: TextStyle(fontSize: size * 0.12, color: _color),
               ),
             ],

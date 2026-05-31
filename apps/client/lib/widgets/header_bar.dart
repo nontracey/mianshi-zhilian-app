@@ -7,7 +7,6 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-import '../providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class HeaderBar extends StatefulWidget {
@@ -92,7 +91,7 @@ class _HeaderBarState extends State<HeaderBar> {
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         top: size.height + 4,
-        right: 16,  // 右对齐
+        right: 16, // 右对齐
         width: 300,
         child: Material(
           elevation: 8,
@@ -104,7 +103,9 @@ class _HeaderBarState extends State<HeaderBar> {
               color: isDark ? const Color(0xFF161B22) : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isDark ? const Color(0xFF30363D) : const Color(0xFFE0E0E0),
+                color: isDark
+                    ? const Color(0xFF30363D)
+                    : const Color(0xFFE0E0E0),
               ),
             ),
             child: Column(
@@ -125,7 +126,9 @@ class _HeaderBarState extends State<HeaderBar> {
                       ),
                       const Spacer(),
                       Text(
-                        l10n.getp('{count}_items', {'count': _searchResults.length}),
+                        l10n.getp('count_items_2', {
+                          'count': _searchResults.length,
+                        }),
                         style: TextStyle(
                           fontSize: 11,
                           color: isDark ? Colors.white38 : Colors.grey.shade400,
@@ -134,7 +137,12 @@ class _HeaderBarState extends State<HeaderBar> {
                     ],
                   ),
                 ),
-                Divider(height: 1, color: isDark ? const Color(0xFF30363D) : const Color(0xFFF0F0F0)),
+                Divider(
+                  height: 1,
+                  color: isDark
+                      ? const Color(0xFF30363D)
+                      : const Color(0xFFF0F0F0),
+                ),
                 // 搜索结果列表
                 Flexible(
                   child: ListView.separated(
@@ -144,7 +152,9 @@ class _HeaderBarState extends State<HeaderBar> {
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
                       indent: 52,
-                      color: isDark ? const Color(0xFF30363D) : const Color(0xFFF0F0F0),
+                      color: isDark
+                          ? const Color(0xFF30363D)
+                          : const Color(0xFFF0F0F0),
                     ),
                     itemBuilder: (context, index) {
                       final topic = _searchResults[index];
@@ -161,7 +171,10 @@ class _HeaderBarState extends State<HeaderBar> {
                           }
                         },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           child: Row(
                             children: [
                               // 图标
@@ -169,10 +182,16 @@ class _HeaderBarState extends State<HeaderBar> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.1),
+                                  color: AppColors.accent.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.menu_book_outlined, size: 18, color: AppColors.accent),
+                                child: const Icon(
+                                  Icons.menu_book_outlined,
+                                  size: 18,
+                                  color: AppColors.accent,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               // 内容
@@ -185,7 +204,9 @@ class _HeaderBarState extends State<HeaderBar> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
-                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF1A1A1A),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -196,23 +217,32 @@ class _HeaderBarState extends State<HeaderBar> {
                                         Icon(
                                           Icons.folder_outlined,
                                           size: 12,
-                                          color: isDark ? Colors.white38 : Colors.grey,
+                                          color: isDark
+                                              ? Colors.white38
+                                              : Colors.grey,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           topic.domain,
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: isDark ? Colors.white38 : Colors.grey,
+                                            color: isDark
+                                                ? Colors.white38
+                                                : Colors.grey,
                                           ),
                                         ),
                                         if (topic.highFrequency) ...[
                                           const SizedBox(width: 8),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 1,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.warning.withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(3),
+                                              color: AppColors.warning
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
                                             ),
                                             child: Text(
                                               l10n.get('high_frequency'),
@@ -233,7 +263,9 @@ class _HeaderBarState extends State<HeaderBar> {
                               Icon(
                                 Icons.arrow_forward_ios,
                                 size: 14,
-                                color: isDark ? Colors.white24 : Colors.grey.shade300,
+                                color: isDark
+                                    ? Colors.white24
+                                    : Colors.grey.shade300,
                               ),
                             ],
                           ),
@@ -268,7 +300,11 @@ class _HeaderBarState extends State<HeaderBar> {
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.grey.shade400,
             ),
-            prefixIcon: Icon(Icons.search, size: 16, color: isDark ? Colors.white38 : Colors.grey),
+            prefixIcon: Icon(
+              Icons.search,
+              size: 16,
+              color: isDark ? Colors.white38 : Colors.grey,
+            ),
             suffixIcon: _isSearching
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 16),
@@ -289,8 +325,13 @@ class _HeaderBarState extends State<HeaderBar> {
               borderSide: BorderSide.none,
             ),
             filled: true,
-            fillColor: isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            fillColor: isDark
+                ? const Color(0xFF21262D)
+                : const Color(0xFFF0F2F5),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 0,
+            ),
             isDense: true,
           ),
         ),
@@ -304,7 +345,7 @@ class _HeaderBarState extends State<HeaderBar> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final aiProvider = context.watch<AiProvider>();
     final authProvider = context.watch<AuthProvider>();
-    
+
     // 获取当前使用的AI模型名称
     final currentModelName = aiProvider.configs.isNotEmpty
         ? aiProvider.configs.first.name
@@ -322,12 +363,7 @@ class _HeaderBarState extends State<HeaderBar> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         decoration: BoxDecoration(
           color: surfaceColor,
-          border: Border(
-            bottom: BorderSide(
-              color: borderColor,
-              width: 1,
-            ),
-          ),
+          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
         ),
         child: Row(
           children: [
@@ -365,7 +401,10 @@ class _HeaderBarState extends State<HeaderBar> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('search_topics_hint'), style: TextStyle(fontSize: 16)),
+        title: Text(
+          l10n.get('search_topics_hint'),
+          style: TextStyle(fontSize: 16),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: TextField(
@@ -374,7 +413,9 @@ class _HeaderBarState extends State<HeaderBar> {
             decoration: InputDecoration(
               hintText: l10n.get('search_topics_hint'),
               prefixIcon: Icon(Icons.search, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               isDense: true,
             ),
             onSubmitted: (value) {
@@ -406,7 +447,11 @@ class _HeaderBarState extends State<HeaderBar> {
 
   Widget _buildMobileSearchIcon(BuildContext context, bool isDark) {
     return IconButton(
-      icon: Icon(Icons.search, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
+      icon: Icon(
+        Icons.search,
+        size: 20,
+        color: isDark ? Colors.white70 : Colors.grey.shade700,
+      ),
       onPressed: () => _showMobileSearchDialog(context, isDark),
       tooltip: l10n.get('search'),
     );
@@ -416,9 +461,13 @@ class _HeaderBarState extends State<HeaderBar> {
     // 这里可以后续接入用户头像
     return IconButton.filledTonal(
       onPressed: widget.onProfile,
-      icon: Icon(Icons.person_outline, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
+      icon: Icon(
+        Icons.person_outline,
+        size: 20,
+        color: isDark ? Colors.white70 : Colors.grey.shade700,
+      ),
       style: IconButton.styleFrom(
-        backgroundColor: isDark 
+        backgroundColor: isDark
             ? Colors.white.withValues(alpha: 0.1)
             : Colors.black.withValues(alpha: 0.05),
       ),
@@ -443,9 +492,9 @@ class _AiModelSelector extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AiConfigPage()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const AiConfigPage()));
       },
       borderRadius: BorderRadius.circular(8),
       child: Padding(
@@ -456,7 +505,7 @@ class _AiModelSelector extends StatelessWidget {
             Icon(
               Icons.smart_toy_outlined,
               size: 16,
-              color: hasConfig 
+              color: hasConfig
                   ? const Color(0xFF3078F0)
                   : (isDark ? Colors.white38 : Colors.grey),
             ),
@@ -523,7 +572,9 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
           const SizedBox(width: 8),
           Container(
             decoration: BoxDecoration(
-              color: widget.isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+              color: widget.isDark
+                  ? const Color(0xFF21262D)
+                  : const Color(0xFFF0F2F5),
               borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.all(2),
@@ -550,7 +601,10 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                           );
                         },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Theme.of(context).colorScheme.primary
@@ -564,19 +618,28 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                           stage.$2,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                             color: isSelected
                                 ? Colors.white
                                 : isEnabled
-                                    ? (widget.isDark ? Colors.white70 : const Color(0xFF666666))
-                                    : (widget.isDark ? Colors.white30 : Colors.grey.shade400),
+                                ? (widget.isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF666666))
+                                : (widget.isDark
+                                      ? Colors.white30
+                                      : Colors.grey.shade400),
                           ),
                         ),
-                        if (!isEnabled) ...[const SizedBox(width: 4),
+                        if (!isEnabled) ...[
+                          const SizedBox(width: 4),
                           Icon(
                             Icons.lock_outline,
                             size: 10,
-                            color: widget.isDark ? Colors.white30 : Colors.grey.shade400,
+                            color: widget.isDark
+                                ? Colors.white30
+                                : Colors.grey.shade400,
                           ),
                         ],
                       ],
@@ -636,14 +699,16 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                 stage.$2,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      stage.$1 == _currentStage ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: stage.$1 == _currentStage
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: !isEnabled
                       ? (widget.isDark ? Colors.white30 : Colors.grey.shade400)
                       : null,
                 ),
               ),
-              if (!isEnabled) ...[const SizedBox(width: 6),
+              if (!isEnabled) ...[
+                const SizedBox(width: 6),
                 Icon(
                   Icons.lock_outline,
                   size: 12,

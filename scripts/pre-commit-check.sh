@@ -15,8 +15,18 @@ flutter pub get
 echo "✅ 依赖获取完成"
 echo ""
 
-# 2. 静态分析
-echo "🔎 Step 2/4: 运行静态分析..."
+# 2. l10n 规则检查
+echo "🌐 Step 2/5: 运行 l10n 规则检查..."
+if python3 lib/l10n/check_l10n_keys.py; then
+  echo "✅ l10n 规则检查通过"
+else
+  echo "❌ l10n 规则检查失败，请修复上面的问题"
+  exit 1
+fi
+echo ""
+
+# 3. 静态分析
+echo "🔎 Step 3/5: 运行静态分析..."
 if flutter analyze --no-fatal-infos; then
   echo "✅ 静态分析通过"
 else
@@ -25,8 +35,8 @@ else
 fi
 echo ""
 
-# 3. 运行测试
-echo "🧪 Step 3/4: 运行测试..."
+# 4. 运行测试
+echo "🧪 Step 4/5: 运行测试..."
 if flutter test; then
   echo "✅ 测试通过"
 else
@@ -35,8 +45,8 @@ else
 fi
 echo ""
 
-# 4. 构建 Web
-echo "🏗️ Step 4/4: 构建 Web..."
+# 5. 构建 Web
+echo "🏗️ Step 5/5: 构建 Web..."
 if flutter build web --release; then
   echo "✅ Web 构建成功"
 else

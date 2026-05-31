@@ -36,11 +36,11 @@ class AiConfig {
   /// 能力标签（返回 l10n key 列表，UI 层使用 l10n.get() 逐个翻译后拼接）
   List<String> get capabilityLabels {
     final labels = <String>[];
-    if (supportsTextInput) labels.add('文本');
-    if (supportsImageInput) labels.add('图片');
-    if (supportsAudioInput) labels.add('语音');
-    if (supportsStreaming) labels.add('流式');
-    return labels.isEmpty ? ['未声明能力'] : labels;
+    if (supportsTextInput) labels.add('support_text');
+    if (supportsImageInput) labels.add('support_image');
+    if (supportsAudioInput) labels.add('speech_voice');
+    if (supportsStreaming) labels.add('support_streaming');
+    return labels.isEmpty ? ['capability_not_declared'] : labels;
   }
 
   @Deprecated('Use capabilityLabels with l10n.get() instead')

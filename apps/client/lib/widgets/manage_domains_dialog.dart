@@ -119,7 +119,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                               ),
                             ),
                             Text(
-                              l10n.getp('{count}_4e2a_knowledge_point', {'count': domain.topicCount}),
+                              l10n.getp('count_knowledge_point_2', {'count': domain.topicCount}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,

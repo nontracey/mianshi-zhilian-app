@@ -14,16 +14,16 @@ class ScoreBadge extends StatelessWidget {
     return const Color(0xFF64748B);
   }
 
-  String get _label {
-    if (score >= 85) return '熟练';
-    if (score >= 60) return '不熟练';
-    return '未掌握';
+  String get _labelKey {
+    if (score >= 85) return 'mastery_skilled';
+    if (score >= 60) return 'mastery_learning';
+    return 'un_mastery';
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final label = l10n.get(_label);
+    final label = l10n.get(_labelKey);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

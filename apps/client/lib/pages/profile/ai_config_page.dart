@@ -41,9 +41,16 @@ class _AiConfigPageState extends State<AiConfigPage> {
                 padding: const EdgeInsets.all(48),
                 child: Column(
                   children: [
-                    const Icon(Icons.hub_outlined, size: 64, color: Colors.grey),
+                    const Icon(
+                      Icons.hub_outlined,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(height: 16),
-                    Text(l10n.get('no_ai_config'), style: const TextStyle(fontSize: 16)),
+                    Text(
+                      l10n.get('no_ai_config'),
+                      style: const TextStyle(fontSize: 16),
+                    ),
                     const SizedBox(height: 8),
                     Text(l10n.get('click_top_right_add_config')),
                   ],
@@ -89,7 +96,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(isEditing ? l10n.get('edit_config') : l10n.get('add_new_config')),
+          title: Text(
+            isEditing ? l10n.get('edit_config') : l10n.get('add_new_config'),
+          ),
           content: SingleChildScrollView(
             child: SizedBox(
               width: 400,
@@ -106,8 +115,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: baseUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'Base URL',
+                    decoration: InputDecoration(
+                      labelText: l10n.get('base_url'),
                       hintText: 'https://api.openai.com/v1',
                     ),
                   ),
@@ -115,8 +124,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   TextField(
                     controller: apiKeyController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'API Key',
+                    decoration: InputDecoration(
+                      labelText: l10n.get('api_key'),
                       hintText: 'sk-...',
                     ),
                   ),
@@ -143,12 +152,15 @@ class _AiConfigPageState extends State<AiConfigPage> {
                                     model: modelController.text.trim(),
                                   );
                               setDialogState(() {
-                                testResult = success ? l10n.get('connection_success') : l10n.get('connection_failed');
+                                testResult = success
+                                    ? l10n.get('connection_success')
+                                    : l10n.get('connection_failed');
                                 isTesting = false;
                               });
                             } catch (e) {
                               setDialogState(() {
-                                testResult = '${l10n.get('connection_failed')}：$e';
+                                testResult =
+                                    '${l10n.get('connection_failed')}：$e';
                                 isTesting = false;
                               });
                             }
@@ -160,7 +172,11 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.wifi_tethering),
-                    label: Text(isTesting ? l10n.get('testing') : l10n.get('test_connect')),
+                    label: Text(
+                      isTesting
+                          ? l10n.get('testing')
+                          : l10n.get('test_connect'),
+                    ),
                   ),
                   if (testResult != null) ...[
                     const SizedBox(height: 8),
@@ -249,7 +265,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
                       ),
                       _UsageChip(
-                        label: l10n.get('6a21_62df_interview'),
+                        label: l10n.get('mode_mock_interview'),
                         value: 'mockInterview',
                         selected: usageTags.contains('mockInterview'),
                         onSelected: (value) => setDialogState(
@@ -269,7 +285,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
                       ),
                       _UsageChip(
-                        label: l10n.get('8bed_97f3_8bc6_522b'),
+                        label: l10n.get('speech_voice_identify_distinct'),
                         value: 'stt',
                         selected: usageTags.contains('stt'),
                         onSelected: (value) => setDialogState(
@@ -355,7 +371,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.get('confirm_delete')),
-        content: Text('${l10n.get('confirm_delete_config')}「${config.name}」${l10n.get('question_mark')}'),
+        content: Text(
+          '${l10n.get('confirm_delete_config')}「${config.name}」${l10n.get('question_mark')}',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -435,15 +453,31 @@ class _ConfigCard extends StatelessWidget {
         ],
       ),
       children: [
-        Text('${l10n.get('model')}：${config.model}'),
+        Text(l10n.getp('model_value', {'model': config.model})),
         const SizedBox(height: 4),
-        Text('Base URL：${config.baseUrl}'),
+        Text(l10n.getp('base_url_value', {'url': config.baseUrl})),
         const SizedBox(height: 4),
-        Text('${l10n.get('capability')}：${config.capabilityLabels.map((k) => l10n.get(k)).join(' · ')}'),
+        Text(
+          l10n.getp('capability_value', {
+            'capability': config.capabilityLabels
+                .map((k) => l10n.get(k))
+                .join(' · '),
+          }),
+        ),
         const SizedBox(height: 4),
-        Text('${l10n.get('usage_purpose')}：${config.usageTags.join('、')}'),
+        Text(
+          l10n.getp('usage_purpose_value', {
+            'usage': config.usageTags.join(' · '),
+          }),
+        ),
         const SizedBox(height: 4),
-        Text('${l10n.get('status')}：${config.enabled ? l10n.get('already_enable') : l10n.get('already_disable')}'),
+        Text(
+          l10n.getp('status_value', {
+            'status': config.enabled
+                ? l10n.get('already_enable')
+                : l10n.get('already_disable'),
+          }),
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,

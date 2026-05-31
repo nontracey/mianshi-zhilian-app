@@ -129,7 +129,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           );
 
           return MaterialApp(
-            title: l10n.get('interview_667a_7ec3'),
+            title: l10n.get('interview_intelligence_training'),
             debugShowCheckedModeBanner: false,
             locale: Locale(l10n.language),
             localizationsDelegates: const [
@@ -203,8 +203,8 @@ class _LearningShellState extends State<LearningShell> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(userRole == UserRole.guest
-                              ? l10n.get('login_540e_53ef_67e5_770b_test_7248_content')
-                              : l10n.get('9700_8981_management_5458_permission_67e5_770b_8349_7a3f_con')),
+                              ? l10n.get('login_after_optional_check_view_test_version_content')
+                              : l10n.get('demand_key_management_member_permission_check_view_draft_con')),
                           duration: const Duration(seconds: 2),
                         ),
                       );

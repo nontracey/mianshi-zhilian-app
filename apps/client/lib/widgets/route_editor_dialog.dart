@@ -91,7 +91,7 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
                   const Icon(Icons.route, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    widget.existingRoute != null ? l10n.get('edit_route') : l10n.get('521b_5efa_custom_route'),
+                    widget.existingRoute != null ? l10n.get('edit_route') : l10n.get('create_build_custom_route'),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),

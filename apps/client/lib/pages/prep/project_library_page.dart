@@ -16,7 +16,6 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final List<Map<String, dynamic>> _projects = [];
   final _storage = StorageService();
-  
 
   @override
   void initState() {
@@ -80,11 +79,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.folder_open,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
+            Icon(Icons.folder_open, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
               l10n.get('no_saved_projects'),
@@ -97,10 +92,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             const SizedBox(height: 8),
             Text(
               l10n.get('add_project_experience'),
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -179,7 +171,9 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                           '${project['role']} · ${project['scale']}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? Colors.white54 : const Color(0xFF666666),
+                            color: isDark
+                                ? Colors.white54
+                                : const Color(0xFF666666),
                           ),
                         ),
                       ],
@@ -211,14 +205,22 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Colors.red,
+                            ),
                             const SizedBox(width: 8),
-                            Text(l10n.get('delete'), style: const TextStyle(color: Colors.red)),
+                            Text(
+                              l10n.get('delete'),
+                              style: const TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
                     ],
-                    onSelected: (value) => _handleMenuAction(context, index, project, value),
+                    onSelected: (value) =>
+                        _handleMenuAction(context, index, project, value),
                   ),
                 ],
               ),
@@ -228,22 +230,27 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: (project['techStack']?.split(', ') ?? []).map<Widget>((tech) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      tech,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.accent,
+                children: (project['techStack']?.split(', ') ?? []).map<Widget>(
+                  (tech) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                    ),
-                  );
-                }).toList(),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tech,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    );
+                  },
+                ).toList(),
               ),
               const SizedBox(height: 12),
 
@@ -329,15 +336,13 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   }
 
   void _navigateToAddProject(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ProjectDigPage(),
-      ),
-    ).then((result) {
-      if (result != null && result is Map<String, dynamic>) {
-        _addProject(result);
-      }
-    });
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProjectDigPage()))
+        .then((result) {
+          if (result != null && result is Map<String, dynamic>) {
+            _addProject(result);
+          }
+        });
   }
 
   void _navigateToEditProject(
@@ -345,18 +350,16 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     int index,
     Map<String, dynamic> project,
   ) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ProjectDigPage(),
-      ),
-    ).then((result) {
-      if (result != null && result is Map<String, dynamic>) {
-        setState(() {
-          _projects[index] = {..._projects[index], ...result};
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProjectDigPage()))
+        .then((result) {
+          if (result != null && result is Map<String, dynamic>) {
+            setState(() {
+              _projects[index] = {..._projects[index], ...result};
+            });
+            _saveProjects();
+          }
         });
-        _saveProjects();
-      }
-    });
   }
 
   void _viewProjectDetail(
@@ -375,11 +378,8 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         expand: false,
-        builder: (ctx, scrollController) => _buildProjectDetailSheet(
-          ctx,
-          project,
-          scrollController,
-        ),
+        builder: (ctx, scrollController) =>
+            _buildProjectDetailSheet(ctx, project, scrollController),
       ),
     );
   }
@@ -410,20 +410,14 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           // 项目名称
           Text(
             project['name'] ?? '',
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
           ),
           const SizedBox(height: 8),
 
           // 角色和规模
           Text(
             '${project['role']} · ${project['scale']}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 16),
 
@@ -431,7 +425,9 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: (project['techStack']?.split(', ') ?? []).map<Widget>((tech) {
+            children: (project['techStack']?.split(', ') ?? []).map<Widget>((
+              tech,
+            ) {
               return Chip(
                 label: Text(tech, style: const TextStyle(fontSize: 12)),
                 backgroundColor: AppColors.accent.withValues(alpha: 0.1),
@@ -442,7 +438,10 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           const SizedBox(height: 20),
 
           // STAR 详情
-          _buildStarDetail(l10n.get('situation_background'), project['background']),
+          _buildStarDetail(
+            l10n.get('situation_background'),
+            project['background'],
+          ),
           _buildStarDetail(l10n.get('task_task'), project['task']),
           _buildStarDetail(l10n.get('action_action'), project['action']),
           _buildStarDetail(l10n.get('result_result'), project['result']),
@@ -455,7 +454,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: Text(l10n.get('5173_95ed')),
+                  label: Text(l10n.get('close')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -499,10 +498,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            content,
-            style: const TextStyle(fontSize: 14, height: 1.6),
-          ),
+          Text(content, style: const TextStyle(fontSize: 14, height: 1.6)),
         ],
       ),
     );
@@ -510,12 +506,14 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
 
   void _startProjectDig(BuildContext context, Map<String, dynamic> project) {
     final questions = [
-      '这个项目的核心技术难点是什么？',
-      '为什么选择 ${project['techStack'] ?? '这个'} 技术栈？',
-      '遇到过什么线上问题？如何解决的？',
-      '如果重新设计，你会怎么改进？',
-      '你在项目中的最大贡献是什么？',
-      '这个项目的性能指标是多少？如何优化的？',
+      l10n.get('project_question_core_challenge'),
+      l10n.getp('project_question_why_tech_stack', {
+        'techStack': project['techStack'] ?? l10n.get('this_project'),
+      }),
+      l10n.get('project_question_incident_resolution'),
+      l10n.get('project_question_redesign'),
+      l10n.get('project_question_personal_contribution'),
+      l10n.get('project_question_metrics_optimization'),
     ];
 
     showDialog(
@@ -527,13 +525,22 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${l10n.get('project')}：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                '${l10n.get('project')}：${project['name']}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               if (project['techStack'] != null) ...[
                 const SizedBox(height: 4),
-                Text('${l10n.get('tech_6808')}：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text(
+                  '${l10n.get('tech_stack')}：${project['techStack']}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               ],
               const SizedBox(height: 16),
-              Text(l10n.get('interview_5b98_53ef_80fd_4f1a_95ee'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                l10n.get('interview_official_optional_enable_will_question'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               ...questions.map((q) => _buildDigQuestion(q)),
             ],
@@ -542,7 +549,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('5173_95ed')),
+            child: Text(l10n.get('close')),
           ),
           FilledButton(
             onPressed: () {
