@@ -54,7 +54,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('项目深挖库')),
+        title: Text(l10n.get('project_deep_dig_library')),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -68,7 +68,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _navigateToAddProject(context),
         icon: const Icon(Icons.add),
-        label: Text(l10n.get('添加项目')),
+        label: Text(l10n.get('add_project')),
       ),
     );
   }
@@ -87,7 +87,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.get('还没有保存的项目'),
+              l10n.get('no_saved_projects'),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -96,7 +96,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('添加你的项目经历，方便面试前快速复习'),
+              l10n.get('add_project_experience'),
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
@@ -106,7 +106,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
             FilledButton.icon(
               onPressed: () => _navigateToAddProject(context),
               icon: const Icon(Icons.add),
-              label: Text(l10n.get('添加项目')),
+              label: Text(l10n.get('add_project')),
             ),
           ],
         ),
@@ -193,7 +193,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                           children: [
                             const Icon(Icons.edit, size: 18),
                             const SizedBox(width: 8),
-                            Text(l10n.get('编辑')),
+                            Text(l10n.get('edit')),
                           ],
                         ),
                       ),
@@ -203,7 +203,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                           children: [
                             const Icon(Icons.play_arrow, size: 18),
                             const SizedBox(width: 8),
-                            Text(l10n.get('深挖练习')),
+                            Text(l10n.get('deep_dig_practice')),
                           ],
                         ),
                       ),
@@ -213,7 +213,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                           children: [
                             const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                             const SizedBox(width: 8),
-                            Text(l10n.get('删除'), style: const TextStyle(color: Colors.red)),
+                            Text(l10n.get('delete'), style: const TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -256,7 +256,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
 
               // 更新时间
               Text(
-                '${l10n.get('更新于')} ${project['updatedAt'] ?? ''}',
+                '${l10n.get('updated_at')} ${project['updatedAt'] ?? ''}',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white38 : const Color(0xFF999999),
@@ -442,10 +442,10 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
           const SizedBox(height: 20),
 
           // STAR 详情
-          _buildStarDetail(l10n.get('Situation（背景）'), project['background']),
-          _buildStarDetail(l10n.get('Task（任务）'), project['task']),
-          _buildStarDetail(l10n.get('Action（行动）'), project['action']),
-          _buildStarDetail(l10n.get('Result（结果）'), project['result']),
+          _buildStarDetail(l10n.get('situation_background'), project['background']),
+          _buildStarDetail(l10n.get('task_task'), project['task']),
+          _buildStarDetail(l10n.get('action_action'), project['action']),
+          _buildStarDetail(l10n.get('result_result'), project['result']),
           const SizedBox(height: 20),
 
           // 操作按钮
@@ -455,7 +455,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: Text(l10n.get('关闭')),
+                  label: Text(l10n.get('5173_95ed')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -466,7 +466,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
                     _startProjectDig(context, project);
                   },
                   icon: const Icon(Icons.play_arrow),
-                  label: Text(l10n.get('深挖练习')),
+                  label: Text(l10n.get('deep_dig_practice')),
                 ),
               ),
             ],
@@ -521,19 +521,19 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('项目深挖练习')),
+        title: Text(l10n.get('project_deep_dig_practice')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${l10n.get('项目')}：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text('${l10n.get('project')}：${project['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
               if (project['techStack'] != null) ...[
                 const SizedBox(height: 4),
-                Text('${l10n.get('技术栈')}：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text('${l10n.get('tech_6808')}：${project['techStack']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
               const SizedBox(height: 16),
-              Text(l10n.get('面试官可能会问：'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('interview_5b98_53ef_80fd_4f1a_95ee'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...questions.map((q) => _buildDigQuestion(q)),
             ],
@@ -542,7 +542,7 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('关闭')),
+            child: Text(l10n.get('5173_95ed')),
           ),
           FilledButton(
             onPressed: () {
@@ -550,12 +550,12 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
               // 显示提示，让用户自己练习
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(l10n.get('请对着这些问题进行口头练习，记录你的回答')),
+                  content: Text(l10n.get('practice_verbally')),
                   duration: const Duration(seconds: 3),
                 ),
               );
             },
-            child: Text(l10n.get('开始练习')),
+            child: Text(l10n.get('start_practice')),
           ),
         ],
       ),

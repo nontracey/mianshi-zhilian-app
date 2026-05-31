@@ -31,7 +31,7 @@ class ScoreBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        l10n.getp('{score} 分 · {label}', {'score': '$score', 'label': label}),
+        l10n.getp('score_label', {'score': '$score', 'label': label}),
         style: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w800,

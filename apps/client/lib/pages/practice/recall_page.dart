@@ -15,6 +15,7 @@ import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import '../../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class RecallPage extends StatefulWidget {
   const RecallPage({super.key, required this.topicIds});
@@ -53,7 +54,7 @@ class _RecallPageState extends State<RecallPage> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (widget.topicIds.isEmpty) {
-      return Center(child: Text(l10n.get('没有可练习的知识点')));
+      return Center(child: Text(l10n.get('6ca1_has_53ef_practice_7684_knowledge_point')));
     }
 
     final contentProvider = context.watch<ContentProvider>();
@@ -61,7 +62,7 @@ class _RecallPageState extends State<RecallPage> {
     final topic = contentProvider.findTopic(widget.topicIds[_currentIndex]);
 
     if (topic == null) {
-      return Center(child: Text(l10n.get('知识点未找到')));
+      return Center(child: Text(l10n.get('knowledge_point_un_627e_5230')));
     }
 
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -233,18 +234,18 @@ class _RecallPageState extends State<RecallPage> {
             children: [
               _InputModeTab(
                 icon: Icons.notes_outlined,
-                label: l10n.get('文本'),
+                label: l10n.get('6587_672c'),
                 value: 'text',
                 selected: _inputMode == 'text',
                 onTap: () => setState(() => _inputMode = 'text'),
               ),
               _InputModeTab(
                 icon: Icons.mic_outlined,
-                label: l10n.get('语音'),
+                label: l10n.get('8bed_97f3'),
                 value: 'voice',
                 selected: _inputMode == 'voice',
                 enabled: supportsAudio,
-                disabledTooltip: l10n.get('当前模型不支持语音输入'),
+                disabledTooltip: l10n.get('current_6a21_578b_not_652f_6301_8bed_97f3_input'),
                 onTap: () => setState(() {
                   _inputMode = 'voice';
                   _voiceTranscribed = false;
@@ -252,16 +253,16 @@ class _RecallPageState extends State<RecallPage> {
               ),
               _InputModeTab(
                 icon: Icons.image_outlined,
-                label: l10n.get('图片'),
+                label: l10n.get('56fe_7247'),
                 value: 'image',
                 selected: _inputMode == 'image',
                 enabled: supportsImage,
-                disabledTooltip: l10n.get('当前模型不支持图片输入'),
+                disabledTooltip: l10n.get('current_6a21_578b_not_652f_6301_56fe_7247_input'),
                 onTap: () => setState(() => _inputMode = 'image'),
               ),
               _InputModeTab(
                 icon: Icons.code,
-                label: l10n.get('代码'),
+                label: l10n.get('code'),
                 value: 'code',
                 selected: _inputMode == 'code',
                 onTap: () => setState(() => _inputMode = 'code'),
@@ -299,10 +300,10 @@ class _RecallPageState extends State<RecallPage> {
                   : const Icon(Icons.auto_awesome),
               label: Text(
                 _isEvaluating
-                    ? l10n.get('评估中')
+                    ? l10n.get('evaluation_4e2d')
                     : aiProvider.enabledConfigs.isEmpty
-                    ? l10n.get('保存本地练习')
-                    : l10n.get('获取_AI_评估'),
+                    ? l10n.get('save_local_practice')
+                    : l10n.get('83b7_53d6_ai_evaluation'),
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -327,7 +328,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.get('未配置_AI_模型_将保存为本地练习_配置后可获得深度评分'),
+                    l10n.get('un_config_ai_6a21_578b_5c06_save_4e3a_local_practice_config'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -379,15 +380,15 @@ class _RecallPageState extends State<RecallPage> {
                   children: [
                     Text(
                       _voiceTranscribed
-                          ? l10n.get('语音已转写_可编辑后添加到回答')
-                          : l10n.get('点击麦克风开始语音复述'),
+                          ? l10n.get('8bed_97f3_already_8f6c_5199_53ef_edit_540e_add_5230_answer')
+                          : l10n.get('70b9_51fb_9ea6_514b_98ce_start_8bed_97f3_590d_8ff0'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
                     Text(
-                      l10n.get('转写文本可独立编辑_确认后添加到回答'),
+                      l10n.get('8f6c_5199_6587_672c_53ef_72ec_7acb_edit_confirm_540e_add_523'),
                       style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -411,12 +412,12 @@ class _RecallPageState extends State<RecallPage> {
                 minLines: 3,
                 maxLines: 8,
                 decoration: InputDecoration(
-                  hintText: l10n.get('语音转写结果'),
+                  hintText: l10n.get('8bed_97f3_8f6c_5199_result'),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(12),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, size: 18),
-                    tooltip: l10n.get('清空转写'),
+                    tooltip: l10n.get('6e05_7a7a_8f6c_5199'),
                     onPressed: () {
                       setState(() {
                         _voiceTranscriptController.clear();
@@ -442,12 +443,12 @@ class _RecallPageState extends State<RecallPage> {
                           _voiceTranscribed = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.get('已添加到回答')), duration: Duration(seconds: 1)),
+                          SnackBar(content: Text(l10n.get('already_add_5230_answer')), duration: Duration(seconds: 1)),
                         );
                       }
                     },
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text(l10n.get('添加到回答')),
+                    label: Text(l10n.get('add_5230_answer')),
                   ),
                 ),
               ],
@@ -491,7 +492,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '已选择: ${_selectedImageName ?? l10n.get('图片')}',
+                    '已选择: ${_selectedImageName ?? l10n.get('56fe_7247')}',
                     style: const TextStyle(fontSize: 12, color: AppColors.success),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -501,7 +502,7 @@ class _RecallPageState extends State<RecallPage> {
                     _selectedImageBytes = null;
                     _selectedImageName = null;
                   }),
-                  child: Text(l10n.get('移除'), style: TextStyle(fontSize: 12)),
+                  child: Text(l10n.get('79fb_9664'), style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -513,7 +514,7 @@ class _RecallPageState extends State<RecallPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    l10n.get('添加截图_架构图等_AI_将结合图片评估'),
+                    l10n.get('add_622a_56fe_architecture_56fe_7b49_ai_5c06_7ed3_5408_56fe'),
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
@@ -526,7 +527,7 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined, size: 16),
-                    label: Text(l10n.get('相册'), style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.get('76f8_518c'), style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -534,7 +535,7 @@ class _RecallPageState extends State<RecallPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _pickImage(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                    label: Text(l10n.get('拍照'), style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.get('62cd_7167'), style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ],
@@ -561,7 +562,7 @@ class _RecallPageState extends State<RecallPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('选择图片失败: {error}', {'error': e}))),
+          SnackBar(content: Text(l10n.getp('select_56fe_7247_fail_{error}', {'error': e}))),
         );
       }
     }
@@ -592,7 +593,7 @@ class _RecallPageState extends State<RecallPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n.get('AI_正在分析'),
+                l10n.get('ai_6b63_5728_analysis'),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -628,8 +629,8 @@ class _RecallPageState extends State<RecallPage> {
     if (_selectedImageBytes != null) {
       final confirmed = await PrivacyService.confirmUpload(
         context: context,
-        dataType: l10n.get('图片'),
-        dataDescription: l10n.get('你选择的图片将发送给_AI_进行评估分析'),
+        dataType: l10n.get('56fe_7247'),
+        dataDescription: l10n.get('4f60_select_7684_56fe_7247_5c06_53d1_9001_7ed9_ai_8fdb_884c'),
       );
       if (!confirmed) return;
     }
@@ -687,7 +688,7 @@ class _RecallPageState extends State<RecallPage> {
               _isStreaming = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.getp('流式输出失败：{error}', {'error': error}))),
+              SnackBar(content: Text(l10n.getp('6d41_5f0f_output_fail_{error}', {'error': error}))),
             );
           }
         },
@@ -769,7 +770,7 @@ class _RecallPageState extends State<RecallPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(l10n.getp('评估失败：{error}', {'error': e}))));
+        ).showSnackBar(SnackBar(content: Text(l10n.getp('evaluation_fail_{error}', {'error': e}))));
       }
     } finally {
       if (mounted) {
@@ -784,11 +785,11 @@ class _RecallPageState extends State<RecallPage> {
     final wrong =
         (result['wrongPoints'] ?? result['errorPoints']) as List<dynamic>? ??
         [];
-    if (missed.isNotEmpty) tags.add(l10n.get('概念缺失'));
-    if (wrong.isNotEmpty) tags.add(l10n.get('概念混淆'));
+    if (missed.isNotEmpty) tags.add(l10n.get('concept_7f3a_5931'));
+    if (wrong.isNotEmpty) tags.add(l10n.get('concept_6df7_6dc6'));
     final summary = (result['summary'] ?? '').toString();
     if (summary.contains('表达') || summary.contains('结构')) {
-      tags.add(l10n.get('表达不清'));
+      tags.add(l10n.get('expression_not_6e05'));
     }
     return tags;
   }
@@ -864,7 +865,7 @@ class _QuestionPanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    l10n.get('高频'),
+                    l10n.get('high_freq'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -878,7 +879,7 @@ class _QuestionPanel extends StatelessWidget {
           Text(
             topic.recallPrompts.isNotEmpty
                 ? topic.recallPrompts.first.prompt
-                : l10n.getp('请用自己的话解释 {title} 的核心内容。', {'title': topic.title}),
+                : l10n.getp('8bf7_7528_81ea_5df1_7684_8bdd_explain_{title}_7684_core_cont', {'title': topic.title}),
             style: const TextStyle(fontSize: 15, height: 1.6),
           ),
           if (topic.interviewerFocus?.isNotEmpty == true) ...[
@@ -900,7 +901,7 @@ class _QuestionPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${l10n.get('面试官关注')}${topic.interviewerFocus}',
+                      '${l10n.get('interviewer_focus')}${topic.interviewerFocus}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -945,7 +946,7 @@ class _RubricPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.get('评分要点'),
+            l10n.get('8bc4_5206_8981_70b9'),
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           if (mustHave.isNotEmpty) ...[
@@ -976,7 +977,7 @@ class _RubricPanel extends StatelessWidget {
           if (commonMistakes.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              l10n.get('常见错误'),
+              l10n.get('common_wrong'),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -1030,12 +1031,12 @@ class _ModelSelector extends StatelessWidget {
           children: [
             const Icon(Icons.hub_outlined, size: 18),
             const SizedBox(width: 8),
-            Expanded(child: Text(l10n.get('未配置_AI_模型_本次使用本地练习模式'))),
+            Expanded(child: Text(l10n.get('un_config_ai_6a21_578b_672c_6b21_4f7f_7528_local_practice_6a'))),
             TextButton(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.get('请到个人中心__AI_配置添加你的模型'))),
+                SnackBar(content: Text(l10n.get('8bf7_5230_personal_center_ai_config_add_4f60_7684_6a21_578b'))),
               ),
-              child: Text(l10n.get('去配置')),
+              child: Text(l10n.get('53bb_config')),
             ),
           ],
         ),
@@ -1049,7 +1050,7 @@ class _ModelSelector extends StatelessWidget {
           ? selected
           : configs.first.id,
       decoration: InputDecoration(
-        labelText: l10n.get('评分模型'),
+        labelText: l10n.get('8bc4_5206_6a21_578b'),
         isDense: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1091,13 +1092,13 @@ class _CapabilityTags extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final tags = <Widget>[];
     if (config.supportsTextInput == true) {
-      tags.add(_tag(l10n.get('文本'), AppColors.accent));
+      tags.add(_tag(l10n.get('6587_672c'), AppColors.accent));
     }
     if (config.supportsImageInput == true) {
-      tags.add(_tag(l10n.get('图片'), AppColors.success));
+      tags.add(_tag(l10n.get('56fe_7247'), AppColors.success));
     }
     if (config.supportsAudioInput == true) {
-      tags.add(_tag(l10n.get('语音'), AppColors.warning));
+      tags.add(_tag(l10n.get('8bed_97f3'), AppColors.warning));
     }
     if (tags.isEmpty) return const SizedBox();
     return Row(mainAxisSize: MainAxisSize.min, children: tags);
@@ -1222,10 +1223,10 @@ class _AnswerInputField extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         hintText: switch (inputMode) {
-          'code' => l10n.get('写下思路_复杂度_边界条件或代码'),
-          'image' => l10n.get('描述图片_架构图_手写笔记中的关键信息'),
-          'voice' => l10n.get('语音转写文本会出现在上方编辑区_确认后添加到这里'),
-          _ => l10n.get('在这里输入你的复述答案'),
+          'code' => l10n.get('5199_4e0b_601d_8def_complexity_8fb9_754c_6761_4ef6_6216_code'),
+          'image' => l10n.get('description_56fe_7247_architecture_56fe_624b_5199_note_4e2d'),
+          'voice' => l10n.get('8bed_97f3_8f6c_5199_6587_672c_4f1a_51fa_73b0_5728_4e0a_65b9'),
+          _ => l10n.get('5728_8fd9_91cc_input_4f60_7684_590d_8ff0_answer'),
         },
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1253,7 +1254,7 @@ class _ProgressIndicator extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            l10n.getp('第 {current} / {total} 题', {'current': current, 'total': total}),
+            l10n.getp('7b2c_{current}_{total}_question_count', {'current': current, 'total': total}),
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           const SizedBox(width: 16),
@@ -1286,6 +1287,7 @@ class _EvaluationResultPanel extends StatefulWidget {
 }
 
 class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   bool _showReference = false;
   int? _selfScore; // 0=不太理解, 1=部分理解, 2=理解良好
 
@@ -1335,7 +1337,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
               ),
               const SizedBox(width: 8),
               Text(
-                aiUnavailable ? l10n.get('本地练习已保存') : l10n.get('AI_评估结果'),
+                aiUnavailable ? l10n.get('local_practice_already_save') : l10n.get('ai_evaluation_result'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -1357,15 +1359,15 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 final tags = <(String, IconData, Color)>[];
                 if (missed.isNotEmpty) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('概念缺失'), Icons.visibility_off_outlined, AppColors.warning));
+                  tags.add((l10n.get('concept_7f3a_5931'), Icons.visibility_off_outlined, AppColors.warning));
                 }
                 if (errors.isNotEmpty) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('概念混淆'), Icons.swap_horiz, AppColors.danger));
+                  tags.add((l10n.get('concept_6df7_6dc6'), Icons.swap_horiz, AppColors.danger));
                 }
                 if (summary.contains('表达') || summary.contains('结构')) {
                   final l10n = context.watch<LocalizationProvider>();
-                  tags.add((l10n.get('表达不清'), Icons.chat_bubble_outline, AppColors.info));
+                  tags.add((l10n.get('expression_not_6e05'), Icons.chat_bubble_outline, AppColors.info));
                 }
                 if (tags.isEmpty) return const SizedBox.shrink();
                 return Padding(
@@ -1432,7 +1434,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            l10n.get('查看参考答案'),
+                            l10n.get('67e5_770b_reference_answer'),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -1477,14 +1479,14 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.get('自评掌握程度'),
+                    l10n.get('81ea_8bc4_mastery_7a0b_5ea6'),
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       _SelfEvalChip(
-                        label: l10n.get('不太理解'),
+                        label: l10n.get('not_592a_7406_89e3'),
                         icon: Icons.sentiment_dissatisfied,
                         color: AppColors.danger,
                         selected: _selfScore == 0,
@@ -1492,7 +1494,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: l10n.get('部分理解'),
+                        label: l10n.get('90e8_5206_7406_89e3'),
                         icon: Icons.sentiment_neutral,
                         color: AppColors.warning,
                         selected: _selfScore == 1,
@@ -1500,7 +1502,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                       ),
                       const SizedBox(width: 8),
                       _SelfEvalChip(
-                        label: l10n.get('理解良好'),
+                        label: l10n.get('7406_89e3_826f_597d'),
                         icon: Icons.sentiment_satisfied,
                         color: AppColors.success,
                         selected: _selfScore == 2,
@@ -1518,7 +1520,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.tips_and_updates_outlined,
-              label: l10n.get('遗漏点'),
+              label: l10n.get('missed_70b9'),
               color: AppColors.warning,
             ),
             const SizedBox(height: 8),
@@ -1534,7 +1536,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.cancel_outlined,
-              label: l10n.get('错误点'),
+              label: l10n.get('wrong_70b9'),
               color: AppColors.danger,
             ),
             const SizedBox(height: 8),
@@ -1550,7 +1552,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
             const SizedBox(height: 16),
             _SectionHeader(
               icon: Icons.auto_fix_high_outlined,
-              label: l10n.get('优化回答'),
+              label: l10n.get('optimize_answer'),
               color: AppColors.success,
             ),
             const SizedBox(height: 8),
@@ -1612,7 +1614,7 @@ class _EvaluationResultPanelState extends State<_EvaluationResultPanel> {
                 );
               },
               icon: const Icon(Icons.library_books_outlined, size: 16),
-              label: Text(l10n.get('查看回答版本库')),
+              label: Text(l10n.get('67e5_770b_answer_version_5e93')),
             ),
           ],
         ],
@@ -1756,12 +1758,12 @@ class _NavigationButtons extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: hasPrevious ? onPrevious : null,
             icon: const Icon(Icons.arrow_back, size: 18),
-            label: Text(l10n.get('上一个')),
+            label: Text(l10n.get('prev_4e2a')),
           ),
           FilledButton.icon(
             onPressed: hasNext ? onNext : null,
             icon: const Icon(Icons.arrow_forward, size: 18),
-            label: Text(l10n.get('下一个')),
+            label: Text(l10n.get('next_4e2a')),
           ),
         ],
       ),
@@ -1843,10 +1845,10 @@ class _BottomActionBar extends StatelessWidget {
                     : const Icon(Icons.auto_awesome, size: 18),
                 label: Text(
                   isEvaluating
-                      ? l10n.get('评估中')
+                      ? l10n.get('evaluation_4e2d')
                       : hasAi
-                      ? l10n.get('AI_评估')
-                      : l10n.get('保存练习'),
+                      ? l10n.get('ai_evaluation')
+                      : l10n.get('save_practice'),
                 ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),

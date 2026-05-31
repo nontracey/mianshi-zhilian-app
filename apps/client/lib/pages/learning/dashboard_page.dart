@@ -309,7 +309,7 @@ class _NextBestAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return _EmptyState(message: l10n.get('暂无推荐行动'));
+      return _EmptyState(message: l10n.get('6682_no_recommend_action'));
     }
 
     final nextTopic = weakTopics.first;
@@ -325,7 +325,7 @@ class _NextBestAction extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              l10n.get('推荐任务'),
+              l10n.get('recommend_task'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -370,12 +370,12 @@ class _NextBestAction extends StatelessWidget {
                   children: [
                     _ActionTag(
                       icon: Icons.access_time,
-                      text: l10n.get('预计用时_25_分钟'),
+                      text: l10n.get('9884_8ba1_7528_65f6_25_min'),
                     ),
                     const SizedBox(width: 12),
                     _ActionTag(
                       icon: Icons.quiz_outlined,
-                      text: l10n.get('考点_6_个'),
+                      text: l10n.get('8003_70b9_6_4e2a'),
                     ),
                   ],
                 ),
@@ -388,7 +388,7 @@ class _NextBestAction extends StatelessWidget {
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(l10n.get('开始学习')),
+                    child: Text(l10n.get('start_study')),
                   ),
                 ),
               ],
@@ -446,10 +446,10 @@ class _AIFeedbackItem extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final score = attempt.score ?? 0;
     final feedbackType = score >= 85
-        ? l10n.get('表现优秀')
+        ? l10n.get('8868_73b0_4f18_79c0')
         : score >= 60
-        ? l10n.get('解题思路待优化')
-        : l10n.get('知识点掌握不足');
+        ? l10n.get('89e3_question_count_601d_8def_5f85_optimize')
+        : l10n.get('knowledge_point_mastery_not_8db3');
     final feedbackColor = score >= 85
         ? AppColors.success
         : score >= 60
@@ -517,10 +517,10 @@ class _AIFeedbackItem extends StatelessWidget {
 
   String _timeAgo(DateTime dateTime, LocalizationProvider l10n) {
     final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return l10n.get('刚刚');
-    if (diff.inMinutes < 60) return l10n.getp('{minutes} 分钟前', {'minutes': diff.inMinutes});
-    if (diff.inHours < 24) return l10n.getp('{hours} 小时前', {'hours': diff.inHours});
-    if (diff.inDays < 7) return l10n.getp('{days} 天前', {'days': diff.inDays});
+    if (diff.inMinutes < 1) return l10n.get('521a_521a');
+    if (diff.inMinutes < 60) return l10n.getp('{minutes}_min_524d', {'minutes': diff.inMinutes});
+    if (diff.inHours < 24) return l10n.getp('{hours}_hour_524d', {'hours': diff.inHours});
+    if (diff.inDays < 7) return l10n.getp('{days}_day_524d', {'days': diff.inDays});
     return '${dateTime.month}/${dateTime.day}';
   }
 }
@@ -628,7 +628,7 @@ class _MasteryOverview extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    l10n.get('掌握度'),
+                    l10n.get('mastery'),
                     style: TextStyle(
                       fontSize: 10,
                       color: isDark ? Colors.white54 : Colors.grey,
@@ -646,19 +646,19 @@ class _MasteryOverview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MasteryStatItem(
-                label: l10n.get('熟练'),
+                label: l10n.get('719f_7ec3'),
                 value: '$masteredPercent%',
                 color: AppColors.success,
               ),
               const SizedBox(height: 8),
               _MasteryStatItem(
-                label: l10n.get('学习中'),
+                label: l10n.get('study_4e2d'),
                 value: '$learningPercent%',
                 color: AppColors.accent,
               ),
               const SizedBox(height: 8),
               _MasteryStatItem(
-                label: l10n.get('未掌握'),
+                label: l10n.get('un_mastery'),
                 value: '$newPercent%',
                 color: AppColors.warning,
               ),
@@ -737,7 +737,7 @@ class _MasteryStats extends StatelessWidget {
     if (categories.isEmpty) {
       return Center(
         child: Text(
-          l10n.get('暂无分类数据'),
+          l10n.get('6682_no_5206_7c7b_data'),
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey.shade500,
@@ -953,12 +953,12 @@ class _DomainKnowledgeCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      l10n.getp('{count} 考点', {'count': domain.topicCount}),
+                      l10n.getp('{count}_8003_70b9', {'count': domain.topicCount}),
                       style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      l10n.getp('{count} 练习', {'count': practiceCount}),
+                      l10n.getp('{count}_practice', {'count': practiceCount}),
                       style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade500),
                     ),
                   ],
@@ -998,6 +998,7 @@ class _LearningPathItem extends StatefulWidget {
 }
 
 class _LearningPathItemState extends State<_LearningPathItem> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   bool _isExpanded = false;
 
   @override
@@ -1006,10 +1007,10 @@ class _LearningPathItemState extends State<_LearningPathItem> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final level = getMasteryLevel(widget.masteryPercent);
     final status = level == MasteryLevel.mastered
-        ? l10n.get('已完成')
+        ? l10n.get('already_complete')
         : level == MasteryLevel.learning
-        ? l10n.get('进行中')
-        : l10n.get('未开始');
+        ? l10n.get('8fdb_884c_4e2d')
+        : l10n.get('un_start');
     final statusColor = getMasteryColor(widget.masteryPercent);
 
     return Container(
@@ -1098,7 +1099,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                         Row(
                           children: [
                             Text(
-                              l10n.getp('进度 {percent}%', {'percent': widget.masteryPercent}),
+                              l10n.getp('progress_{percent}', {'percent': widget.masteryPercent}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1106,7 +1107,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              l10n.getp('考点 {count}', {'count': widget.domain.topicCount}),
+                              l10n.getp('8003_70b9_{count}', {'count': widget.domain.topicCount}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -1160,7 +1161,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.menu_book_outlined,
-                        label: l10n.get('知识点'),
+                        label: l10n.get('knowledge_point'),
                         value: '${widget.domain.topicCount}',
                         isDark: isDark,
                       ),
@@ -1168,7 +1169,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.trending_up,
-                        label: l10n.get('掌握度'),
+                        label: l10n.get('mastery'),
                         value: '${widget.masteryPercent}%',
                         isDark: isDark,
                       ),
@@ -1176,7 +1177,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                       _buildStatItem(
                         context,
                         icon: Icons.category_outlined,
-                        label: l10n.get('分类'),
+                        label: l10n.get('5206_7c7b'),
                         value: '${widget.domain.categories.length}',
                         isDark: isDark,
                       ),
@@ -1200,7 +1201,7 @@ class _LearningPathItemState extends State<_LearningPathItem> {
                     child: OutlinedButton.icon(
                       onPressed: widget.onViewCatalog ?? widget.onTap,
                       icon: const Icon(Icons.open_in_new, size: 16),
-                      label: Text(l10n.get('查看知识目录')),
+                      label: Text(l10n.get('67e5_770b_knowledge_catalog')),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
@@ -1271,10 +1272,10 @@ class _WeakTopicItem extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final scoreColor = getMasteryColor(score);
     final level = score >= 85
-        ? l10n.get('高')
+        ? l10n.get('high')
         : score >= 60
-        ? l10n.get('中')
-        : l10n.get('低');
+        ? l10n.get('medium')
+        : l10n.get('low');
 
     return InkWell(
       onTap: onTap,
@@ -1340,7 +1341,7 @@ class _WeakTopicItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),
-              child: Text(l10n.get('去练习'), style: TextStyle(fontSize: 11)),
+              child: Text(l10n.get('53bb_practice'), style: TextStyle(fontSize: 11)),
             ),
           ],
         ),
@@ -1384,17 +1385,17 @@ class _ReviewItem extends StatelessWidget {
       final isTomorrow = reviewDate.isAtSameMomentAs(today.add(const Duration(days: 1)));
       
       if (isToday) {
-        timeText = l10n.getp('今天 {hour}:{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
+        timeText = l10n.getp('4eca_day_{hour}_{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
         timeColor = AppColors.danger;
       } else if (isTomorrow) {
-        timeText = l10n.getp('明天 {hour}:{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
+        timeText = l10n.getp('660e_day_{hour}_{minute}', {'hour': nextReviewAt!.hour, 'minute': nextReviewAt!.minute.toString().padLeft(2, '0')});
         timeColor = AppColors.textSecondary;
       } else {
         timeText = '${nextReviewAt!.month}/${nextReviewAt!.day}';
         timeColor = AppColors.textSecondary;
       }
     } else {
-      timeText = l10n.get('待安排');
+      timeText = l10n.get('5f85_5b89_6392');
       timeColor = AppColors.textTertiary;
     }
 
@@ -1470,7 +1471,7 @@ class _ReviewItem extends StatelessWidget {
                 ),
               ),
               child: Text(
-                l10n.get('复习'),
+                l10n.get('review'),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -1647,11 +1648,11 @@ class _LeftPanel extends StatelessWidget {
       children: [
         // 今日复习队列
         _PanelCard(
-          title: l10n.get('今日复习队列'),
+          title: l10n.get('4eca_day_review_queue'),
           icon: Icons.replay_outlined,
           trailing: '${dueTopics.length}',
           headerTrailing: Text(
-            l10n.get('到期时间'),
+            l10n.get('5230_671f_time'),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white38 : AppColors.textTertiary,
@@ -1660,7 +1661,7 @@ class _LeftPanel extends StatelessWidget {
           child: Column(
             children: [
               if (dueTopics.isEmpty)
-                _EmptyState(message: l10n.get('暂无到期内容'))
+                _EmptyState(message: l10n.get('6682_no_5230_671f_content'))
               else
                 ...dueTopics.take(5).map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1676,7 +1677,7 @@ class _LeftPanel extends StatelessWidget {
               if (dueTopics.length > 5)
                 TextButton(
                   onPressed: onReview,
-                  child: Text(l10n.get('查看全部复习')),
+                  child: Text(l10n.get('67e5_770b_all_review')),
                 ),
             ],
           ),
@@ -1684,13 +1685,13 @@ class _LeftPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 薄弱知识点TOP5
         _PanelCard(
-          title: l10n.get('薄弱知识点_TOP_5'),
+          title: l10n.get('weak_knowledge_point_top_5'),
           icon: Icons.trending_down_outlined,
           trailing: '${weakTopics.length}',
           child: Column(
             children: [
               if (weakTopics.isEmpty)
-                _EmptyState(message: l10n.get('暂无薄弱项'))
+                _EmptyState(message: l10n.get('6682_no_weak_9879'))
               else
                 ...weakTopics.map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
@@ -1783,21 +1784,21 @@ class _CenterPanelState extends State<_CenterPanel> {
       final defaultRoutes = [
         LearningRoute(
           id: 'java',
-          name: l10n.get('Java_后端开发'),
-          description: l10n.get('Java_核心_JVM_并发_Spring_数据库_中间件_系统设计'),
+          name: l10n.get('java_backend_dev'),
+          description: l10n.get('java_core_jvm_concurrent_spring_database_4e2d_95f4_4ef6_syst'),
           domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'frontend',
-          name: l10n.get('前端开发'),
-          description: l10n.get('JavaScript_TypeScript_React_Vue_前端工程化'),
+          name: l10n.get('frontend_dev'),
+          description: l10n.get('javascript_typescript_react_vue_frontend_engineering_5316'),
           domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
           isDefault: true,
         ),
         LearningRoute(
           id: 'agent',
-          name: l10n.get('Agent_开发'),
+          name: l10n.get('agent_dev'),
           description: l10n.get('text_cbc3c2e6'),
           domainIds: ['agent', 'algorithm', 'architecture', 'network'],
           isDefault: true,
@@ -1870,14 +1871,14 @@ class _CenterPanelState extends State<_CenterPanel> {
       children: [
         // 当前学习路线
         _PanelCard(
-          title: l10n.get('当前学习路线'),
+          title: l10n.get('current_study_route'),
           icon: Icons.route_outlined,
-          trailing: l10n.get('切换路线'),
+          trailing: l10n.get('5207_6362_route'),
           onTrailingTap: () => _showRouteSelector(context),
           child: Column(
             children: [
               if (domains.isEmpty)
-                _EmptyState(message: l10n.get('暂无学习路线'))
+                _EmptyState(message: l10n.get('6682_no_study_route'))
               else
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
@@ -1912,14 +1913,14 @@ class _CenterPanelState extends State<_CenterPanel> {
         const SizedBox(height: 16),
         // 领域知识卡片
         _PanelCard(
-          title: l10n.get('领域知识卡片'),
+          title: l10n.get('domain_knowledge_card'),
           icon: Icons.school_outlined,
-          trailing: l10n.get('管理领域'),
+          trailing: l10n.get('management_domain'),
           onTrailingTap: () => _showManageDomains(context),
           child: Column(
             children: [
               if (allEnabledDomains.isEmpty)
-                _EmptyState(message: l10n.get('暂无领域数据'))
+                _EmptyState(message: l10n.get('6682_no_domain_data'))
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -1973,21 +1974,21 @@ class _CenterPanelState extends State<_CenterPanel> {
     final defaultRoutes = [
       LearningRoute(
         id: 'java',
-        name: l10n.get('Java_后端开发'),
-        description: l10n.get('Java_核心_JVM_并发_Spring_数据库_中间件_系统设计'),
+        name: l10n.get('java_backend_dev'),
+        description: l10n.get('java_core_jvm_concurrent_spring_database_4e2d_95f4_4ef6_syst'),
         domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'frontend',
-        name: l10n.get('前端开发'),
-        description: l10n.get('JavaScript_TypeScript_React_Vue_前端工程化'),
+        name: l10n.get('frontend_dev'),
+        description: l10n.get('javascript_typescript_react_vue_frontend_engineering_5316'),
         domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
         isDefault: true,
       ),
       LearningRoute(
         id: 'agent',
-        name: l10n.get('Agent_开发'),
+        name: l10n.get('agent_dev'),
         description: l10n.get('text_cbc3c2e6'),
         domainIds: ['agent', 'algorithm', 'architecture', 'network'],
         isDefault: true,
@@ -2120,7 +2121,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               children: [
                 const Icon(Icons.route, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text(l10n.get('选择学习路线'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(l10n.get('select_study_route'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
@@ -2173,7 +2174,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                               color: AppColors.accent.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(3),
                                             ),
-                                            child: Text(l10n.get('自定义'), style: TextStyle(fontSize: 9, color: AppColors.accent)),
+                                            child: Text(l10n.get('custom'), style: TextStyle(fontSize: 9, color: AppColors.accent)),
                                           ),
                                         ],
                                       ],
@@ -2251,7 +2252,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                   );
                 },
                 icon: const Icon(Icons.add),
-                label: Text(l10n.get('创建自定义路线')),
+                label: Text(l10n.get('521b_5efa_custom_route')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -2309,14 +2310,14 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
               children: [
                 const Icon(Icons.school_outlined, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text(l10n.get('管理领域'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(l10n.get('management_domain'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('切换开关来启用_禁用领域'),
+              l10n.get('5207_6362_5f00_5173_6765_enable_disable_domain'),
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -2358,7 +2359,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                                   ),
                                 ),
                                 Text(
-                                  l10n.getp('{count} 个知识点', {'count': domain.topicCount}),
+                                  l10n.getp('{count}_4e2a_knowledge_point', {'count': domain.topicCount}),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: isDisabled ? Colors.grey : (isDark ? Colors.white54 : Colors.grey),
@@ -2403,7 +2404,7 @@ class _ManageDomainsDialogState extends State<_ManageDomainsDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.get('禁用的领域不会在首页显示_但内容不会被删除'),
+                      l10n.get('disable_7684_domain_not_4f1a_5728_9996_9875_show_4f46_conten'),
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.grey.shade700),
                     ),
                   ),
@@ -2502,7 +2503,7 @@ class _RightPanel extends StatelessWidget {
       children: [
         // 掌握度概览
         _PanelCard(
-          title: l10n.get('掌握度概览'),
+          title: l10n.get('mastery_6982_89c8'),
           icon: Icons.pie_chart_outline,
           headerTrailing: _DomainDropdown(
             currentDomainId: currentDomainId,
@@ -2527,14 +2528,14 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 掌握度趋势
         _PanelCard(
-          title: l10n.get('掌握度趋势_近_7_天'),
+          title: l10n.get('mastery_8d8b_52bf_8fd1_7_day'),
           icon: Icons.trending_up_outlined,
           child: _MasteryTrendChart(trendData: trendData),
         ),
         const SizedBox(height: 16),
         // 下一步最佳行动
         _PanelCard(
-          title: l10n.get('下一步最佳行动'),
+          title: l10n.get('next_6b65_best_action'),
           icon: Icons.lightbulb_outline,
           child: _NextBestAction(
             weakTopics: weakTopics,
@@ -2544,7 +2545,7 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 备选行动
         _PanelCard(
-          title: l10n.get('备选行动'),
+          title: l10n.get('5907_9009_action'),
           icon: Icons.list_alt_outlined,
           child: _AlternativeActions(
             weakTopics: weakTopics,
@@ -2554,13 +2555,13 @@ class _RightPanel extends StatelessWidget {
         const SizedBox(height: 16),
         // 最近AI反馈
         _PanelCard(
-          title: l10n.get('最近_AI_反馈'),
+          title: l10n.get('recent_ai_feedback'),
           icon: Icons.auto_awesome_outlined,
-          trailing: l10n.get('查看全部'),
+          trailing: l10n.get('67e5_770b_all'),
           child: Column(
             children: [
               if (recentAttempts.isEmpty)
-                _EmptyState(message: l10n.get('暂无反馈记录'))
+                _EmptyState(message: l10n.get('6682_no_feedback_8bb0_5f55'))
               else
                 ...recentAttempts.take(3).map((attempt) {
                   return _AIFeedbackItem(
@@ -2607,7 +2608,7 @@ class _MasteryTrendChart extends StatelessWidget {
               )
             : Center(
                 child: Text(
-                  l10n.get('开始学习后将展示趋势'),
+                  l10n.get('start_study_540e_5c06_5c55_793a_8d8b_52bf'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2706,7 +2707,7 @@ class _AlternativeActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (weakTopics.isEmpty) {
-      return _EmptyState(message: l10n.get('暂无备选行动'));
+      return _EmptyState(message: l10n.get('6682_no_5907_9009_action'));
     }
 
     // 取第2-4个薄弱知识点作为备选
@@ -2740,7 +2741,7 @@ class _AlternativeActions extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.getp('{type}：{title}', {'type': topic.id.contains('review') ? l10n.get('复习') : l10n.get('学习'), 'title': topic.title}),
+                          l10n.getp('{type}：{title}', {'type': topic.id.contains('review') ? l10n.get('review') : l10n.get('study'), 'title': topic.title}),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

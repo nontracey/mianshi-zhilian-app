@@ -129,7 +129,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           );
 
           return MaterialApp(
-            title: l10n.get('面试智练'),
+            title: l10n.get('interview_667a_7ec3'),
             debugShowCheckedModeBanner: false,
             locale: Locale(l10n.language),
             localizationsDelegates: const [
@@ -203,8 +203,8 @@ class _LearningShellState extends State<LearningShell> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(userRole == UserRole.guest
-                              ? l10n.get('登录后可查看测试版内容')
-                              : l10n.get('需要管理员权限查看草稿内容')),
+                              ? l10n.get('login_540e_53ef_67e5_770b_test_7248_content')
+                              : l10n.get('9700_8981_management_5458_permission_67e5_770b_8349_7a3f_con')),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -236,27 +236,27 @@ class _LearningShellState extends State<LearningShell> {
               destinations: [
                 NavigationDestination(
                   icon: Icon(Icons.dashboard_outlined),
-                  label: l10n.get('学习'),
+                  label: l10n.get('study'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.menu_book_outlined),
-                  label: l10n.get('目录'),
+                  label: l10n.get('catalog'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.psychology_alt_outlined),
-                  label: l10n.get('练习'),
+                  label: l10n.get('practice'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.flag_outlined),
-                  label: l10n.get('面试'),
+                  label: l10n.get('interview'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.bar_chart_outlined),
-                  label: l10n.get('掌握度'),
+                  label: l10n.get('mastery'),
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline),
-                  label: l10n.get('设置'),
+                  label: l10n.get('settings'),
                 ),
               ],
             ),
@@ -399,7 +399,7 @@ class _LearningShellState extends State<LearningShell> {
     AppSection.dashboard => l10n.get('dashboard_title'),
     AppSection.catalog => l10n.get('catalog_title'),
     AppSection.practice => l10n.get('practice_title'),
-    AppSection.prep => l10n.get('面试准备'),
+    AppSection.prep => l10n.get('interview_preparation'),
     AppSection.mastery => l10n.get('mastery_title'),
     AppSection.profile => l10n.get('profile_title'),
   };

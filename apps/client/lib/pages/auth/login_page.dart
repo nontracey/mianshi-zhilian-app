@@ -89,14 +89,14 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isRegister ? l10n.get('注册账号') : l10n.get('登录'))),
+      appBar: AppBar(title: Text(_isRegister ? l10n.get('register_account') : l10n.get('login'))),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: WorkPanel(
-              title: _isRegister ? l10n.get('创建新账号') : l10n.get('登录账号'),
+              title: _isRegister ? l10n.get('create_new_account') : l10n.get('login_account'),
               children: [
                 Form(
                   key: _formKey,
@@ -107,17 +107,17 @@ class _LoginPageState extends State<LoginPage> {
                       TextFormField(
                         controller: _usernameController,
                         decoration: InputDecoration(
-                          labelText: l10n.get('用户名'),
-                          hintText: l10n.get('3-20 个字符'),
+                          labelText: l10n.get('username'),
+                          hintText: l10n.get('char_3to20'),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.person_outline),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return l10n.get('请输入用户名');
+                            return l10n.get('please_enter_username');
                           }
                           if (value.trim().length < 3) {
-                            return l10n.get('用户名至少 3 个字符');
+                            return l10n.get('username_min_3_chars');
                           }
                           return null;
                         },
@@ -128,18 +128,18 @@ class _LoginPageState extends State<LoginPage> {
                       TextFormField(
                         controller: _passwordController,
                         decoration: InputDecoration(
-                          labelText: l10n.get('密码'),
-                          hintText: l10n.get('至少 6 个字符'),
+                          labelText: l10n.get('password'),
+                          hintText: l10n.get('min_6_chars'),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.lock_outline),
                         ),
                         obscureText: true,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return l10n.get('请输入密码');
+                            return l10n.get('please_enter_password');
                           }
                           if (value.length < 6) {
-                            return l10n.get('密码至少 6 个字符');
+                            return l10n.get('password_min_6_chars');
                           }
                           return null;
                         },
@@ -151,8 +151,8 @@ class _LoginPageState extends State<LoginPage> {
                         TextFormField(
                           controller: _confirmPasswordController,
                           decoration: InputDecoration(
-                            labelText: l10n.get('确认密码'),
-                            hintText: l10n.get('再次输入密码'),
+                            labelText: l10n.get('confirm_password'),
+                            hintText: l10n.get('confirm_password_hint'),
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.lock_outline),
                           ),
@@ -160,10 +160,10 @@ class _LoginPageState extends State<LoginPage> {
                           validator: (value) {
                             if (!_isRegister) return null;
                             if (value == null || value.isEmpty) {
-                              return l10n.get('请再次输入密码');
+                              return l10n.get('please_confirm_password_again');
                             }
                             if (value != _passwordController.text) {
-                              return l10n.get('两次输入的密码不一致');
+                              return l10n.get('passwords_do_not_match');
                             }
                             return null;
                           },
@@ -197,7 +197,7 @@ class _LoginPageState extends State<LoginPage> {
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : Text(_isRegister ? l10n.get('注册') : l10n.get('登录')),
+                            : Text(_isRegister ? l10n.get('register') : l10n.get('login')),
                       ),
                       const SizedBox(height: 12),
 
@@ -210,7 +210,7 @@ class _LoginPageState extends State<LoginPage> {
                                 _error = null;
                                 _confirmPasswordController.clear();
                               }),
-                        child: Text(_isRegister ? l10n.get('已有账号？去登录') : l10n.get('没有账号？去注册')),
+                        child: Text(_isRegister ? l10n.get('have_account_login') : l10n.get('no_account_register')),
                       ),
 
                       // 忘记密码
@@ -219,7 +219,7 @@ class _LoginPageState extends State<LoginPage> {
                           onPressed: () {
                             // TODO: 跳转到忘记密码页面
                           },
-                          child: Text(l10n.get('忘记密码？')),
+                          child: Text(l10n.get('forgot_password_q')),
                         ),
                       ],
                     ],

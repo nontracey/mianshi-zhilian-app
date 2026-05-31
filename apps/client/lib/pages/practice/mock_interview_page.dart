@@ -10,6 +10,7 @@ import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import '../../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 enum _InterviewStage { main, followUp, clarify, summary }
 
@@ -96,16 +97,16 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(l10n.get('切换场景')),
-          content: Text(l10n.get('切换场景将重新开始面试_当前进度会丢失_确定切换吗')),
+          title: Text(l10n.get('5207_6362_scenario')),
+          content: Text(l10n.get('5207_6362_scenario_5c06_91cd_new_start_interview_current_pro')),
           actions: [
             TextButton(
               onPressed: Navigator.of(ctx).pop,
-              child: Text(l10n.get('取消')),
+              child: Text(l10n.get('cancel')),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.get('确定')),
+              child: Text(l10n.get('786e_5b9a')),
             ),
           ],
         ),
@@ -160,7 +161,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('请先输入你的回答'))));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_input_4f60_7684_answer'))));
       return;
     }
 
@@ -172,7 +173,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('请先在个人中心配置_AI'))));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('8bf7_5148_5728_personal_center_config_ai'))));
       return;
     }
 
@@ -195,7 +196,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           '${l10n.get('text_ea189e1f')}';
     } else if (_stage == _InterviewStage.clarify) {
       contextualAnswer = '[澄清回答] $contextualAnswer\n\n'
-          '${l10n.get('请给出最终综合评估_不再追问')}';
+          '${l10n.get('8bf7_7ed9_51fa_6700_7ec8_7efc_5408_evaluation_not_518d_follo')}';
     }
 
     try {
@@ -300,8 +301,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.getp('AI 评估失败：{error}', {'error': e})),
-            action: SnackBarAction(label: l10n.get('重试'), onPressed: _evaluate),
+            content: Text(l10n.getp('ai_evaluation_fail_{error}', {'error': e})),
+            action: SnackBarAction(label: l10n.get('retry'), onPressed: _evaluate),
           ),
         );
       }
@@ -342,8 +343,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   Widget build(BuildContext context) {
     if (_activeTopicIds.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('模拟面试'))),
-        body: Center(child: Text(l10n.get('没有可用的知识点'))),
+        appBar: AppBar(title: Text(l10n.get('6a21_62df_interview'))),
+        body: Center(child: Text(l10n.get('6ca1_has_53ef_7528_7684_knowledge_point'))),
       );
     }
 
@@ -355,8 +356,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     if (topic == null) {
       final l10n = context.watch<LocalizationProvider>();
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('模拟面试'))),
-        body: Center(child: Text(l10n.get('知识点加载失败'))),
+        appBar: AppBar(title: Text(l10n.get('6a21_62df_interview'))),
+        body: Center(child: Text(l10n.get('knowledge_point_loading_fail'))),
       );
     }
 
@@ -383,7 +384,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(l10n.get('模拟面试')),
+            Text(l10n.get('6a21_62df_interview')),
           ],
         ),
         actions: [
@@ -515,8 +516,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                           ),
                           label: Text(
                             _currentIndex < _activeTopicIds.length - 1
-                                ? l10n.get('下一题')
-                                : l10n.get('查看面试报告'),
+                                ? l10n.get('next_question_count')
+                                : l10n.get('67e5_770b_interview_62a5_544a'),
                           ),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -579,8 +580,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               ),
               label: Text(
                 _currentIndex < _activeTopicIds.length - 1
-                    ? l10n.get('下一题')
-                    : l10n.get('查看面试报告'),
+                    ? l10n.get('next_question_count')
+                    : l10n.get('67e5_770b_interview_62a5_544a'),
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -597,10 +598,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   Widget _buildQuestionCard(Topic topic) {
     final l10n = context.watch<LocalizationProvider>();
     final stageLabel = switch (_stage) {
-      _InterviewStage.main => l10n.get('主问'),
-      _InterviewStage.followUp => l10n.get('追问'),
-      _InterviewStage.clarify => l10n.get('澄清'),
-      _InterviewStage.summary => l10n.get('总结'),
+      _InterviewStage.main => l10n.get('4e3b_95ee'),
+      _InterviewStage.followUp => l10n.get('follow_up'),
+      _InterviewStage.clarify => l10n.get('6f84_6e05'),
+      _InterviewStage.summary => l10n.get('summary'),
     };
     final stageColor = switch (_stage) {
       _InterviewStage.main => AppColors.accent,
@@ -611,7 +612,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final displayQuestion = _followUpQuestion ??
         (topic.recallPrompts.isNotEmpty
             ? topic.recallPrompts.first.prompt
-            : l10n.getp('请解释 {title} 的核心概念', {'title': topic.title}));
+            : l10n.getp('8bf7_explain_{title}_7684_core_concept', {'title': topic.title}));
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -679,7 +680,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  l10n.getp('问题 {index}', {'index': _currentIndex + 1}),
+                  l10n.getp('problem_{index}', {'index': _currentIndex + 1}),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: AppColors.accent,
@@ -690,7 +691,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Spacer(),
               if (_followUpHistory.isNotEmpty)
                 Text(
-                  l10n.getp('第 {round} 轮', {'round': _followUpHistory.length + 1}),
+                  l10n.getp('7b2c_{round}_8f6e', {'round': _followUpHistory.length + 1}),
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 12,
@@ -727,7 +728,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.getp('面试官关注：{focus}', {'focus': topic.interviewerFocus}),
+                      l10n.getp('interviewer_focus_format', {'focus': topic.interviewerFocus}),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -763,12 +764,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Icon(Icons.edit_note_outlined, size: 18),
               const SizedBox(width: 8),
               Text(
-                l10n.get('你的回答'),
+                l10n.get('4f60_7684_answer'),
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               Text(
-                l10n.getp('{count} 字', {'count': _answerController.text.length}),
+                l10n.getp('{count}_5b57', {'count': _answerController.text.length}),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade500,
@@ -782,7 +783,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             minLines: 6,
             maxLines: 12,
             decoration: InputDecoration(
-              hintText: l10n.get('请输入你的回答'),
+              hintText: l10n.get('8bf7_input_4f60_7684_answer'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -818,10 +819,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     )
                   : const Icon(Icons.auto_awesome),
               label: Text(_isEvaluating
-                  ? l10n.get('AI_评估中')
+                  ? l10n.get('ai_evaluation_4e2d')
                   : _stage == _InterviewStage.main
-                      ? l10n.get('提交并评估')
-                      : l10n.get('提交回答')),
+                      ? l10n.get('submit_5e76_evaluation')
+                      : l10n.get('submit_answer')),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -847,7 +848,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.get('面试设置'),
+            l10n.get('interview_settings'),
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           ),
           const SizedBox(height: 12),
@@ -856,31 +857,31 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             runSpacing: 8,
             children: [
               _ScenarioChip(
-                label: l10n.get('混合'),
+                label: l10n.get('6df7_5408'),
                 value: 'mixed',
                 selected: _scenario == 'mixed',
                 onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
-                label: l10n.get('基础知识'),
+                label: l10n.get('basic_knowledge'),
                 value: 'foundation',
                 selected: _scenario == 'foundation',
                 onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
-                label: l10n.get('系统设计'),
+                label: l10n.get('system_design'),
                 value: 'systemDesign',
                 selected: _scenario == 'systemDesign',
                 onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
-                label: l10n.get('代码题'),
+                label: l10n.get('code_question_count'),
                 value: 'code',
                 selected: _scenario == 'code',
                 onSelected: _onScenarioChanged,
               ),
               _ScenarioChip(
-                label: l10n.get('项目深挖'),
+                label: l10n.get('project_deep_dig'),
                 value: 'project',
                 selected: _scenario == 'project',
                 onSelected: _onScenarioChanged,
@@ -890,7 +891,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           if (_scenario != 'mixed') ...[
             const SizedBox(height: 6),
             Text(
-              l10n.getp('匹配 {matched} / {total} 题', {'matched': _activeTopicIds.length, 'total': widget.topicIds.length}),
+              l10n.getp('5339_914d_{matched}_{total}_question_count', {'matched': _activeTopicIds.length, 'total': widget.topicIds.length}),
               style: TextStyle(
                 fontSize: 12,
                 color: _activeTopicIds.isEmpty
@@ -903,8 +904,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _formalMode,
-            title: Text(l10n.get('正式模拟模式')),
-            subtitle: Text(l10n.get('逐题不展示详细反馈_结束后统一复盘')),
+            title: Text(l10n.get('6b63_5f0f_6a21_62df_6a21_5f0f')),
+            subtitle: Text(l10n.get('9010_question_count_not_5c55_793a_detail_feedback_end_540e_7')),
             onChanged: (value) => setState(() => _formalMode = value),
           ),
         ],
@@ -930,7 +931,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Icon(Icons.question_answer_outlined, size: 16, color: AppColors.warning),
               const SizedBox(width: 8),
               Text(
-                l10n.getp('追问记录（{count} 轮）', {'count': _followUpHistory.length}),
+                l10n.getp('follow_up_8bb0_5f55_{count}_8f6e', {'count': _followUpHistory.length}),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -986,7 +987,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         children: [
           Icon(Icons.check_circle_outline, color: AppColors.accent),
           SizedBox(width: 8),
-          Expanded(child: Text(l10n.get('回答已记录_正式模拟模式将在结束后统一展示报告'))),
+          Expanded(child: Text(l10n.get('answer_already_8bb0_5f55_6b63_5f0f_6a21_62df_6a21_5f0f_5c06'))),
         ],
       ),
     );
@@ -1028,7 +1029,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Icon(Icons.assessment_outlined, size: 18),
               const SizedBox(width: 8),
               Text(
-                l10n.get('评估结果'),
+                l10n.get('evaluation_result'),
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
@@ -1043,16 +1044,16 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           Text(summary, style: const TextStyle(height: 1.5)),
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _buildPointList(l10n.get('遗漏点'), missed, AppColors.warning),
+            _buildPointList(l10n.get('missed_70b9'), missed, AppColors.warning),
           ],
           if (wrong.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _buildPointList(l10n.get('错误点'), wrong, AppColors.danger),
+            _buildPointList(l10n.get('wrong_70b9'), wrong, AppColors.danger),
           ],
           if (improved.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              l10n.get('优化回答'),
+              l10n.get('optimize_answer'),
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
@@ -1102,7 +1103,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 const Icon(Icons.timer_outlined, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
                 Text(
-                  l10n.getp('本题用时 {duration}', {'duration': _formatDuration(_questionDurations.last)}),
+                  l10n.getp('672c_question_count_7528_65f6_{duration}', {'duration': _formatDuration(_questionDurations.last)}),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -1148,22 +1149,22 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final l10n = context.watch<LocalizationProvider>();
     final dimensions = [
       {
-        'label': l10n.get('概念完整性'),
+        'label': l10n.get('concept_5b8c_6574_6027'),
         'weight': weights['concept'] ?? weights['mustHave'] ?? 40,
         'color': AppColors.accent,
       },
       {
-        'label': l10n.get('表达准确性'),
+        'label': l10n.get('expression_51c6_786e_6027'),
         'weight': weights['expression'] ?? weights['accuracy'] ?? 25,
         'color': AppColors.success,
       },
       {
-        'label': l10n.get('面试表达'),
+        'label': l10n.get('interview_expression'),
         'weight': weights['interview'] ?? weights['structure'] ?? 20,
         'color': AppColors.warning,
       },
       {
-        'label': l10n.get('扩展深度'),
+        'label': l10n.get('extension_depth'),
         'weight': weights['depth'] ?? weights['goodToHave'] ?? 15,
         'color': AppColors.categoryPurple,
       },
@@ -1226,7 +1227,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     _saveSessionIfNeeded(avgScore);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('面试报告'))),
+      appBar: AppBar(title: Text(l10n.get('interview_62a5_544a'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -1256,7 +1257,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             child: Column(
               children: [
                 Text(
-                  l10n.get('面试完成'),
+                  l10n.get('interview_complete'),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -1277,7 +1278,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   ),
                 ),
                 Text(
-                  l10n.get('平均分'),
+                  l10n.get('5e73_5747_5206'),
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
                 const SizedBox(height: 16),
@@ -1287,19 +1288,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     _ResultStat(
                       icon: Icons.timer_outlined,
                       value: _formatDuration(totalSeconds),
-                      label: l10n.get('总用时'),
+                      label: l10n.get('603b_7528_65f6'),
                     ),
                     const SizedBox(width: 24),
                     _ResultStat(
                       icon: Icons.quiz_outlined,
                       value: '${_results.length}',
-                      label: l10n.get('题目数'),
+                      label: l10n.get('question_6570'),
                     ),
                     const SizedBox(width: 24),
                     _ResultStat(
                       icon: Icons.warning_amber_outlined,
                       value: '$weakCount',
-                      label: l10n.get('需复习'),
+                      label: l10n.get('9700_review'),
                       valueColor: weakCount > 0 ? AppColors.danger : null,
                     ),
                   ],
@@ -1332,7 +1333,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        l10n.get('建议_下一轮训练包'),
+                        l10n.get('suggestion_next_8f6e_training_5305'),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppColors.danger,
@@ -1342,7 +1343,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.getp('{count} 题得分低于 60 分，建议先复盘这些薄弱知识点，再进行下一场模拟面试。', {'count': weakCount}),
+                    l10n.getp('{count}_question_count_5f97_5206_4f4e_4e8e_60_5206_suggestio', {'count': weakCount}),
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1358,7 +1359,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       Navigator.of(context).pop(weakIds);
                     },
                     icon: const Icon(Icons.replay_outlined, size: 18),
-                    label: Text(l10n.get('复盘薄弱知识点')),
+                    label: Text(l10n.get('590d_76d8_weak_knowledge_point')),
                   ),
                 ],
               ),
@@ -1368,7 +1369,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
           // ── 各题得分 ──
           Text(
-            l10n.get('各题得分'),
+            l10n.get('5404_question_count_5f97_5206'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
@@ -1438,7 +1439,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                           children: [
                             if (duration != null)
                               Text(
-                                l10n.getp('用时 {duration}', {'duration': _formatDuration(duration)}),
+                                l10n.getp('7528_65f6_{duration}', {'duration': _formatDuration(duration)}),
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.grey.shade500,
@@ -1454,7 +1455,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                                   ),
                                 ),
                               Text(
-                                '${result['followUpCount'] ?? 0}${l10n.get('轮追问')}',
+                                '${result['followUpCount'] ?? 0}${l10n.get('8f6e_follow_up')}',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: AppColors.warning,
@@ -1471,7 +1472,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        l10n.getp('{score} 分', {'score': score}),
+                        l10n.getp('{score}_5206', {'score': score}),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: score >= 85
@@ -1483,7 +1484,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       ),
                       if (score < 60)
                         Text(
-                          l10n.get('需复习'),
+                          l10n.get('9700_review'),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColors.danger,
@@ -1503,7 +1504,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l10n.get('返回')),
+                  child: Text(l10n.get('back')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1514,7 +1515,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                     // 可以从外部触发再来一场
                   },
                   icon: const Icon(Icons.replay_outlined, size: 18),
-                  label: Text(l10n.get('再来一场')),
+                  label: Text(l10n.get('518d_6765_4e00_573a')),
                 ),
               ),
             ],
@@ -1558,13 +1559,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           attempts: attempts,
           averageScore: avgScore,
           reportSummary: avgScore >= 85
-              ? l10n.get('整体表现稳定_可以继续正式模拟')
-              : l10n.get('建议先复盘低分题_再进行下一场模拟面试'),
+              ? l10n.get('6574_4f53_8868_73b0_7a33_5b9a_53ef_4ee5_7ee7_7eed_6b63_5f0f')
+              : l10n.get('suggestion_5148_590d_76d8_4f4e_5206_question_count_518d_8fdb'),
           weakTopicIds: _results
               .where((r) => (r['score'] as int? ?? 0) < 60)
               .map((r) => r['topicId'] as String)
               .toList(),
-          nextActions: [l10n.get('复盘低分题'), l10n.get('清理今日复习'), l10n.get('再进行一场模拟面试')],
+          nextActions: [l10n.get('590d_76d8_4f4e_5206_question_count'), l10n.get('6e05_7406_4eca_day_review'), l10n.get('518d_8fdb_884c_4e00_573a_6a21_62df_interview')],
           formalMode: _formalMode,
         ),
       );

@@ -41,12 +41,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.get('密码修改成功'))),
+            SnackBar(content: Text(l10n.get('password_changed_successfully'))),
           );
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(authProvider.error ?? l10n.get('修改失败'))),
+            SnackBar(content: Text(authProvider.error ?? l10n.get('modification_failed'))),
           );
         }
       }
@@ -62,7 +62,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('修改密码'))),
+      appBar: AppBar(title: Text(l10n.get('change_password'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -75,12 +75,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 controller: _oldPasswordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: l10n.get('当前密码'),
+                  labelText: l10n.get('current_password'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return l10n.get('请输入当前密码');
+                  if (v == null || v.isEmpty) return l10n.get('please_enter_current_password');
                   return null;
                 },
               ),
@@ -91,15 +91,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 controller: _newPasswordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: l10n.get('新密码'),
-                  hintText: l10n.get('至少 6 个字符'),
+                  labelText: l10n.get('new_password'),
+                  hintText: l10n.get('min_6_chars'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return l10n.get('请输入新密码');
-                  if (v.length < 6) return l10n.get('密码至少 6 个字符');
-                  if (v == _oldPasswordController.text) return l10n.get('新密码不能与旧密码相同');
+                  if (v == null || v.isEmpty) return l10n.get('please_enter_new_password');
+                  if (v.length < 6) return l10n.get('password_min_6_chars');
+                  if (v == _oldPasswordController.text) return l10n.get('new_password_same_as_old');
                   return null;
                 },
               ),
@@ -110,14 +110,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 controller: _confirmPasswordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: l10n.get('确认新密码'),
-                  hintText: l10n.get('再次输入新密码'),
+                  labelText: l10n.get('confirm_new_password'),
+                  hintText: l10n.get('confirm_new_password_hint'),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return l10n.get('请确认新密码');
-                  if (v != _newPasswordController.text) return l10n.get('两次输入的密码不一致');
+                  if (v == null || v.isEmpty) return l10n.get('please_confirm_new_password');
+                  if (v != _newPasswordController.text) return l10n.get('passwords_do_not_match');
                   return null;
                 },
               ),
@@ -132,7 +132,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(l10n.get('修改密码')),
+                    : Text(l10n.get('change_password')),
               ),
               const SizedBox(height: 16),
 
@@ -147,7 +147,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n.get('忘记了当前密码？'),
+                      l10n.get('forgot_current_password'),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: isDark ? Colors.white : Colors.black87,
@@ -155,7 +155,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      l10n.get('如果您绑定了邮箱或微信，可以通过验证码重置密码。否则，请提交工单申请重置。'),
+                      l10n.get('bound_account_reset_desc'),
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? Colors.white54 : Colors.grey,
@@ -169,7 +169,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             // TODO: 验证码重置
                           },
                           icon: const Icon(Icons.sms_outlined, size: 16),
-                          label: Text(l10n.get('验证码重置')),
+                          label: Text(l10n.get('verification_code_reset')),
                         ),
                         const SizedBox(width: 12),
                         OutlinedButton.icon(
@@ -177,7 +177,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             // 跳转到工单页面
                           },
                           icon: const Icon(Icons.support_agent, size: 16),
-                          label: Text(l10n.get('提交工单')),
+                          label: Text(l10n.get('submit_ticket')),
                         ),
                       ],
                     ),

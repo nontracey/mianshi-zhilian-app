@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../main.dart';
 import '../theme/colors.dart';
 import '../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 IconData _sectionIcon(AppSection section) => switch (section) {
   AppSection.dashboard => Icons.dashboard_outlined,
@@ -15,12 +16,12 @@ IconData _sectionIcon(AppSection section) => switch (section) {
 };
 
 String _sectionTitle(AppSection section, LocalizationProvider l10n) => switch (section) {
-  AppSection.dashboard => l10n.get('学习'),
-  AppSection.catalog => l10n.get('目录'),
-  AppSection.practice => l10n.get('练习'),
-  AppSection.prep => l10n.get('面试'),
-  AppSection.mastery => l10n.get('掌握度'),
-  AppSection.profile => l10n.get('设置'),
+  AppSection.dashboard => l10n.get('study'),
+  AppSection.catalog => l10n.get('catalog'),
+  AppSection.practice => l10n.get('practice'),
+  AppSection.prep => l10n.get('interview'),
+  AppSection.mastery => l10n.get('mastery'),
+  AppSection.profile => l10n.get('settings'),
 };
 
 class NavigationRailPanel extends StatelessWidget {
@@ -79,7 +80,7 @@ class NavigationRailPanel extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          l10n.get('面试智练'),
+                          l10n.get('interview_667a_7ec3'),
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -98,7 +99,7 @@ class NavigationRailPanel extends StatelessWidget {
                         onPressed: onToggleCollapse,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        tooltip: l10n.get('收缩侧边栏'),
+                        tooltip: l10n.get('6536_7f29_4fa7_8fb9_680f'),
                       ),
                     ],
                   ),
@@ -130,7 +131,7 @@ class NavigationRailPanel extends StatelessWidget {
                     color: isDark ? Colors.white54 : Colors.grey,
                   ),
                   onPressed: onToggleCollapse,
-                  tooltip: l10n.get('展开侧边栏'),
+                  tooltip: l10n.get('5c55_5f00_4fa7_8fb9_680f'),
                 ),
               ),
             ),
@@ -143,7 +144,7 @@ class NavigationRailPanel extends StatelessWidget {
                 children: [
                   _StatItem(
                     icon: Icons.access_time,
-                    label: l10n.get('学习总时长'),
+                    label: l10n.get('study_603b_65f6_957f'),
                     value: '${totalHours.toStringAsFixed(1)} h',
                     trailing: todayHoursGrowth > 0 ? '+${todayHoursGrowth.toStringAsFixed(1)}h' : null,
                     trailingColor: const Color(0xFF10B981),
@@ -152,8 +153,8 @@ class NavigationRailPanel extends StatelessWidget {
                   const SizedBox(height: 12),
                   _StatItem(
                     icon: Icons.local_fire_department_outlined,
-                    label: l10n.get('连续学习'),
-                    value: l10n.getp('{days} 天', {'days': streakDays}),
+                    label: l10n.get('streak_study'),
+                    value: l10n.getp('{days}_day', {'days': streakDays}),
                     isDark: isDark,
                   ),
                 ],
@@ -167,7 +168,7 @@ class NavigationRailPanel extends StatelessWidget {
               child: Column(
                 children: [
                   Tooltip(
-                    message: l10n.getp('连续学习 {days} 天', {'days': streakDays}),
+                    message: l10n.getp('streak_study_{days}_day', {'days': streakDays}),
                     child: Icon(
                       Icons.local_fire_department_outlined,
                       size: 20,

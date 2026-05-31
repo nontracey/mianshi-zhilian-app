@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import '../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class HeaderBar extends StatefulWidget {
   const HeaderBar({
@@ -115,7 +116,7 @@ class _HeaderBarState extends State<HeaderBar> {
                   child: Row(
                     children: [
                       Text(
-                        l10n.get('搜索结果'),
+                        l10n.get('search_results'),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -124,7 +125,7 @@ class _HeaderBarState extends State<HeaderBar> {
                       ),
                       const Spacer(),
                       Text(
-                        l10n.getp('{count} 项', {'count': _searchResults.length}),
+                        l10n.getp('{count}_items', {'count': _searchResults.length}),
                         style: TextStyle(
                           fontSize: 11,
                           color: isDark ? Colors.white38 : Colors.grey.shade400,
@@ -214,7 +215,7 @@ class _HeaderBarState extends State<HeaderBar> {
                                               borderRadius: BorderRadius.circular(3),
                                             ),
                                             child: Text(
-                                              l10n.get('高频'),
+                                              l10n.get('high_frequency'),
                                               style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.w600,
@@ -262,7 +263,7 @@ class _HeaderBarState extends State<HeaderBar> {
           onChanged: _onSearchChanged,
           style: const TextStyle(fontSize: 13),
           decoration: InputDecoration(
-            hintText: l10n.get('搜索知识点'),
+            hintText: l10n.get('search_topics_hint'),
             hintStyle: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.grey.shade400,
@@ -307,7 +308,7 @@ class _HeaderBarState extends State<HeaderBar> {
     // 获取当前使用的AI模型名称
     final currentModelName = aiProvider.configs.isNotEmpty
         ? aiProvider.configs.first.name
-        : l10n.get('未配置_AI_模型');
+        : l10n.get('ai_not_configured');
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= 600;
@@ -364,14 +365,14 @@ class _HeaderBarState extends State<HeaderBar> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('搜索知识点'), style: const TextStyle(fontSize: 16)),
+        title: Text(l10n.get('search_topics_hint'), style: TextStyle(fontSize: 16)),
         content: SizedBox(
           width: double.maxFinite,
           child: TextField(
             controller: searchController,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: l10n.get('搜索知识点'),
+              hintText: l10n.get('search_topics_hint'),
               prefixIcon: Icon(Icons.search, size: 18),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               isDense: true,
@@ -387,7 +388,7 @@ class _HeaderBarState extends State<HeaderBar> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.get('取消')),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -396,7 +397,7 @@ class _HeaderBarState extends State<HeaderBar> {
                 _onSearchChanged(searchController.text.trim());
               }
             },
-            child: Text(l10n.get('搜索')),
+            child: Text(l10n.get('search')),
           ),
         ],
       ),
@@ -407,7 +408,7 @@ class _HeaderBarState extends State<HeaderBar> {
     return IconButton(
       icon: Icon(Icons.search, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
       onPressed: () => _showMobileSearchDialog(context, isDark),
-      tooltip: l10n.get('搜索'),
+      tooltip: l10n.get('search'),
     );
   }
 
@@ -461,7 +462,7 @@ class _AiModelSelector extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              hasConfig ? modelName : l10n.get('未配置_AI'),
+              hasConfig ? modelName : l10n.get('ai_not_config'),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -502,88 +503,157 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
     final l10n = context.watch<LocalizationProvider>();
     final allowedEnvs = widget.userRole.allowedContentEnvs;
     final stages = [
-      ('published', l10n.get('发布'), true),   // 所有用户可用
-      ('testing', l10n.get('测试'), allowedEnvs.contains('testing')), // 根据角色
-      ('draft', l10n.get('草稿'), allowedEnvs.contains('draft')),   // 根据角色
+      ('published', l10n.get('content_published'), true),
+      ('testing', l10n.get('content_testing'), allowedEnvs.contains('testing')),
+      ('draft', l10n.get('content_draft'), allowedEnvs.contains('draft')),
     ];
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = screenWidth >= 600;
 
-    return Row(
-      children: [
-        Text(
-          l10n.get('内容'),
-          style: TextStyle(
-            fontSize: 12,
-            color: widget.isDark ? Colors.white54 : const Color(0xFF666666),
+    if (isWide) {
+      return Row(
+        children: [
+          Text(
+            l10n.get('content_label'),
+            style: TextStyle(
+              fontSize: 12,
+              color: widget.isDark ? Colors.white54 : const Color(0xFF666666),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: widget.isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.all(2),
-          child: Row(
-            children: stages.map((stage) {
-              final isSelected = stage.$1 == _currentStage;
-              final isEnabled = stage.$3;
-              
-              return GestureDetector(
-                onTap: isEnabled
-                    ? () {
-                        setState(() => _currentStage = stage.$1);
-                        widget.onStageChanged?.call(stage.$1);
-                      }
-                    : () {
-                        final message = widget.userRole == UserRole.guest
-                            ? l10n.get('登录后可查看测试版内容')
-                            : l10n.get('需要管理员权限查看草稿内容');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(message),
-                            duration: const Duration(seconds: 2),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: widget.isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.all(2),
+            child: Row(
+              children: stages.map((stage) {
+                final isSelected = stage.$1 == _currentStage;
+                final isEnabled = stage.$3;
+
+                return GestureDetector(
+                  onTap: isEnabled
+                      ? () {
+                          setState(() => _currentStage = stage.$1);
+                          widget.onStageChanged?.call(stage.$1);
+                        }
+                      : () {
+                          final message = widget.userRole == UserRole.guest
+                              ? l10n.get('login_for_testing')
+                              : l10n.get('admin_for_draft');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          stage.$2,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : isEnabled
+                                    ? (widget.isDark ? Colors.white70 : const Color(0xFF666666))
+                                    : (widget.isDark ? Colors.white30 : Colors.grey.shade400),
                           ),
-                        );
-                      },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        stage.$2,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : isEnabled
-                                  ? (widget.isDark ? Colors.white70 : const Color(0xFF666666))
-                                  : (widget.isDark ? Colors.white30 : Colors.grey.shade400),
                         ),
-                      ),
-                      if (!isEnabled) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.lock_outline,
-                          size: 10,
-                          color: widget.isDark ? Colors.white30 : Colors.grey.shade400,
-                        ),
+                        if (!isEnabled) ...[const SizedBox(width: 4),
+                          Icon(
+                            Icons.lock_outline,
+                            size: 10,
+                            color: widget.isDark ? Colors.white30 : Colors.grey.shade400,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
+        ],
+      );
+    }
+
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 40),
+      onSelected: (stage) {
+        setState(() => _currentStage = stage);
+        widget.onStageChanged?.call(stage);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: widget.isDark
+              ? const Color(0xFF21262D)
+              : const Color(0xFFF0F2F5),
+          borderRadius: BorderRadius.circular(6),
         ),
-      ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              stages.firstWhere((s) => s.$1 == _currentStage).$2,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: widget.isDark ? Colors.white70 : const Color(0xFF666666),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: widget.isDark ? Colors.white70 : const Color(0xFF666666),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => stages.map((stage) {
+        final isEnabled = stage.$3;
+        return PopupMenuItem<String>(
+          enabled: isEnabled,
+          value: stage.$1,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                stage.$2,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      stage.$1 == _currentStage ? FontWeight.w600 : FontWeight.normal,
+                  color: !isEnabled
+                      ? (widget.isDark ? Colors.white30 : Colors.grey.shade400)
+                      : null,
+                ),
+              ),
+              if (!isEnabled) ...[const SizedBox(width: 6),
+                Icon(
+                  Icons.lock_outline,
+                  size: 12,
+                  color: widget.isDark ? Colors.white30 : Colors.grey.shade400,
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

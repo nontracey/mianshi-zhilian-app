@@ -78,7 +78,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('目标已保存'))),
+        SnackBar(content: Text(l10n.get('goal_already_save'))),
       );
     }
   }
@@ -86,7 +86,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
   Future<void> _generatePlan() async {
     if (_interviewDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('请先选择面试日期'))),
+        SnackBar(content: Text(l10n.get('8bf7_5148_select_interview_day_671f'))),
       );
       return;
     }
@@ -94,7 +94,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
     final daysUntil = _interviewDate!.difference(DateTime.now()).inDays;
     if (daysUntil <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('面试日期已过期'))),
+        SnackBar(content: Text(l10n.get('interview_day_671f_already_8fc7_671f'))),
       );
       return;
     }
@@ -115,21 +115,21 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('训练计划')),
+        title: Text(l10n.get('training_plan')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.getp('距离面试还有 {days} 天', {'days': daysUntil.toString()})),
+              Text(l10n.getp('8ddd_79bb_interview_8fd8_has_{days}_day', {'days': daysUntil.toString()})),
               const SizedBox(height: 8),
-              Text(l10n.getp('每日投入：{minutes} 分钟', {'minutes': _dailyMinutes.toString()})),
+              Text(l10n.getp('daily_6295_5165_{minutes}_min_1', {'minutes': _dailyMinutes.toString()})),
               if (_selectedTechStack.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(l10n.getp('技术栈：{techStack}', {'techStack': _selectedTechStack.join(', ')})),
+                Text(l10n.getp('tech_6808_{techstack}', {'techStack': _selectedTechStack.join(', ')})),
               ],
               const SizedBox(height: 16),
-              Text(l10n.get('训练计划：'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('training_plan_1'), style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...plan.map((p) => _buildPlanItem(
                 p['phase'] as String,
@@ -142,16 +142,16 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('关闭')),
+            child: Text(l10n.get('5173_95ed')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.get('计划已保存，开始执行！'))),
+                SnackBar(content: Text(l10n.get('plan_already_save_start_6267_884c'))),
               );
             },
-            child: Text(l10n.get('开始执行')),
+            child: Text(l10n.get('start_6267_884c')),
           ),
         ],
       ),
@@ -204,18 +204,18 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
     
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('准备目标'))),
+        appBar: AppBar(title: Text(l10n.get('preparation_goal'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('准备目标')),
+        title: Text(l10n.get('preparation_goal')),
         actions: [
           TextButton(
             onPressed: _saveGoal,
-            child: Text(l10n.get('保存')),
+            child: Text(l10n.get('save')),
           ),
         ],
       ),
@@ -224,49 +224,49 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildSectionHeader(l10n.get('目标信息'), Icons.business_outlined, isDark),
+            _buildSectionHeader(l10n.get('goal_info'), Icons.business_outlined, isDark),
             const SizedBox(height: 12),
             _buildTextField(
               controller: _companyController,
-              label: l10n.get('目标公司'),
-              hint: l10n.get('例如：字节跳动、阿里巴巴'),
+              label: l10n.get('goal_company'),
+              hint: l10n.get('4f8b_5982_5b57_8282_8df3_52a8_963f_91cc_5df4_5df4'),
               icon: Icons.business,
             ),
             const SizedBox(height: 12),
             _buildTextField(
               controller: _positionController,
-              label: l10n.get('目标岗位'),
-              hint: l10n.get('例如：Java 高级工程师、前端开发'),
+              label: l10n.get('goal_position'),
+              hint: l10n.get('4f8b_5982_java_senior_engineer_frontend_dev'),
               icon: Icons.work_outline,
             ),
             const SizedBox(height: 20),
             
-            _buildSectionHeader(l10n.get('面试时间'), Icons.calendar_today_outlined, isDark),
+            _buildSectionHeader(l10n.get('interview_time'), Icons.calendar_today_outlined, isDark),
             const SizedBox(height: 12),
             _buildDatePicker(context, isDark),
             const SizedBox(height: 20),
 
-            _buildSectionHeader(l10n.get('每日投入'), Icons.timer_outlined, isDark),
+            _buildSectionHeader(l10n.get('daily_6295_5165'), Icons.timer_outlined, isDark),
             const SizedBox(height: 12),
             _buildDailyMinutesSelector(isDark),
             const SizedBox(height: 20),
             
-            _buildSectionHeader(l10n.get('当前水平'), Icons.assessment_outlined, isDark),
+            _buildSectionHeader(l10n.get('current_6c34_5e73'), Icons.assessment_outlined, isDark),
             const SizedBox(height: 12),
             _buildLevelSelector(isDark),
             const SizedBox(height: 20),
             
-            _buildSectionHeader(l10n.get('技术栈'), Icons.code_outlined, isDark),
+            _buildSectionHeader(l10n.get('tech_6808'), Icons.code_outlined, isDark),
             const SizedBox(height: 12),
             _buildTechStackSelector(isDark),
             const SizedBox(height: 20),
             
-            _buildSectionHeader(l10n.get('岗位描述（可选）'), Icons.description_outlined, isDark),
+            _buildSectionHeader(l10n.get('position_description_53ef_9009'), Icons.description_outlined, isDark),
             const SizedBox(height: 12),
             _buildTextField(
               controller: _jdController,
-              label: l10n.get('粘贴 JD'),
-              hint: l10n.get('粘贴岗位描述，帮助生成个性化训练计划'),
+              label: l10n.get('paste_jd'),
+              hint: l10n.get('paste_position_description_help_751f_6210_4e2a_6027_5316_tra'),
               icon: Icons.description,
               maxLines: 5,
             ),
@@ -275,7 +275,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
             FilledButton.icon(
               onPressed: _generatePlan,
               icon: const Icon(Icons.auto_awesome),
-              label: Text(l10n.get('生成训练计划')),
+              label: Text(l10n.get('751f_6210_training_plan')),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -294,7 +294,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.get('设置目标后，系统会根据面试日期自动生成冲刺计划'),
+                      l10n.get('settings_goal_540e_system_4f1a_6839_636e_interview_day_671f'),
                       style: TextStyle(fontSize: 12, color: AppColors.accent),
                     ),
                   ),
@@ -380,7 +380,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
                   Text(
                     _interviewDate != null
                         ? '${_interviewDate!.year}-${_interviewDate!.month.toString().padLeft(2, '0')}-${_interviewDate!.day.toString().padLeft(2, '0')}'
-                        : l10n.get('选择面试日期'),
+                        : l10n.get('select_interview_day_671f'),
                     style: TextStyle(
                       fontSize: 14,
                       color: _interviewDate != null
@@ -390,7 +390,7 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
                   ),
                   if (daysUntil != null)
                     Text(
-                      daysUntil > 0 ? l10n.getp('还有 {days} 天', {'days': daysUntil.toString()}) : l10n.get('已过期'),
+                      daysUntil > 0 ? l10n.getp('8fd8_has_{days}_day', {'days': daysUntil.toString()}) : l10n.get('already_8fc7_671f'),
                       style: TextStyle(
                         fontSize: 12,
                         color: daysUntil > 0 ? AppColors.accent : AppColors.danger,
@@ -408,11 +408,11 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
 
   Widget _buildDailyMinutesSelector(bool isDark) {
     final options = [
-      (30, l10n.get('30 分钟')),
-      (60, l10n.get('1 小时')),
-      (90, l10n.get('1.5 小时')),
-      (120, l10n.get('2 小时')),
-      (180, l10n.get('3 小时')),
+      (30, l10n.get('30_min')),
+      (60, l10n.get('1_hour')),
+      (90, l10n.get('1_5_hour')),
+      (120, l10n.get('2_hour')),
+      (180, l10n.get('3_hour')),
     ];
 
     return Wrap(
@@ -431,10 +431,10 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
 
   Widget _buildLevelSelector(bool isDark) {
     final levels = [
-      ('beginner', l10n.get('入门'), l10n.get('刚开始学习')),
-      ('intermediate', l10n.get('中级'), l10n.get('有一定基础')),
-      ('advanced', l10n.get('高级'), l10n.get('准备冲高级岗')),
-      ('expert', l10n.get('专家'), l10n.get('准备架构师/专家岗')),
+      ('beginner', l10n.get('beginner'), l10n.get('521a_start_study')),
+      ('intermediate', l10n.get('intermediate'), l10n.get('has_4e00_5b9a_basic')),
+      ('advanced', l10n.get('senior'), l10n.get('preparation_51b2_senior_5c97')),
+      ('expert', l10n.get('expert'), l10n.get('preparation_architect_expert_5c97')),
     ];
 
     return Column(

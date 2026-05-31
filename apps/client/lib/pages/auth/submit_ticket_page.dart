@@ -59,14 +59,14 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('工单已提交，我们会尽快处理'))),
+          SnackBar(content: Text(l10n.get('ticket_submitted'))),
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.get('提交失败')}: $e')),
+          SnackBar(content: Text('${l10n.get('submit_failed')}: $e')),
         );
       }
     } finally {
@@ -82,7 +82,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isPasswordReset ? l10n.get('重置密码工单') : l10n.get('提交反馈')),
+        title: Text(_isPasswordReset ? l10n.get('reset_password_ticket') : l10n.get('submit_feedback')),
       ),
       body: Form(
         key: _formKey,
@@ -103,8 +103,8 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
                   Expanded(
                     child: Text(
                       _isPasswordReset
-                          ? l10n.get('如果您忘记了密码且无法通过其他方式重置，请提交工单，管理员会审核处理。')
-                          : l10n.get('有任何问题或建议，请在这里告诉我们。'),
+                          ? l10n.get('forgot_password_ticket_desc')
+                          : l10n.get('feedback_guide'),
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? Colors.white70 : Colors.grey.shade700,
@@ -120,13 +120,13 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
             TextFormField(
               controller: _subjectController,
               decoration: InputDecoration(
-                labelText: l10n.get('主题'),
-                hintText: _isPasswordReset ? l10n.get('例：忘记密码需要重置') : l10n.get('简要描述您的问题'),
+                labelText: l10n.get('subject'),
+                hintText: _isPasswordReset ? l10n.get('example_forgot_password_reset') : l10n.get('briefly_describe_issue'),
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.subject),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return l10n.get('请输入主题');
+                if (v == null || v.trim().isEmpty) return l10n.get('please_enter_subject');
                 return null;
               },
             ),
@@ -137,17 +137,17 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
               controller: _descriptionController,
               maxLines: 6,
               decoration: InputDecoration(
-                labelText: l10n.get('详细描述'),
+                labelText: l10n.get('detailed_description'),
                 hintText: _isPasswordReset
-                    ? l10n.get('请详细描述您的情况，包括注册时使用的用户名等信息...')
-                    : l10n.get('请详细描述您的问题或建议...'),
+                    ? l10n.get('describe_situation_for_reset')
+                    : l10n.get('describe_issue_detail'),
                 border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return l10n.get('请输入详细描述');
+                if (v == null || v.trim().isEmpty) return l10n.get('please_enter_detailed_description');
                 if (v.trim().length < _minDescriptionLength) {
-                  return l10n.getp('描述至少需要 {count} 个字', {'count': _minDescriptionLength.toString()});
+                  return l10n.getp('describe_min_chars', {'count': _minDescriptionLength.toString()});
                 }
                 return null;
               },
@@ -156,7 +156,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
 
             // 上传图片
             Text(
-              l10n.get('上传图片（可选，最多5张）'),
+              l10n.get('upload_images_max5'),
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : Colors.black87,
@@ -235,7 +235,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(l10n.get('提交工单')),
+                  : Text(l10n.get('submit_ticket')),
             ),
           ],
         ),

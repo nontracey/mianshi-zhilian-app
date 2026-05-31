@@ -183,7 +183,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       widget.onListeningChanged?.call(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('录音失败', {'error': '$e'}))),
+          SnackBar(content: Text(l10n.getp('5f55_97f3_fail', {'error': '$e'}))),
         );
       }
     }
@@ -238,7 +238,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('语音识别失败', {'error': '$e'}))),
+          SnackBar(content: Text(l10n.getp(l10n.get('voice_recognize_failed'), {'error': '$e'}))),
         );
       }
     }

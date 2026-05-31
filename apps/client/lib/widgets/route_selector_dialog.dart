@@ -38,7 +38,7 @@ class RouteSelectorDialog extends StatelessWidget {
                 const Icon(Icons.route, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Text(
-                  l10n.get('选择学习路线'),
+                  l10n.get('select_study_route'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
@@ -139,7 +139,7 @@ class RouteSelectorDialog extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onCreateRoute,
                 icon: const Icon(Icons.add),
-                label: Text(l10n.get('创建自定义路线')),
+                label: Text(l10n.get('521b_5efa_custom_route')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),

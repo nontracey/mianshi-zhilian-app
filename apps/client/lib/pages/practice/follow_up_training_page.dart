@@ -135,7 +135,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('请先输入你的回答'))),
+        SnackBar(content: Text(l10n.get('8bf7_5148_input_4f60_7684_answer'))),
       );
       return;
     }
@@ -176,7 +176,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('评估失败：{error}', {'error': '$e'}))),
+          SnackBar(content: Text(l10n.getp('evaluation_fail_{error}', {'error': '$e'}))),
         );
       }
     } finally {
@@ -213,8 +213,8 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final topic = _getCurrentTopic();
     if (topic == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.get('追问训练'))),
-        body: Center(child: Text(l10n.get('没有可练习的知识点'))),
+        appBar: AppBar(title: Text(l10n.get('follow_up_training'))),
+        body: Center(child: Text(l10n.get('6ca1_has_53ef_practice_7684_knowledge_point'))),
       );
     }
 
@@ -240,7 +240,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(l10n.get('追问训练')),
+            Text(l10n.get('follow_up_training')),
           ],
         ),
         actions: [
@@ -254,7 +254,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '${l10n.get('追问')} ${_currentFollowUpIndex + 1}/${topic.followUps.length}',
+                '${l10n.get('follow_up')} ${_currentFollowUpIndex + 1}/${topic.followUps.length}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -361,7 +361,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    isFollowUp ? l10n.get('追问') : l10n.get('主问题'),
+                    isFollowUp ? l10n.get('follow_up') : l10n.get('main_question'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -405,7 +405,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
   }
 
   Widget _buildDifficultyTag(int difficulty) {
-    final labels = {1: l10n.get('入门'), 2: l10n.get('基础'), 3: l10n.get('中等'), 4: l10n.get('较难'), 5: l10n.get('困难')};
+    final labels = {1: l10n.get('beginner'), 2: l10n.get('basic'), 3: l10n.get('medium'), 4: l10n.get('8f83_96be'), 5: l10n.get('hard')};
     final colors = {
       1: const Color(0xFF10B981),
       2: const Color(0xFF00CCF9),
@@ -421,7 +421,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        labels[difficulty] ?? l10n.get('未知'),
+        labels[difficulty] ?? l10n.get('un_77e5'),
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
@@ -446,7 +446,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.get('评分标准'),
+              l10n.get('8bc4_5206_standard'),
               style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -454,15 +454,15 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             ),
             const SizedBox(height: 12),
             if (rubric.mustHave.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('必须包含'), rubric.mustHave, AppColors.danger),
+              _buildRubricSection(l10n.get('must_include'), rubric.mustHave, AppColors.danger),
               const SizedBox(height: 8),
             ],
             if (rubric.goodToHave.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('加分项'), rubric.goodToHave, AppColors.success),
+              _buildRubricSection(l10n.get('52a0_5206_9879'), rubric.goodToHave, AppColors.success),
               const SizedBox(height: 8),
             ],
             if (rubric.commonMistakes.isNotEmpty) ...[
-              _buildRubricSection(l10n.get('常见错误'), rubric.commonMistakes, AppColors.warning),
+              _buildRubricSection(l10n.get('common_wrong'), rubric.commonMistakes, AppColors.warning),
             ],
           ],
         ),
@@ -548,7 +548,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${l10n.get('提示')} ($_hintLevel/${hints.isNotEmpty ? hints.length : 3})',
+                  '${l10n.get('hint')} ($_hintLevel/${hints.isNotEmpty ? hints.length : 3})',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -584,7 +584,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             const Icon(Icons.edit_outlined, size: 16, color: AppColors.accent),
             const SizedBox(width: 6),
             Text(
-              l10n.get('你的回答'),
+              l10n.get('4f60_7684_answer'),
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -596,7 +596,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             TextButton.icon(
               onPressed: _showNextHint,
               icon: const Icon(Icons.lightbulb_outline, size: 14),
-              label: Text(l10n.get('提示'), style: const TextStyle(fontSize: 12)),
+              label: Text(l10n.get('hint'), style: const TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
@@ -610,7 +610,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
           maxLines: 8,
           minLines: 4,
           decoration: InputDecoration(
-            hintText: l10n.get('输入你的回答'),
+            hintText: l10n.get('input_4f60_7684_answer'),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -633,10 +633,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 : const Icon(Icons.auto_awesome),
             label: Text(
               _isEvaluating
-                  ? l10n.get('评估中')
+                  ? l10n.get('evaluation_4e2d')
                   : hasAi
-                      ? l10n.get('获取_AI_评估')
-                      : l10n.get('保存本地练习'),
+                      ? l10n.get('83b7_53d6_ai_evaluation')
+                      : l10n.get('save_local_practice'),
             ),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -657,7 +657,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.get('未配置 AI，将保存为本地练习'),
+                    l10n.get('no_ai_will_save_locally'),
                     style: TextStyle(
                       fontSize: 11,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -703,7 +703,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             Row(
               children: [
                 Text(
-                  l10n.get('评估结果'),
+                  l10n.get('evaluation_result'),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -718,7 +718,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      l10n.getp('{score} 分', {'score': '$score'}),
+                      l10n.getp('{score}_5206', {'score': '$score'}),
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -743,7 +743,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                   children: [
                     const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
                     const SizedBox(width: 8),
-                    Text(l10n.get('已保存为本地练习'), style: const TextStyle(fontSize: 13)),
+                    Text(l10n.get('already_save_4e3a_local_practice'), style: const TextStyle(fontSize: 13)),
                   ],
                 ),
               ),
@@ -760,20 +760,20 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             
             // 遗漏点
             if (missedPoints.isNotEmpty) ...[
-              _buildPointsSection(l10n.get('遗漏点'), missedPoints, AppColors.warning),
+              _buildPointsSection(l10n.get('missed_70b9'), missedPoints, AppColors.warning),
               const SizedBox(height: 8),
             ],
             
             // 错误点
             if (wrongPoints.isNotEmpty) ...[
-              _buildPointsSection(l10n.get('错误点'), wrongPoints, AppColors.danger),
+              _buildPointsSection(l10n.get('wrong_70b9'), wrongPoints, AppColors.danger),
               const SizedBox(height: 8),
             ],
             
             // 优化回答
             if (improvedAnswer.isNotEmpty) ...[
               Text(
-                l10n.get('参考回答'),
+                l10n.get('reference_answer'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -804,7 +804,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               child: OutlinedButton.icon(
                 onPressed: _nextQuestion,
                 icon: const Icon(Icons.arrow_forward, size: 16),
-                label: Text(l10n.get('下一题')),
+                label: Text(l10n.get('next_question_count')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -857,7 +857,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final followUpCount = _answers.where((a) => a['isFollowUp'] == true).length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('追问训练完成'))),
+      appBar: AppBar(title: Text(l10n.get('follow_up_training_complete'))),
       body: Center(
         child: Container(
           margin: const EdgeInsets.all(24),
@@ -879,7 +879,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                l10n.get('追问训练完成！'),
+                l10n.get('follow_up_training_complete_excl'),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -891,10 +891,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildStatItem(l10n.get('总题数'), '$totalQuestions'),
-                  _buildStatItem(l10n.get('追问数'), '$followUpCount'),
+                  _buildStatItem(l10n.get('603b_question_count_6570'), '$totalQuestions'),
+                  _buildStatItem(l10n.get('follow_up_count'), '$followUpCount'),
                   if (scoredAnswers.isNotEmpty)
-                    _buildStatItem(l10n.get('平均分'), '$avgScore'),
+                    _buildStatItem(l10n.get('5e73_5747_5206'), '$avgScore'),
                 ],
               ),
               const SizedBox(height: 32),
@@ -904,7 +904,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                 children: [
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text(l10n.get('返回')),
+                    child: Text(l10n.get('back')),
                   ),
                   const SizedBox(width: 16),
                   FilledButton(
@@ -918,7 +918,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
                         _evaluationResult = null;
                       });
                     },
-                    child: Text(l10n.get('再练一轮')),
+                    child: Text(l10n.get('practice_again_round')),
                   ),
                 ],
               ),

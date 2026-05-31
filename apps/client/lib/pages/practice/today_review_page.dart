@@ -10,6 +10,7 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 
 import 'recall_page.dart';
 import '../../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class TodayReviewPage extends StatelessWidget {
   const TodayReviewPage({super.key, required this.currentDomainId});
@@ -54,7 +55,7 @@ class TodayReviewPage extends StatelessWidget {
     }.values.toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.get('今日复习工作台'))),
+      appBar: AppBar(title: Text(l10n.get('4eca_day_review_5de5_4f5c_53f0'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -74,10 +75,10 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 到期与逾期 ──
           _ReviewGroup(
-            title: l10n.get('到期与逾期'),
+            title: l10n.get('5230_671f_4e0e_903e_671f'),
             icon: Icons.schedule_outlined,
             iconColor: AppColors.warning,
-            emptyText: l10n.get('暂无到期复习'),
+            emptyText: l10n.get('6682_no_5230_671f_review'),
             emptyIcon: Icons.check_circle_outline,
             topics: dueTopics,
             progressProvider: progress,
@@ -85,7 +86,7 @@ class TodayReviewPage extends StatelessWidget {
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('已将「{title}」推迟到明天', {'title': topic.title}))),
+                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf_5230_660e_day', {'title': topic.title}))),
               );
             },
           ),
@@ -93,10 +94,10 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 低分与错因回流 ──
           _ReviewGroup(
-            title: l10n.get('低分与错因回流'),
+            title: l10n.get('4f4e_5206_4e0e_9519_56e0_56de_6d41'),
             icon: Icons.trending_down_outlined,
             iconColor: AppColors.danger,
-            emptyText: l10n.get('暂无低分回流'),
+            emptyText: l10n.get('6682_no_4f4e_5206_56de_6d41'),
             emptyIcon: Icons.sentiment_satisfied_outlined,
             topics: lowScoreTopics,
             progressProvider: progress,
@@ -106,7 +107,7 @@ class TodayReviewPage extends StatelessWidget {
                   ? (attempts.first.score ?? 0)
                   : 0;
               final practiceCount = attempts.length;
-              return l10n.getp('最近得分 {lastScore} 分（已练习 {practiceCount} 次），需要重新组织回答', {'lastScore': lastScore, 'practiceCount': practiceCount});
+              return l10n.getp('recent_5f97_5206_{lastscore}_5206_already_practice_{practice', {'lastScore': lastScore, 'practiceCount': practiceCount});
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: null, // 低分不建议跳过
@@ -115,21 +116,21 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 高频未稳 ──
           _ReviewGroup(
-            title: l10n.get('高频未稳'),
+            title: l10n.get('high_freq_unstable'),
             icon: Icons.priority_high_outlined,
             iconColor: AppColors.accent,
-            emptyText: l10n.get('高频知识掌握稳定'),
+            emptyText: l10n.get('high_freq_knowledge_mastery_7a33_5b9a'),
             emptyIcon: Icons.verified_outlined,
             topics: highFrequencyTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final score = progress.getTopicProgress(topic.id)?.score ?? 0;
-              return l10n.getp('高频知识点，当前 {score} 分，未达熟练阈值', {'score': score});
+              return l10n.getp('high_freq_knowledge_point_current_{score}_5206_un_8fbe_719f', {'score': score});
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('已将「{title}」推迟到明天', {'title': topic.title}))),
+                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf_5230_660e_day', {'title': topic.title}))),
               );
             },
           ),
@@ -137,24 +138,24 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 长期未复习 ──
           _ReviewGroup(
-            title: l10n.get('长期未复习'),
+            title: l10n.get('957f_671f_un_review'),
             icon: Icons.event_busy_outlined,
             iconColor: AppColors.categoryPurple,
-            emptyText: l10n.get('所有知识点近期都有复习'),
+            emptyText: l10n.get('6240_has_knowledge_point_8fd1_671f_90fd_has_review'),
             emptyIcon: Icons.event_available_outlined,
             topics: longUnreviewedTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.isEmpty) return l10n.get('从未练习_遗忘风险极高');
+              if (attempts.isEmpty) return l10n.get('4ece_un_practice_forgetting_98ce_9669_6781_9ad8');
               final lastDate = attempts.first.createdAt;
               final days = DateTime.now().difference(lastDate).inDays;
-              return l10n.getp('距上次练习已 {days} 天，建议尽快复习巩固', {'days': days});
+              return l10n.getp('8ddd_last_practice_already_{days}_day_suggestion_5c3d_5feb_r', {'days': days});
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: (topic) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('已将「{title}」推迟', {'title': topic.title}))),
+                SnackBar(content: Text(l10n.getp('already_5c06_{title}_63a8_8fdf', {'title': topic.title}))),
               );
             },
           ),
@@ -162,20 +163,20 @@ class TodayReviewPage extends StatelessWidget {
 
           // ── 最近退步 ──
           _ReviewGroup(
-            title: l10n.get('最近退步'),
+            title: l10n.get('recent_9000_6b65'),
             icon: Icons.trending_down_outlined,
             iconColor: AppColors.danger,
-            emptyText: l10n.get('近期无退步知识点'),
+            emptyText: l10n.get('8fd1_671f_no_9000_6b65_knowledge_point'),
             emptyIcon: Icons.trending_up_outlined,
             topics: regressedTopics,
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.length < 2) return l10n.get('分数下降_需要巩固');
+              if (attempts.length < 2) return l10n.get('score_4e0b_964d_9700_8981_5de9_56fa');
               final latest = attempts[0].score ?? 0;
               final previous = attempts[1].score ?? 0;
               final diff = previous - latest;
-              return l10n.getp('从 {previous} 分降至 {latest} 分（下降 {diff} 分）', {'previous': previous, 'latest': latest, 'diff': diff});
+              return l10n.getp('4ece_{previous}_5206_964d_81f3_{latest}_5206_4e0b_964d_{diff', {'previous': previous, 'latest': latest, 'diff': diff});
             },
             onStart: (topic) => _startRecall(context, [topic]),
             onSkip: null,
@@ -202,7 +203,7 @@ class TodayReviewPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    l10n.get('今日复习已完成'),
+                    l10n.get('4eca_day_review_already_complete'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -211,7 +212,7 @@ class TodayReviewPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.get('没有到期或薄弱内容需要复习_可以进行高频冲刺或模拟面试'),
+                    l10n.get('6ca1_has_5230_671f_6216_weak_content_9700_8981_review_53ef_4'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -233,20 +234,20 @@ class TodayReviewPage extends StatelessWidget {
   ) {
     final l10n = context.watch<LocalizationProvider>();
     final p = progress.getTopicProgress(topic.id);
-    if (p?.nextReviewAt == null) return l10n.get('需要复习');
+    if (p?.nextReviewAt == null) return l10n.get('9700_8981_review');
     final now = DateTime.now();
     final daysOverdue = now.difference(p!.nextReviewAt!).inDays;
-    if (daysOverdue > 3) return l10n.getp('已逾期 {daysOverdue} 天，遗忘风险极高', {'daysOverdue': daysOverdue});
-    if (daysOverdue > 0) return l10n.getp('已逾期 {daysOverdue} 天，遗忘风险增加', {'daysOverdue': daysOverdue});
+    if (daysOverdue > 3) return l10n.getp('already_903e_671f_{daysoverdue}_day_forgetting_98ce_9669_678', {'daysOverdue': daysOverdue});
+    if (daysOverdue > 0) return l10n.getp('already_903e_671f_{daysoverdue}_day_forgetting_98ce_9669_589', {'daysOverdue': daysOverdue});
     if (daysOverdue == 0) {
       final attempts = progress.getAttemptsForTopic(topic.id);
       if (attempts.isNotEmpty) {
         final daysSincePractice = now.difference(attempts.first.createdAt).inDays;
-        if (daysSincePractice > 0) return l10n.getp('距上次练习 {daysSincePractice} 天，按遗忘曲线到期', {'daysSincePractice': daysSincePractice});
+        if (daysSincePractice > 0) return l10n.getp('8ddd_last_practice_{dayssincepractice}_day_6309_forgetting_c', {'daysSincePractice': daysSincePractice});
       }
-      return l10n.get('今天到期_按遗忘曲线安排');
+      return l10n.get('4eca_day_5230_671f_6309_forgetting_curve_5b89_6392');
     }
-    return l10n.getp('提前复习（原定 {days} 天后）', {'days': -daysOverdue});
+    return l10n.getp('63d0_524d_review_539f_5b9a_{days}_day_540e', {'days': -daysOverdue});
   }
 
   void _startRecall(BuildContext context, List<Topic> topics) {
@@ -308,7 +309,7 @@ class _ReviewHeroPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n.get('复习负载'),
+            l10n.get('review_load'),
             style: TextStyle(
               color: Colors.white70,
               fontWeight: FontWeight.w600,
@@ -318,8 +319,8 @@ class _ReviewHeroPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             totalCount == 0
-                ? l10n.get('暂无待复习内容')
-                : l10n.getp('共 {totalCount} 个知识点等待复习', {'totalCount': totalCount}),
+                ? l10n.get('6682_no_5f85_review_content')
+                : l10n.getp('total_{totalcount}_4e2a_knowledge_point_pending_review', {'totalCount': totalCount}),
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -332,28 +333,28 @@ class _ReviewHeroPanel extends StatelessWidget {
             children: [
               _StatChip(
                 icon: Icons.schedule_outlined,
-                label: l10n.get('到期'),
+                label: l10n.get('5230_671f'),
                 value: dueCount,
                 color: AppColors.warning,
               ),
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.trending_down_outlined,
-                label: l10n.get('低分'),
+                label: l10n.get('4f4e_5206'),
                 value: lowScoreCount,
                 color: AppColors.danger,
               ),
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.event_busy_outlined,
-                label: l10n.get('未复习'),
+                label: l10n.get('un_review'),
                 value: longUnreviewedCount,
                 color: AppColors.categoryPurple,
               ),
               const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.priority_high_outlined,
-                label: l10n.get('退步'),
+                label: l10n.get('9000_6b65'),
                 value: regressedCount,
                 color: AppColors.accent,
               ),
@@ -366,7 +367,7 @@ class _ReviewHeroPanel extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onStartAll,
                 icon: const Icon(Icons.play_arrow, size: 20),
-                label: Text(l10n.get('一键开始全部复习')),
+                label: Text(l10n.get('4e00_952e_start_all_review')),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.bgDark,
@@ -598,7 +599,7 @@ class _ReviewTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  l10n.getp('{minutes} 分钟', {'minutes': topic.estimatedMinutes}),
+                  l10n.getp('{minutes}_min', {'minutes': topic.estimatedMinutes}),
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -619,7 +620,7 @@ class _ReviewTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n.get('上次遗漏'),
+                      l10n.get('last_missed'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -655,7 +656,7 @@ class _ReviewTile extends StatelessWidget {
                   child: FilledButton.tonalIcon(
                     onPressed: onStart,
                     icon: const Icon(Icons.play_arrow, size: 18),
-                    label: Text(l10n.get('开始复习')),
+                    label: Text(l10n.get('start_review')),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
@@ -671,7 +672,7 @@ class _ReviewTile extends StatelessWidget {
                         vertical: 10,
                       ),
                     ),
-                    child: Text(l10n.get('推迟')),
+                    child: Text(l10n.get('63a8_8fdf')),
                   ),
                 ],
               ],

@@ -9,6 +9,7 @@ import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
 import '../../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class PracticePage extends StatelessWidget {
   const PracticePage({
@@ -42,7 +43,7 @@ class PracticePage extends StatelessWidget {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text(l10n.get('正在加载知识点'), style: TextStyle(color: Colors.grey.shade500)),
+            Text(l10n.get('6b63_5728_loading_knowledge_point'), style: TextStyle(color: Colors.grey.shade500)),
           ],
         ),
       );
@@ -58,7 +59,7 @@ class PracticePage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         Text(
-          l10n.get('选择练习模式'),
+          l10n.get('select_practice_6a21_5f0f'),
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -78,8 +79,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.today_outlined,
-                    title: l10n.get('今日复习'),
-                    subtitle: l10n.getp('基于遗忘曲线，今天有 {count} 个知识点待复习', {'count': reviewCount}),
+                    title: l10n.get('4eca_day_review'),
+                    subtitle: l10n.getp('based_on_forgetting_curve_4eca_day_has_{count}_4e2a_knowledg', {'count': reviewCount}),
                     color: AppColors.accent,
                     onTap: onDailyReview,
                   ),
@@ -88,8 +89,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.casino_outlined,
-                    title: l10n.get('随机抽问'),
-                    subtitle: l10n.get('选择领域后随机抽取知识点进行复述练习'),
+                    title: l10n.get('968f_673a_62bd_95ee'),
+                    subtitle: l10n.get('select_domain_540e_968f_673a_62bd_53d6_knowledge_point_8fdb'),
                     color: AppColors.success,
                     onTap: () => _showDomainPicker(context, domains),
                   ),
@@ -98,8 +99,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.question_answer_outlined,
-                    title: l10n.get('追问训练'),
-                    subtitle: l10n.get('模拟面试官追问_深入练习知识点'),
+                    title: l10n.get('follow_up_training'),
+                    subtitle: l10n.get('6a21_62df_interview_5b98_follow_up_6df1_5165_practice_knowle'),
                     color: AppColors.categoryPurple,
                     onTap: () => _startFollowUpTraining(context, domainTopics),
                   ),
@@ -108,8 +109,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.trending_down_outlined,
-                    title: l10n.get('弱点训练包'),
-                    subtitle: l10n.get('针对薄弱知识点进行专项训练'),
+                    title: l10n.get('weakness_training_5305'),
+                    subtitle: l10n.get('9488_5bf9_weak_knowledge_point_8fdb_884c_4e13_9879_training'),
                     color: AppColors.danger,
                     onTap: () => _startWeaknessTraining(context),
                   ),
@@ -118,8 +119,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.local_fire_department_outlined,
-                    title: l10n.get('高频冲刺'),
-                    subtitle: l10n.get('针对高频面试题进行强化训练'),
+                    title: l10n.get('high_freq_sprint'),
+                    subtitle: l10n.get('9488_5bf9_high_freq_interview_question_count_8fdb_884c_5f3a'),
                     color: AppColors.warning,
                     onTap: () => _startHighFrequencyTraining(context, domainTopics),
                   ),
@@ -128,8 +129,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.work_outline,
-                    title: l10n.get('项目深挖'),
-                    subtitle: l10n.get('STAR法则练习_深入项目细节'),
+                    title: l10n.get('project_deep_dig'),
+                    subtitle: l10n.get('star_6cd5_5219_practice_6df1_5165_project_7ec6_8282'),
                     color: AppColors.categoryGreen,
                     onTap: () => _startProjectDig(context),
                   ),
@@ -138,8 +139,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.architecture_outlined,
-                    title: l10n.get('系统设计'),
-                    subtitle: l10n.get('系统设计面试练习'),
+                    title: l10n.get('system_design'),
+                    subtitle: l10n.get('system_design_interview_practice'),
                     color: AppColors.categoryAmber,
                     onTap: () => _startSystemDesign(context),
                   ),
@@ -148,8 +149,8 @@ class PracticePage extends StatelessWidget {
                   width: cardWidth,
                   child: _PracticeModeCard(
                     icon: Icons.groups_outlined,
-                    title: l10n.get('模拟面试'),
-                    subtitle: l10n.get('连续多题模式_模拟真实面试场景'),
+                    title: l10n.get('6a21_62df_interview'),
+                    subtitle: l10n.get('streak_591a_question_count_6a21_5f0f_6a21_62df_771f_5b9e_int'),
                     color: AppColors.categoryRed,
                     onTap: onMockInterview,
                   ),
@@ -167,7 +168,7 @@ class PracticePage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text(l10n.get('选择领域')),
+        title: Text(l10n.get('select_domain')),
         children: domains
             .map<SimpleDialogOption>(
               (domain) => SimpleDialogOption(
@@ -192,7 +193,7 @@ class PracticePage extends StatelessWidget {
     if (topicsWithFollowUps.isEmpty) {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('当前领域没有可追问的知识点'))),
+        SnackBar(content: Text(l10n.get('current_domain_6ca1_has_53ef_follow_up_7684_knowledge_point'))),
       );
       return;
     }
@@ -226,7 +227,7 @@ class PracticePage extends StatelessWidget {
     if (highFrequencyTopics.isEmpty) {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('当前领域没有高频知识点'))),
+        SnackBar(content: Text(l10n.get('current_domain_6ca1_has_high_freq_knowledge_point'))),
       );
       return;
     }
@@ -298,12 +299,12 @@ class _EmptyPracticeState extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              l10n.get('暂无可练习的知识点'),
+              l10n.get('6682_no_53ef_practice_7684_knowledge_point'),
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('知识点正在加载中_请稍等片刻再试'),
+              l10n.get('knowledge_point_6b63_5728_loading_4e2d_8bf7_7a0d_7b49_7247_5'),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -311,7 +312,7 @@ class _EmptyPracticeState extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: Text(l10n.get('重新加载')),
+              label: Text(l10n.get('91cd_new_loading')),
             ),
           ],
         ),

@@ -76,7 +76,7 @@ class ProfilePage extends StatelessWidget {
               final l10n = context.watch<LocalizationProvider>();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(l10n.get('缓存已清除_正在重新加载当前领域')),
+                  content: Text(l10n.get('cache_already_clear_6b63_5728_91cd_new_loading_current_domai')),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -164,18 +164,18 @@ class ProfilePage extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(l10n.get('从云端恢复')),
+                title: Text(l10n.get('4ece_cloud_restore')),
                 content: Text(
-                  l10n.get('恢复将覆盖当前所有本地数据_此操作不可撤销_是否继续'),
+                  l10n.get('restore_5c06_8986_76d6_current_6240_has_local_data_6b64_64cd'),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(l10n.get('取消')),
+                    child: Text(l10n.get('cancel')),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(l10n.get('确认恢复')),
+                    child: Text(l10n.get('confirm_restore')),
                   ),
                 ],
               ),
@@ -236,7 +236,7 @@ class _AccountPanel extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return WorkPanel(
-      title: l10n.get('账户管理'),
+      title: l10n.get('8d26_6237_management'),
       icon: Icons.person_outline,
       children: [
         Row(
@@ -260,7 +260,7 @@ class _AccountPanel extends StatelessWidget {
                   Text(
                     authProvider.isLoggedIn
                         ? '@${authProvider.user!.username}'
-                        : l10n.get('本地游客模式__数据保存在本机'),
+                        : l10n.get('local_6e38_5ba2_6a21_5f0f_data_save_5728_672c_673a'),
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white54 : Colors.grey,
@@ -273,13 +273,13 @@ class _AccountPanel extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout, size: 18),
-                label: Text(l10n.get('退出')),
+                label: Text(l10n.get('9000_51fa')),
               )
             else
               FilledButton.icon(
                 onPressed: onLogin,
                 icon: const Icon(Icons.login, size: 18),
-                label: Text(l10n.get('登录')),
+                label: Text(l10n.get('login')),
               ),
           ],
         ),
@@ -288,9 +288,9 @@ class _AccountPanel extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _MiniStat(label: l10n.get('练习记录'), value: '$attemptsCount'),
-            _MiniStat(label: l10n.get('连续天数'), value: '$streakDays'),
-            _MiniStat(label: l10n.get('同步方式'), value: _syncLabel(syncSettings.method, l10n)),
+            _MiniStat(label: l10n.get('practice_8bb0_5f55'), value: '$attemptsCount'),
+            _MiniStat(label: l10n.get('streak_day_6570'), value: '$streakDays'),
+            _MiniStat(label: l10n.get('sync_65b9_5f0f'), value: _syncLabel(syncSettings.method, l10n)),
           ],
         ),
         const SizedBox(height: 16),
@@ -301,25 +301,25 @@ class _AccountPanel extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => _showEditProfileDialog(context),
               icon: const Icon(Icons.badge_outlined, size: 18),
-              label: Text(l10n.get('修改资料')),
+              label: Text(l10n.get('modify_8d44_6599')),
             ),
             _BindingButton(
               icon: Icons.mail_outline,
-              label: profile.emailBound ? l10n.get('邮箱已绑定') : l10n.get('绑定邮箱'),
-              status: profile.emailBound ? l10n.get('已绑定') : l10n.get('待开通'),
-              onTap: () => _showUnavailable(context, l10n.get('邮箱绑定')),
+              label: profile.emailBound ? l10n.get('email_already_bind') : l10n.get('bind_email'),
+              status: profile.emailBound ? l10n.get('already_bind') : l10n.get('5f85_5f00_901a'),
+              onTap: () => _showUnavailable(context, l10n.get('email_bind')),
             ),
             _BindingButton(
               icon: Icons.wechat,
-              label: profile.wechatBound ? l10n.get('微信已绑定') : l10n.get('绑定微信'),
-              status: profile.wechatBound ? l10n.get('已绑定') : l10n.get('待开通'),
-              onTap: () => _showUnavailable(context, l10n.get('微信绑定')),
+              label: profile.wechatBound ? l10n.get('wechat_already_bind') : l10n.get('bind_wechat'),
+              status: profile.wechatBound ? l10n.get('already_bind') : l10n.get('5f85_5f00_901a'),
+              onTap: () => _showUnavailable(context, l10n.get('wechat_bind')),
             ),
             _BindingButton(
               icon: Icons.link_outlined,
-              label: l10n.get('绑定其他账号'),
-              status: l10n.get('待开通'),
-              onTap: () => _showUnavailable(context, l10n.get('第三方账号绑定')),
+              label: l10n.get('bind_5176_4ed6_account'),
+              status: l10n.get('5f85_5f00_901a'),
+              onTap: () => _showUnavailable(context, l10n.get('7b2c_4e09_65b9_account_bind')),
             ),
           ],
         ),
@@ -359,7 +359,7 @@ class _AccountPanel extends StatelessWidget {
                           ? _displayName
                           : l10n.get(_displayName);
                       return Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : l10n.get('本'),
+                        name.isNotEmpty ? name[0].toUpperCase() : l10n.get('672c'),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
                           fontSize: 20,
@@ -400,7 +400,7 @@ class _AccountPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              l10n.get('更换头像'),
+              l10n.get('66f4_6362_avatar'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 24),
@@ -412,7 +412,7 @@ class _AccountPanel extends StatelessWidget {
                   _buildAvatarOption(
                     context,
                     icon: Icons.camera_alt,
-                    label: l10n.get('拍照'),
+                    label: l10n.get('62cd_7167'),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await _pickImageFromCamera(context);
@@ -422,7 +422,7 @@ class _AccountPanel extends StatelessWidget {
                 _buildAvatarOption(
                   context,
                   icon: Icons.photo_library,
-                  label: l10n.get('相册'),
+                  label: l10n.get('76f8_518c'),
                   onTap: () async {
                     Navigator.pop(ctx);
                     await _pickImageFromGallery(context);
@@ -442,7 +442,7 @@ class _AccountPanel extends StatelessWidget {
                 _buildAvatarOption(
                   context,
                   icon: Icons.shuffle,
-                  label: l10n.get('随机'),
+                  label: l10n.get('968f_673a'),
                   onTap: () {
                     Navigator.pop(ctx);
                     final newSeed = DateTime.now().millisecondsSinceEpoch.toString();
@@ -458,7 +458,7 @@ class _AccountPanel extends StatelessWidget {
                   Navigator.pop(ctx);
                   onProfileChanged(profile.copyWith(avatarUrl: null));
                 },
-                child: Text(l10n.get('恢复默认头像'), style: TextStyle(color: Colors.red)),
+                child: Text(l10n.get('restore_default_avatar'), style: TextStyle(color: Colors.red)),
               ),
           ],
         ),
@@ -483,7 +483,7 @@ class _AccountPanel extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('拍照失败: {error}', {'error': e}))),
+          SnackBar(content: Text(l10n.getp('62cd_7167_fail_{error}', {'error': e}))),
         );
       }
     }
@@ -513,7 +513,7 @@ class _AccountPanel extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('选择图片失败: {error}', {'error': e}))),
+          SnackBar(content: Text(l10n.getp('select_56fe_7247_fail_{error}', {'error': e}))),
         );
       }
     }
@@ -550,19 +550,19 @@ class _AccountPanel extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('输入头像_URL')),
+        title: Text(l10n.get('input_avatar_url')),
         content: TextField(
           controller: urlController,
           decoration: InputDecoration(
             hintText: 'https://example.com/avatar.jpg',
-            labelText: l10n.get('头像链接'),
+            labelText: l10n.get('avatar_link'),
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('取消')),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -572,7 +572,7 @@ class _AccountPanel extends StatelessWidget {
               }
               Navigator.pop(ctx);
             },
-            child: Text(l10n.get('确定')),
+            child: Text(l10n.get('786e_5b9a')),
           ),
         ],
       ),
@@ -581,16 +581,16 @@ class _AccountPanel extends StatelessWidget {
 
   String _syncLabel(String method, LocalizationProvider l10n) => switch (method) {
     'webdav' => 'WebDAV',
-    'cloud' => l10n.get('云同步'),
-    'file' => l10n.get('文件'),
-    _ => l10n.get('本地'),
+    'cloud' => l10n.get('4e91_sync'),
+    'file' => l10n.get('file'),
+    _ => l10n.get('local'),
   };
 
   void _showUnavailable(BuildContext context, String name) {
     final l10n = context.watch<LocalizationProvider>();
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(l10n.getp('{name} 功能待开通，可先使用本地数据和 WebDAV 备份', {'name': name}))));
+    ).showSnackBar(SnackBar(content: Text(l10n.getp('{name}_feature_5f85_5f00_901a_53ef_5148_4f7f_7528_local_data', {'name': name}))));
   }
 
   void _showEditProfileDialog(BuildContext context) {
@@ -628,7 +628,7 @@ class _AccountPanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.get('编辑个人资料'),
+              l10n.get('edit_personal_8d44_6599'),
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 24),
@@ -647,7 +647,7 @@ class _AccountPanel extends StatelessWidget {
                         ? Text(
                             nicknameController.text.isNotEmpty
                                 ? nicknameController.text[0].toUpperCase()
-                                : l10n.get('用'),
+                                : l10n.get('7528'),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontSize: 28,
@@ -663,7 +663,7 @@ class _AccountPanel extends StatelessWidget {
                       _showAvatarPicker(context);
                     },
                     icon: const Icon(Icons.camera_alt, size: 16),
-                    label: Text(l10n.get('更换头像')),
+                    label: Text(l10n.get('66f4_6362_avatar')),
                   ),
                 ],
               ),
@@ -674,8 +674,8 @@ class _AccountPanel extends StatelessWidget {
             TextField(
               controller: nicknameController,
               decoration: InputDecoration(
-                labelText: l10n.get('昵称'),
-                hintText: l10n.get('输入你的昵称'),
+                labelText: l10n.get('nickname'),
+                hintText: l10n.get('input_4f60_7684_nickname'),
                 prefixIcon: const Icon(Icons.person_outline),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -688,7 +688,7 @@ class _AccountPanel extends StatelessWidget {
             TextField(
               controller: emailController,
               decoration: InputDecoration(
-                labelText: l10n.get('邮箱_展示用'),
+                labelText: l10n.get('email_5c55_793a_7528'),
                 hintText: 'your@email.com',
                 prefixIcon: const Icon(Icons.email_outlined),
                 border: OutlineInputBorder(
@@ -701,7 +701,7 @@ class _AccountPanel extends StatelessWidget {
             
             // 提示
             Text(
-              l10n.get('邮箱仅用于展示_不影响数据同步'),
+              l10n.get('email_4ec5_7528_4e8e_5c55_793a_not_5f71_54cd_data_sync'),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 24),
@@ -714,9 +714,9 @@ class _AccountPanel extends StatelessWidget {
                   onProfileChanged(
                     LocalProfile(
                       nickname: nicknameController.text.trim().isEmpty
-                          ? '本地用户'
-                          : nicknameController.text.trim() == l10n.get('本地用户')
-                              ? '本地用户'
+                          ? l10n.get('local_user')
+                          : nicknameController.text.trim() == l10n.get('local_user')
+                              ? l10n.get('local_user')
                               : nicknameController.text.trim(),
                       email: emailController.text.trim(),
                       avatarSeed: profile.avatarSeed,
@@ -727,7 +727,7 @@ class _AccountPanel extends StatelessWidget {
                   );
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.get('资料已更新'))),
+                    SnackBar(content: Text(l10n.get('8d44_6599_already_update'))),
                   );
                 },
                 style: FilledButton.styleFrom(
@@ -736,7 +736,7 @@ class _AccountPanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(l10n.get('保存')),
+                child: Text(l10n.get('save')),
               ),
             ),
           ],
@@ -825,26 +825,26 @@ class _ContentEnvPanel extends StatelessWidget {
     );
 
     return WorkPanel(
-      title: l10n.get('知识源配置'),
+      title: l10n.get('knowledge_6e90_config'),
       icon: Icons.cloud_outlined,
       trailing: FilledButton.tonalIcon(
         onPressed: onApplyChanged,
         icon: const Icon(Icons.refresh),
-        label: Text(l10n.get('应用并重载')),
+        label: Text(l10n.get('application_5e76_91cd_8f7d')),
       ),
       children: [
         // 环境切换
         SegmentedButton<ContentEnv>(
           segments: [
-            ButtonSegment(value: ContentEnv.production, label: Text(l10n.get('发布版'))),
+            ButtonSegment(value: ContentEnv.production, label: Text(l10n.get('publish_7248'))),
             ButtonSegment(
               value: ContentEnv.test,
-              label: Text(l10n.get('测试版')),
+              label: Text(l10n.get('test_7248')),
               enabled: userRole.allowedContentEnvs.contains('test'),
             ),
             ButtonSegment(
               value: ContentEnv.draft,
-              label: Text(l10n.get('草稿版')),
+              label: Text(l10n.get('8349_7a3f_7248')),
               enabled: userRole.allowedContentEnvs.contains('draft'),
             ),
           ],
@@ -872,7 +872,7 @@ class _ContentEnvPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.getp('当前：{url}', {'url': settings.contentBaseUrl}),
+                  l10n.getp('current_{url}', {'url': settings.contentBaseUrl}),
                   style: const TextStyle(fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -884,7 +884,7 @@ class _ContentEnvPanel extends StatelessWidget {
 
         // 测试版自定义 URL
         Text(
-          l10n.get('测试版地址_留空使用默认'),
+          l10n.get('test_7248_address_7559_7a7a_4f7f_7528_default'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -892,7 +892,7 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.getp('默认：{url}/content/test', {'url': AppSettings.defaultWorkerApiUrl}),
+          l10n.getp('default_{url}_content_test', {'url': AppSettings.defaultWorkerApiUrl}),
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -902,7 +902,7 @@ class _ContentEnvPanel extends StatelessWidget {
         TextField(
           controller: testController,
           decoration: InputDecoration(
-            hintText: l10n.get('自定义测试版_URL'),
+            hintText: l10n.get('custom_test_7248_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
@@ -912,7 +912,7 @@ class _ContentEnvPanel extends StatelessWidget {
 
         // 发布版自定义 URL
         Text(
-          l10n.get('发布版地址_留空使用默认'),
+          l10n.get('publish_7248_address_7559_7a7a_4f7f_7528_default'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -920,7 +920,7 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.getp('默认：{url}', {'url': AppSettings.defaultProdContentUrl}),
+          l10n.getp('default_url', {'url': AppSettings.defaultProdContentUrl}),
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -930,7 +930,7 @@ class _ContentEnvPanel extends StatelessWidget {
         TextField(
           controller: prodController,
           decoration: InputDecoration(
-            hintText: l10n.get('自定义发布版_URL'),
+            hintText: l10n.get('custom_publish_7248_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
@@ -956,12 +956,12 @@ class _AiConfigPanel extends StatelessWidget {
     final defaultConfig = configs.where((c) => c.isDefault).firstOrNull;
 
     return WorkPanel(
-      title: l10n.get('AI_配置'),
+      title: l10n.get('ai_config'),
       icon: Icons.smart_toy_outlined,
       trailing: FilledButton.tonalIcon(
         onPressed: onNavigateToConfig,
         icon: const Icon(Icons.settings_outlined),
-        label: Text(l10n.get('管理配置')),
+        label: Text(l10n.get('management_config')),
       ),
       children: [
         if (defaultConfig != null) ...[
@@ -969,13 +969,13 @@ class _AiConfigPanel extends StatelessWidget {
             icon: Icons.hub_outlined,
             title: defaultConfig.name,
             subtitle:
-                '模型：${defaultConfig.model} · ${defaultConfig.enabled ? l10n.get('已启用') : l10n.get('已禁用')}',
+                '模型：${defaultConfig.model} · ${defaultConfig.enabled ? l10n.get('already_enable') : l10n.get('already_disable')}',
           ),
         ] else ...[
           InfoRow(
             icon: Icons.warning_amber_outlined,
-            title: l10n.get('未配置_AI'),
-            subtitle: l10n.get('请添加_AI_配置以使用评估功能'),
+            title: l10n.get('un_config_ai'),
+            subtitle: l10n.get('8bf7_add_ai_config_4ee5_4f7f_7528_evaluation_feature'),
           ),
         ],
       ],
@@ -1000,7 +1000,7 @@ class _SttConfigPanel extends StatelessWidget {
     final isWhisper = settings.sttMode == 'whisper';
 
     return WorkPanel(
-      title: l10n.get('语音识别'),
+      title: l10n.get('8bed_97f3_8bc6_522b'),
       icon: Icons.mic_outlined,
       children: [
         // STT 模式切换
@@ -1010,9 +1010,9 @@ class _SttConfigPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: _SttModeCard(
-                  label: l10n.get('系统语音'),
+                  label: l10n.get('system_8bed_97f3'),
                   icon: Icons.phone_android,
-                  description: l10n.get('使用设备内置语音识别'),
+                  description: l10n.get('4f7f_7528_8bbe_5907_5185_7f6e_8bed_97f3_8bc6_522b'),
                   selected: !isWhisper,
                   onTap: () => onSettingsChanged(
                     settings.copyWith(sttMode: 'system'),
@@ -1024,7 +1024,7 @@ class _SttConfigPanel extends StatelessWidget {
                 child: _SttModeCard(
                   label: 'Whisper API',
                   icon: Icons.cloud_outlined,
-                  description: l10n.get('使用_Whisper_兼容_API'),
+                  description: l10n.get('4f7f_7528_whisper_517c_5bb9_api'),
                   selected: isWhisper,
                   onTap: () => onSettingsChanged(
                     settings.copyWith(sttMode: 'whisper'),
@@ -1046,7 +1046,7 @@ class _SttConfigPanel extends StatelessWidget {
                     text: settings.whisperBaseUrl ?? '',
                   ),
                   decoration: InputDecoration(
-                    labelText: l10n.get('API_地址'),
+                    labelText: l10n.get('api_address'),
                     hintText: 'https://api.openai.com/v1',
                     isDense: true,
                   ),
@@ -1075,7 +1075,7 @@ class _SttConfigPanel extends StatelessWidget {
                     text: settings.whisperModel,
                   ),
                   decoration: InputDecoration(
-                    labelText: l10n.get('模型名称'),
+                    labelText: l10n.get('6a21_578b_name'),
                     hintText: 'whisper-1',
                     isDense: true,
                   ),
@@ -1093,7 +1093,7 @@ class _SttConfigPanel extends StatelessWidget {
           child: Text(
             isWhisper
                 ? l10n.get('text_60307d1a')
-                : l10n.get('使用设备内置语音识别_离线可用_但识别质量因设备而异'),
+                : l10n.get('4f7f_7528_8bbe_5907_5185_7f6e_8bed_97f3_8bc6_522b_offline_53'),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).textTheme.bodySmall?.color,
@@ -1203,11 +1203,11 @@ class _AppearancePanel extends StatelessWidget {
     final density = settings.cardDensity;
 
     return WorkPanel(
-      title: l10n.get('外观与主题'),
+      title: l10n.get('appearance_4e0e_theme'),
       icon: Icons.palette_outlined,
       children: [
         // 主题选择
-        Text(l10n.get('主题风格'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(l10n.get('theme_98ce_683c'), style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -1223,7 +1223,7 @@ class _AppearancePanel extends StatelessWidget {
           }).toList(),
         ),
         const SizedBox(height: 16),
-        Text(l10n.get('主色选择'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(l10n.get('4e3b_8272_select'), style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,
@@ -1251,7 +1251,7 @@ class _AppearancePanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Text(l10n.get('强调色选择'), style: TextStyle(fontWeight: FontWeight.w700)),
+        Text(l10n.get('5f3a_8c03_8272_select'), style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,
@@ -1281,7 +1281,7 @@ class _AppearancePanel extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Text(l10n.get('字体大小'), style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(l10n.get('font_size'), style: TextStyle(fontWeight: FontWeight.w700)),
             const Spacer(),
             Text('${(fontScale * 100).toInt()}%'),
           ],
@@ -1296,10 +1296,10 @@ class _AppearancePanel extends StatelessWidget {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: density,
-          decoration: InputDecoration(labelText: l10n.get('卡片密度'), isDense: true),
+          decoration: InputDecoration(labelText: l10n.get('card_density'), isDense: true),
           items: [
-            DropdownMenuItem(value: 'comfortable', child: Text(l10n.get('舒适'))),
-            DropdownMenuItem(value: 'compact', child: Text(l10n.get('紧凑'))),
+            DropdownMenuItem(value: 'comfortable', child: Text(l10n.get('comfortable'))),
+            DropdownMenuItem(value: 'compact', child: Text(l10n.get('compact'))),
           ],
           onChanged: (value) {
             if (value != null) onDensityChanged(value);
@@ -1336,18 +1336,18 @@ class _LearningSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('学习设置'),
+      title: l10n.get('study_settings'),
       icon: Icons.school_outlined,
       children: [
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
-          decoration: InputDecoration(labelText: l10n.get('推荐策略'), isDense: true),
+          decoration: InputDecoration(labelText: l10n.get('recommend_strategy'), isDense: true),
           items: [
-            DropdownMenuItem(value: 'smart', child: Text(l10n.get('智能推荐'))),
-            DropdownMenuItem(value: 'low-score-first', child: Text(l10n.get('低分优先'))),
-            DropdownMenuItem(value: 'path-order', child: Text(l10n.get('路径顺序'))),
-            DropdownMenuItem(value: 'high-frequency', child: Text(l10n.get('高频优先'))),
-            DropdownMenuItem(value: 'review-first', child: Text(l10n.get('复习优先'))),
+            DropdownMenuItem(value: 'smart', child: Text(l10n.get('667a_80fd_recommend'))),
+            DropdownMenuItem(value: 'low-score-first', child: Text(l10n.get('4f4e_5206_priority'))),
+            DropdownMenuItem(value: 'path-order', child: Text(l10n.get('8def_5f84_987a_5e8f'))),
+            DropdownMenuItem(value: 'high-frequency', child: Text(l10n.get('high_freq_priority'))),
+            DropdownMenuItem(value: 'review-first', child: Text(l10n.get('review_priority'))),
           ],
           onChanged: (value) {
             if (value != null) {
@@ -1360,7 +1360,7 @@ class _LearningSettingsPanel extends StatelessWidget {
           children: [
             Expanded(
               child: _NumberSetting(
-                label: l10n.get('每日新学'),
+                label: l10n.get('daily_new_learn'),
                 value: settings.dailyNewCount,
                 onChanged: (value) =>
                     onSettingsChanged(settings.copyWith(dailyNewCount: value)),
@@ -1369,7 +1369,7 @@ class _LearningSettingsPanel extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _NumberSetting(
-                label: l10n.get('每日复习'),
+                label: l10n.get('daily_review'),
                 value: settings.dailyReviewCount,
                 onChanged: (value) => onSettingsChanged(
                   settings.copyWith(dailyReviewCount: value),
@@ -1381,14 +1381,14 @@ class _LearningSettingsPanel extends StatelessWidget {
         const SizedBox(height: 12),
         SwitchListTile(
           value: settings.prioritizePrerequisites,
-          title: Text(l10n.get('优先补前置知识')),
+          title: Text(l10n.get('priority_supplement_prerequisite_knowledge')),
           onChanged: (value) => onSettingsChanged(
             settings.copyWith(prioritizePrerequisites: value),
           ),
         ),
         SwitchListTile(
           value: settings.allowSkipLowFrequency,
-          title: Text(l10n.get('允许跳过低频知识')),
+          title: Text(l10n.get('5141_8bb8_8df3_8fc7_low_freq_knowledge')),
           onChanged: (value) => onSettingsChanged(
             settings.copyWith(allowSkipLowFrequency: value),
           ),
@@ -1396,15 +1396,15 @@ class _LearningSettingsPanel extends StatelessWidget {
         DropdownButtonFormField<String>(
           initialValue: settings.mockInterviewPreference,
           decoration: InputDecoration(
-            labelText: l10n.get('模拟面试组卷偏好'),
+            labelText: l10n.get('6a21_62df_interview_7ec4_5377_504f_597d'),
             isDense: true,
           ),
           items: [
-            DropdownMenuItem(value: 'mixed', child: Text(l10n.get('混合'))),
-            DropdownMenuItem(value: 'foundation', child: Text(l10n.get('基础知识'))),
-            DropdownMenuItem(value: 'systemDesign', child: Text(l10n.get('系统设计'))),
-            DropdownMenuItem(value: 'code', child: Text(l10n.get('代码题'))),
-            DropdownMenuItem(value: 'project', child: Text(l10n.get('项目深挖'))),
+            DropdownMenuItem(value: 'mixed', child: Text(l10n.get('6df7_5408'))),
+            DropdownMenuItem(value: 'foundation', child: Text(l10n.get('basic_knowledge'))),
+            DropdownMenuItem(value: 'systemDesign', child: Text(l10n.get('system_design'))),
+            DropdownMenuItem(value: 'code', child: Text(l10n.get('code_question_count'))),
+            DropdownMenuItem(value: 'project', child: Text(l10n.get('project_deep_dig'))),
           ],
           onChanged: (value) {
             if (value != null) {
@@ -1470,12 +1470,12 @@ class _LanguagePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('关于'),
+      title: l10n.get('about'),
       icon: Icons.info_outline,
       children: [
         SegmentedButton<String>(
           segments: [
-            ButtonSegment(value: 'zh', label: Text(l10n.get('中文'))),
+            ButtonSegment(value: 'zh', label: Text(l10n.get('chinese'))),
             ButtonSegment(value: 'en', label: Text('English')),
           ],
           selected: {settings.language},
@@ -1509,33 +1509,33 @@ class _DataManagementPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('同步与备份'),
+      title: l10n.get('sync_4e0e_backup'),
       children: [
         InfoRow(
           icon: Icons.cloud_sync_outlined,
-          title: l10n.getp('当前方式：{method}', {'method': _methodLabel(syncSettings.method, l10n)}),
+          title: l10n.getp('current_65b9_5f0f_{method}', {'method': _methodLabel(syncSettings.method, l10n)}),
           subtitle: syncSettings.lastSyncAt == null
               ? l10n.get(syncSettings.lastSyncStatus)
               : '${l10n.get(syncSettings.lastSyncStatus)} · ${syncSettings.lastSyncAt}',
         ),
         DropdownButtonFormField<String>(
           initialValue: syncSettings.method,
-          decoration: InputDecoration(labelText: l10n.get('同步方式'), isDense: true),
+          decoration: InputDecoration(labelText: l10n.get('sync_65b9_5f0f'), isDense: true),
           items: [
-            DropdownMenuItem(value: 'local', child: Text(l10n.get('本地模式'))),
-            DropdownMenuItem(value: 'file', child: Text(l10n.get('文件导入_导出'))),
-            DropdownMenuItem(value: 'webdav', child: Text(l10n.get('自定义_WebDAV'))),
-            DropdownMenuItem(value: 'cloud', child: Text(l10n.get('账号云同步'))),
-            DropdownMenuItem(value: 'baidu', child: Text(l10n.get('百度网盘_待开通'))),
-            DropdownMenuItem(value: 'quark', child: Text(l10n.get('夸克网盘_待开通'))),
-            DropdownMenuItem(value: 'aliyun', child: Text(l10n.get('阿里云盘_待开通'))),
-            DropdownMenuItem(value: 'onedrive', child: Text(l10n.get('OneDrive_待开通'))),
+            DropdownMenuItem(value: 'local', child: Text(l10n.get('local_6a21_5f0f'))),
+            DropdownMenuItem(value: 'file', child: Text(l10n.get('file_import_export'))),
+            DropdownMenuItem(value: 'webdav', child: Text(l10n.get('custom_webdav'))),
+            DropdownMenuItem(value: 'cloud', child: Text(l10n.get('account_4e91_sync'))),
+            DropdownMenuItem(value: 'baidu', child: Text(l10n.get('767e_5ea6_7f51_76d8_5f85_5f00_901a'))),
+            DropdownMenuItem(value: 'quark', child: Text(l10n.get('5938_514b_7f51_76d8_5f85_5f00_901a'))),
+            DropdownMenuItem(value: 'aliyun', child: Text(l10n.get('963f_91cc_4e91_76d8_5f85_5f00_901a'))),
+            DropdownMenuItem(value: 'onedrive', child: Text(l10n.get('onedrive_5f85_5f00_901a'))),
           ],
           onChanged: (value) {
             if (value == null) return;
             if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(value)) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.getp('{method} 功能待开通', {'method': _methodLabel(value, l10n)}))),
+                SnackBar(content: Text(l10n.getp('{method}_feature_5f85_5f00_901a', {'method': _methodLabel(value, l10n)}))),
               );
             }
             onSyncSettingsChanged(
@@ -1545,7 +1545,7 @@ class _DataManagementPanel extends StatelessWidget {
                 webDavUsername: syncSettings.webDavUsername,
                 webDavPassword: syncSettings.webDavPassword,
                 lastSyncAt: syncSettings.lastSyncAt,
-                lastSyncStatus: value == 'local' ? l10n.get('本地模式') : l10n.get('待配置'),
+                lastSyncStatus: value == 'local' ? l10n.get('local_6a21_5f0f') : l10n.get('5f85_config'),
               ),
             );
           },
@@ -1555,7 +1555,7 @@ class _DataManagementPanel extends StatelessWidget {
           TextFormField(
             initialValue: syncSettings.webDavUrl,
             decoration: InputDecoration(
-              labelText: l10n.get('WebDAV_地址'),
+              labelText: l10n.get('webdav_address'),
               hintText: 'https://dav.example.com/remote.php/dav/files/me',
             ),
             onChanged: (value) => onSyncSettingsChanged(
@@ -1572,7 +1572,7 @@ class _DataManagementPanel extends StatelessWidget {
           const SizedBox(height: 8),
           TextFormField(
             initialValue: syncSettings.webDavUsername,
-            decoration: InputDecoration(labelText: l10n.get('用户名')),
+            decoration: InputDecoration(labelText: l10n.get('username')),
             onChanged: (value) => onSyncSettingsChanged(
               SyncSettings(
                 method: syncSettings.method,
@@ -1588,7 +1588,7 @@ class _DataManagementPanel extends StatelessWidget {
           TextFormField(
             initialValue: syncSettings.webDavPassword,
             obscureText: true,
-            decoration: InputDecoration(labelText: l10n.get('应用密码')),
+            decoration: InputDecoration(labelText: l10n.get('application_password')),
             onChanged: (value) => onSyncSettingsChanged(
               SyncSettings(
                 method: syncSettings.method,
@@ -1606,7 +1606,7 @@ class _DataManagementPanel extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onTestConnection,
               icon: const Icon(Icons.wifi_find, size: 16),
-              label: Text(l10n.get('测试连接')),
+              label: Text(l10n.get('test_connect')),
             ),
           ),
         ],
@@ -1616,20 +1616,20 @@ class _DataManagementPanel extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onSync,
               icon: const Icon(Icons.cloud_upload),
-              label: Text(l10n.get('备份到云端')),
+              label: Text(l10n.get('backup_5230_cloud')),
             ),
             const SizedBox(width: 12),
             if (syncSettings.method == 'webdav')
               FilledButton.tonalIcon(
                 onPressed: onRestore,
                 icon: const Icon(Icons.cloud_download),
-                label: Text(l10n.get('从云端恢复')),
+                label: Text(l10n.get('4ece_cloud_restore')),
               ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
               onPressed: onExport,
               icon: const Icon(Icons.download),
-              label: Text(l10n.get('数据导出')),
+              label: Text(l10n.get('data_export')),
             ),
           ],
         ),
@@ -1638,14 +1638,14 @@ class _DataManagementPanel extends StatelessWidget {
   }
 
   String _methodLabel(String method, LocalizationProvider l10n) => switch (method) {
-    'file' => l10n.get('文件导入_导出'),
+    'file' => l10n.get('file_import_export'),
     'webdav' => 'WebDAV',
-    'cloud' => l10n.get('账号云同步'),
-    'baidu' => l10n.get('百度网盘'),
-    'quark' => l10n.get('夸克网盘'),
-    'aliyun' => l10n.get('阿里云盘'),
+    'cloud' => l10n.get('account_4e91_sync'),
+    'baidu' => l10n.get('767e_5ea6_7f51_76d8'),
+    'quark' => l10n.get('5938_514b_7f51_76d8'),
+    'aliyun' => l10n.get('963f_91cc_4e91_76d8'),
     'onedrive' => 'OneDrive',
-    _ => l10n.get('本地模式'),
+    _ => l10n.get('local_6a21_5f0f'),
   };
 }
 
@@ -1677,10 +1677,10 @@ class _AboutPanelState extends State<_AboutPanel> {
         setState(() {
           _isChecking = false;
           if (updateInfo != null) {
-            _updateMessage = l10n.getp('发现新版本 v{version}', {'version': updateInfo.version});
+            _updateMessage = l10n.getp('53d1_73b0_new_version_v{version}', {'version': updateInfo.version});
             _showUpdateDialog(updateInfo);
           } else {
-            _updateMessage = l10n.get('已是最新版本');
+            _updateMessage = l10n.get('already_is_6700_new_version');
           }
         });
       }
@@ -1689,7 +1689,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         final l10n = context.watch<LocalizationProvider>();
         setState(() {
           _isChecking = false;
-          _updateMessage = l10n.get('检查更新失败');
+          _updateMessage = l10n.get('68c0_67e5_update_fail');
         });
       }
     }
@@ -1700,14 +1700,14 @@ class _AboutPanelState extends State<_AboutPanel> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.getp('发现新版本 v{version}', {'version': updateInfo.version})),
+        title: Text(l10n.getp('53d1_73b0_new_version_v{version}', {'version': updateInfo.version})),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.getp('发布日期：{date}', {'date': updateInfo.releaseDate})),
+            Text(l10n.getp('publish_day_671f_{date}', {'date': updateInfo.releaseDate})),
             const SizedBox(height: 12),
-            Text(l10n.get('更新内容'), style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(l10n.get('update_content'), style: TextStyle(fontWeight: FontWeight.w700)),
             ...updateInfo.notes.map(
               (note) => Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1716,7 +1716,7 @@ class _AboutPanelState extends State<_AboutPanel> {
             ),
             const SizedBox(height: 12),
             Text(
-              l10n.getp('平台：{size}', {'size': UpdateService.formatSize(updateInfo.platforms.values.first.size)}),
+              l10n.getp('5e73_53f0_{size}', {'size': UpdateService.formatSize(updateInfo.platforms.values.first.size)}),
               style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
           ],
@@ -1724,14 +1724,14 @@ class _AboutPanelState extends State<_AboutPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('稍后再说')),
+            child: Text(l10n.get('7a0d_540e_518d_8bf4')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               _downloadUpdate(updateInfo);
             },
-            child: Text(l10n.get('立即更新')),
+            child: Text(l10n.get('7acb_5373_update')),
           ),
         ],
       ),
@@ -1747,7 +1747,7 @@ class _AboutPanelState extends State<_AboutPanel> {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('当前平台暂无更新包'))));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('current_5e73_53f0_6682_no_update_5305'))));
       return;
     }
 
@@ -1756,7 +1756,7 @@ class _AboutPanelState extends State<_AboutPanel> {
       final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get('Web_端请刷新页面获取最新版本'))));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('web_7aef_8bf7_5237_new_page_83b7_53d6_6700_new_version'))));
       return;
     }
 
@@ -1773,7 +1773,7 @@ class _AboutPanelState extends State<_AboutPanel> {
           // 保存 setDialogState 供 onProgress 回调使用
           _currentSetDialogState = setDialogState;
           return AlertDialog(
-            title: Text(l10n.get('下载更新')),
+            title: Text(l10n.get('download_update')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1781,7 +1781,7 @@ class _AboutPanelState extends State<_AboutPanel> {
                   value: total > 0 ? received / total : null,
                 ),
                 const SizedBox(height: 16),
-                Text(l10n.getp('正在下载 v{version}...', {'version': updateInfo.version})),
+                Text(l10n.getp('6b63_5728_download_v{version}', {'version': updateInfo.version})),
                 const SizedBox(height: 8),
                 Text(
                   '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
@@ -1824,7 +1824,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         _showInstallGuide(filePath, updateInfo.version);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('下载失败或校验不通过_请重试'))),
+          SnackBar(content: Text(l10n.get('download_fail_6216_6821_9a8c_not_901a_8fc7_8bf7_retry'))),
         );
       }
     }
@@ -1838,20 +1838,20 @@ class _AboutPanelState extends State<_AboutPanel> {
     switch (ext) {
       case 'apk':
         icon = Icons.android;
-        instruction = l10n.get('下载完成_请在通知栏或文件管理器中打开_APK_文件进行安装_n')
-            + l10n.get('如提示_未知来源_请在设置中允许安装');
+        instruction = l10n.get('download_complete_8bf7_5728_notification_680f_6216_file_mana')
+            + l10n.get('5982_hint_un_77e5_6765_6e90_8bf7_5728_settings_4e2d_5141_8bb');
         break;
       case 'dmg':
         icon = Icons.apple;
-        instruction = l10n.get('下载完成_请打开_DMG_文件_将应用拖入_应用程序_文件夹');
+        instruction = l10n.get('download_complete_8bf7_6253_5f00_dmg_file_5c06_application_6');
         break;
       case 'exe':
         icon = Icons.desktop_windows;
-        instruction = l10n.get('下载完成_请运行_EXE_文件按照向导完成安装');
+        instruction = l10n.get('download_complete_8bf7_8fd0_884c_exe_file_6309_7167_5411_5bf');
         break;
       default:
         icon = Icons.folder_open;
-        instruction = l10n.get('下载完成_请在文件管理器中找到安装包并运行');
+        instruction = l10n.get('download_complete_8bf7_5728_file_management_5668_4e2d_627e_5');
         break;
     }
 
@@ -1859,7 +1859,7 @@ class _AboutPanelState extends State<_AboutPanel> {
       context: context,
       builder: (ctx) => AlertDialog(
         icon: Icon(icon, size: 40, color: AppColors.success),
-        title: Text(l10n.getp('v{version} 下载完成', {'version': version})),
+        title: Text(l10n.getp('v{version}_download_complete', {'version': version})),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1892,7 +1892,7 @@ class _AboutPanelState extends State<_AboutPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('知道了')),
+            child: Text(l10n.get('77e5_9053_4e86')),
           ),
         ],
       ),
@@ -1903,24 +1903,24 @@ class _AboutPanelState extends State<_AboutPanel> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('关于面试智练'),
+      title: l10n.get('about_interview_667a_7ec3'),
       children: [
         InfoRow(
           icon: Icons.info_outline,
-          title: l10n.get('版本_010'),
-          subtitle: l10n.get('AI_主动回忆学习工作台'),
+          title: l10n.get('version_010'),
+          subtitle: l10n.get('ai_4e3b_52a8_56de_5fc6_study_5de5_4f5c_53f0'),
         ),
         InfoRow(
           icon: Icons.cloud_sync_outlined,
-          title: l10n.get('本地优先__云端同步'),
-          subtitle: l10n.get('云同步失败不会阻断学习_本地事件会等待重试'),
+          title: l10n.get('local_priority_cloud_sync'),
+          subtitle: l10n.get('4e91_sync_fail_not_4f1a_963b_65ad_study_local_4e8b_4ef6_4f1a'),
         ),
         InkWell(
           onTap: _isChecking ? null : _checkUpdate,
           child: InfoRow(
             icon: Icons.system_update_alt_outlined,
-            title: l10n.get('检查更新'),
-            subtitle: _updateMessage ?? l10n.get('点击检查是否有新版本'),
+            title: l10n.get('68c0_67e5_update'),
+            subtitle: _updateMessage ?? l10n.get('70b9_51fb_68c0_67e5_is_or_has_new_version'),
           ),
         ),
         if (_isChecking)

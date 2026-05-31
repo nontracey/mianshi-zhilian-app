@@ -50,7 +50,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                 const Icon(Icons.school_outlined, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Text(
-                  l10n.get('管理领域'),
+                  l10n.get('management_domain'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
@@ -62,7 +62,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('拖动排序，点击删除按钮移除领域'),
+              l10n.get('drag_to_sort_delete_domain'),
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.white54 : Colors.grey,
@@ -119,7 +119,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                               ),
                             ),
                             Text(
-                              l10n.getp('{count} 个知识点', {'count': domain.topicCount}),
+                              l10n.getp('{count}_4e2a_knowledge_point', {'count': domain.topicCount}),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,
@@ -160,7 +160,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.get('删除领域不会删除内容，只是从当前视图移除'),
+                      l10n.get('delete_domain_info'),
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.white70 : Colors.grey.shade700,
@@ -178,7 +178,7 @@ class _ManageDomainsDialogState extends State<ManageDomainsDialog> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(l10n.get('完成')),
+                child: Text(l10n.get('complete')),
               ),
             ),
           ],

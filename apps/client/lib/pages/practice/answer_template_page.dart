@@ -21,7 +21,7 @@ class AnswerTemplatePage extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('回答模板')),
+        title: Text(l10n.get('answer_template')),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -49,7 +49,7 @@ class AnswerTemplatePage extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.get('选择适合面试场景的回答模板，可以帮你组织回答结构'),
+                    l10n.get('choose_template_guide'),
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.accent,
@@ -63,11 +63,11 @@ class AnswerTemplatePage extends StatelessWidget {
           
           // 简短版模板
           _TemplateCard(
-            title: l10n.get('简短版'),
-            subtitle: l10n.get('适合电话面试、快速回答'),
+            title: l10n.get('7b80_77ed_7248'),
+            subtitle: l10n.get('9002_5408_7535_8bdd_interview_5feb_901f_answer'),
             icon: Icons.short_text,
             color: const Color(0xFF10B981),
-            duration: l10n.get('30秒 - 1分钟'),
+            duration: l10n.get('time_30sec_to_1min'),
             structure: [
               _TemplateSection(nameKey: '核心定义', descKey: '一句话解释概念'),
               _TemplateSection(nameKey: '关键特点', descKey: '2_3个核心要点'),
@@ -80,11 +80,11 @@ class AnswerTemplatePage extends StatelessWidget {
           
           // 标准版模板
           _TemplateCard(
-            title: l10n.get('标准版'),
-            subtitle: l10n.get('适合大多数技术面试'),
+            title: l10n.get('standard_7248'),
+            subtitle: l10n.get('9002_5408_5927_591a_6570_tech_interview'),
             icon: Icons.article_outlined,
             color: AppColors.accent,
-            duration: l10n.get('2-3分钟'),
+            duration: l10n.get('time_2to3min'),
             structure: [
               _TemplateSection(nameKey: '概念定义', descKey: '清晰解释是什么'),
               _TemplateSection(nameKey: '核心原理', descKey: '工作原理和机制'),
@@ -99,11 +99,11 @@ class AnswerTemplatePage extends StatelessWidget {
 
           // 深入版模板
           _TemplateCard(
-            title: l10n.get('深入版'),
-            subtitle: l10n.get('适合深入探讨、高级岗位'),
+            title: l10n.get('6df1_5165_7248'),
+            subtitle: l10n.get('9002_5408_6df1_5165_63a2_8ba8_senior_position'),
             icon: Icons.psychology_outlined,
             color: const Color(0xFF8B5CF6),
-            duration: l10n.get('3-5分钟'),
+            duration: l10n.get('time_3to5min'),
             structure: [
               _TemplateSection(nameKey: '概念定义', descKey: '清晰解释是什么'),
               _TemplateSection(nameKey: '底层原理', descKey: '深入工作原理'),
@@ -129,30 +129,30 @@ class AnswerTemplatePage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('模板使用指南')),
+        title: Text(l10n.get('template_usage_guide')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.get('1. 选择合适的模板'), style: TextStyle(fontWeight: FontWeight.w600)),
-              Text(l10n.get('根据面试场景和问题深度选择模板')),
+              Text(l10n.get('select_suitable_template'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('choose_template_by_scenario')),
               SizedBox(height: 12),
-              Text(l10n.get('2. 个性化调整'), style: TextStyle(fontWeight: FontWeight.w600)),
-              Text(l10n.get('模板只是框架，需要根据具体问题填充内容')),
+              Text(l10n.get('personalized_adjustment'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('template_is_just_framework')),
               SizedBox(height: 12),
-              Text(l10n.get('3. 结合实际经验'), style: TextStyle(fontWeight: FontWeight.w600)),
-              Text(l10n.get('用项目中的真实案例来支撑你的回答')),
+              Text(l10n.get('combine_actual_experience'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('use_real_cases')),
               SizedBox(height: 12),
-              Text(l10n.get('4. 练习表达'), style: TextStyle(fontWeight: FontWeight.w600)),
-              Text(l10n.get('不仅要记住内容，还要练习流畅表达')),
+              Text(l10n.get('practice_expression'), style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(l10n.get('remember_and_practice_fluent_expression')),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('知道了')),
+            child: Text(l10n.get('77e5_9053_4e86')),
           ),
         ],
       ),
@@ -174,18 +174,18 @@ class AnswerTemplatePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.get('回答技巧'),
+              l10n.get('answer_6280_5de7'),
               style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
             ),
             const SizedBox(height: 12),
-            _buildTipItem(l10n.get('STAR法则'), l10n.get('STAR法则描述')),
-            _buildTipItem(l10n.get('对比分析'), l10n.get('与其他方案对比')),
-            _buildTipItem(l10n.get('实际案例'), l10n.get('用项目经验支撑')),
-            _buildTipItem(l10n.get('深入原理'), l10n.get('展示底层理解')),
-            _buildTipItem(l10n.get('总结升华'), l10n.get('最后总结要点')),
+            _buildTipItem(l10n.get('star_6cd5_5219_1'), l10n.get('star_6cd5_5219_description')),
+            _buildTipItem(l10n.get('comparison_analysis'), l10n.get('4e0e_5176_4ed6_solution_comparison')),
+            _buildTipItem(l10n.get('actual_case'), l10n.get('7528_project_experience_652f_6491')),
+            _buildTipItem(l10n.get('6df1_5165_principle'), l10n.get('5c55_793a_5e95_5c42_7406_89e3')),
+            _buildTipItem(l10n.get('summary_5347_534e'), l10n.get('6700_540e_summary_8981_70b9')),
           ],
         ),
       ),
@@ -280,7 +280,7 @@ class _QuestionCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    l10n.get('问题'),
+                    l10n.get('problem'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -414,7 +414,7 @@ class _TemplateCard extends StatelessWidget {
               children: [
                 // 结构说明
                 Text(
-                  l10n.get('回答结构'),
+                  l10n.get('answer_structure'),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -479,7 +479,7 @@ class _TemplateCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      l10n.get('示例回答'),
+                      l10n.get('793a_4f8b_answer'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -490,11 +490,11 @@ class _TemplateCard extends StatelessWidget {
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: example));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.get('已复制示例'))),
+                          SnackBar(content: Text(l10n.get('already_590d_5236_793a_4f8b'))),
                         );
                       },
                       icon: const Icon(Icons.copy, size: 14),
-                      label: Text(l10n.get('复制'), style: const TextStyle(fontSize: 11)),
+                      label: Text(l10n.get('590d_5236'), style: const TextStyle(fontSize: 11)),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       ),
@@ -529,7 +529,7 @@ class _TemplateCard extends StatelessWidget {
                       backgroundColor: color,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text(l10n.get('使用此模板')),
+                    child: Text(l10n.get('use_this_template')),
                   ),
                 ),
               ],

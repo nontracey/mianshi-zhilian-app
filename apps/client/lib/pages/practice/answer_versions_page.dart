@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import '../../providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class AnswerVersionsPage extends StatefulWidget {
   const AnswerVersionsPage({
@@ -63,7 +64,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('回答版本库')),
+        title: Text(l10n.get('answer_version_5e93')),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -91,7 +92,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.get('保存你的多版回答_支持_初稿__AI_修改__面试版_迭代'),
+                    l10n.get('save_4f60_7684_591a_7248_answer_652f_6301_521d_7a3f_ai_modif'),
                     style: TextStyle(fontSize: 12, color: AppColors.accent),
                   ),
                 ),
@@ -112,7 +113,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddVersionDialog(context),
         icon: const Icon(Icons.add),
-        label: Text(l10n.get('添加版本')),
+        label: Text(l10n.get('add_version')),
       ),
     );
   }
@@ -140,7 +141,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    l10n.get('问题'),
+                    l10n.get('problem'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -186,7 +187,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.get('还没有保存的回答版本'),
+              l10n.get('8fd8_6ca1_has_save_7684_answer_version'),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -195,7 +196,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.get('点击下方按钮添加你的第一版回答'),
+              l10n.get('70b9_51fb_4e0b_65b9_button_add_4f60_7684_7b2c_4e00_7248_answ'),
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
@@ -205,7 +206,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             FilledButton.icon(
               onPressed: () => _showAddVersionDialog(context),
               icon: const Icon(Icons.add),
-              label: Text(l10n.get('添加版本')),
+              label: Text(l10n.get('add_version')),
             ),
           ],
         ),
@@ -221,9 +222,9 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
   ) {
     final type = version['type'] as String;
     final typeLabels = {
-      'draft': l10n.get('初稿'),
-      'ai_modified': l10n.get('AI_修改版'),
-      'interview': l10n.get('面试版'),
+      'draft': l10n.get('521d_7a3f'),
+      'ai_modified': l10n.get('ai_modify_7248'),
+      'interview': l10n.get('interview_7248'),
     };
     final typeColors = {
       'draft': Colors.grey,
@@ -284,7 +285,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: Text(
-                  l10n.get('AI_评估自动保存'),
+                  l10n.get('ai_evaluation_81ea_52a8_save'),
                   style: TextStyle(fontSize: 10, color: AppColors.accent),
                 ),
               ),
@@ -299,15 +300,15 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: version['content'] ?? ''));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.get('已复制到剪贴板'))),
+                  SnackBar(content: Text(l10n.get('already_590d_5236_5230_526a_8d34_677f'))),
                 );
               },
-              tooltip: l10n.get('复制'),
+              tooltip: l10n.get('590d_5236'),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 18),
               onPressed: () => _deleteVersion(index),
-              tooltip: l10n.get('删除'),
+              tooltip: l10n.get('delete'),
             ),
             const Icon(Icons.expand_more),
           ],
@@ -338,7 +339,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                       child: OutlinedButton.icon(
                         onPressed: () => _editVersion(index),
                         icon: const Icon(Icons.edit, size: 16),
-                        label: Text(l10n.get('编辑')),
+                        label: Text(l10n.get('edit')),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -346,7 +347,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                       child: OutlinedButton.icon(
                         onPressed: () => _askAIForImprovement(version),
                         icon: const Icon(Icons.auto_awesome, size: 16),
-                        label: Text(l10n.get('AI_改进')),
+                        label: Text(l10n.get('ai_improve')),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -354,7 +355,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                       child: FilledButton.icon(
                         onPressed: () => _setAsInterviewVersion(index),
                         icon: const Icon(Icons.check, size: 16),
-                        label: Text(l10n.get('设为面试版')),
+                        label: Text(l10n.get('8bbe_4e3a_interview_7248')),
                       ),
                     ),
                   ],
@@ -375,7 +376,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(l10n.get('添加回答版本')),
+          title: Text(l10n.get('add_answer_version')),
           content: SizedBox(
             width: 500,
             child: SingleChildScrollView(
@@ -384,23 +385,23 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 版本类型选择
-                  Text(l10n.get('版本类型'), style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(l10n.get('version_type'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
                       ChoiceChip(
-                        label: Text(l10n.get('初稿')),
+                        label: Text(l10n.get('521d_7a3f')),
                         selected: _selectedVersionType == 'draft',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'draft'),
                       ),
                       ChoiceChip(
-                        label: Text(l10n.get('AI_修改版')),
+                        label: Text(l10n.get('ai_modify_7248')),
                         selected: _selectedVersionType == 'ai_modified',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'ai_modified'),
                       ),
                       ChoiceChip(
-                        label: Text(l10n.get('面试版')),
+                        label: Text(l10n.get('interview_7248')),
                         selected: _selectedVersionType == 'interview',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'interview'),
                       ),
@@ -409,13 +410,13 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   const SizedBox(height: 16),
 
                   // 回答内容
-                  Text(l10n.get('回答内容'), style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(l10n.get('answer_content'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _answerController,
                     maxLines: 10,
                     decoration: InputDecoration(
-                      hintText: l10n.get('输入你的回答'),
+                      hintText: l10n.get('input_4f60_7684_answer'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -428,14 +429,14 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.get('取消')),
+              child: Text(l10n.get('cancel')),
             ),
             FilledButton(
               onPressed: () {
                 _saveVersion();
                 Navigator.pop(ctx);
               },
-              child: Text(l10n.get('保存')),
+              child: Text(l10n.get('save')),
             ),
           ],
         ),
@@ -446,7 +447,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
   Future<void> _saveVersion() async {
     if (_answerController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('请输入回答内容'))),
+        SnackBar(content: Text(l10n.get('8bf7_input_answer_content'))),
       );
       return;
     }
@@ -463,7 +464,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('版本已保存'))),
+        SnackBar(content: Text(l10n.get('version_already_save'))),
       );
     }
   }
@@ -472,12 +473,12 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('确认删除')),
-        content: Text(l10n.get('确定要删除这个版本吗')),
+        title: Text(l10n.get('confirm_delete')),
+        content: Text(l10n.get('786e_5b9a_8981_delete_8fd9_4e2a_version_5417')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('取消')),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () async {
@@ -489,10 +490,10 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
               final messenger = ScaffoldMessenger.of(context);
               Navigator.of(context).pop();
               messenger.showSnackBar(
-                SnackBar(content: Text(l10n.get('版本已删除'))),
+                SnackBar(content: Text(l10n.get('version_already_delete'))),
               );
             },
-            child: Text(l10n.get('删除')),
+            child: Text(l10n.get('delete')),
           ),
         ],
       ),
@@ -507,7 +508,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(l10n.get('编辑版本')),
+          title: Text(l10n.get('edit_version')),
           content: SizedBox(
             width: 500,
             child: SingleChildScrollView(
@@ -516,23 +517,23 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 版本类型选择
-                  Text(l10n.get('版本类型'), style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(l10n.get('version_type'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
                       ChoiceChip(
-                        label: Text(l10n.get('初稿')),
+                        label: Text(l10n.get('521d_7a3f')),
                         selected: _selectedVersionType == 'draft',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'draft'),
                       ),
                       ChoiceChip(
-                        label: Text(l10n.get('AI_修改版')),
+                        label: Text(l10n.get('ai_modify_7248')),
                         selected: _selectedVersionType == 'ai_modified',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'ai_modified'),
                       ),
                       ChoiceChip(
-                        label: Text(l10n.get('面试版')),
+                        label: Text(l10n.get('interview_7248')),
                         selected: _selectedVersionType == 'interview',
                         onSelected: (_) => setDialogState(() => _selectedVersionType = 'interview'),
                       ),
@@ -541,13 +542,13 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   const SizedBox(height: 16),
 
                   // 回答内容
-                  Text(l10n.get('回答内容'), style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(l10n.get('answer_content'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _answerController,
                     maxLines: 10,
                     decoration: InputDecoration(
-                      hintText: l10n.get('输入你的回答'),
+                      hintText: l10n.get('input_4f60_7684_answer'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -560,7 +561,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.get('取消')),
+              child: Text(l10n.get('cancel')),
             ),
             FilledButton(
               onPressed: () async {
@@ -577,10 +578,10 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.of(context).pop();
                 messenger.showSnackBar(
-                  SnackBar(content: Text(l10n.get('版本已更新'))),
+                  SnackBar(content: Text(l10n.get('version_already_update'))),
                 );
               },
-              child: Text(l10n.get('保存')),
+              child: Text(l10n.get('save')),
             ),
           ],
         ),
@@ -592,7 +593,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     final content = version['content'] as String? ?? '';
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('请先填写回答内容'))),
+        SnackBar(content: Text(l10n.get('8bf7_5148_586b_5199_answer_content'))),
       );
       return;
     }
@@ -601,12 +602,12 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     if (!aiProvider.hasAnyConfig) {
       // 无 AI 配置时降级为复制到剪贴板
       await Clipboard.setData(ClipboardData(
-        text: l10n.getp('请帮我改进以下面试回答：\n\n{content}', {'content': content}),
+        text: l10n.getp('8bf7_5e2e_6211_improve_4ee5_4e0b_interview_answer_n_n{conten', {'content': content}),
       ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.get('未配置_AI_已复制到剪贴板_可粘贴到外部_AI_对话')),
+            content: Text(l10n.get('un_config_ai_already_590d_5236_5230_526a_8d34_677f_53ef_past')),
             duration: Duration(seconds: 3),
           ),
         );
@@ -664,7 +665,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
               children: [
                 const Icon(Icons.auto_awesome, size: 20, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text(l10n.get('AI_改进建议')),
+                Text(l10n.get('ai_improve_suggestion')),
               ],
             ),
             content: SizedBox(
@@ -682,7 +683,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                             children: [
                               CircularProgressIndicator(),
                               SizedBox(height: 12),
-                              Text(l10n.get('AI_正在分析你的回答')),
+                              Text(l10n.get('ai_6b63_5728_analysis_4f60_7684_answer')),
                             ],
                           ),
                         ),
@@ -723,7 +724,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text(l10n.get('关闭')),
+                child: Text(l10n.get('5173_95ed')),
               ),
               if (improvedText.isNotEmpty)
                 FilledButton.icon(
@@ -742,12 +743,12 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                     Navigator.pop(ctx);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.get('已保存为_AI_修改版'))),
+                        SnackBar(content: Text(l10n.get('already_save_4e3a_ai_modify_7248'))),
                       );
                     }
                   },
                   icon: const Icon(Icons.save, size: 16),
-                  label: Text(l10n.get('保存为_AI_修改版')),
+                  label: Text(l10n.get('save_4e3a_ai_modify_7248')),
                 ),
             ],
           );
@@ -764,14 +765,14 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     required void Function(String error) onError,
   }) async {
     try {
-      final prompt = l10n.get('请帮我改进以下面试回答_使其更结构化_更专业_更完整')
-          + l10n.get('保留核心要点_优化表达方式_补充关键细节')
-          + l10n.get('只输出改进后的回答内容_不要加前缀说明_nn')
-          + l10n.getp('原始回答：\n{answer}', {'answer': originalAnswer});
+      final prompt = l10n.get('8bf7_5e2e_6211_improve_4ee5_4e0b_interview_answer_4f7f_5176')
+          + l10n.get('4fdd_7559_core_8981_70b9_optimize_expression_65b9_5f0f_suppl')
+          + l10n.get('53ea_output_improve_540e_7684_answer_content_not_8981_52a0_5')
+          + l10n.getp('539f_59cb_answer_n{answer}', {'answer': originalAnswer});
 
       final stream = aiProvider.sendMessageStream(
         prompt,
-        systemPrompt: l10n.get('你是一位资深面试辅导专家_擅长帮助候选人优化面试回答'),
+        systemPrompt: l10n.get('4f60_is_4e00_4f4d_8d44_6df1_interview_8f85_5bfc_expert_64c5'),
       );
 
       await for (final token in stream) {
@@ -779,7 +780,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
       }
       onComplete();
     } catch (e) {
-      onError(l10n.getp('AI 改进失败: {error}', {'error': e}));
+      onError(l10n.getp('ai_improve_fail_{error}', {'error': e}));
     }
   }
 
@@ -790,7 +791,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     await _saveVersions();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('已设为面试版'))),
+        SnackBar(content: Text(l10n.get('already_8bbe_4e3a_interview_7248'))),
       );
     }
   }

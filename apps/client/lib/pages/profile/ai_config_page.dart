@@ -23,12 +23,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.get('AI 配置管理')),
+        title: Text(l10n.get('ai_config_management')),
         actions: [
           IconButton(
             onPressed: () => _showEditDialog(context),
             icon: const Icon(Icons.add),
-            tooltip: l10n.get('添加配置'),
+            tooltip: l10n.get('add_config'),
           ),
         ],
       ),
@@ -43,9 +43,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   children: [
                     const Icon(Icons.hub_outlined, size: 64, color: Colors.grey),
                     const SizedBox(height: 16),
-                    Text(l10n.get('暂无 AI 配置'), style: const TextStyle(fontSize: 16)),
+                    Text(l10n.get('no_ai_config'), style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text(l10n.get('点击右上角 + 添加新配置')),
+                    Text(l10n.get('click_top_right_add_config')),
                   ],
                 ),
               ),
@@ -89,7 +89,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(isEditing ? l10n.get('编辑配置') : l10n.get('添加新配置')),
+          title: Text(isEditing ? l10n.get('edit_config') : l10n.get('add_new_config')),
           content: SingleChildScrollView(
             child: SizedBox(
               width: 400,
@@ -99,8 +99,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   TextField(
                     controller: nameController,
                     decoration: InputDecoration(
-                      labelText: l10n.get('名称'),
-                      hintText: l10n.get('例如：OpenAI、DeepSeek'),
+                      labelText: l10n.get('name'),
+                      hintText: l10n.get('example_openai_deepseek'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -124,7 +124,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   TextField(
                     controller: modelController,
                     decoration: InputDecoration(
-                      labelText: l10n.get('模型名'),
+                      labelText: l10n.get('model_name'),
                       hintText: 'gpt-4o-mini',
                     ),
                   ),
@@ -143,12 +143,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
                                     model: modelController.text.trim(),
                                   );
                               setDialogState(() {
-                                testResult = success ? l10n.get('连接成功') : l10n.get('连接失败');
+                                testResult = success ? l10n.get('connection_success') : l10n.get('connection_failed');
                                 isTesting = false;
                               });
                             } catch (e) {
                               setDialogState(() {
-                                testResult = '${l10n.get('连接失败')}：$e';
+                                testResult = '${l10n.get('connection_failed')}：$e';
                                 isTesting = false;
                               });
                             }
@@ -160,14 +160,14 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.wifi_tethering),
-                    label: Text(isTesting ? l10n.get('测试中...') : l10n.get('测试连接')),
+                    label: Text(isTesting ? l10n.get('testing') : l10n.get('test_connect')),
                   ),
                   if (testResult != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       testResult!,
                       style: TextStyle(
-                        color: testResult == l10n.get('连接成功')
+                        color: testResult == l10n.get('connection_success')
                             ? AppColors.success
                             : AppColors.danger,
                       ),
@@ -176,20 +176,20 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   const SizedBox(height: 16),
                   SwitchListTile(
                     value: isDefault,
-                    title: Text(l10n.get('设为默认')),
+                    title: Text(l10n.get('set_as_default')),
                     onChanged: (value) =>
                         setDialogState(() => isDefault = value),
                   ),
                   SwitchListTile(
                     value: enabled,
-                    title: Text(l10n.get('启用')),
+                    title: Text(l10n.get('enable')),
                     onChanged: (value) => setDialogState(() => enabled = value),
                   ),
                   const Divider(),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      l10n.get('模型能力声明'),
+                      l10n.get('model_capability_statement'),
                       style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -197,14 +197,14 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   ),
                   SwitchListTile(
                     value: supportsTextInput,
-                    title: Text(l10n.get('支持文本')),
-                    subtitle: Text(l10n.get('关闭后不会用于文本评分')),
+                    title: Text(l10n.get('support_text')),
+                    subtitle: Text(l10n.get('closed_not_used_for_scoring')),
                     onChanged: (value) =>
                         setDialogState(() => supportsTextInput = value),
                   ),
                   SwitchListTile(
                     value: supportsImageInput,
-                    title: Text(l10n.get('支持图片理解')),
+                    title: Text(l10n.get('support_image')),
                     onChanged: (value) => setDialogState(() {
                       supportsImageInput = value;
                       supportsMultimodal =
@@ -213,8 +213,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   ),
                   SwitchListTile(
                     value: supportsAudioInput,
-                    title: Text(l10n.get('支持原始音频理解')),
-                    subtitle: Text(l10n.get('未开启时仍可先转写成文字再评分')),
+                    title: Text(l10n.get('support_raw_audio')),
+                    subtitle: Text(l10n.get('transcribe_before_scoring')),
                     onChanged: (value) => setDialogState(() {
                       supportsAudioInput = value;
                       supportsMultimodal =
@@ -223,7 +223,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   ),
                   SwitchListTile(
                     value: supportsStreaming,
-                    title: Text(l10n.get('支持流式响应')),
+                    title: Text(l10n.get('support_streaming')),
                     onChanged: (value) =>
                         setDialogState(() => supportsStreaming = value),
                   ),
@@ -231,7 +231,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      l10n.get('用途标签'),
+                      l10n.get('usage_tag'),
                       style: Theme.of(ctx).textTheme.labelLarge,
                     ),
                   ),
@@ -239,7 +239,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     spacing: 8,
                     children: [
                       _UsageChip(
-                        label: l10n.get('复述评分'),
+                        label: l10n.get('recall_scoring'),
                         value: 'recall',
                         selected: usageTags.contains('recall'),
                         onSelected: (value) => setDialogState(
@@ -249,7 +249,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
                       ),
                       _UsageChip(
-                        label: l10n.get('模拟面试'),
+                        label: l10n.get('6a21_62df_interview'),
                         value: 'mockInterview',
                         selected: usageTags.contains('mockInterview'),
                         onSelected: (value) => setDialogState(
@@ -259,7 +259,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
                       ),
                       _UsageChip(
-                        label: l10n.get('图片理解'),
+                        label: l10n.get('image_understanding'),
                         value: 'imageReview',
                         selected: usageTags.contains('imageReview'),
                         onSelected: (value) => setDialogState(
@@ -269,7 +269,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
                       ),
                       _UsageChip(
-                        label: l10n.get('语音识别'),
+                        label: l10n.get('8bed_97f3_8bc6_522b'),
                         value: 'stt',
                         selected: usageTags.contains('stt'),
                         onSelected: (value) => setDialogState(
@@ -287,7 +287,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.get('取消')),
+              child: Text(l10n.get('cancel')),
             ),
             FilledButton(
               onPressed: () {
@@ -342,7 +342,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
 
                 Navigator.pop(ctx);
               },
-              child: Text(l10n.get('保存')),
+              child: Text(l10n.get('save')),
             ),
           ],
         ),
@@ -354,12 +354,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('确认删除')),
-        content: Text('${l10n.get('确定要删除配置')}「${config.name}」${l10n.get('吗？')}'),
+        title: Text(l10n.get('confirm_delete')),
+        content: Text('${l10n.get('confirm_delete_config')}「${config.name}」${l10n.get('question_mark')}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('取消')),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -367,7 +367,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
               Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            child: Text(l10n.get('删除')),
+            child: Text(l10n.get('delete')),
           ),
         ],
       ),
@@ -408,7 +408,7 @@ class _ConfigCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                l10n.get('默认'),
+                l10n.get('default'),
                 style: const TextStyle(
                   color: AppColors.success,
                   fontSize: 12,
@@ -424,7 +424,7 @@ class _ConfigCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                l10n.get('已禁用'),
+                l10n.get('already_disable'),
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 12,
@@ -435,15 +435,15 @@ class _ConfigCard extends StatelessWidget {
         ],
       ),
       children: [
-        Text('${l10n.get('模型')}：${config.model}'),
+        Text('${l10n.get('model')}：${config.model}'),
         const SizedBox(height: 4),
         Text('Base URL：${config.baseUrl}'),
         const SizedBox(height: 4),
-        Text('${l10n.get('能力')}：${config.capabilityLabels.map((k) => l10n.get(k)).join(' · ')}'),
+        Text('${l10n.get('capability')}：${config.capabilityLabels.map((k) => l10n.get(k)).join(' · ')}'),
         const SizedBox(height: 4),
-        Text('${l10n.get('用途')}：${config.usageTags.join('、')}'),
+        Text('${l10n.get('usage_purpose')}：${config.usageTags.join('、')}'),
         const SizedBox(height: 4),
-        Text('${l10n.get('状态')}：${config.enabled ? l10n.get('已启用') : l10n.get('已禁用')}'),
+        Text('${l10n.get('status')}：${config.enabled ? l10n.get('already_enable') : l10n.get('already_disable')}'),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -451,18 +451,18 @@ class _ConfigCard extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: onEdit,
               icon: const Icon(Icons.edit_outlined, size: 18),
-              label: Text(l10n.get('编辑')),
+              label: Text(l10n.get('edit')),
             ),
             if (!config.isDefault)
               OutlinedButton.icon(
                 onPressed: onSetDefault,
                 icon: const Icon(Icons.star_outline, size: 18),
-                label: Text(l10n.get('设为默认')),
+                label: Text(l10n.get('set_as_default')),
               ),
             OutlinedButton.icon(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline, size: 18),
-              label: Text(l10n.get('删除')),
+              label: Text(l10n.get('delete')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
               ),
