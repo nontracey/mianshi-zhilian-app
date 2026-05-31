@@ -1,7 +1,6 @@
 ---
 name: doc-code-audit
 description: Systematic methodology for auditing documentation vs implementation mismatches, including localization (l10n) checks, across multi-project codebases
-version: 1.0.0
 source: auto-skill
 extracted_at: '2026-06-01T12:00:00.000Z'
 ---
