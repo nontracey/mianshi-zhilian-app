@@ -27,7 +27,7 @@ jobs:
           restore-keys: |
             web-deploy-${{ runner.os }}-
       - run: flutter pub get
-      - run: flutter build web --release
+      - run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ vars.UPDATE_MANIFEST_URL }}
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

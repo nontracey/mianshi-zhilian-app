@@ -11,7 +11,10 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider(
     this._storage, {
-    this.apiBaseUrl = 'https://mianshi-zhilian-api.nontracey.workers.dev',
+    this.apiBaseUrl = const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'https://mianshi-zhilian-api.nontracey.workers.dev',
+    ),
   });
 
   User? _user;

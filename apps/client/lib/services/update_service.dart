@@ -68,8 +68,11 @@ class UpdateService {
   final String updateManifestUrl;
 
   UpdateService({
-    this.updateManifestUrl =
-        'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
+    this.updateManifestUrl = const String.fromEnvironment(
+      'UPDATE_MANIFEST_URL',
+      defaultValue:
+          'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
+    ),
   });
 
   /// 检查是否有新版本

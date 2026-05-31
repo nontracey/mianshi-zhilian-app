@@ -22,6 +22,12 @@ jobs:
           cache: npm
           cache-dependency-path: workers/api/package-lock.json
       - run: npm ci
+
+      - name: Inject D1 database ID
+        run: >
+          sed -i "s/PLACEHOLDER_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/"
+          wrangler.toml
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
