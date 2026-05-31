@@ -12,6 +12,7 @@ import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import '../../providers/localization_provider.dart';
 
 class TopicDetailPage extends StatefulWidget {
   const TopicDetailPage({
@@ -31,6 +32,7 @@ class TopicDetailPage extends StatefulWidget {
 
 class _TopicDetailPageState extends State<TopicDetailPage>
     with SingleTickerProviderStateMixin {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   late TabController _tabController;
   final _answerController = TextEditingController();
   bool _isEvaluating = false;
@@ -123,7 +125,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          topic.status == 'test' ? '测试内容' : '草稿内容',
+                          topic.status == 'test' ? l10n.get('测试内容') : l10n.get('草稿内容'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -165,14 +167,14 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         children: [
           _buildTabButton(
             context,
-            label: '知识查阅',
+            label: l10n.get('知识查阅'),
             icon: Icons.menu_book_outlined,
             isSelected: _tabController.index == 0,
             onTap: () => _tabController.animateTo(0),
           ),
           _buildTabButton(
             context,
-            label: '复述练习',
+            label: l10n.get('复述练习'),
             icon: Icons.record_voice_over_outlined,
             isSelected: _tabController.index == 1,
             onTap: () => _tabController.animateTo(1),
@@ -282,7 +284,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     if (answer.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先输入你的回答')));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('请先输入你的回答'))));
       return;
     }
 
@@ -290,7 +292,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     if (aiProvider.defaultConfig == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先在个人中心配置 AI')));
+      ).showSnackBar(SnackBar(content: Text(l10n.get('请先在个人中心配置_AI'))));
       return;
     }
 
@@ -318,7 +320,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('AI 评估失败：$e'),
-            action: SnackBarAction(label: '重试', onPressed: _handleEvaluate),
+            action: SnackBarAction(label: l10n.get('重试'), onPressed: _handleEvaluate),
           ),
         );
       }
@@ -338,6 +340,7 @@ class _LeftSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -356,12 +359,12 @@ class _LeftSidebar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.visibility_outlined, size: 14, color: AppColors.accent),
                     SizedBox(width: 6),
                     Text(
-                      '面试官关注点',
+                      l10n.get('面试官关注点'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -382,7 +385,7 @@ class _LeftSidebar extends StatelessWidget {
         ],
         // 知识卡片目录
         Text(
-          '知识目录',
+          l10n.get('知识目录'),
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -424,7 +427,7 @@ class _LeftSidebar extends StatelessWidget {
         if (topic.prerequisites.isNotEmpty) ...[
           const Divider(height: 24),
           Text(
-            '前置知识',
+            l10n.get('前置知识'),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -480,7 +483,7 @@ class _LeftSidebar extends StatelessWidget {
             dense: true,
             visualDensity: VisualDensity.compact,
             leading: const Icon(Icons.code, size: 16, color: AppColors.success),
-            title: const Text('LeetCode 练习', style: TextStyle(fontSize: 13)),
+            title: Text(l10n.get('LeetCode_练习'), style: TextStyle(fontSize: 13)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 8),
             minLeadingWidth: 24,
           ),
@@ -499,13 +502,14 @@ class _TopicHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final difficultyLabel = switch (topic.difficulty) {
-      1 => '入门',
-      2 => '基础',
-      3 => '中等',
-      4 => '较难',
-      5 => '困难',
-      _ => '未知',
+      1 => l10n.get('入门'),
+      2 => l10n.get('基础'),
+      3 => l10n.get('中等'),
+      4 => l10n.get('较难'),
+      5 => l10n.get('困难'),
+      _ => l10n.get('未知'),
     };
 
     final difficultyColor = switch (topic.difficulty) {
@@ -554,7 +558,7 @@ class _TopicHeader extends StatelessWidget {
           if (topic.highFrequency)
             Chip(
               label: Text(
-                topic.interviewFrequencyLabel ?? '高频',
+                topic.interviewFrequencyLabel ?? l10n.get('高频'),
                 style: TextStyle(
                   fontSize: 12,
                   color: topic.interviewFrequency == 'medium'
@@ -591,6 +595,7 @@ class _KnowledgeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
@@ -619,8 +624,8 @@ class _KnowledgeTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '面试官关注点',
+                      Text(
+                        l10n.get('面试官关注点'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -946,6 +951,7 @@ class _InterviewAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final formattedContent = _formatInterviewContent(card.content);
 
     return WorkPanel(
@@ -970,7 +976,7 @@ class _InterviewAnswerCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '面试回答框架',
+                    l10n.get('面试回答框架'),
                     style: TextStyle(
                       color: AppColors.accent,
                       fontWeight: FontWeight.w700,
@@ -1502,6 +1508,7 @@ class _DiagramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     // 优先使用 SVG 资源：svgPath > asset > 智能图解
     final svgUrl = card.svgPath ?? card.asset;
 
@@ -1530,7 +1537,7 @@ class _DiagramCard extends StatelessWidget {
                       child: const CircularProgressIndicator(strokeWidth: 2),
                     ),
                     errorBuilder: (ctx, err, stack) => Text(
-                      card.fallback ?? 'SVG 加载失败',
+                      card.fallback ?? l10n.get('SVG_加载失败'),
                       style: TextStyle(color: AppColors.warning, fontSize: 13),
                     ),
                   )
@@ -1538,7 +1545,7 @@ class _DiagramCard extends StatelessWidget {
                     svgUrl,
                     width: double.infinity,
                     errorBuilder: (ctx, err, stack) => Text(
-                      card.fallback ?? '图片加载失败',
+                      card.fallback ?? l10n.get('图片加载失败'),
                       style: TextStyle(color: AppColors.warning, fontSize: 13),
                     ),
                   ),
@@ -1649,6 +1656,7 @@ class _SmartDiagram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final type = _detectType();
     final items = card.items;
 
@@ -1664,14 +1672,14 @@ class _SmartDiagram extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 图解类型标签
-          _buildTypeTag(type),
+          _buildTypeTag(type, l10n),
           const SizedBox(height: 16),
           // 根据类型渲染不同的布局
           switch (type) {
             _DiagramType.flow => _buildFlowLayout(items),
             _DiagramType.hierarchy => _buildHierarchyLayout(items),
-            _DiagramType.compare => _buildCompareLayout(items),
-            _DiagramType.cycle => _buildCycleLayout(items),
+            _DiagramType.compare => _buildCompareLayout(items, l10n),
+            _DiagramType.cycle => _buildCycleLayout(items, l10n),
           },
           // fallback 提示
           if (card.fallback != null && card.fallback!.isNotEmpty) ...[
@@ -1683,12 +1691,12 @@ class _SmartDiagram extends StatelessWidget {
     );
   }
 
-  Widget _buildTypeTag(_DiagramType type) {
+  Widget _buildTypeTag(_DiagramType type, LocalizationProvider l10n) {
     final (icon, label, color) = switch (type) {
-      _DiagramType.flow => (Icons.linear_scale, '流程图', AppColors.accent),
-      _DiagramType.hierarchy => (Icons.account_tree, '结构图', AppColors.success),
-      _DiagramType.compare => (Icons.compare_arrows, '对比图', AppColors.warning),
-      _DiagramType.cycle => (Icons.autorenew, '循环图', AppColors.categoryPurple),
+      _DiagramType.flow => (Icons.linear_scale, l10n.get('流程图'), AppColors.accent),
+      _DiagramType.hierarchy => (Icons.account_tree, l10n.get('结构图'), AppColors.success),
+      _DiagramType.compare => (Icons.compare_arrows, l10n.get('对比图'), AppColors.warning),
+      _DiagramType.cycle => (Icons.autorenew, l10n.get('循环图'), AppColors.categoryPurple),
     };
 
     return Container(
@@ -1866,7 +1874,7 @@ class _SmartDiagram extends StatelessWidget {
   }
 
   // 对比图布局
-  Widget _buildCompareLayout(List<String> items) {
+  Widget _buildCompareLayout(List<String> items, LocalizationProvider l10n) {
     // 将 items 分成两列
     final half = (items.length / 2).ceil();
     final leftItems = items.sublist(0, half);
@@ -1876,11 +1884,11 @@ class _SmartDiagram extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _buildCompareColumn('方案 A', leftItems, AppColors.accent),
+          child: _buildCompareColumn(l10n.get('方案_A'), leftItems, AppColors.accent),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildCompareColumn('方案 B', rightItems, AppColors.warning),
+          child: _buildCompareColumn(l10n.get('方案_B'), rightItems, AppColors.warning),
         ),
       ],
     );
@@ -1936,7 +1944,7 @@ class _SmartDiagram extends StatelessWidget {
   }
 
   // 循环图布局
-  Widget _buildCycleLayout(List<String> items) {
+  Widget _buildCycleLayout(List<String> items, LocalizationProvider l10n) {
     return Column(
       children: [
         for (var i = 0; i < items.length; i++) ...[
@@ -1960,7 +1968,7 @@ class _SmartDiagram extends StatelessWidget {
               Icon(Icons.refresh, size: 18, color: AppColors.categoryPurple),
               const SizedBox(width: 8),
               Text(
-                '循环执行',
+                l10n.get('循环执行'),
                 style: TextStyle(
                   color: AppColors.categoryPurple,
                   fontWeight: FontWeight.w600,
@@ -2080,6 +2088,7 @@ class _SvgDiagramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     // 优先使用内联 svg 字段，其次用 asset 字段
     final svgData = card.svg;
     final svgAsset = card.asset;
@@ -2130,7 +2139,7 @@ class _SvgDiagramCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          card.fallback ?? 'SVG 加载失败',
+                          card.fallback ?? l10n.get('SVG_加载失败'),
                           style: TextStyle(
                             color: AppColors.warning,
                             fontSize: 13,
@@ -2146,7 +2155,7 @@ class _SvgDiagramCard extends StatelessWidget {
                   height: 120,
                   alignment: Alignment.center,
                   child: Text(
-                    card.fallback ?? '暂无图解内容',
+                    card.fallback ?? l10n.get('暂无图解内容'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 13,
@@ -2174,8 +2183,9 @@ class _FollowUpSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: '常见追问',
+      title: l10n.get('常见追问'),
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -2226,18 +2236,20 @@ class _FollowUpCardState extends State<_FollowUpCard> {
   }
 
   String get _difficultyLabel {
+    final l10n = context.watch<LocalizationProvider>();
     return switch (widget.question.difficulty) {
-      1 => '入门',
-      2 => '基础',
-      3 => '中等',
-      4 => '较难',
-      5 => '困难',
+      1 => l10n.get('入门'),
+      2 => l10n.get('基础'),
+      3 => l10n.get('中等'),
+      4 => l10n.get('较难'),
+      5 => l10n.get('困难'),
       _ => '',
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
@@ -2392,7 +2404,7 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '参考答案',
+                              l10n.get('参考答案'),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -2406,8 +2418,8 @@ class _FollowUpCardState extends State<_FollowUpCard> {
                                   ClipboardData(text: widget.question.answer),
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('已复制到剪贴板'),
+                                  SnackBar(
+                                    content: Text(l10n.get('已复制到剪贴板')),
                                     duration: Duration(seconds: 1),
                                   ),
                                 );
@@ -2969,12 +2981,13 @@ class _RubricSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: '评分标准',
+      title: l10n.get('评分标准'),
       children: [
         // 必须覆盖的关键点
         Text(
-          '必须覆盖的关键点',
+          l10n.get('必须覆盖的关键点'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: AppColors.success,
@@ -3002,7 +3015,7 @@ class _RubricSection extends StatelessWidget {
         if (rubric.goodToHave.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
-            '加分项',
+            l10n.get('加分项'),
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: AppColors.accent,
@@ -3027,7 +3040,7 @@ class _RubricSection extends StatelessWidget {
         if (rubric.commonMistakes.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
-            '常见错误',
+            l10n.get('常见错误'),
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: AppColors.danger,
@@ -3139,6 +3152,7 @@ class _PromptPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3160,7 +3174,7 @@ class _PromptPanel extends StatelessWidget {
                   const Icon(Icons.quiz_outlined, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    '复述题目',
+                    l10n.get('复述题目'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -3216,7 +3230,7 @@ class _PromptPanel extends StatelessWidget {
                         color: AppColors.warning,
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text('用自己的话解释这个知识点的核心内容。')),
+                      Expanded(child: Text(l10n.get('用自己的话解释这个知识点的核心内容'))),
                     ],
                   ),
                 ),
@@ -3246,7 +3260,7 @@ class _PromptPanel extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '必须说到的关键点',
+                      l10n.get('必须说到的关键点'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -3301,7 +3315,7 @@ class _PromptPanel extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '常见错误',
+                        l10n.get('常见错误'),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
@@ -3357,6 +3371,7 @@ class _AnswerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3378,7 +3393,7 @@ class _AnswerPanel extends StatelessWidget {
                   const Icon(Icons.edit_note_outlined, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    '你的回答',
+                    l10n.get('你的回答'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -3396,7 +3411,7 @@ class _AnswerPanel extends StatelessWidget {
                 minLines: 8,
                 maxLines: 16,
                 decoration: InputDecoration(
-                  hintText: '在这里输入你的复述答案...\n\n建议：先说定义 → 再拆机制 → 最后讲场景和误区',
+                  hintText: l10n.get('在这里输入你的复述答案nn建议_先说定义__再拆机制__最后讲场景和误区'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -3429,7 +3444,7 @@ class _AnswerPanel extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_awesome),
-                  label: Text(isEvaluating ? 'AI 评估中...' : '获取 AI 深度评估'),
+                  label: Text(isEvaluating ? l10n.get('AI_评估中') : l10n.get('获取_AI_深度评估')),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -3456,6 +3471,7 @@ class _EvaluationResultPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final score = result['score'] as int? ?? 0;
     final missed = result['missedPoints'] as List<dynamic>? ?? [];
     final errors = result['errorPoints'] as List<dynamic>? ?? [];
@@ -3479,7 +3495,7 @@ class _EvaluationResultPanel extends StatelessWidget {
               const Icon(Icons.assessment_outlined, color: AppColors.accent),
               const SizedBox(width: 8),
               Text(
-                'AI 评估结果',
+                l10n.get('AI_评估结果'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -3537,7 +3553,7 @@ class _EvaluationResultPanel extends StatelessWidget {
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              '遗漏点',
+              l10n.get('遗漏点'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.warning,
@@ -3566,7 +3582,7 @@ class _EvaluationResultPanel extends StatelessWidget {
           if (errors.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              '错误点',
+              l10n.get('错误点'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.danger,
@@ -3595,7 +3611,7 @@ class _EvaluationResultPanel extends StatelessWidget {
           if (optimized.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              '优化回答',
+              l10n.get('优化回答'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.success,
