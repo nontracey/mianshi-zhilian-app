@@ -920,7 +920,7 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.getp('默认：{url}/content/production', {'url': AppSettings.defaultWorkerApiUrl}),
+          l10n.getp('默认：{url}', {'url': AppSettings.defaultProdContentUrl}),
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -147,6 +147,10 @@ class AppSettings {
   static const defaultWorkerApiUrl =
       'https://mianshi-zhilian-api.nontracey.workers.dev';
 
+  /// Cloudflare Pages 上的内容仓库（不走 Worker 代理）
+  static const defaultProdContentUrl =
+      'https://mianshi-zhilian-content.pages.dev';
+
   /// 获取当前内容源的基础 URL
   String get contentBaseUrl {
     if (contentEnv == ContentEnv.test) {
@@ -161,7 +165,7 @@ class AppSettings {
     }
     return customProdContentUrl?.isNotEmpty == true
         ? customProdContentUrl!
-        : '$defaultWorkerApiUrl/content/production';
+        : defaultProdContentUrl;
   }
 
   /// 测试版 URL（显示用）

@@ -200,27 +200,37 @@ class ContentProvider extends ChangeNotifier {
         return;
       }
 
-      // 缓存中没有或需要刷新，从网络加载
+      // 缓存中没有或需要刷新，从网络并发加载
       debugPrint(
         'Loading domain $domainId from network (needsRefresh: $needsRefresh)',
       );
+      // 收集所有需要加载的 topic 路径
+      final pathsToLoad = <String>[];
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
-          // topicPath 格式: "topics/java/topic-001-xxx.json"
           final cleanPath = topicPath
               .replaceAll('topics/', '')
               .replaceAll('.json', '');
           if (!_topics.containsKey(cleanPath) || needsRefresh) {
-            try {
-              final topic = await _api.fetchTopic(cleanPath);
-              _topics[cleanPath] = topic;
-              // 每加载一个 topic 就通知 UI 更新，让用户看到渐进式加载
-              notifyListeners();
-            } catch (e) {
-              debugPrint('Failed to load topic $cleanPath: $e');
-            }
+            pathsToLoad.add(cleanPath);
           }
         }
+      }
+      // 分批并发加载，每批 8 个
+      const batchSize = 8;
+      for (var i = 0; i < pathsToLoad.length; i += batchSize) {
+        final batch = pathsToLoad.sublist(
+          i,
+          (i + batchSize < pathsToLoad.length) ? i + batchSize : null,
+        );
+        final results = await Future.wait(
+          batch.map((path) => _api.fetchTopic(path)),
+        );
+        for (var j = 0; j < batch.length; j++) {
+          _topics[batch[j]] = results[j];
+        }
+        // 每批加载完后一次性通知 UI 更新
+        notifyListeners();
       }
 
       // 只缓存当前领域的 topics
