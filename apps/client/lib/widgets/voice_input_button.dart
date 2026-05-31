@@ -6,6 +6,7 @@ import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mianshi_zhilian/services/whisper_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 class VoiceInputButton extends StatefulWidget {
   const VoiceInputButton({
@@ -39,6 +40,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   final WhisperSttService _whisperService = WhisperSttService();
 
   bool _isListening = false;
+  late LocalizationProvider l10n;
 
   @override
   void initState() {
@@ -99,7 +101,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (!_isAvailable) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('语音识别不可用，请检查麦克风权限')),
+          SnackBar(content: Text(l10n.get('voice_not_available'))),
         );
       }
       return;
@@ -134,7 +136,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (kIsWeb) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Whisper 语音输入暂不支持 Web 端，请使用系统语音')),
+          SnackBar(content: Text(l10n.get('voice_web_unsupported'))),
         );
       }
       return;
@@ -143,7 +145,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (widget.whisperBaseUrl == null || widget.whisperApiKey == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先在设置中配置 Whisper API')),
+          SnackBar(content: Text(l10n.get('voice_no_whisper_key'))),
         );
       }
       return;
@@ -154,7 +156,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请授予麦克风权限')),
+            SnackBar(content: Text(l10n.get('voice_grant_permission'))),
           );
         }
         return;
@@ -180,7 +182,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       widget.onListeningChanged?.call(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('录音启动失败: $e')),
+          SnackBar(content: Text(l10n.getp('voice_record_failed_with_error', {'error': '$e'}))),
         );
       }
     }
@@ -196,16 +198,16 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 12),
-                Text('正在识别语音...'),
+                const SizedBox(width: 12),
+                Text(l10n.get('voice_recognizing')),
               ],
             ),
             duration: Duration(seconds: 30),
@@ -235,7 +237,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('语音识别失败: $e')),
+          SnackBar(content: Text(l10n.getp('voice_recognize_failed_with_error', {'error': '$e'}))),
         );
       }
     }
@@ -250,6 +252,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   @override
   Widget build(BuildContext context) {
+    l10n = context.watch<LocalizationProvider>();
     return IconButton(
       onPressed: _toggleListening,
       icon: Icon(
@@ -257,8 +260,8 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         color: _isListening ? Colors.red : null,
       ),
       tooltip: _isListening
-          ? '停止录音'
-          : (widget.sttMode == 'whisper' ? 'Whisper 语音输入' : '语音输入'),
+          ? l10n.get('voice_stop_recording')
+          : (widget.sttMode == 'whisper' ? l10n.get('voice_whisper_input') : l10n.get('voice_input')),
     );
   }
 }
