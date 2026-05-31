@@ -620,7 +620,33 @@ sequenceDiagram
 
 ### 7.7 中英文切换
 
-第一版建议在 Flutter 中使用 `intl` 或 `easy_localization` 一类的国际化方案；如果后续补小程序/H5 轻量版，再使用对应前端生态的 i18n 方案。
+实现方案采用自定义 L10n 静态类 + Provider 封装，未使用 `intl` 或 `easy_localization`，以保持零代码生成依赖和轻量级维护。
+
+### L10n 静态类 (`lib/l10n/l10n.dart`)
+
+- `_zh` (876 条): 中文键 → 中文值。新 UI 键 (英文) → 中文值，兼容原硬编码中文键。
+- `_en` (1187 条): 中文键 → 英文值 (向后兼容)；新 UI 键 (英文) → 英文值；AI 提示词翻译。
+- `get(key, language)`: 按语言查找，未命中返回 key 本身。
+- `getp(key, language, params)`: 模板插值，支持 `{param}` 替换。
+
+### LocalizationProvider (`lib/providers/localization_provider.dart`)
+
+包装 L10n 的 ChangeNotifier，通过 Provider 向组件树提供响应式语言切换：
+
+- `setLanguage(lang)` → 切换语言，通知所有消费者重建。
+- `get(key)` / `getp(key, params)` → 调用 L10n 同名静态方法。
+
+### 维护脚本
+
+`apps/client/` 下包含多个 Python 辅助脚本：
+
+| 脚本 | 功能 |
+|------|------|
+| `_translate_en.py` | 将自动生成的占位符替换为专业英文翻译 |
+| `_final_rebuild.py` | 从当前文件重建 _zh/_en 结构，排序、去重、补缺失键 |
+| `_quality_check.py` | 质检：统计自动生成条目数、中文值、缺失键 |
+| `_check_l10n.py` | 统计 _zh/_en 中中英文占比 |
+| `_find_key.py` | 在 _zh 中搜索指定键 |
 
 需要国际化的内容：
 

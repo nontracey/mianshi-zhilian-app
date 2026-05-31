@@ -27,9 +27,12 @@ lib/
 │   ├── prep/                    # 面试准备（JD 解析、训练计划）
 │   ├── profile/                 # 个人中心（AI 配置、主题、数据管理）
 │   └── auth/                    # 登录注册
+├── l10n/                       # 国际化
+│   └── l10n.dart                # 中英文翻译映射（_zh 876条 / _en 1187条）
 ├── providers/                   # 状态管理
 │   ├── ai_provider.dart         # AI 配置和请求状态
 │   ├── auth_provider.dart       # 认证状态
+│   ├── localization_provider.dart # 语言切换（包装 L10n 的 ChangeNotifier）
 │   ├── progress_provider.dart   # 学习进度和掌握度
 │   └── settings_provider.dart   # 设置和 WebDAV 同步
 ├── services/                    # 服务层
