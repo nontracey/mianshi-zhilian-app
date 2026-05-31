@@ -7,6 +7,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
+import '../../providers/localization_provider.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -22,6 +23,7 @@ class InterviewPrepPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
     final topics = content.getTopicsByDomain(currentDomainId);
@@ -38,11 +40,11 @@ class InterviewPrepPage extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         WorkPanel(
-          title: plan.hasTarget ? '面试准备 · ${plan.targetRole}' : '通用技术面试准备',
+          title: plan.hasTarget ? '面试准备 · ${plan.targetRole}' : l10n.get('通用技术面试准备'),
           trailing: FilledButton.tonalIcon(
-            onPressed: () => _showPlanDialog(context, progress, plan),
+            onPressed: () => _showPlanDialog(context, progress, plan, l10n),
             icon: const Icon(Icons.tune_outlined),
-            label: Text(plan.hasTarget ? '调整目标' : '设置目标'),
+            label: Text(plan.hasTarget ? l10n.get('调整目标') : l10n.get('设置目标')),
           ),
           children: [
             LayoutBuilder(
@@ -50,25 +52,25 @@ class InterviewPrepPage extends StatelessWidget {
                 final compact = constraints.maxWidth < 760;
                 final cards = [
                   _PrepMetric(
-                    label: '面试就绪度',
+                    label: l10n.get('面试就绪度'),
                     value: '$readiness',
                     suffix: '/100',
                     color: _scoreColor(readiness),
                   ),
                   _PrepMetric(
-                    label: '今日待复习',
+                    label: l10n.get('今日待复习'),
                     value: '$reviewCount',
                     suffix: '项',
                     color: AppColors.warning,
                   ),
                   _PrepMetric(
-                    label: '高频未稳',
+                    label: l10n.get('高频未稳'),
                     value: '$highFrequencyUnmastered',
                     suffix: '项',
                     color: AppColors.accent,
                   ),
                   _PrepMetric(
-                    label: '低分回流',
+                    label: l10n.get('低分回流'),
                     value: '$lowScoreCount',
                     suffix: '次',
                     color: AppColors.danger,
@@ -93,8 +95,8 @@ class InterviewPrepPage extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               plan.hasTarget
-                  ? _targetDescription(plan)
-                  : '未设置目标岗位也可以直接使用。当前按通用技术面试路径推荐复习、高频题和模拟面试。',
+                  ? _targetDescription(context, plan)
+                  : l10n.get('未设置目标岗位也可以直接使用_当前按通用技术面试路径推荐复习_高频题和模拟面试'),
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -107,12 +109,12 @@ class InterviewPrepPage extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onStartPractice,
                   icon: const Icon(Icons.today_outlined),
-                  label: const Text('开始今日练习'),
+                  label: Text(l10n.get('开始今日练习')),
                 ),
                 OutlinedButton.icon(
                   onPressed: onStartMock,
                   icon: const Icon(Icons.record_voice_over_outlined),
-                  label: const Text('来一场模拟面试'),
+                  label: Text(l10n.get('来一场模拟面试')),
                 ),
               ],
             ),
@@ -128,8 +130,9 @@ class InterviewPrepPage extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         WorkPanel(
-          title: '下一步建议',
+          title: l10n.get('下一步建议'),
           children: _buildActions(
+            context,
             readiness: readiness,
             reviewCount: reviewCount,
             highFrequencyUnmastered: highFrequencyUnmastered,
@@ -138,19 +141,19 @@ class InterviewPrepPage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         WorkPanel(
-          title: '隐私与降级',
-          children: const [
+          title: l10n.get('隐私与降级'),
+          children: [
             InfoLine(
               icon: Icons.lock_outline,
-              text: '目标岗位、JD、项目素材和回答草稿默认只保存在本地。',
+              text: l10n.get('目标岗位_JD_项目素材和回答草稿默认只保存在本地'),
             ),
             InfoLine(
               icon: Icons.person_outline,
-              text: '不登录也能完整练习；登录只用于云端备份和跨设备恢复。',
+              text: l10n.get('不登录也能完整练习_登录只用于云端备份和跨设备恢复'),
             ),
             InfoLine(
               icon: Icons.hub_outlined,
-              text: '未配置 AI 模型时，练习会降级为本地作答、自评和参考回答。',
+              text: l10n.get('未配置_AI_模型时_练习会降级为本地作答_自评和参考回答'),
             ),
           ],
         ),
@@ -158,61 +161,64 @@ class InterviewPrepPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildActions({
+  List<Widget> _buildActions(
+    BuildContext context, {
     required int readiness,
     required int reviewCount,
     required int highFrequencyUnmastered,
     required bool hasTarget,
   }) {
+    final l10n = context.watch<LocalizationProvider>();
     final actions = <Widget>[];
     if (reviewCount > 0) {
       actions.add(
-        const InfoLine(icon: Icons.replay_outlined, text: '先清今日复习，避免到期内容继续遗忘。'),
+        InfoLine(icon: Icons.replay_outlined, text: l10n.get('先清今日复习_避免到期内容继续遗忘')),
       );
     }
     if (highFrequencyUnmastered > 0) {
       actions.add(
-        const InfoLine(
+        InfoLine(
           icon: Icons.local_fire_department_outlined,
-          text: '优先冲刺高频未稳知识点，适合临近面试。',
+          text: l10n.get('优先冲刺高频未稳知识点_适合临近面试'),
         ),
       );
     }
     if (readiness < 70) {
       actions.add(
-        const InfoLine(
+        InfoLine(
           icon: Icons.construction_outlined,
-          text: '就绪度偏低，建议先低分回流，再做模拟面试。',
+          text: l10n.get('就绪度偏低_建议先低分回流_再做模拟面试'),
         ),
       );
     } else {
       actions.add(
-        const InfoLine(
+        InfoLine(
           icon: Icons.groups_outlined,
-          text: '可以进入正式模拟模式，结束后统一复盘。',
+          text: l10n.get('可以进入正式模拟模式_结束后统一复盘'),
         ),
       );
     }
     if (!hasTarget) {
       actions.add(
-        const InfoLine(
+        InfoLine(
           icon: Icons.flag_outlined,
-          text: '设置目标岗位或粘贴 JD 后，可获得更贴近岗位的准备建议。',
+          text: l10n.get('设置目标岗位或粘贴_JD_后_可获得更贴近岗位的准备建议'),
         ),
       );
     }
     return actions;
   }
 
-  String _targetDescription(PrepPlan plan) {
+  String _targetDescription(BuildContext context, PrepPlan plan) {
+    final l10n = context.watch<LocalizationProvider>();
     final parts = <String>[];
     if (plan.techStack.isNotEmpty) parts.add('技术栈：${plan.techStack}');
     if (plan.dailyMinutes > 0) parts.add('每日 ${plan.dailyMinutes} 分钟');
     if (plan.interviewDate != null) {
       final days = plan.interviewDate!.difference(DateTime.now()).inDays + 1;
-      parts.add(days > 0 ? '距离面试 $days 天' : '面试日期已到');
+      parts.add(days > 0 ? '距离面试 $days 天' : l10n.get('面试日期已到'));
     }
-    return parts.isEmpty ? '目标已设置，App 会增强推荐权重。' : parts.join(' · ');
+    return parts.isEmpty ? l10n.get('目标已设置_App_会增强推荐权重') : parts.join(' · ');
   }
 
   Color _scoreColor(int score) {
@@ -225,6 +231,7 @@ class InterviewPrepPage extends StatelessWidget {
     BuildContext context,
     ProgressProvider progress,
     PrepPlan current,
+    LocalizationProvider l10n,
   ) {
     final roleController = TextEditingController(text: current.targetRole);
     final stackController = TextEditingController(text: current.techStack);
@@ -236,7 +243,7 @@ class InterviewPrepPage extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('面试目标'),
+          title: Text(l10n.get('面试目标')),
           content: SizedBox(
             width: 480,
             child: SingleChildScrollView(
@@ -245,16 +252,16 @@ class InterviewPrepPage extends StatelessWidget {
                 children: [
                   TextField(
                     controller: roleController,
-                    decoration: const InputDecoration(
-                      labelText: '目标岗位（可选）',
-                      hintText: 'Java 后端 / AI 工程化 / 架构师',
+                    decoration: InputDecoration(
+                      labelText: l10n.get('目标岗位_可选'),
+                      hintText: l10n.get('Java_后端_AI_工程化_架构师'),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: stackController,
-                    decoration: const InputDecoration(
-                      labelText: '技术栈（可选）',
+                    decoration: InputDecoration(
+                      labelText: l10n.get('技术栈_可选'),
                       hintText: 'Spring Cloud, Redis, RAG...',
                     ),
                   ),
@@ -295,7 +302,7 @@ class InterviewPrepPage extends StatelessWidget {
                     icon: const Icon(Icons.event_outlined),
                     label: Text(
                       interviewDate == null
-                          ? '选择面试日期（可选）'
+                          ? l10n.get('选择面试日期_可选')
                           : '面试日期：${interviewDate!.year}-${interviewDate!.month}-${interviewDate!.day}',
                     ),
                   ),
@@ -304,8 +311,8 @@ class InterviewPrepPage extends StatelessWidget {
                     controller: jdController,
                     minLines: 4,
                     maxLines: 8,
-                    decoration: const InputDecoration(
-                      labelText: '岗位描述 / JD（可选，本地保存）',
+                    decoration: InputDecoration(
+                      labelText: l10n.get('岗位描述_JD_可选_本地保存'),
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                     ),
@@ -317,7 +324,7 @@ class InterviewPrepPage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(l10n.get('取消')),
             ),
             FilledButton(
               onPressed: () {
@@ -333,7 +340,7 @@ class InterviewPrepPage extends StatelessWidget {
                 );
                 Navigator.pop(ctx);
               },
-              child: const Text('保存'),
+              child: Text(l10n.get('保存')),
             ),
           ],
         ),
@@ -425,28 +432,28 @@ class _JdAnalysisSection extends StatelessWidget {
   final List<Topic> topics;
   final ProgressProvider progress;
 
-  static const _techKeywords = [
+  static List<String> _techKeywords(LocalizationProvider l10n) => [
     'java', 'python', 'go', 'golang', 'rust', 'c++', 'javascript', 'typescript',
     'spring', 'springboot', 'spring cloud', 'mybatis', 'hibernate',
     'redis', 'mysql', 'postgresql', 'mongodb', 'elasticsearch', 'es',
     'kafka', 'rabbitmq', 'rocketmq', 'mq',
     'docker', 'kubernetes', 'k8s', 'linux', 'nginx',
-    '微服务', '分布式', '高并发', '高可用', '缓存', '消息队列',
-    '设计模式', '数据结构', '算法', '系统设计', '架构',
-    'jvm', 'gc', '并发', '多线程', '线程池', '锁',
-    '网络', 'tcp', 'http', 'https', 'rpc', 'grpc',
-    '数据库', '索引', '事务', 'mvcc', 'b+树',
-    '集合', 'hashmap', 'arraylist', '链表', '树', '图',
-    '排序', '二分', '动态规划', '贪心', '回溯',
+    l10n.get('微服务'), l10n.get('分布式'), l10n.get('高并发'), l10n.get('高可用'), l10n.get('缓存'), l10n.get('消息队列'),
+    l10n.get('设计模式'), l10n.get('数据结构'), l10n.get('算法'), l10n.get('系统设计'), l10n.get('架构'),
+    'jvm', 'gc', l10n.get('并发'), l10n.get('多线程'), l10n.get('线程池'), '锁',
+    l10n.get('网络'), 'tcp', 'http', 'https', 'rpc', 'grpc',
+    l10n.get('数据库'), l10n.get('索引'), l10n.get('事务'), 'mvcc', l10n.get('b树'),
+    l10n.get('集合'), 'hashmap', 'arraylist', l10n.get('链表'), '树', '图',
+    l10n.get('排序'), l10n.get('二分'), l10n.get('动态规划'), l10n.get('贪心'), l10n.get('回溯'),
     'react', 'vue', 'flutter', 'android', 'ios',
-    '机器学习', '深度学习', 'llm', 'rag', 'prompt',
+    l10n.get('机器学习'), l10n.get('深度学习'), 'llm', 'rag', 'prompt',
     'ci/cd', 'git', 'jenkins', 'devops',
-    '项目', '实习', '经验',
+    l10n.get('项目'), l10n.get('实习'), l10n.get('经验'),
   ];
 
-  List<String> _extractKeywords(String jd) {
+  List<String> _extractKeywords(String jd, LocalizationProvider l10n) {
     final lower = jd.toLowerCase();
-    return _techKeywords.where((kw) => lower.contains(kw)).toList();
+    return _techKeywords(l10n).where((kw) => lower.contains(kw)).toList();
   }
 
   List<Topic> _matchTopics(List<String> keywords) {
@@ -468,7 +475,8 @@ class _JdAnalysisSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final keywords = _extractKeywords(jobDescription);
+    final l10n = context.watch<LocalizationProvider>();
+    final keywords = _extractKeywords(jobDescription, l10n);
     final matchedTopics = _matchTopics(keywords);
 
     // 按掌握度排序：未掌握优先
@@ -479,7 +487,7 @@ class _JdAnalysisSection extends StatelessWidget {
     });
 
     return WorkPanel(
-      title: 'JD 匹配分析',
+      title: l10n.get('JD_匹配分析'),
       trailing: Text(
         '${matchedTopics.length} 项匹配',
         style: TextStyle(
@@ -490,7 +498,7 @@ class _JdAnalysisSection extends StatelessWidget {
       ),
       children: [
         if (keywords.isEmpty)
-          const Text('未识别到关键技术词，请检查 JD 内容。')
+          Text(l10n.get('未识别到关键技术词_请检查_JD_内容'))
         else ...[
           Wrap(
             spacing: 6,
@@ -505,10 +513,10 @@ class _JdAnalysisSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (matchedTopics.isEmpty)
-            const Text('当前内容库中未找到与 JD 匹配的知识点。')
+            Text(l10n.get('当前内容库中未找到与_JD_匹配的知识点'))
           else ...[
             Text(
-              '建议优先复习（按掌握度从低到高）：',
+              l10n.get('建议优先复习_按掌握度从低到高'),
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -571,7 +579,7 @@ class _JdAnalysisSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        score > 0 ? '$score' : '未练习',
+                        score > 0 ? '$score' : l10n.get('未练习'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
