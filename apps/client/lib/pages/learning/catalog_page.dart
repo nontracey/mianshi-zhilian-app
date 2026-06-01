@@ -951,13 +951,11 @@ class _CatalogPageState extends State<CatalogPage> {
     final Map<String, List<Topic>> groups = {};
 
     if (hasPhaseData) {
-      // 按 phase 分组
       for (final topic in topics) {
         final phase = topic.phase ?? l10n.get('un_score_category');
         groups.putIfAbsent(phase, () => []).add(topic);
       }
     } else {
-      // 按 category 分组（用 domain 作为分类）
       for (final topic in topics) {
         final category = topic.domain.isNotEmpty
             ? topic.domain
@@ -966,7 +964,6 @@ class _CatalogPageState extends State<CatalogPage> {
       }
     }
 
-    // 排序
     final phaseOrder = [
       l10n.get('basic'),
       l10n.get('beginner'),
@@ -995,33 +992,34 @@ class _CatalogPageState extends State<CatalogPage> {
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
       itemCount: sortedKeys.length,
       itemBuilder: (context, index) {
         final key = sortedKeys[index];
         final groupTopics = groups[key]!;
+        final isLast = index == sortedKeys.length - 1;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPhaseHeader(context, key, index, isDark, groupTopics.length),
-            const SizedBox(height: 8),
-            ...groupTopics.map(
-              (topic) =>
-                  _buildTopicCard(context, topic, progressProvider, isDark),
-            ),
-            if (index < sortedKeys.length - 1) const SizedBox(height: 16),
-          ],
+        return _buildRoadmapPhase(
+          context,
+          key,
+          index,
+          groupTopics,
+          progressProvider,
+          isDark,
+          isLast,
         );
       },
     );
   }
 
-  Widget _buildPhaseHeader(
+  Widget _buildRoadmapPhase(
     BuildContext context,
     String label,
     int index,
+    List<Topic> topics,
+    ProgressProvider progressProvider,
     bool isDark,
-    int count,
+    bool isLast,
   ) {
     const colors = [
       AppColors.categoryGreen,
@@ -1032,42 +1030,291 @@ class _CatalogPageState extends State<CatalogPage> {
     ];
     final color = colors[index % colors.length];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
+    // 计算阶段进度
+    int mastered = 0;
+    int familiar = 0;
+    for (final t in topics) {
+      final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+      if (score >= 85) mastered++;
+      else if (score > 0) familiar++;
+    }
+    final total = topics.length;
+    final progressPercent = total > 0 ? ((mastered + familiar * 0.5) / total * 100).round() : 0;
+
+    return IntrinsicHeight(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.flag, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
+          // 左侧时间线
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                // 节点圆点
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: mastered == total && total > 0
+                        ? AppColors.success
+                        : color,
+                    border: Border.all(
+                      color: mastered == total && total > 0
+                          ? AppColors.success
+                          : color,
+                      width: 3,
+                    ),
+                  ),
+                  child: mastered == total && total > 0
+                      ? const Icon(Icons.check, size: 12, color: Colors.white)
+                      : null,
+                ),
+                // 连接线
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 3,
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              l10n.getp('count_question_count_2', {'count': count}),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
+          // 右侧内容
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 阶段头部：标题 + 进度条 + 统计
+                _buildRoadmapPhaseHeader(
+                  context,
+                  label,
+                  color,
+                  total,
+                  mastered,
+                  familiar,
+                  progressPercent,
+                  isDark,
+                ),
+                const SizedBox(height: 6),
+                // 紧凑知识点列表
+                ...topics.map(
+                  (topic) => _buildRoadmapTopicRow(
+                    context,
+                    topic,
+                    progressProvider,
+                    isDark,
+                    color,
+                  ),
+                ),
+                if (!isLast) const SizedBox(height: 16),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRoadmapPhaseHeader(
+    BuildContext context,
+    String label,
+    Color color,
+    int total,
+    int mastered,
+    int familiar,
+    int progressPercent,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 第一行：阶段名 + 统计
+          Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                l10n.getp('mastered_familiar_total', {
+                  'mastered': mastered,
+                  'familiar': familiar,
+                  'total': total,
+                }),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 第二行：进度条
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progressPercent / 100,
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.06),
+                    color: color,
+                    minHeight: 5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$progressPercent%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoadmapTopicRow(
+    BuildContext context,
+    Topic topic,
+    ProgressProvider progressProvider,
+    bool isDark,
+    Color phaseColor,
+  ) {
+    final progress = progressProvider.getTopicProgress(topic.id);
+    final score = progress?.score ?? 0;
+    final nextReview = progress?.nextReviewAt;
+
+    final statusColor = score >= 85
+        ? AppColors.success
+        : score > 0
+        ? AppColors.warning
+        : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: InkWell(
+        onTap: () => widget.onTopicLearn(topic.id),
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              // 状态圆点
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // 标题
+              Expanded(
+                child: Text(
+                  topic.title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: score >= 85 ? FontWeight.w500 : FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 高频标签
+              if (topic.highFrequency) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    l10n.get('high_freq'),
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+              // 分数
+              if (score > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '$score',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+              ],
+              // 复习时间
+              if (nextReview != null) ...[
+                const SizedBox(width: 6),
+                Text(
+                  _formatReviewTime(nextReview),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: nextReview.isBefore(DateTime.now())
+                        ? AppColors.danger
+                        : (isDark ? Colors.white38 : const Color(0xFF999999)),
+                  ),
+                ),
+              ],
+              // 练习按钮
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => widget.onTopicPractice(topic.id),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    l10n.get('practice'),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

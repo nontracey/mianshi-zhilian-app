@@ -89,11 +89,30 @@ class _HeaderBarState extends State<HeaderBar> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     _overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: size.height + 4,
-        right: 16, // 右对齐
-        width: 300,
-        child: Material(
+      builder: (context) => Stack(
+        children: [
+          // 全屏透明层：点击外部关闭 overlay
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                _removeOverlay();
+                _searchController.clear();
+                _searchFocusNode.unfocus();
+                setState(() {
+                  _isSearching = false;
+                  _searchResults = [];
+                });
+              },
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          // 搜索结果面板
+          Positioned(
+            top: size.height + 4,
+            right: 16, // 右对齐
+            width: 300,
+            child: Material(
           elevation: 8,
           borderRadius: BorderRadius.circular(10),
           shadowColor: Colors.black.withValues(alpha: 0.15),
@@ -279,7 +298,9 @@ class _HeaderBarState extends State<HeaderBar> {
           ),
         ),
       ),
-    );
+    ],
+  ),
+);
 
     Overlay.of(context).insert(_overlayEntry!);
   }
@@ -380,6 +401,14 @@ class _HeaderBarState extends State<HeaderBar> {
                 hasConfig: aiProvider.configs.isNotEmpty,
                 isDark: isDark,
               ),
+            // 窄屏下显示 AI 模型图标按钮
+            if (!isWide) ...[
+              const SizedBox(width: 8),
+              _AiModelIconButton(
+                hasConfig: aiProvider.configs.isNotEmpty,
+                isDark: isDark,
+              ),
+            ],
 
             // 中间弹性空间
             const Spacer(),
@@ -475,7 +504,47 @@ class _HeaderBarState extends State<HeaderBar> {
   }
 }
 
-// AI 模型选择器
+// AI 模型选择器（窄屏图标按钮）
+class _AiModelIconButton extends StatelessWidget {
+  const _AiModelIconButton({
+    required this.hasConfig,
+    required this.isDark,
+  });
+
+  final bool hasConfig;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiConfigPage()),
+        );
+      },
+      icon: Icon(
+        Icons.smart_toy_outlined,
+        size: 20,
+        color: hasConfig
+            ? const Color(0xFF3078F0)
+            : (isDark ? Colors.white38 : Colors.grey),
+      ),
+      tooltip: hasConfig ? l10nOf(context).get('ai_model') : l10nOf(context).get('ai_not_config'),
+      style: IconButton.styleFrom(
+        backgroundColor: hasConfig
+            ? const Color(0xFF3078F0).withValues(alpha: 0.1)
+            : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04)),
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+LocalizationProvider l10nOf(BuildContext context) =>
+    context.watch<LocalizationProvider>();
+
+// AI 模型选择器（宽屏完整版）
 class _AiModelSelector extends StatelessWidget {
   const _AiModelSelector({
     required this.modelName,
