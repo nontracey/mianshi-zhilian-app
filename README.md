@@ -187,4 +187,4 @@ git push origin vx.x.x
 
 ## 支持项目
 
-如果这个项目对你有帮助，欢迎[请作者喝杯咖啡](docs/sponsor.md)。
+如果这个项目对你有帮助，欢迎[请作者喝杯咖啡 ☕](docs/sponsor.md)。
