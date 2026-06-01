@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="mianshi_zhilian"
+        android:label="面试智练"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
