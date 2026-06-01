@@ -204,6 +204,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 ? _buildEmptyState(context)
                 : _buildTopicList(
                     context,
+                    currentDomain,
                     sortedTopics,
                     progressProvider,
                     isDark,
@@ -621,12 +622,19 @@ class _CatalogPageState extends State<CatalogPage> {
 
   Widget _buildTopicList(
     BuildContext context,
+    Domain currentDomain,
     List<Topic> topics,
     ProgressProvider progressProvider,
     bool isDark,
   ) {
     if (_roadmapView) {
-      return _buildRoadmapView(context, topics, progressProvider, isDark);
+      return _buildRoadmapView(
+        context,
+        currentDomain,
+        topics,
+        progressProvider,
+        isDark,
+      );
     }
 
     return ListView.builder(
@@ -923,65 +931,31 @@ class _CatalogPageState extends State<CatalogPage> {
 
     if (diff.isNegative) {
       final pastDiff = now.difference(time);
-      if (pastDiff.inMinutes < 60)
+      if (pastDiff.inMinutes < 60) {
         return l10n.getp('n_min_ago_2', {'n': pastDiff.inMinutes});
-      if (pastDiff.inHours < 24)
+      }
+      if (pastDiff.inHours < 24) {
         return l10n.getp('n_hour_ago_2', {'n': pastDiff.inHours});
+      }
       return l10n.getp('n_day_ago_2', {'n': pastDiff.inDays});
     }
 
-    if (diff.inMinutes < 60)
+    if (diff.inMinutes < 60) {
       return l10n.getp('n_min_after_2', {'n': diff.inMinutes});
-    if (diff.inHours < 24)
+    }
+    if (diff.inHours < 24) {
       return l10n.getp('n_hour_after_2', {'n': diff.inHours});
+    }
     return l10n.getp('n_day_after_2', {'n': diff.inDays});
   }
 
   Widget _buildRoadmapView(
     BuildContext context,
+    Domain currentDomain,
     List<Topic> topics,
     ProgressProvider progressProvider,
     bool isDark,
   ) {
-    // 检查是否有 phase 数据
-    final hasPhaseData = topics.any(
-      (t) => t.phase != null && t.phase!.isNotEmpty,
-    );
-
-    final Map<String, List<Topic>> groups = {};
-
-    if (hasPhaseData) {
-      for (final topic in topics) {
-        final phase = topic.phase ?? l10n.get('un_score_category');
-        groups.putIfAbsent(phase, () => []).add(topic);
-      }
-    } else {
-      for (final topic in topics) {
-        final category = topic.domain.isNotEmpty
-            ? topic.domain
-            : l10n.get('un_score_category');
-        groups.putIfAbsent(category, () => []).add(topic);
-      }
-    }
-
-    final phaseOrder = [
-      l10n.get('basic'),
-      l10n.get('beginner'),
-      l10n.get('progress_level'),
-      l10n.get('intermediate'),
-      l10n.get('senior'),
-      l10n.get('hard'),
-    ];
-    final sortedKeys = groups.keys.toList()
-      ..sort((a, b) {
-        final ia = phaseOrder.indexOf(a);
-        final ib = phaseOrder.indexOf(b);
-        final va = ia == -1 ? 999 : ia;
-        final vb = ib == -1 ? 999 : ib;
-        if (va != vb) return va.compareTo(vb);
-        return a.compareTo(b);
-      });
-
     if (topics.isEmpty) {
       return Center(
         child: Text(
@@ -991,19 +965,19 @@ class _CatalogPageState extends State<CatalogPage> {
       );
     }
 
+    final sections = _buildRoadmapSections(currentDomain, topics);
+
     return ListView.builder(
       padding: const EdgeInsets.only(top: 4, bottom: 16),
-      itemCount: sortedKeys.length,
+      itemCount: sections.length,
       itemBuilder: (context, index) {
-        final key = sortedKeys[index];
-        final groupTopics = groups[key]!;
-        final isLast = index == sortedKeys.length - 1;
+        final section = sections[index];
+        final isLast = index == sections.length - 1;
 
         return _buildRoadmapPhase(
           context,
-          key,
+          section,
           index,
-          groupTopics,
           progressProvider,
           isDark,
           isLast,
@@ -1012,11 +986,85 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
+  List<_RoadmapSection> _buildRoadmapSections(
+    Domain currentDomain,
+    List<Topic> topics,
+  ) {
+    final categoryById = {
+      for (final category in currentDomain.categories) category.id: category,
+    };
+    final topicsByCategory = <String, List<Topic>>{};
+    for (final topic in topics) {
+      topicsByCategory.putIfAbsent(topic.categoryId, () => []).add(topic);
+    }
+
+    final sections = <_RoadmapSection>[];
+    final consumedCategories = <String>{};
+    final learningPath = currentDomain.learningPaths.firstOrNull;
+
+    if (learningPath != null && learningPath.steps.isNotEmpty) {
+      for (final step in learningPath.steps) {
+        final stepTopics = <Topic>[];
+        for (final categoryId in step.categoryIds) {
+          consumedCategories.add(categoryId);
+          stepTopics.addAll(topicsByCategory[categoryId] ?? const []);
+        }
+        if (stepTopics.isEmpty) continue;
+        stepTopics.sort((a, b) => a.order.compareTo(b.order));
+        sections.add(
+          _RoadmapSection(
+            title: step.title,
+            description: step.description,
+            estimatedHours: step.estimatedHours,
+            topics: stepTopics,
+          ),
+        );
+      }
+    }
+
+    final remainingCategories =
+        currentDomain.categories
+            .where(
+              (category) =>
+                  !consumedCategories.contains(category.id) &&
+                  (topicsByCategory[category.id]?.isNotEmpty ?? false),
+            )
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+
+    for (final category in remainingCategories) {
+      final categoryTopics = [...topicsByCategory[category.id]!]
+        ..sort((a, b) => a.order.compareTo(b.order));
+      sections.add(
+        _RoadmapSection(
+          title: category.title,
+          description: category.description,
+          topics: categoryTopics,
+        ),
+      );
+    }
+
+    final uncategorizedTopics =
+        topics
+            .where((topic) => !categoryById.containsKey(topic.categoryId))
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+    if (uncategorizedTopics.isNotEmpty) {
+      sections.add(
+        _RoadmapSection(
+          title: l10n.get('un_score_category'),
+          topics: uncategorizedTopics,
+        ),
+      );
+    }
+
+    return sections;
+  }
+
   Widget _buildRoadmapPhase(
     BuildContext context,
-    String label,
+    _RoadmapSection section,
     int index,
-    List<Topic> topics,
     ProgressProvider progressProvider,
     bool isDark,
     bool isLast,
@@ -1029,17 +1077,23 @@ class _CatalogPageState extends State<CatalogPage> {
       AppColors.categoryRed,
     ];
     final color = colors[index % colors.length];
+    final topics = section.topics;
 
     // 计算阶段进度
     int mastered = 0;
     int familiar = 0;
     for (final t in topics) {
       final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
-      if (score >= 85) mastered++;
-      else if (score > 0) familiar++;
+      if (score >= 85) {
+        mastered++;
+      } else if (score > 0) {
+        familiar++;
+      }
     }
     final total = topics.length;
-    final progressPercent = total > 0 ? ((mastered + familiar * 0.5) / total * 100).round() : 0;
+    final progressPercent = total > 0
+        ? ((mastered + familiar * 0.5) / total * 100).round()
+        : 0;
 
     return IntrinsicHeight(
       child: Row(
@@ -1093,7 +1147,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 // 阶段头部：标题 + 进度条 + 统计
                 _buildRoadmapPhaseHeader(
                   context,
-                  label,
+                  section,
                   color,
                   total,
                   mastered,
@@ -1123,7 +1177,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
   Widget _buildRoadmapPhaseHeader(
     BuildContext context,
-    String label,
+    _RoadmapSection section,
     Color color,
     int total,
     int mastered,
@@ -1144,15 +1198,30 @@ class _CatalogPageState extends State<CatalogPage> {
           // 第一行：阶段名 + 统计
           Row(
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+              Expanded(
+                child: Text(
+                  section.title,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              if (section.estimatedHours > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '${section.estimatedHours}h',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
               Text(
                 l10n.getp('mastered_familiar_total', {
                   'mastered': mastered,
@@ -1166,6 +1235,20 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ],
           ),
+          if (section.description != null &&
+              section.description!.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              section.description!,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: isDark ? Colors.white60 : Colors.grey.shade700,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           const SizedBox(height: 8),
           // 第二行：进度条
           Row(
@@ -1252,7 +1335,10 @@ class _CatalogPageState extends State<CatalogPage> {
               if (topic.highFrequency) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(3),
@@ -1297,7 +1383,10 @@ class _CatalogPageState extends State<CatalogPage> {
               GestureDetector(
                 onTap: () => widget.onTopicPractice(topic.id),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -1318,4 +1407,18 @@ class _CatalogPageState extends State<CatalogPage> {
       ),
     );
   }
+}
+
+class _RoadmapSection {
+  final String title;
+  final String? description;
+  final int estimatedHours;
+  final List<Topic> topics;
+
+  const _RoadmapSection({
+    required this.title,
+    this.description,
+    this.estimatedHours = 0,
+    required this.topics,
+  });
 }
