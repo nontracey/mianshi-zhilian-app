@@ -2,6 +2,16 @@
 
 面试智练是一款 AI 主动回忆学习工作台，通过"知识学习 → 主动复述 → AI 评估纠错 → 掌握度更新"帮助用户系统备战技术面试。
 
+## 界面预览
+
+| 学习工作台 | 知识目录 |
+| --- | --- |
+| <img src="./docs/assets/screenshots/dashboard.jpg" alt="学习工作台" width="260" /> | <img src="./docs/assets/screenshots/catalog.jpg" alt="知识目录" width="260" /> |
+
+| 练习模式 | 面试准备 |
+| --- | --- |
+| <img src="./docs/assets/screenshots/practice.jpg" alt="练习模式" width="260" /> | <img src="./docs/assets/screenshots/prep.jpg" alt="面试准备" width="260" /> |
+
 ## 功能特性
 
 ### 学习工作台
