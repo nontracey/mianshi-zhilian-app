@@ -184,3 +184,7 @@ git push origin vx.x.x
 | Web App | https://mianshi-zhilian-app.pages.dev |
 | 内容 CDN | https://mianshi-zhilian-content.pages.dev |
 | Worker API | https://mianshi-zhilian-api.nontracey.workers.dev |
+
+## 支持项目
+
+如果这个项目对你有帮助，欢迎[请作者喝杯咖啡](docs/sponsor.md)。
