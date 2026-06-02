@@ -328,11 +328,21 @@ async function initDatabase(db: D1Database): Promise<void> {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       nickname TEXT,
+      role TEXT DEFAULT 'user',
       created_at TEXT DEFAULT (datetime('now')),
       last_login_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+  `);
 
+  // 迁移：已有表缺少 role 列时自动补充
+  const cols = await db.prepare(`PRAGMA table_info(users)`).all() as any;
+  const hasRole = (cols.results as any[]).some((c: any) => c.name === 'role');
+  if (!hasRole) {
+    await db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'`);
+  }
+
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -378,14 +388,14 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       return json({ error: '用户名已存在' }, 409);
     }
 
-    // 创建用户（统一转小写存储，PBKDF2 哈希密码）
+    // 创建用户（统一转小写存储，PBKDF2 哈希密码，默认 role=user）
     const userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
     const finalNickname = nickname || username;
     const normalizedUsername = username.toLowerCase();
 
     await env.DB.prepare(
-      'INSERT INTO users (id, username, password_hash, nickname) VALUES (?, ?, ?, ?)'
+      'INSERT INTO users (id, username, password_hash, nickname, role) VALUES (?, ?, ?, ?, \'user\')'
     )
       .bind(userId, normalizedUsername, passwordHash, finalNickname)
       .run();
@@ -395,7 +405,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 
     return json({
       success: true,
-      user: { id: userId, username, nickname: finalNickname },
+      user: { id: userId, username, nickname: finalNickname, role: 'user' },
       token,
       refreshToken,
     });
@@ -420,19 +430,19 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
     // 查找用户（大小写不敏感）
     const user = await env.DB.prepare(
-      'SELECT id, username, password_hash, nickname FROM users WHERE LOWER(username) = LOWER(?)'
+      'SELECT id, username, password_hash, nickname, COALESCE(role, \'user\') as role FROM users WHERE LOWER(username) = LOWER(?)'
     )
       .bind(username)
       .first() as any;
 
     if (!user) {
-      return json({ error: '用户名或密码错误' }, 401);
+      return json({ error: '账号或密码错误' }, 401);
     }
 
     // 验证密码（兼容旧 SHA-256 和新 PBKDF2 格式）
     const passwordValid = await verifyPassword(password, user.password_hash);
     if (!passwordValid) {
-      return json({ error: '用户名或密码错误' }, 401);
+      return json({ error: '账号或密码错误' }, 401);
     }
 
     // 如果是旧格式哈希，自动升级为 PBKDF2
@@ -453,7 +463,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
     return json({
       success: true,
-      user: { id: user.id, username: user.username, nickname: user.nickname },
+      user: { id: user.id, username: user.username, nickname: user.nickname, role: user.role },
       token,
       refreshToken,
     });
@@ -489,7 +499,7 @@ async function handleRefreshToken(request: Request, env: Env): Promise<Response>
     }
 
     const user = await env.DB.prepare(
-      'SELECT id, username, nickname FROM users WHERE id = ?'
+      'SELECT id, username, nickname, COALESCE(role, \'user\') as role FROM users WHERE id = ?'
     )
       .bind(tokenRow.user_id)
       .first() as any;
@@ -510,7 +520,7 @@ async function handleRefreshToken(request: Request, env: Env): Promise<Response>
 
     return json({
       success: true,
-      user: { id: user.id, username: user.username, nickname: user.nickname },
+      user: { id: user.id, username: user.username, nickname: user.nickname, role: user.role },
       token,
       refreshToken: nextRefreshToken,
     });
@@ -557,7 +567,7 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
     await initDatabase(env.DB);
 
     const user = await env.DB.prepare(
-      'SELECT id, username, nickname, created_at, last_login_at FROM users WHERE id = ?'
+      'SELECT id, username, nickname, COALESCE(role, \'user\') as role, created_at, last_login_at FROM users WHERE id = ?'
     )
       .bind(userId)
       .first();
