@@ -27,21 +27,13 @@ jobs:
           restore-keys: |
             web-deploy-${{ runner.os }}-
       - run: flutter pub get
-      - name: Generate version.json
+      - run: bash tool/generate_version.sh
+      - name: Read pubspec version
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          BUILD=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-          mkdir -p web
-          cat > web/version.json << EOF
-          {
-            "version": "$VERSION",
-            "buildNumber": "$BUILD",
-            "releaseDate": "$(date -u +%Y-%m-%d)"
-          }
-          EOF
-          echo "Generated web/version.json: version=$VERSION build=$BUILD"
-      - run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ vars.UPDATE_MANIFEST_URL }} --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+          FULL_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          echo "APP_VERSION=${FULL_VERSION%%+*}" >> "$GITHUB_ENV"
+          echo "APP_BUILD_NUMBER=${FULL_VERSION##*+}" >> "$GITHUB_ENV"
+      - run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ vars.UPDATE_MANIFEST_URL }} --dart-define=APP_VERSION=${{ env.APP_VERSION }} --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

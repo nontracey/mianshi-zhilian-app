@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'app_version_service.dart';
 
 class UpdateInfo {
   final String version;
   final int buildNumber;
   final String releaseDate;
+  final String minimumRequiredVersion;
   final List<String> notes;
   final Map<String, PlatformUpdate> platforms;
 
@@ -16,6 +20,7 @@ class UpdateInfo {
     required this.version,
     required this.buildNumber,
     required this.releaseDate,
+    required this.minimumRequiredVersion,
     required this.notes,
     required this.platforms,
   });
@@ -33,6 +38,7 @@ class UpdateInfo {
       version: json['version'] as String? ?? '',
       buildNumber: json['buildNumber'] as int? ?? 0,
       releaseDate: json['releaseDate'] as String? ?? '',
+      minimumRequiredVersion: json['minimumRequiredVersion'] as String? ?? '',
       notes: (json['notes'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList(),
@@ -76,7 +82,7 @@ class UpdateService {
   });
 
   /// 检查是否有新版本
-  Future<UpdateInfo?> checkForUpdate(String currentVersion) async {
+  Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
       final response = await http.get(Uri.parse(updateManifestUrl));
       if (response.statusCode != 200) {
@@ -87,7 +93,13 @@ class UpdateService {
       final data = json.decode(response.body) as Map<String, dynamic>;
       final remoteVersion = data['version'] as String? ?? '';
 
-      if (_isNewerVersion(remoteVersion, currentVersion)) {
+      final remoteBuildNumber = data['buildNumber'] as int? ?? 0;
+      if (_isNewerVersion(
+        remoteVersion: remoteVersion,
+        remoteBuildNumber: remoteBuildNumber,
+        localVersion: currentVersion.version,
+        localBuildNumber: currentVersion.buildNumber,
+      )) {
         return UpdateInfo.fromJson(data);
       }
 
@@ -96,6 +108,12 @@ class UpdateService {
       debugPrint('Check update error: $e');
       return null;
     }
+  }
+
+  bool isRequiredUpdate(UpdateInfo updateInfo, AppBuildInfo currentVersion) {
+    final minimumVersion = updateInfo.minimumRequiredVersion;
+    if (minimumVersion.isEmpty) return false;
+    return _isVersionGreater(minimumVersion, currentVersion.version);
   }
 
   /// 获取当前平台的更新信息
@@ -173,6 +191,15 @@ class UpdateService {
     }
   }
 
+  /// 启动系统默认安装流程。
+  ///
+  /// Android 会打开 APK 安装确认，Windows 会启动 EXE 安装器，macOS 会打开 DMG。
+  Future<bool> openInstaller(String filePath) async {
+    if (kIsWeb) return false;
+    final result = await OpenFilex.open(filePath);
+    return result.type == ResultType.done;
+  }
+
   /// 校验文件的 SHA256
   Future<bool> verifySha256(String filePath, String expectedSha256) async {
     try {
@@ -208,7 +235,23 @@ class UpdateService {
   }
 
   /// 比较版本号
-  bool _isNewerVersion(String remote, String local) {
+  bool _isNewerVersion({
+    required String remoteVersion,
+    required int remoteBuildNumber,
+    required String localVersion,
+    required int localBuildNumber,
+  }) {
+    final versionCompare = _compareVersion(remoteVersion, localVersion);
+    if (versionCompare > 0) return true;
+    if (versionCompare < 0) return false;
+    return remoteBuildNumber > localBuildNumber;
+  }
+
+  bool _isVersionGreater(String remote, String local) {
+    return _compareVersion(remote, local) > 0;
+  }
+
+  int _compareVersion(String remote, String local) {
     final remoteParts = remote
         .replaceAll('v', '')
         .split('.')
@@ -223,11 +266,11 @@ class UpdateService {
     for (var i = 0; i < 3; i++) {
       final r = i < remoteParts.length ? (remoteParts[i] ?? 0) : 0;
       final l = i < localParts.length ? (localParts[i] ?? 0) : 0;
-      if (r > l) return true;
-      if (r < l) return false;
+      if (r > l) return 1;
+      if (r < l) return -1;
     }
 
-    return false;
+    return 0;
   }
 
   /// 格式化文件大小

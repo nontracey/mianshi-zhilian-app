@@ -14,16 +14,34 @@ import 'dart:io';
 }
 
 void main(List<String> args) {
-  final version = args.isNotEmpty ? args.first : '0.1.0';
+  if (args.isEmpty) {
+    stderr.writeln(
+      'Usage: dart scripts/build_update_manifest.dart <tag> [assetsDir]',
+    );
+    exit(64);
+  }
+
+  final version = args.first;
   final assetsDir = args.length > 1 ? Directory(args[1]) : Directory.current;
   final tag = version.startsWith('v') ? version : 'v$version';
   final cleanVersion = version.replaceFirst('v', '');
+  final minimumRequiredVersion = Platform
+      .environment['MINIMUM_REQUIRED_VERSION']
+      ?.trim();
 
   // 从 pubspec.yaml 读取 buildNumber
   final pubspecFile = File('apps/client/pubspec.yaml');
   int buildNumber = 100;
   if (pubspecFile.existsSync()) {
-    final (bn, _) = _parsePubspecVersion(pubspecFile.readAsStringSync());
+    final (bn, pubspecVersion) = _parsePubspecVersion(
+      pubspecFile.readAsStringSync(),
+    );
+    if (pubspecVersion != cleanVersion) {
+      stderr.writeln(
+        'Release tag $tag does not match apps/client/pubspec.yaml version $pubspecVersion',
+      );
+      exit(65);
+    }
     buildNumber = bn;
   } else {
     stderr.writeln(
@@ -60,11 +78,10 @@ void main(List<String> args) {
     };
   }
 
-  final manifest = {
+  final manifest = <String, Object?>{
     'version': cleanVersion,
     'buildNumber': buildNumber,
     'releaseDate': DateTime.now().toIso8601String().split('T').first,
-    'minimumRequiredVersion': '0.1.0',
     'notes': ['新增领域知识目录', '新增 AI 复述评估', '优化掌握度排序'],
     'platforms': {
       'android': platformAsset('android'),
@@ -73,6 +90,9 @@ void main(List<String> args) {
       'web': platformAsset('web'),
     },
   };
+  if (minimumRequiredVersion != null && minimumRequiredVersion.isNotEmpty) {
+    manifest['minimumRequiredVersion'] = minimumRequiredVersion;
+  }
   File('${assetsDir.path}/update.json').writeAsStringSync(
     '${const JsonEncoder.withIndent('  ').convert(manifest)}\n',
   );

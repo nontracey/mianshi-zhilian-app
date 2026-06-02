@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
@@ -15,6 +14,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/services/app_version_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
@@ -2351,7 +2351,7 @@ class _AboutPanelState extends State<_AboutPanel> {
   bool _isChecking = false;
   String? _updateMessage;
   StateSetter? _currentSetDialogState;
-  String _currentVersion = '';
+  AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
 
   @override
   void initState() {
@@ -2360,17 +2360,10 @@ class _AboutPanelState extends State<_AboutPanel> {
   }
 
   Future<void> _loadVersion() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
+    final version = await const AppVersionService().load();
+    if (mounted) {
       setState(() {
-        _currentVersion = info.version;
-      });
-    } catch (e) {
-      debugPrint('Failed to load package info: $e');
-      // 兜底：读取编译时注入的版本号，无需手动维护
-      const definedVersion = String.fromEnvironment('APP_VERSION', defaultValue: '0.1.0');
-      setState(() {
-        _currentVersion = definedVersion;
+        _currentVersion = version;
       });
     }
   }
@@ -2383,9 +2376,7 @@ class _AboutPanelState extends State<_AboutPanel> {
 
     try {
       final updateService = UpdateService();
-      final versionToCheck =
-          _currentVersion.isNotEmpty ? _currentVersion : '0.1.0';
-      final updateInfo = await updateService.checkForUpdate(versionToCheck);
+      final updateInfo = await updateService.checkForUpdate(_currentVersion);
 
       if (mounted) {
         final l10n = context.watch<LocalizationProvider>();
@@ -2415,8 +2406,16 @@ class _AboutPanelState extends State<_AboutPanel> {
 
   void _showUpdateDialog(UpdateInfo updateInfo) {
     final l10n = context.watch<LocalizationProvider>();
+    final updateService = UpdateService();
+    final isRequiredUpdate = updateService.isRequiredUpdate(
+      updateInfo,
+      _currentVersion,
+    );
+    final platformUpdate = updateService.getPlatformUpdate(updateInfo);
+    final size = platformUpdate?.size ?? updateInfo.platforms.values.first.size;
     showDialog(
       context: context,
+      barrierDismissible: !isRequiredUpdate,
       builder: (ctx) => AlertDialog(
         title: Text(
           l10n.getp('publish_current_new_version_v_version_2', {
@@ -2444,19 +2443,18 @@ class _AboutPanelState extends State<_AboutPanel> {
             const SizedBox(height: 12),
             Text(
               l10n.getp('flat_platform_size_2', {
-                'size': UpdateService.formatSize(
-                  updateInfo.platforms.values.first.size,
-                ),
+                'size': UpdateService.formatSize(size),
               }),
               style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('slightly_after_again_explain')),
-          ),
+          if (!isRequiredUpdate)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.get('slightly_after_again_explain')),
+            ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -2472,29 +2470,28 @@ class _AboutPanelState extends State<_AboutPanel> {
   Future<void> _downloadUpdate(UpdateInfo updateInfo) async {
     final l10n = context.watch<LocalizationProvider>();
     final updateService = UpdateService();
-    final platformUpdate = updateService.getPlatformUpdate(updateInfo);
-
-    if (platformUpdate == null) {
-      final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.get('current_flat_platform_temporary_no_update_pack'),
-          ),
-        ),
-      );
-      return;
-    }
 
     // Web 端提示刷新
     if (kIsWeb) {
-      final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             l10n.get(
               'web_client_please_refresh_new_page_gain_fetch_most_version',
             ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final platformUpdate = updateService.getPlatformUpdate(updateInfo);
+
+    if (platformUpdate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.get('current_flat_platform_temporary_no_update_pack'),
           ),
         ),
       );
@@ -2566,6 +2563,7 @@ class _AboutPanelState extends State<_AboutPanel> {
       Navigator.pop(context); // 关闭下载对话框
 
       if (filePath != null) {
+        await updateService.openInstaller(filePath);
         _showInstallGuide(filePath, updateInfo.version);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2671,7 +2669,8 @@ class _AboutPanelState extends State<_AboutPanel> {
       children: [
         InfoRow(
           icon: Icons.info_outline,
-          title: '${l10n.get('version_prefix')} ${_currentVersion.isNotEmpty ? _currentVersion : "0.1.0"}',
+          title:
+              '${l10n.get('version_prefix')} ${_currentVersion.displayVersion}',
           subtitle: l10n.get('ai_main_dynamic_back_memory_study_work_platform'),
         ),
         InfoRow(

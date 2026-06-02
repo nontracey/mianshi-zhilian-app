@@ -13,10 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_notes: ${{ steps.generate_notes.outputs.notes }}
+      app_version: ${{ steps.pubspec_version.outputs.version }}
+      app_build_number: ${{ steps.pubspec_version.outputs.build_number }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Read pubspec version
+        id: pubspec_version
+        working-directory: apps/client
+        run: |
+          FULL_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          VERSION=${FULL_VERSION%%+*}
+          BUILD_NUMBER=${FULL_VERSION##*+}
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match pubspec version ${VERSION}" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
       
       - name: Get previous tag
         id: prev_tag
@@ -103,8 +120,7 @@ jobs:
             gh release create "${GITHUB_REF_NAME}" \
               --target "${GITHUB_SHA}" \
               --title "${GITHUB_REF_NAME}" \
-              --notes-file release_notes.md \
-              --draft
+              --notes-file release_notes.md
 
   android:
     runs-on: ubuntu-latest
@@ -128,11 +144,8 @@ jobs:
           restore-keys: |
             android-build-${{ runner.os }}-
       - run: flutter pub get
-      - name: Set APP_VERSION
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-      - run: flutter build apk --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+      - run: bash tool/generate_version.sh
+      - run: flutter build apk --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk "mianshi-zhilian-${GITHUB_REF_NAME}-android.apk"
       - uses: actions/upload-artifact@v4
         with:
@@ -162,21 +175,8 @@ jobs:
           restore-keys: |
             web-build-${{ runner.os }}-
       - run: flutter pub get
-      - name: Generate version.json
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          BUILD=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-          mkdir -p web
-          cat > web/version.json << EOF
-          {
-            "version": "$VERSION",
-            "buildNumber": "$BUILD",
-            "releaseDate": "$(date -u +%Y-%m-%d)"
-          }
-          EOF
-          echo "Generated web/version.json: version=$VERSION build=$BUILD"
-      - run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ vars.UPDATE_MANIFEST_URL }} --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+      - run: bash tool/generate_version.sh
+      - run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ vars.UPDATE_MANIFEST_URL }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cd build/web && zip -r "../../mianshi-zhilian-${GITHUB_REF_NAME}-web.zip" .
       - uses: actions/upload-artifact@v4
         with:
@@ -206,19 +206,15 @@ jobs:
           restore-keys: |
             windows-build-${{ runner.os }}-
       - run: flutter pub get
-      - name: Set APP_VERSION
-        shell: bash
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-      - run: flutter build windows --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+      - run: bash tool/generate_version.sh
+      - run: flutter build windows --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup -y
       - name: Build Windows installer
         shell: pwsh
         run: |
-          $version = "${env:GITHUB_REF_NAME}".TrimStart("v")
+          $version = "${{ needs.prepare-release.outputs.app_version }}"
           $iss = @"
           [Setup]
           AppId={{8B6D7BCF-9D8E-4E8D-BE2D-1D2B8C2F5F31}
@@ -287,11 +283,8 @@ jobs:
           restore-keys: |
             macos-build-${{ runner.os }}-
       - run: flutter pub get
-      - name: Set APP_VERSION
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-      - run: flutter build macos --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+      - run: bash tool/generate_version.sh
+      - run: flutter build macos --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Build drag-install DMG
         run: |
           rm -rf dmg-root
@@ -327,8 +320,14 @@ jobs:
           channel: stable
           cache: true
       - run: dart scripts/build_update_manifest.dart "${GITHUB_REF_NAME}" release-assets
+        env:
+          MINIMUM_REQUIRED_VERSION: ${{ vars.MINIMUM_REQUIRED_VERSION }}
       - run: scripts/verify_release_assets.sh release-assets
       - name: Upload update manifest to release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/update.json
+      - name: Publish release as latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false --latest

@@ -29,6 +29,8 @@ jobs:
             flutter-${{ runner.os }}-
       
       - run: flutter pub get
+      - run: bash tool/generate_version.sh
+      - run: git diff --exit-code lib/generated/app_version.g.dart
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - run: flutter build web --release
