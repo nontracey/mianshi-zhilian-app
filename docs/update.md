@@ -15,9 +15,12 @@
        ↓
 有新版本 → 显示更新内容和文件大小
        ↓
-用户确认 → 下载对应平台安装包
+用户确认 → 依次尝试下载源：
+  GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
        ↓
 校验 sha256 → 引导安装
+       ↓
+所有源失败 → 提示"网络无法连接，请检查网络或配置镜像站"
 ```
 
 ### update.json 格式
@@ -36,7 +39,7 @@
     "android": {
       "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk",
       "mirrors": [
-        "https://gitee.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
+        "https://ghproxy.com/https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
       ],
       "sha256": "abc123...",
       "size": 52428800
@@ -72,21 +75,40 @@
 | `mianshi-zhilian-vX.Y.Z-macos.dmg` | macOS 安装镜像 |
 | `mianshi-zhilian-vX.Y.Z-macos.zip` | macOS 便携版 |
 | `mianshi-zhilian-vX.Y.Z-web.zip` | Web 静态文件 |
-| `update.json` | 更新清单（含 sha256 和 size） |
+| `update.json` | 更新清单（含 sha256、size 和镜像地址） |
 
 ### 构建策略
 
 - 各平台并行构建，不等待全部完成
 - 单个平台构建完成后立即上传到 GitHub Release
 - 所有平台完成后生成并上传 `update.json`
-- 如果配置了 `GITEE_TOKEN`，CI 会把安装包和 `update.json` 同步到 Gitee Release；客户端弱网下载失败时会尝试 `mirrors` 备用地址
+- `update.json` 中的 `mirrors` 默认包含 `ghproxy.com` 加速镜像；可通过 CI 环境变量 `GH_MIRROR_PREFIX` 追加自定义镜像
+
+## 下载源与镜像机制
+
+客户端下载更新时按以下顺序依次尝试：
+
+| 优先级 | 下载源 | 说明 |
+|--------|--------|------|
+| 1 | GitHub 官方 | `update.json` 中的 `url` 字段，默认首选 |
+| 2 | 用户自定义镜像 | 在"关于与更新"页 ⚙️ 设置中配置的前缀，拼接到 GitHub URL 前面 |
+| 3 | ghproxy.com | 内置备用镜像，自动加速 GitHub Release 下载 |
+| 4 | manifest 中的其他镜像 | `update.json` `mirrors` 字段中的额外地址 |
+
+- 某个源下载失败后自动尝试下一个，用户在进度对话框中能看到当前正在从哪个源下载
+- 校验失败（sha256 不匹配）不会重试其他源，直接报错
+- 所有源都失败时提示"网络无法连接，请检查网络或配置 GitHub 镜像站后重试"
+
+### 用户自定义镜像站
+
+用户可以在 **个人中心 → 关于与更新 → ⚙️ 下载设置** 中配置自定义 GitHub 镜像站前缀（如 `https://ghproxy.com`）。配置后该镜像会排在 GitHub 官方之后、内置备用镜像之前。留空则仅使用默认的下载源顺序。
 
 ## 平台更新策略
 
 | 平台 | MVP 策略 | 正式策略 |
 |------|---------|---------|
 | Web | 刷新即更新 | Cloudflare Pages 自动更新 |
-| Android | 下载 APK，用户确认安装 | 首次安装第三方 APK 时可能需要系统授权“允许安装未知应用”；后续可接应用商店 |
+| Android | 下载 APK，用户确认安装 | 首次安装第三方 APK 时可能需要系统授权"允许安装未知应用"；后续可接应用商店 |
 | Windows | 下载 exe/zip，引导安装 | MSIX App Installer |
 | macOS | 下载 dmg/zip，引导安装 | 后续可做 Sparkle 自动更新 |
 
@@ -107,7 +129,7 @@ https://mianshi-zhilian-api.nontracey.workers.dev/update.json
 
 也可以通过 `UPDATE_MANIFEST_URL` 编译参数改为其他稳定地址。
 
-Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发，客户端会直接请求 `update.json` 中的平台 `url`，失败后再依次尝试 `mirrors`，避免把 GitHub/Gitee Release 安装包下载流量计入 Cloudflare Worker。
+Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发，客户端会直接请求 `update.json` 中的平台 `url`，失败后再依次尝试镜像源，避免把 GitHub Release 安装包下载流量计入 Cloudflare Worker。
 
 ## 隐私说明
 
@@ -122,40 +144,30 @@ Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 W
 ```dart
 class UpdateService {
   final String updateManifestUrl;
+  final String? customMirrorPrefix; // 用户自定义镜像站前缀
 
-  Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
-    final response = await http.get(Uri.parse(updateManifestUrl));
-    final data = json.decode(response.body);
-    final remoteVersion = data['version'];
-    final remoteBuildNumber = data['buildNumber'];
-    
-    if (_isNewerVersion(
-      remoteVersion: remoteVersion,
-      remoteBuildNumber: remoteBuildNumber,
-      localVersion: currentVersion.version,
-      localBuildNumber: currentVersion.buildNumber,
-    )) {
-      return UpdateInfo.fromJson(data);
-    }
-    return null;
-  }
+  /// 下载结果枚举，区分失败原因
+  // DownloadResult { success, networkError, verificationFailed, cancelled }
 
-  PlatformUpdate? getPlatformUpdate(UpdateInfo updateInfo) {
-    if (kIsWeb) return null; // Web 端自动更新
-    // 根据当前平台返回对应的更新信息
-  }
+  /// 构建下载 URL 列表：GitHub → 自定义镜像 → ghproxy → manifest mirrors
+  List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) { ... }
+
+  /// 下载更新，返回 (文件路径, DownloadResult)
+  Future<(String?, DownloadResult)> downloadUpdate({ ... }) { ... }
+
+  Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async { ... }
+  PlatformUpdate? getPlatformUpdate(UpdateInfo updateInfo) { ... }
 }
 ```
 
 ### 个人中心集成
 
 ```dart
-// 检查更新
-final updateService = UpdateService();
+// 关于与更新页面
+// - 点击"检查更新"行 → 检查并下载更新
+// - 点击 ⚙️ 图标 → 打开下载设置弹窗（配置自定义镜像站）
+final updateService = UpdateService(
+  customMirrorPrefix: settings.customGithubMirror,
+);
 final updateInfo = await updateService.checkForUpdate(currentVersion);
-
-if (updateInfo != null) {
-  // 显示更新对话框
-  showDialog(...);
-}
 ```

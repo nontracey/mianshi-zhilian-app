@@ -151,6 +151,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
+          path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
             apps/client/build
@@ -184,6 +191,13 @@ jobs:
           cache: true
       - uses: actions/cache@v4
         with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
           path: apps/client/build/web
           key: web-build-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/web/**') }}
           restore-keys: |
@@ -215,10 +229,22 @@ jobs:
           cache: true
       - uses: actions/cache@v4
         with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
           path: apps/client/build/windows
           key: windows-build-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/windows/**') }}
           restore-keys: |
             windows-build-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Temp\chocolatey
+          key: innosetup-${{ runner.os }}
       - run: flutter pub get
       - run: bash tool/generate_version.sh
       - run: flutter build windows --release --dart-define=API_BASE_URL=${{ needs.prepare-release.outputs.api_base_url }} --dart-define=UPDATE_MANIFEST_URL=${{ needs.prepare-release.outputs.update_manifest_url }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
@@ -291,8 +317,16 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+      - uses: actions/cache@v4
+        with:
+          path: |
             apps/client/build/macos
             apps/client/macos/Flutter/ephemeral
+            ~/Library/Developer/Xcode/DerivedData
           key: macos-build-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/macos/**') }}
           restore-keys: |
             macos-build-${{ runner.os }}-
