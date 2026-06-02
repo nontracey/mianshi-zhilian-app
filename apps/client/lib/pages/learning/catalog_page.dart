@@ -46,7 +46,7 @@ class _CatalogPageState extends State<CatalogPage> {
     return all.where((d) => !_disabledIds.contains(d.id)).toList();
   }
 
-  bool _roadmapView = false;
+  bool _roadmapView = true;
   String _searchQuery = '';
   final Set<int> _difficultyFilters = {};
   bool _highFrequencyOnly = false;
