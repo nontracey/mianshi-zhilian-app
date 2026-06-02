@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
 import '../models/user.dart';
+import '../services/api_headers.dart';
 import '../services/storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -64,7 +65,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await ApiHeaders.build(_storage),
         body: json.encode({
           'username': username,
           'password': password,
@@ -79,6 +80,8 @@ class AuthProvider extends ChangeNotifier {
         _token = data['token'] as String;
         _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
+        await _storage.recordAnalyticsFeature('login');
+        await _bindDevice();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -105,7 +108,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await ApiHeaders.build(_storage),
         body: json.encode({'username': username, 'password': password}),
       );
 
@@ -116,6 +119,8 @@ class AuthProvider extends ChangeNotifier {
         _token = data['token'] as String;
         _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
+        await _storage.recordAnalyticsFeature('login');
+        await _bindDevice();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -140,7 +145,7 @@ class AuthProvider extends ChangeNotifier {
       try {
         await http.post(
           Uri.parse('$apiBaseUrl/auth/logout'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await ApiHeaders.build(_storage),
           body: json.encode({'refreshToken': refreshToken}),
         );
       } catch (e) {
@@ -194,7 +199,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await ApiHeaders.build(_storage),
         body: json.encode({'refreshToken': refreshToken}),
       );
 
@@ -205,12 +210,13 @@ class AuthProvider extends ChangeNotifier {
           _token = data['token'] as String;
           _refreshToken = data['refreshToken'] as String?;
           await _saveUser();
+          await _bindDevice();
           notifyListeners();
           return true;
         }
       }
 
-      if (response.statusCode == 401) {
+      if (response.statusCode == 401 || response.statusCode == 403) {
         await _clearSavedUser();
       }
       return false;
@@ -220,17 +226,29 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _bindDevice() async {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
+    try {
+      final deviceId = await _storage.getOrCreateDeviceId();
+      await http.post(
+        Uri.parse('$apiBaseUrl/analytics/bind-device'),
+        headers: await ApiHeaders.build(_storage, token: token),
+        body: json.encode({'device_id': deviceId}),
+      );
+    } catch (e) {
+      debugPrint('Bind device failed: $e');
+    }
+  }
+
   Future<http.Response> _authorizedPost(
     String path, {
     Map<String, dynamic>? body,
   }) async {
-    Future<http.Response> send() {
+    Future<http.Response> send() async {
       return http.post(
         Uri.parse('$apiBaseUrl$path'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
+        headers: await ApiHeaders.build(_storage, token: _token),
         body: json.encode(body ?? {}),
       );
     }
@@ -243,10 +261,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<http.Response> _authorizedGet(String path) async {
-    Future<http.Response> send() {
+    Future<http.Response> send() async {
       return http.get(
         Uri.parse('$apiBaseUrl$path'),
-        headers: {'Authorization': 'Bearer $_token'},
+        headers: await ApiHeaders.build(_storage, token: _token, json: false),
       );
     }
 

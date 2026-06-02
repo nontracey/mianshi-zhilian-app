@@ -28,6 +28,13 @@ jobs:
           sed -i "s/PLACEHOLDER_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/"
           wrangler.toml
 
+      - name: Put JWT secret
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:

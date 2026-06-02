@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Ticket {
   final String id;
   final String userId;
@@ -25,13 +27,11 @@ class Ticket {
 
   factory Ticket.fromJson(Map<String, dynamic> json) => Ticket(
     id: json['id'] as String,
-    userId: json['user_id'] as String,
+    userId: json['user_id'] as String? ?? 'anonymous',
     type: json['type'] as String,
     subject: json['subject'] as String,
     description: json['description'] as String,
-    imageUrls: (json['image_urls'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList() ?? [],
+    imageUrls: _parseImageUrls(json['image_urls']),
     status: json['status'] as String? ?? 'pending',
     createdAt: DateTime.parse(json['created_at'] as String),
     resolvedAt: json['resolved_at'] != null
@@ -39,6 +39,19 @@ class Ticket {
         : null,
     adminReply: json['admin_reply'] as String?,
   );
+
+  static List<String> _parseImageUrls(dynamic value) {
+    if (value is List) return value.map((e) => e.toString()).toList();
+    if (value is String && value.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(value);
+        return decoded is List ? decoded.map((e) => e.toString()).toList() : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/ticket_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
@@ -21,6 +22,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
+  final _contactController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<String> _imageUrls = [];
   bool _isSubmitting = false;
@@ -31,6 +33,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
   @override
   void dispose() {
     _subjectController.dispose();
+    _contactController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -49,17 +52,29 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
     setState(() => _isSubmitting = true);
 
     try {
-      final ticketService = TicketService(storage: StorageService());
+      final auth = context.read<AuthProvider>();
+      final ticketService = TicketService(
+        storage: StorageService(),
+        getApiUrl: () => auth.apiBaseUrl,
+        getToken: () => auth.token,
+      );
       await ticketService.submitTicket(
         type: widget.type,
         subject: _sanitize(_subjectController.text),
+        contact: _sanitize(_contactController.text),
         description: _sanitize(_descriptionController.text),
         imageUrls: _imageUrls,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('ticket_submitted'))),
+          SnackBar(
+            content: Text(
+              _isPasswordReset
+                  ? l10n.get('password_reset_ticket_submitted')
+                  : l10n.get('ticket_submitted'),
+            ),
+          ),
         );
         Navigator.of(context).pop();
       }
@@ -131,6 +146,23 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
               },
             ),
             const SizedBox(height: 16),
+
+            if (_isPasswordReset) ...[
+              TextFormField(
+                controller: _contactController,
+                decoration: InputDecoration(
+                  labelText: l10n.get('contact_method'),
+                  hintText: l10n.get('contact_method_hint'),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.contact_mail_outlined),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return l10n.get('please_enter_contact_method');
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // 详细描述
             TextFormField(

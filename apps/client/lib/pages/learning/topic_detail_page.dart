@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
@@ -324,6 +325,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         final progressProvider = context.read<ProgressProvider>();
         final score = result['score'] as int? ?? 0;
         await progressProvider.updateTopicProgress(topic.id, score: score);
+        await StorageService().recordAnalyticsFeature('ai_eval');
       }
     } catch (e) {
       if (mounted) {

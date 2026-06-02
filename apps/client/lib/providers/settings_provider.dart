@@ -150,6 +150,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<String> syncData([SyncSettings? syncSettings]) async {
+    await _storage.recordAnalyticsFeature('manual_sync');
     final settings = syncSettings ?? const SyncSettings();
     if (settings.method == 'local') {
       return 'local_mode_data_saved';

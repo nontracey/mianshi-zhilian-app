@@ -8,7 +8,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Device-Id, X-Platform, X-App-Version, X-OS-Version, X-Device-Model',
         },
       });
     }
@@ -30,6 +30,9 @@ export default {
     if (url.pathname === '/update.json') {
       return proxyUpdateManifest();
     }
+
+    const blocked = await checkSecurityBlock(request, env);
+    if (blocked) return blocked;
 
     // 用户注册
     if (url.pathname === '/auth/register' && request.method === 'POST') {
@@ -59,6 +62,26 @@ export default {
     // 修改密码（需要认证）
     if (url.pathname === '/auth/change-password' && request.method === 'POST') {
       return handleChangePassword(request, env);
+    }
+
+    if (url.pathname === '/tickets' && request.method === 'POST') {
+      return handleCreateTicket(request, env);
+    }
+
+    if (url.pathname === '/tickets' && request.method === 'GET') {
+      return handleGetMyTickets(request, env);
+    }
+
+    if (url.pathname === '/tickets/password-reset' && request.method === 'POST') {
+      return handleCreatePasswordResetTicket(request, env);
+    }
+
+    if (url.pathname === '/analytics/batch' && request.method === 'POST') {
+      return handleAnalyticsBatch(request, env);
+    }
+
+    if (url.pathname === '/analytics/bind-device' && request.method === 'POST') {
+      return handleBindDevice(request, env);
     }
 
     // 云端同步（需要认证）
@@ -212,6 +235,13 @@ const ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60; // 24 小时
 const REFRESH_TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 天未使用需重新登录
 const REFRESH_TOKEN_BYTES = 32;
 
+function getJwtSecret(env: Env): string {
+  if (!env.JWT_SECRET || env.JWT_SECRET === 'undefined') {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  return env.JWT_SECRET;
+}
+
 // 生成简单的 JWT token
 async function generateToken(userId: string, secret: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -316,8 +346,27 @@ async function getUserIdFromRequest(request: Request, env: Env): Promise<string 
   if (!authHeader?.startsWith('Bearer ')) return null;
 
   const token = authHeader.slice(7);
-  const payload = await verifyToken(token, env.JWT_SECRET);
+  const payload = await verifyToken(token, getJwtSecret(env));
   return payload?.userId || null;
+}
+
+async function getOptionalUserIdFromRequest(request: Request, env: Env): Promise<string | null> {
+  try {
+    return await getUserIdFromRequest(request, env);
+  } catch {
+    return null;
+  }
+}
+
+async function getActiveUserFromRequest(request: Request, env: Env): Promise<any | null> {
+  const userId = await getUserIdFromRequest(request, env);
+  if (!userId) return null;
+  await initDatabase(env.DB);
+  const user = await env.DB.prepare(
+    'SELECT id, username, nickname, COALESCE(role, \'user\') as role, COALESCE(is_disabled, 0) as is_disabled FROM users WHERE id = ?'
+  ).bind(userId).first() as any;
+  if (!user || user.is_disabled === 1) return null;
+  return user;
 }
 
 // 初始化数据库表
@@ -335,11 +384,19 @@ async function initDatabase(db: D1Database): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
   `);
 
-  // 迁移：已有表缺少 role 列时自动补充
+  // 迁移：已有表缺少列时自动补充
   const cols = await db.prepare(`PRAGMA table_info(users)`).all() as any;
-  const hasRole = (cols.results as any[]).some((c: any) => c.name === 'role');
-  if (!hasRole) {
-    await db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'`);
+  const userColumns = new Set((cols.results as any[]).map((c: any) => c.name));
+  const userMigrations: Record<string, string> = {
+    role: `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'`,
+    is_disabled: `ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0`,
+    disabled_at: `ALTER TABLE users ADD COLUMN disabled_at TEXT DEFAULT NULL`,
+    updated_at: `ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT NULL`,
+  };
+  for (const [column, sql] of Object.entries(userMigrations)) {
+    if (!userColumns.has(column)) {
+      await db.exec(sql);
+    }
   }
 
   await db.exec(`
@@ -355,12 +412,167 @@ async function initDatabase(db: D1Database): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
+    CREATE TABLE IF NOT EXISTS tickets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      account_username TEXT,
+      contact TEXT,
+      type TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      description TEXT NOT NULL,
+      image_urls TEXT DEFAULT '[]',
+      status TEXT DEFAULT 'pending',
+      admin_reply TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      resolved_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_tickets_created ON tickets(created_at);
+    CREATE INDEX IF NOT EXISTS idx_tickets_account_username ON tickets(account_username);
+
+    CREATE TABLE IF NOT EXISTS user_devices (
+      device_id TEXT PRIMARY KEY,
+      user_id TEXT,
+      platform TEXT,
+      app_version TEXT,
+      os_version TEXT,
+      device_model TEXT,
+      first_seen_at TEXT DEFAULT (datetime('now')),
+      last_seen_at TEXT DEFAULT (datetime('now')),
+      last_login_at TEXT,
+      visit_count INTEGER DEFAULT 0,
+      total_duration_seconds INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_devices_user ON user_devices(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_devices_last_seen ON user_devices(last_seen_at);
+    CREATE INDEX IF NOT EXISTS idx_user_devices_platform ON user_devices(platform);
+
+    CREATE TABLE IF NOT EXISTS daily_visit_stats (
+      date TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      user_id TEXT,
+      platform TEXT,
+      app_version TEXT,
+      open_count INTEGER DEFAULT 0,
+      heartbeat_count INTEGER DEFAULT 0,
+      duration_seconds INTEGER DEFAULT 0,
+      last_seen_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (date, device_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_visit_stats_date ON daily_visit_stats(date);
+    CREATE INDEX IF NOT EXISTS idx_daily_visit_stats_user ON daily_visit_stats(user_id);
+    CREATE INDEX IF NOT EXISTS idx_daily_visit_stats_platform ON daily_visit_stats(platform);
+
+    CREATE TABLE IF NOT EXISTS daily_section_stats (
+      date TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      user_id TEXT,
+      section TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
+      PRIMARY KEY (date, device_id, section)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_section_stats_date ON daily_section_stats(date);
+    CREATE INDEX IF NOT EXISTS idx_daily_section_stats_section ON daily_section_stats(section);
+
+    CREATE TABLE IF NOT EXISTS daily_feature_stats (
+      date TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      user_id TEXT,
+      feature TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
+      PRIMARY KEY (date, device_id, feature)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_feature_stats_date ON daily_feature_stats(date);
+    CREATE INDEX IF NOT EXISTS idx_daily_feature_stats_feature ON daily_feature_stats(feature);
+
+    CREATE TABLE IF NOT EXISTS analytics_batches (
+      batch_id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      user_id TEXT,
+      received_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_analytics_batches_device ON analytics_batches(device_id);
+
+    CREATE TABLE IF NOT EXISTS app_visit_events (
+      id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      user_id TEXT,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT DEFAULT (datetime('now')),
+      duration_seconds INTEGER DEFAULT 0,
+      platform TEXT,
+      app_version TEXT,
+      route TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_visit_events_user ON app_visit_events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_visit_events_device ON app_visit_events(device_id);
+    CREATE INDEX IF NOT EXISTS idx_visit_events_occurred ON app_visit_events(occurred_at);
+
+    CREATE TABLE IF NOT EXISTS security_block_rules (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      reason TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_security_block_rules_lookup ON security_block_rules(type, value, is_active);
+    CREATE INDEX IF NOT EXISTS idx_security_block_rules_created ON security_block_rules(created_at);
   `);
+}
+
+function getClientIp(request: Request): string {
+  return request.headers.get('CF-Connecting-IP')
+    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
+    || '';
+}
+
+async function checkSecurityBlock(request: Request, env: Env): Promise<Response | null> {
+  try {
+    await initDatabase(env.DB);
+    const checks = [
+      ['device_id', request.headers.get('X-Device-Id') || ''],
+      ['ip', getClientIp(request)],
+      ['platform', request.headers.get('X-Platform') || ''],
+      ['app_version', request.headers.get('X-App-Version') || ''],
+      ['os_version', request.headers.get('X-OS-Version') || ''],
+      ['device_model', request.headers.get('X-Device-Model') || ''],
+    ].filter(([, value]) => value);
+    if (checks.length === 0) return null;
+    const conditions = checks.map(() => '(type = ? AND value = ?)').join(' OR ');
+    const params = checks.flatMap(([type, value]) => [type, value]);
+    const rule = await env.DB.prepare(`
+      SELECT id, type, value, reason
+      FROM security_block_rules
+      WHERE is_active = 1
+        AND (expires_at IS NULL OR expires_at > datetime('now'))
+        AND (${conditions})
+      LIMIT 1
+    `).bind(...params).first() as any;
+    if (!rule) return null;
+    return json({
+      error: '当前设备或访问环境已被限制，请联系管理员',
+      blocked: true,
+      type: rule.type,
+      reason: rule.reason || undefined,
+    }, 403);
+  } catch (e) {
+    console.error('SecurityBlock check error:', e);
+    return null;
+  }
 }
 
 // 用户注册
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   try {
+    getJwtSecret(env);
     const body = await request.json() as any;
     const { username, password, nickname } = body;
 
@@ -401,7 +613,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       .run();
 
     // 生成 token
-    const { token, refreshToken } = await issueAuthTokens(env.DB, userId, env.JWT_SECRET);
+    const { token, refreshToken } = await issueAuthTokens(env.DB, userId, getJwtSecret(env));
 
     return json({
       success: true,
@@ -418,6 +630,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 // 用户登录
 async function handleLogin(request: Request, env: Env): Promise<Response> {
   try {
+    getJwtSecret(env);
     const body = await request.json() as any;
     const { username, password } = body;
 
@@ -430,13 +643,16 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
     // 查找用户（大小写不敏感）
     const user = await env.DB.prepare(
-      'SELECT id, username, password_hash, nickname, COALESCE(role, \'user\') as role FROM users WHERE LOWER(username) = LOWER(?)'
+      'SELECT id, username, password_hash, nickname, COALESCE(role, \'user\') as role, COALESCE(is_disabled, 0) as is_disabled FROM users WHERE LOWER(username) = LOWER(?)'
     )
       .bind(username)
       .first() as any;
 
     if (!user) {
       return json({ error: '账号或密码错误' }, 401);
+    }
+    if (user.is_disabled === 1) {
+      return json({ error: '账号已被禁用，请联系管理员' }, 403);
     }
 
     // 验证密码（兼容旧 SHA-256 和新 PBKDF2 格式）
@@ -459,7 +675,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       .run();
 
     // 生成 token
-    const { token, refreshToken } = await issueAuthTokens(env.DB, user.id, env.JWT_SECRET);
+    const { token, refreshToken } = await issueAuthTokens(env.DB, user.id, getJwtSecret(env));
 
     return json({
       success: true,
@@ -476,6 +692,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 // 刷新登录态，成功后轮换 refresh token
 async function handleRefreshToken(request: Request, env: Env): Promise<Response> {
   try {
+    getJwtSecret(env);
     const body = await request.json() as any;
     const { refreshToken } = body;
 
@@ -499,13 +716,21 @@ async function handleRefreshToken(request: Request, env: Env): Promise<Response>
     }
 
     const user = await env.DB.prepare(
-      'SELECT id, username, nickname, COALESCE(role, \'user\') as role FROM users WHERE id = ?'
+      'SELECT id, username, nickname, COALESCE(role, \'user\') as role, COALESCE(is_disabled, 0) as is_disabled FROM users WHERE id = ?'
     )
       .bind(tokenRow.user_id)
       .first() as any;
 
     if (!user) {
       return json({ error: '用户不存在' }, 404);
+    }
+    if (user.is_disabled === 1) {
+      await env.DB.prepare(`
+        UPDATE refresh_tokens
+        SET revoked_at = COALESCE(revoked_at, datetime('now')), last_used_at = datetime('now')
+        WHERE id = ?
+      `).bind(tokenRow.id).run();
+      return json({ error: '账号已被禁用，请联系管理员' }, 403);
     }
 
     await env.DB.prepare(`
@@ -516,7 +741,7 @@ async function handleRefreshToken(request: Request, env: Env): Promise<Response>
       .bind(tokenRow.id)
       .run();
 
-    const { token, refreshToken: nextRefreshToken } = await issueAuthTokens(env.DB, user.id, env.JWT_SECRET);
+    const { token, refreshToken: nextRefreshToken } = await issueAuthTokens(env.DB, user.id, getJwtSecret(env));
 
     return json({
       success: true,
@@ -567,13 +792,16 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
     await initDatabase(env.DB);
 
     const user = await env.DB.prepare(
-      'SELECT id, username, nickname, COALESCE(role, \'user\') as role, created_at, last_login_at FROM users WHERE id = ?'
+      'SELECT id, username, nickname, COALESCE(role, \'user\') as role, COALESCE(is_disabled, 0) as is_disabled, created_at, last_login_at FROM users WHERE id = ?'
     )
       .bind(userId)
       .first();
 
     if (!user) {
       return json({ error: '用户不存在' }, 404);
+    }
+    if ((user as any).is_disabled === 1) {
+      return json({ error: '账号已被禁用，请联系管理员' }, 403);
     }
 
     return json({ success: true, user });
@@ -586,10 +814,11 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
 // 修改密码
 async function handleChangePassword(request: Request, env: Env): Promise<Response> {
   try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) {
+    const activeUser = await getActiveUserFromRequest(request, env);
+    if (!activeUser) {
       return json({ error: '未登录或 token 已过期' }, 401);
     }
+    const userId = activeUser.id;
 
     const body = await request.json() as any;
     const { oldPassword, newPassword } = body;
@@ -634,6 +863,228 @@ async function handleChangePassword(request: Request, env: Env): Promise<Respons
   } catch (e) {
     console.error('ChangePassword error:', e);
     return json({ error: '修改密码失败' }, 500);
+  }
+}
+
+const TICKET_TYPES = new Set(['password_reset', 'feedback', 'question']);
+const TICKET_STATUSES = new Set(['pending', 'processing', 'needs_info', 'rejected', 'resolved', 'closed']);
+const ANALYTICS_SECTIONS = new Set(['dashboard', 'catalog', 'practice', 'prep', 'mastery', 'profile']);
+const ANALYTICS_FEATURES = new Set(['ai_eval', 'manual_sync', 'ticket_submit', 'login']);
+
+function asString(value: unknown, max = 200): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function parseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((v) => String(v)).slice(0, 5);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map((v) => String(v)).slice(0, 5) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function normalizeTicket(row: any): any {
+  return {
+    ...row,
+    image_urls: parseJsonArray(row.image_urls),
+  };
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[a-zA-Z0-9_-]{8,80}$/.test(value);
+}
+
+async function handleCreateTicket(request: Request, env: Env): Promise<Response> {
+  try {
+    const user = await getActiveUserFromRequest(request, env);
+    if (!user) return json({ error: '未登录或账号不可用' }, 401);
+    const body = await request.json() as any;
+    const type = asString(body.type, 40);
+    const subject = asString(body.subject, 120);
+    const description = asString(body.description, 4000);
+    const imageUrls = parseJsonArray(body.image_urls);
+
+    if (!TICKET_TYPES.has(type) || type === 'password_reset') {
+      return json({ error: '工单类型无效' }, 400);
+    }
+    if (!subject || !description) {
+      return json({ error: '标题和描述不能为空' }, 400);
+    }
+
+    const id = crypto.randomUUID();
+    await initDatabase(env.DB);
+    await env.DB.prepare(`
+      INSERT INTO tickets (id, user_id, type, subject, description, image_urls, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(id, user.id, type, subject, description, JSON.stringify(imageUrls)).run();
+
+    const ticket = await env.DB.prepare('SELECT * FROM tickets WHERE id = ?').bind(id).first();
+    return json({ success: true, ticket: normalizeTicket(ticket) });
+  } catch (e) {
+    console.error('CreateTicket error:', e);
+    return json({ error: '提交工单失败' }, 500);
+  }
+}
+
+async function handleCreatePasswordResetTicket(request: Request, env: Env): Promise<Response> {
+  try {
+    await initDatabase(env.DB);
+    const body = await request.json() as any;
+    const accountUsername = asString(body.account_username, 80).toLowerCase();
+    const contact = asString(body.contact, 160);
+    const description = asString(body.description, 2000);
+    if (!accountUsername || !contact || description.length < 10) {
+      return json({ error: '请填写用户名、联系方式和至少 10 个字符的说明' }, 400);
+    }
+
+    const id = crypto.randomUUID();
+    await env.DB.prepare(`
+      INSERT INTO tickets (id, account_username, contact, type, subject, description, image_urls, status)
+      VALUES (?, ?, ?, 'password_reset', '密码重置申请', ?, '[]', 'pending')
+    `).bind(id, accountUsername, contact, description).run();
+
+    return json({
+      success: true,
+      ticket: normalizeTicket(await env.DB.prepare('SELECT * FROM tickets WHERE id = ?').bind(id).first()),
+      message: {
+        zh: '已提交密码重置申请，管理员会人工审核。请留意你填写的联系方式；如信息不足，管理员会联系你补充。',
+        en: 'Your password reset request has been submitted. An administrator will review it manually. Please watch the contact method you provided; if more information is needed, the administrator will contact you.',
+      },
+    });
+  } catch (e) {
+    console.error('CreatePasswordResetTicket error:', e);
+    return json({ error: '提交密码重置申请失败' }, 500);
+  }
+}
+
+async function handleGetMyTickets(request: Request, env: Env): Promise<Response> {
+  try {
+    const user = await getActiveUserFromRequest(request, env);
+    if (!user) return json({ error: '未登录或账号不可用' }, 401);
+    const rows = await env.DB.prepare(
+      'SELECT * FROM tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'
+    ).bind(user.id).all();
+    return json({ success: true, tickets: (rows.results || []).map(normalizeTicket) });
+  } catch (e) {
+    console.error('GetMyTickets error:', e);
+    return json({ error: '获取工单失败' }, 500);
+  }
+}
+
+async function handleBindDevice(request: Request, env: Env): Promise<Response> {
+  try {
+    const user = await getActiveUserFromRequest(request, env);
+    if (!user) return json({ error: '未登录或账号不可用' }, 401);
+    const body = await request.json().catch(() => ({})) as any;
+    const deviceId = asString(body.device_id, 80);
+    if (!isUuidLike(deviceId)) return json({ error: '设备 ID 无效' }, 400);
+    await initDatabase(env.DB);
+    await env.DB.prepare(`
+      INSERT INTO user_devices (device_id, user_id, first_seen_at, last_seen_at, last_login_at)
+      VALUES (?, ?, datetime('now'), datetime('now'), datetime('now'))
+      ON CONFLICT(device_id) DO UPDATE SET
+        user_id = excluded.user_id,
+        last_seen_at = datetime('now'),
+        last_login_at = datetime('now')
+    `).bind(deviceId, user.id).run();
+    return json({ success: true });
+  } catch (e) {
+    console.error('BindDevice error:', e);
+    return json({ error: '绑定设备失败' }, 500);
+  }
+}
+
+async function handleAnalyticsBatch(request: Request, env: Env): Promise<Response> {
+  try {
+    await initDatabase(env.DB);
+    const body = await request.json() as any;
+    const batchId = asString(body.batch_id, 80);
+    const deviceId = asString(body.device_id, 80);
+    if (!isUuidLike(batchId) || !isUuidLike(deviceId)) {
+      return json({ error: '统计批次或设备 ID 无效' }, 400);
+    }
+
+    const existing = await env.DB.prepare('SELECT batch_id FROM analytics_batches WHERE batch_id = ?')
+      .bind(batchId)
+      .first();
+    if (existing) return json({ success: true, deduped: true });
+
+    const userId = await getOptionalUserIdFromRequest(request, env);
+    const platform = asString(body.platform, 40) || 'unknown';
+    const appVersion = asString(body.app_version, 40) || 'unknown';
+    const osVersion = asString(body.os_version, 80) || 'unknown';
+    const deviceModel = asString(body.device_model, 80) || 'unknown';
+    const days = Array.isArray(body.days) ? body.days.slice(0, 7) : [];
+    let totalOpen = 0;
+    let totalDuration = 0;
+
+    await env.DB.prepare(`
+      INSERT INTO analytics_batches (batch_id, device_id, user_id)
+      VALUES (?, ?, ?)
+    `).bind(batchId, deviceId, userId).run();
+
+    for (const day of days) {
+      const date = asString(day.date, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const openCount = Math.max(0, Math.min(Number(day.open_count) || 0, 1000));
+      const durationSeconds = Math.max(0, Math.min(Number(day.active_seconds) || 0, 24 * 60 * 60));
+      totalOpen += openCount;
+      totalDuration += durationSeconds;
+      await env.DB.prepare(`
+        INSERT INTO daily_visit_stats (date, device_id, user_id, platform, app_version, open_count, duration_seconds, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(date, device_id) DO UPDATE SET
+          user_id = COALESCE(excluded.user_id, daily_visit_stats.user_id),
+          platform = excluded.platform,
+          app_version = excluded.app_version,
+          open_count = daily_visit_stats.open_count + excluded.open_count,
+          duration_seconds = MIN(86400, daily_visit_stats.duration_seconds + excluded.duration_seconds),
+          last_seen_at = datetime('now')
+      `).bind(date, deviceId, userId, platform, appVersion, openCount, durationSeconds).run();
+
+      await upsertCountMap(env.DB, 'daily_section_stats', 'section', date, deviceId, userId, day.section_counts, ANALYTICS_SECTIONS);
+      await upsertCountMap(env.DB, 'daily_feature_stats', 'feature', date, deviceId, userId, day.feature_counts, ANALYTICS_FEATURES);
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO user_devices (device_id, user_id, platform, app_version, os_version, device_model, first_seen_at, last_seen_at, visit_count, total_duration_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+      ON CONFLICT(device_id) DO UPDATE SET
+        user_id = COALESCE(excluded.user_id, user_devices.user_id),
+        platform = excluded.platform,
+        app_version = excluded.app_version,
+        os_version = excluded.os_version,
+        device_model = excluded.device_model,
+        last_seen_at = datetime('now'),
+        visit_count = user_devices.visit_count + excluded.visit_count,
+        total_duration_seconds = user_devices.total_duration_seconds + excluded.total_duration_seconds
+    `).bind(deviceId, userId, platform, appVersion, osVersion, deviceModel, totalOpen, totalDuration).run();
+
+    return json({ success: true });
+  } catch (e) {
+    console.error('AnalyticsBatch error:', e);
+    return json({ error: '访问统计上报失败' }, 500);
+  }
+}
+
+async function upsertCountMap(db: D1Database, table: string, column: string, date: string, deviceId: string, userId: string | null, value: any, allowed: Set<string>): Promise<void> {
+  if (!value || typeof value !== 'object') return;
+  for (const [key, rawCount] of Object.entries(value).slice(0, 20)) {
+    if (!allowed.has(key)) continue;
+    const count = Math.max(0, Math.min(Number(rawCount) || 0, 1000));
+    if (count === 0) continue;
+    await db.prepare(`
+      INSERT INTO ${table} (date, device_id, user_id, ${column}, count)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(date, device_id, ${column}) DO UPDATE SET
+        user_id = COALESCE(excluded.user_id, ${table}.user_id),
+        count = ${table}.count + excluded.count
+    `).bind(date, deviceId, userId, key, count).run();
   }
 }
 
@@ -765,10 +1216,11 @@ async function initSyncTables(db: D1Database): Promise<void> {
 // 上传学习进度
 async function handleSyncProgress(request: Request, env: Env): Promise<Response> {
   try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) {
+    const activeUser = await getActiveUserFromRequest(request, env);
+    if (!activeUser) {
       return json({ error: '未登录或 token 已过期' }, 401);
     }
+    const userId = activeUser.id;
 
     const body = await request.json() as any;
     const { progressMap, settings } = body;
@@ -823,10 +1275,11 @@ async function handleSyncProgress(request: Request, env: Env): Promise<Response>
 // 获取云端学习进度
 async function handleGetProgress(request: Request, env: Env): Promise<Response> {
   try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) {
+    const activeUser = await getActiveUserFromRequest(request, env);
+    if (!activeUser) {
       return json({ error: '未登录或 token 已过期' }, 401);
     }
+    const userId = activeUser.id;
 
     await initSyncTables(env.DB);
 
@@ -874,10 +1327,11 @@ async function handleGetProgress(request: Request, env: Env): Promise<Response> 
 
 async function handleSyncPackage(request: Request, env: Env): Promise<Response> {
   try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) {
+    const activeUser = await getActiveUserFromRequest(request, env);
+    if (!activeUser) {
       return json({ error: '未登录或 token 已过期' }, 401);
     }
+    const userId = activeUser.id;
     const body = await request.json() as any;
     const syncPackage = body.package;
     if (!syncPackage || typeof syncPackage !== 'object') {
@@ -902,10 +1356,11 @@ async function handleSyncPackage(request: Request, env: Env): Promise<Response> 
 
 async function handleGetSyncPackage(request: Request, env: Env): Promise<Response> {
   try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) {
+    const activeUser = await getActiveUserFromRequest(request, env);
+    if (!activeUser) {
       return json({ error: '未登录或 token 已过期' }, 401);
     }
+    const userId = activeUser.id;
     await initSyncTables(env.DB);
     const row = await env.DB.prepare(
       'SELECT package_json, updated_at FROM sync_snapshots WHERE user_id = ?'

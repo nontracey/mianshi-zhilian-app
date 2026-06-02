@@ -1,0 +1,24 @@
+import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
+import 'storage_service.dart';
+
+class ApiHeaders {
+  static Future<Map<String, String>> build(
+    StorageService storage, {
+    String? token,
+    bool json = true,
+  }) async {
+    final deviceId = await storage.getOrCreateDeviceId();
+    final packageInfo = await PackageInfo.fromPlatform();
+    return {
+      if (json) 'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      'X-Device-Id': deviceId,
+      'X-Platform': defaultTargetPlatform.name,
+      'X-App-Version': packageInfo.version,
+      'X-OS-Version': 'unknown',
+      'X-Device-Model': 'unknown',
+    };
+  }
+}

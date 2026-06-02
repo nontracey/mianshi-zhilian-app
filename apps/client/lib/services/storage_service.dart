@@ -415,6 +415,20 @@ class StorageService {
     return id;
   }
 
+  Future<void> recordAnalyticsFeature(String feature) async {
+    const allowed = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
+    if (!allowed.contains(feature)) return;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final buffer = await loadJsonObject('_analyticsBuffer') ?? {'days': <String, dynamic>{}};
+    final days = Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
+    final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
+    final features = Map<String, dynamic>.from(day['feature_counts'] as Map? ?? {});
+    features[feature] = ((features[feature] as num?)?.toInt() ?? 0) + 1;
+    day['feature_counts'] = features;
+    days[today] = day;
+    await saveJsonObject('_analyticsBuffer', {'days': days});
+  }
+
   bool _isSyncRelevantKey(String key) {
     if (_syncKeys.contains(key)) return true;
     return _syncPrefixes.any(key.startsWith);

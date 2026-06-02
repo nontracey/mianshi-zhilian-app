@@ -63,6 +63,8 @@
 | Secret | 说明 |
 |--------|------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token，需要 Pages 和 Workers 权限 |
+| `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio 后台使用同一个 D1 |
+| `JWT_SECRET` | 用户认证 JWT 签名密钥，CI 会写入 Cloudflare Worker Secret |
 
 ### GitHub Variables（非加密）
 
@@ -99,6 +101,23 @@ npx wrangler d1 create mianshi-zhilian-db --location apac
 # 设置 JWT Secret
 echo "your-secret-key" | npx wrangler secret put JWT_SECRET
 ```
+
+## App Worker 后台能力
+
+App Worker 仍坚持本地优先：学习记录、AI 配置和用户自定义同步目标优先留在本地，平台侧不强制接管练习明细。Worker 只维护平台账号、工单、访问聚合统计和安全限制。
+
+新增 D1 表由 Worker 启动时按需迁移：
+
+| 表 | 说明 |
+| --- | --- |
+| `tickets` | 登录用户反馈/问题工单，以及未登录密码重置工单 |
+| `user_devices` | 安装级设备 ID 与用户绑定关系，支持一用户多设备 |
+| `daily_visit_stats` | 按天、设备聚合访问次数和访问时长 |
+| `daily_section_stats` | 按天、设备聚合页面入口访问 |
+| `daily_feature_stats` | 按天、设备聚合 AI 评估、手动同步、工单提交、登录 |
+| `security_block_rules` | 后台维护的设备/IP/平台/版本/型号限制规则，未登录请求也会生效 |
+
+访问统计默认开启，但客户端会先写本地 buffer，约每 30 分钟批量上报。上报失败不会影响学习、登录以外的本地功能。
 
 ## 内容更新注意事项
 

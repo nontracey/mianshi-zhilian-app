@@ -15,6 +15,7 @@ import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/content_api_service.dart';
 import 'services/ai_service.dart';
+import 'services/analytics_service.dart';
 import 'services/data_sync_service.dart';
 import 'services/storage_service.dart';
 import 'services/update_service.dart';
@@ -40,11 +41,13 @@ void main() async {
   final aiService = AiService();
   final updateService = UpdateService();
   final dataSyncService = DataSyncService(storage)..start();
+  final analyticsService = AnalyticsService(storage)..start();
 
   runApp(
     MianshiZhilianApp(
       storage: storage,
       dataSyncService: dataSyncService,
+      analyticsService: analyticsService,
       contentApi: contentApi,
       aiService: aiService,
       updateService: updateService,
@@ -58,6 +61,7 @@ enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 class MianshiZhilianApp extends StatefulWidget {
   final StorageService storage;
   final DataSyncService dataSyncService;
+  final AnalyticsService analyticsService;
   final ContentApiService contentApi;
   final AiService aiService;
   final UpdateService updateService;
@@ -67,6 +71,7 @@ class MianshiZhilianApp extends StatefulWidget {
     super.key,
     required this.storage,
     required this.dataSyncService,
+    required this.analyticsService,
     required this.contentApi,
     required this.aiService,
     required this.updateService,
@@ -83,6 +88,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   @override
   void dispose() {
     widget.dataSyncService.stop();
+    widget.analyticsService.stop();
     super.dispose();
   }
 
@@ -112,6 +118,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           create: (_) =>
               LocalizationProvider(initialLanguage: widget.initialLanguage),
         ),
+        Provider<AnalyticsService>.value(value: widget.analyticsService),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -426,6 +433,7 @@ class _LearningShellState extends State<LearningShell> {
   }
 
   void _setSection(AppSection value) {
+    context.read<AnalyticsService>().recordSection(value.name);
     setState(() {
       _section = value;
       _selectedTopicId = null;
