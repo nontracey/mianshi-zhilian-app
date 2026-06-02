@@ -368,7 +368,7 @@ class LocalProfile {
 }
 
 class SyncSettings {
-  final String method; // local, file, webdav, github, gitee, cloud
+  final String method; // local, file, webdav, github, gitee (cloud 已废弃，fromJson 自动转为 local)
   final String webDavUrl;
   final String webDavUsername;
   final String webDavPassword;

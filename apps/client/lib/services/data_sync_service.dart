@@ -17,10 +17,6 @@ class DataSyncService {
 
   static const _fileName = 'sync-state.json';
   static const _timeout = Duration(seconds: 30);
-  static const _apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://mianshi-zhilian-api.nontracey.workers.dev',
-  );
 
   void start() {
     _timer?.cancel();
@@ -182,7 +178,7 @@ class DataSyncService {
       case 'gitee':
         return _downloadGitee(settings);
       case 'cloud':
-        return _downloadAccountCloud();
+        throw StateError('账号云同步已迁移至 /sync/progress；请使用 AuthProvider.syncToCloud / getCloudProgress');
       default:
         return Future.value(null);
     }
@@ -197,7 +193,7 @@ class DataSyncService {
       case 'gitee':
         return _uploadGitee(settings, package);
       case 'cloud':
-        return _uploadAccountCloud(package);
+        throw StateError('账号云同步已迁移至 /sync/progress；请使用 AuthProvider.syncToCloud / getCloudProgress');
       default:
         throw StateError('Unsupported sync method: ${settings.method}');
     }
@@ -410,37 +406,6 @@ class DataSyncService {
         : await http.put(uri, body: body);
     if (response.statusCode == 409) throw const SyncConflictException();
     _ensureSuccess(response, 'Gitee 上传失败');
-  }
-
-  Future<Map<String, dynamic>?> _downloadAccountCloud() async {
-    final token = await _storage.load('auth_token') as String?;
-    if (token == null || token.isEmpty) {
-      throw StateError('账号云同步需要先登录');
-    }
-    final response = await http.get(
-      Uri.parse('$_apiBaseUrl/sync/package'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (response.statusCode == 404) return null;
-    _ensureSuccess(response, '账号云同步下载失败');
-    final body = json.decode(response.body) as Map<String, dynamic>;
-    return body['package'] as Map<String, dynamic>?;
-  }
-
-  Future<void> _uploadAccountCloud(Map<String, dynamic> package) async {
-    final token = await _storage.load('auth_token') as String?;
-    if (token == null || token.isEmpty) {
-      throw StateError('账号云同步需要先登录');
-    }
-    final response = await http.post(
-      Uri.parse('$_apiBaseUrl/sync/package'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: json.encode({'package': package}),
-    );
-    _ensureSuccess(response, '账号云同步上传失败');
   }
 
   Map<String, dynamic> _mergePackages(

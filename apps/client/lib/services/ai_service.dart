@@ -218,40 +218,6 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
     }
   }
 
-  /// 通过 Worker 代理调用 AI（Web 端用，避免 CORS）
-  Future<Map<String, dynamic>> evaluateViaProxy({
-    required String workerUrl,
-    required String topicTitle,
-    required List<String> mustHave,
-    required List<String> commonMistakes,
-    required String userAnswer,
-    required String apiKey,
-    required String model,
-    required String baseUrl,
-    required String language,
-  }) async {
-    final url = '${workerUrl.replaceAll(RegExp(r'/+$'), '')}/ai/proxy';
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'apiKey': apiKey,
-        'baseUrl': baseUrl,
-        'model': model,
-        'topicTitle': topicTitle,
-        'mustHave': mustHave,
-        'commonMistakes': commonMistakes,
-        'userAnswer': userAnswer,
-        'language': language,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body) as Map<String, dynamic>;
-    }
-    throw Exception('proxy_eval_failed:${response.statusCode}');
-  }
-
   /// 通用流式聊天补全
   Stream<String> sendMessageStream({
     required AiConfig config,

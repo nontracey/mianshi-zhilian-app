@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import 'api_headers.dart';
+import 'device_info_helper.dart';
 import 'storage_service.dart';
 
 class AnalyticsService {
@@ -23,6 +24,7 @@ class AnalyticsService {
   Timer? _timer;
   DateTime? _activeStartedAt;
   String? _currentBatchId;
+  bool _flushing = false;
 
   static const _bufferKey = '_analyticsBuffer';
   static const _lastFlushKey = '_analyticsLastFlushAt';
@@ -50,9 +52,11 @@ class AnalyticsService {
   }
 
   void stop() {
-    flush();
     _timer?.cancel();
     _timer = null;
+    // 同步部分：先取消定时器；异步 flush 交给事件循环收尾
+    // 如果进程立即退出，本批数据下次启动时会随 buffer 重试
+    flush();
   }
 
   Future<void> recordOpen() async {
@@ -66,25 +70,30 @@ class AnalyticsService {
 
   Future<void> recordFeature(String feature) async {
     if (!_features.contains(feature)) return;
-    await _incrementNested('feature_counts', feature);
+    await _storage.recordAnalyticsFeature(feature);
   }
 
   Future<void> flush({String? token}) async {
+    if (_flushing) return;
+    _flushing = true;
     try {
       await _captureActiveSeconds();
       final buffer = await _loadBuffer();
       final days = buffer['days'];
       if (days is! Map || days.isEmpty) return;
-      _currentBatchId ??= const Uuid().v4();
+      // 快照要发送的日期集合，成功时只移除这批日期
+      final snapshotDates = days.keys.toSet();
+      _currentBatchId = const Uuid().v4();
       final deviceId = await _storage.getOrCreateDeviceId();
       final packageInfo = await PackageInfo.fromPlatform();
+      final deviceInfo = await DeviceInfoHelper.instance;
       final payload = {
         'batch_id': _currentBatchId,
         'device_id': deviceId,
         'platform': defaultTargetPlatform.name,
         'app_version': packageInfo.version,
-        'os_version': 'unknown',
-        'device_model': 'unknown',
+        'os_version': deviceInfo.osVersion,
+        'device_model': deviceInfo.deviceModel,
         'days': days.entries.map((entry) {
           final value = Map<String, dynamic>.from(entry.value as Map);
           return {'date': entry.key, ...value};
@@ -99,13 +108,24 @@ class AnalyticsService {
           )
           .timeout(const Duration(seconds: 10));
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        await _storage.saveJsonObject(_bufferKey, {'days': <String, dynamic>{}});
+        // 重新加载 buffer，仅移除已成功发送的日期，
+        // 保留 flush 期间并发写入的新数据
+        final currentBuffer = await _loadBuffer();
+        final currentDays = Map<String, dynamic>.from(
+          currentBuffer['days'] as Map? ?? {},
+        );
+        for (final date in snapshotDates) {
+          currentDays.remove(date);
+        }
+        await _storage.saveJsonObject(_bufferKey, {'days': currentDays});
         await _storage.save(_lastFlushKey, DateTime.now().toIso8601String());
         _currentBatchId = null;
       }
+      // 失败时保留 _currentBatchId 和 buffer，下次 flush 重试
     } catch (e) {
       debugPrint('Analytics flush failed: $e');
     } finally {
+      _flushing = false;
       _activeStartedAt = DateTime.now();
     }
   }

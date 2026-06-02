@@ -445,7 +445,8 @@ class ProgressProvider extends ChangeNotifier {
     return _progressMap.map((k, v) => MapEntry(k, v.toJson()));
   }
 
-  /// 从云端合并进度数据
+  /// 从云端合并进度数据。
+  /// 合并策略：保留每 topic 的最高分；同分时保留更高的练习次数和更早的下次复习时间。
   Future<void> mergeFromCloud(Map<String, dynamic> cloudProgress) async {
     for (final entry in cloudProgress.entries) {
       final topicId = entry.key;
@@ -453,13 +454,23 @@ class ProgressProvider extends ChangeNotifier {
       final localProgress = _progressMap[topicId];
 
       if (localProgress == null) {
-        // 本地没有，直接使用云端数据
         _progressMap[topicId] = TopicProgress.fromJson(cloudData);
       } else {
-        // 合并策略：保留分数更高的
         final cloudScore = cloudData['score'] as int? ?? 0;
-        if (cloudScore > localProgress.score) {
-          _progressMap[topicId] = TopicProgress.fromJson(cloudData);
+        final cloudPracticeCount =
+            cloudData['practiceCount'] as int? ?? 0;
+
+        if (cloudScore > localProgress.score ||
+            (cloudScore == localProgress.score &&
+                cloudPracticeCount > localProgress.practiceCount)) {
+          var merged = TopicProgress.fromJson(cloudData);
+          // 保留更早的下次复习时间
+          if (localProgress.nextReviewAt != null &&
+              merged.nextReviewAt != null &&
+              localProgress.nextReviewAt!.isBefore(merged.nextReviewAt!)) {
+            merged = merged.copyWith(nextReviewAt: localProgress.nextReviewAt);
+          }
+          _progressMap[topicId] = merged;
         }
       }
     }

@@ -426,6 +426,12 @@ class StorageService {
     features[feature] = ((features[feature] as num?)?.toInt() ?? 0) + 1;
     day['feature_counts'] = features;
     days[today] = day;
+    // 与 AnalyticsService 保持一致：仅保留最近 7 天
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    days.removeWhere((key, _) {
+      final date = DateTime.tryParse(key);
+      return date == null || date.isBefore(cutoff);
+    });
     await saveJsonObject('_analyticsBuffer', {'days': days});
   }
 

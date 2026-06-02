@@ -103,14 +103,6 @@ export default {
       return handleGetProgress(request, env);
     }
 
-    if (url.pathname === '/sync/package' && request.method === 'POST') {
-      return json({ error: '账号云同步暂不开放' }, 403);
-    }
-
-    if (url.pathname === '/sync/package' && request.method === 'GET') {
-      return json({ error: '账号云同步暂不开放' }, 403);
-    }
-
     // 代理测试环境内容: /content/test/* → TEST_CONTENT_BASE_URL/*
     if (url.pathname.startsWith('/content/test/')) {
       const subPath = url.pathname.slice('/content/test/'.length);
@@ -123,10 +115,6 @@ export default {
       const subPath = url.pathname.slice('/content/production/'.length);
       const targetUrl = `${env.PROD_CONTENT_BASE_URL}/${subPath}`;
       return proxyFetch(targetUrl, request);
-    }
-
-    if (url.pathname === '/ai/proxy' && request.method === 'POST') {
-      return handleAiProxy(request, env);
     }
 
     if (url.pathname.startsWith('/sync/')) {
@@ -695,11 +683,11 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       return json({ error: '账号或密码错误' }, 401);
     }
 
-    // 验证密码：三层迁移
+    // 验证密码：多层迁移
     // 格式 3（最新）：PBKDF2(PBKDF2(password, static, 10000), random_salt)
     // 格式 2（SHA-256 过渡）：PBKDF2(SHA-256(password), random_salt)
-    // 格式 1（原始）：PBKDF2(password, random_salt)
     // 格式 0（遗留无 salt）：SHA-256(password)
+    // 格式 1（PBKDF2 明文）已移除 —— 所有用户登录时自动升级，不再接受明文穿越网络。
     const clientKey = password_hash; // PBKDF2(password, static, 10000)
     const hashedPassword = hasPassword ? await legacyHash(password) : ''; // SHA-256(password)
     let passwordValid = await verifyPassword(clientKey, user.password_hash);
@@ -708,12 +696,6 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     if (!passwordValid && hashedPassword) {
       // 格式 2 → 格式 3
       passwordValid = await verifyPassword(hashedPassword, user.password_hash);
-      if (passwordValid) needsUpgrade = true;
-    }
-
-    if (!passwordValid && hasHash && hasPassword) {
-      // 格式 1 → 格式 3
-      passwordValid = await verifyPassword(password, user.password_hash);
       if (passwordValid) needsUpgrade = true;
     }
 
@@ -1012,7 +994,7 @@ async function requireAdmin(request: Request, env: Env): Promise<{ id: string; r
 
 /**
  * Admin 重置用户密码（无原密码，仅管理员可调）。
- * POST /admin/users/:id/reset-password  body: { new_password }
+ * POST /admin/users/:id/reset-password  body: { password_hash }
  * 哈希到新格式并撤销该用户所有 refresh token。
  */
 async function handleAdminResetPassword(request: Request, env: Env): Promise<Response> {
@@ -1022,14 +1004,17 @@ async function handleAdminResetPassword(request: Request, env: Env): Promise<Res
     const userId = request.url.split('/admin/users/')[1]?.split('/')[0];
     if (!userId) return json({ error: 'userId 无效' }, 400);
     const body = await request.json() as any;
-    const newPassword = asString(body.new_password, 200);
-    if (newPassword.length < 6) return json({ error: '密码至少 6 个字符' }, 400);
+    // 只接受客户端预哈希的 password_hash（PBKDF2(password, static_salt)），
+    // 不再接受明文密码，与 login 保持一致。
+    const clientKey = asString(body.password_hash, 200);
+    if (!clientKey || clientKey.length < 6) return json({ error: '请提供 password_hash，密码至少 6 个字符' }, 400);
     await initDatabase(env.DB);
     const target = await env.DB.prepare('SELECT id, username FROM users WHERE id = ?')
       .bind(userId)
       .first() as any;
     if (!target) return json({ error: '用户不存在' }, 404);
-    const newHash = await hashPassword(newPassword);
+    // 与登录一致：PBKDF2(clientKey, random_salt) = 格式 3 存储
+    const newHash = await hashPassword(clientKey);
     await env.DB.prepare('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .bind(newHash, userId)
       .run();
@@ -1254,97 +1239,6 @@ async function upsertCountMap(db: D1Database, table: string, column: string, dat
   }
 }
 
-async function handleAiProxy(request: Request, env: Env): Promise<Response> {
-  try {
-    const body = await request.json() as any;
-
-    // 从请求中获取用户的 AI 配置（不存储，只转发）
-    const { apiKey, baseUrl, model, topicTitle, mustHave, commonMistakes, userAnswer, language } = body;
-
-    if (!apiKey || !baseUrl || !model) {
-      return json({ error: 'Missing required fields: apiKey, baseUrl, model' }, 400);
-    }
-
-    // 构建系统提示词
-    const systemPrompt = `你是一个技术面试评估专家。请评估用户对知识点的回答。
-
-评估维度：
-1. 核心概念完整性 (40%)：是否覆盖标准要点
-2. 表达准确性 (25%)：是否有明显错误或混淆
-3. 面试表达质量 (20%)：是否像面试回答，结构是否清晰
-4. 扩展深度 (15%)：是否能结合场景、优缺点、实践经验
-
-标准要点：${(mustHave || []).join('、')}
-常见错误：${(commonMistakes || []).join('、')}
-
-请用${language || '中文'}回答，并以如下 JSON 格式输出：
-{
-  "score": 86,
-  "level": "skilled",
-  "summary": "整体理解正确，但可以补充...",
-  "missedPoints": ["遗漏要点1"],
-  "wrongPoints": ["错误点1"],
-  "improvedAnswer": "面试时可以这样回答：...",
-  "nextAction": "进入下一知识点"
-}
-
-score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。`;
-
-    // 转发请求到用户配置的 AI 服务
-    const targetUrl = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-    const aiResponse = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `知识点：${topicTitle}\n\n我的回答：\n${userAnswer}` },
-        ],
-        temperature: 0.3,
-        max_tokens: 2000,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI upstream error:', aiResponse.status);
-      return json({
-        error: 'AI 服务请求失败',
-      }, aiResponse.status);
-    }
-
-    const aiResult = await aiResponse.json() as any;
-    const content = aiResult.choices?.[0]?.message?.content || '';
-
-    // 尝试从回复中提取 JSON
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return json(JSON.parse(jsonMatch[0]));
-      } catch (_) {
-        // JSON 解析失败，返回原始内容
-      }
-    }
-
-    return json({
-      score: 0,
-      level: 'unfamiliar',
-      summary: content,
-      missedPoints: [],
-      wrongPoints: [],
-      improvedAnswer: '',
-      nextAction: '重试',
-    });
-  } catch (e) {
-    console.error('AI proxy error:', e);
-    return json({ error: 'AI 代理请求失败' }, 500);
-  }
-}
-
 // 初始化同步表
 async function initSyncTables(db: D1Database): Promise<void> {
   await db.exec(`
@@ -1368,12 +1262,6 @@ async function initSyncTables(db: D1Database): Promise<void> {
       recommend_strategy TEXT DEFAULT 'weighted',
       language TEXT DEFAULT 'zh',
       theme_mode TEXT DEFAULT 'system',
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS sync_snapshots (
-      user_id TEXT PRIMARY KEY,
-      package_json TEXT NOT NULL,
       updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
@@ -1488,62 +1376,6 @@ async function handleGetProgress(request: Request, env: Env): Promise<Response> 
   } catch (e) {
     console.error('GetProgress error:', e);
     return json({ error: '获取进度失败' }, 500);
-  }
-}
-
-async function handleSyncPackage(request: Request, env: Env): Promise<Response> {
-  try {
-    const activeUser = await getActiveUserFromRequest(request, env);
-    if (!activeUser) {
-      return json({ error: '未登录或 token 已过期' }, 401);
-    }
-    const userId = activeUser.id;
-    const body = await request.json() as any;
-    const syncPackage = body.package;
-    if (!syncPackage || typeof syncPackage !== 'object') {
-      return json({ error: '缺少同步快照' }, 400);
-    }
-    await initSyncTables(env.DB);
-    await env.DB.prepare(`
-      INSERT INTO sync_snapshots (user_id, package_json, updated_at)
-      VALUES (?, ?, datetime('now'))
-      ON CONFLICT(user_id) DO UPDATE SET
-        package_json = excluded.package_json,
-        updated_at = datetime('now')
-    `)
-      .bind(userId, JSON.stringify(syncPackage))
-      .run();
-    return json({ success: true, syncedAt: new Date().toISOString() });
-  } catch (e) {
-    console.error('SyncPackage error:', e);
-    return json({ error: '同步快照失败' }, 500);
-  }
-}
-
-async function handleGetSyncPackage(request: Request, env: Env): Promise<Response> {
-  try {
-    const activeUser = await getActiveUserFromRequest(request, env);
-    if (!activeUser) {
-      return json({ error: '未登录或 token 已过期' }, 401);
-    }
-    const userId = activeUser.id;
-    await initSyncTables(env.DB);
-    const row = await env.DB.prepare(
-      'SELECT package_json, updated_at FROM sync_snapshots WHERE user_id = ?'
-    )
-      .bind(userId)
-      .first() as any;
-    if (!row) {
-      return json({ package: null }, 200);
-    }
-    return json({
-      success: true,
-      package: JSON.parse(row.package_json),
-      updatedAt: row.updated_at,
-    });
-  } catch (e) {
-    console.error('GetSyncPackage error:', e);
-    return json({ error: '获取同步快照失败' }, 500);
   }
 }
 
