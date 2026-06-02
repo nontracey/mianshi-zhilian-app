@@ -28,6 +28,7 @@ void main(List<String> args) {
   final minimumRequiredVersion = Platform
       .environment['MINIMUM_REQUIRED_VERSION']
       ?.trim();
+  final notesEnv = Platform.environment['RELEASE_NOTES']?.trim();
 
   // 从 pubspec.yaml 读取 buildNumber
   final pubspecFile = File('apps/client/pubspec.yaml');
@@ -82,7 +83,9 @@ void main(List<String> args) {
     'version': cleanVersion,
     'buildNumber': buildNumber,
     'releaseDate': DateTime.now().toIso8601String().split('T').first,
-    'notes': ['新增领域知识目录', '新增 AI 复述评估', '优化掌握度排序'],
+    'notes': notesEnv != null && notesEnv.isNotEmpty
+        ? notesEnv.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        : ['版本更新'],
     'platforms': {
       'android': platformAsset('android'),
       'windows': platformAsset('windows'),
