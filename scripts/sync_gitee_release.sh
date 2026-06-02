@@ -38,7 +38,20 @@ status="$(
     "$api_base/repos/$owner/$repo/releases/tags/$tag?access_token=$GITEE_TOKEN"
 )"
 
-if [ "$status" = "404" ]; then
+release_id=""
+if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+  release_id="$(python3 - "$release_json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+print(data.get("id", "") if isinstance(data, dict) else "")
+PY
+)"
+fi
+
+if [ "$status" = "404" ] || [ -z "$release_id" ]; then
   status="$(
     curl -sS -o "$release_json" -w "%{http_code}" \
       -X POST "$api_base/repos/$owner/$repo/releases" \
@@ -61,7 +74,7 @@ import sys
 
 with open(sys.argv[1], encoding="utf-8") as f:
     data = json.load(f)
-print(data.get("id", ""))
+print(data.get("id", "") if isinstance(data, dict) else "")
 PY
 )"
 
