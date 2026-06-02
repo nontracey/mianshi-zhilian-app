@@ -128,7 +128,11 @@ jobs:
           restore-keys: |
             android-build-${{ runner.os }}-
       - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Set APP_VERSION
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+      - run: flutter build apk --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk "mianshi-zhilian-${GITHUB_REF_NAME}-android.apk"
       - uses: actions/upload-artifact@v4
         with:
@@ -202,7 +206,12 @@ jobs:
           restore-keys: |
             windows-build-${{ runner.os }}-
       - run: flutter pub get
-      - run: flutter build windows --release
+      - name: Set APP_VERSION
+        shell: bash
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+      - run: flutter build windows --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup -y
@@ -278,7 +287,11 @@ jobs:
           restore-keys: |
             macos-build-${{ runner.os }}-
       - run: flutter pub get
-      - run: flutter build macos --release
+      - name: Set APP_VERSION
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+      - run: flutter build macos --release --dart-define=APP_VERSION=${{ env.APP_VERSION }}
       - name: Build drag-install DMG
         run: |
           rm -rf dmg-root
