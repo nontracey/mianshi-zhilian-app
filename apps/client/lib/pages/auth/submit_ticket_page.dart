@@ -1,14 +1,14 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/ticket_service.dart';
-import 'package:mianshi_zhilian/services/upload_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:image_picker/image_picker.dart';
 
 class SubmitTicketPage extends StatefulWidget {
   const SubmitTicketPage({
@@ -22,12 +22,6 @@ class SubmitTicketPage extends StatefulWidget {
   State<SubmitTicketPage> createState() => _SubmitTicketPageState();
 }
 
-class _PendingImage {
-  _PendingImage({required this.bytes});
-  final Uint8List bytes;
-  String? uploadedUrl; // 提交时上传 R2 后填入
-}
-
 class _SubmitTicketPageState extends State<SubmitTicketPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _formKey = GlobalKey<FormState>();
@@ -35,8 +29,10 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
   final _contactController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<_PendingImage> _images = [];
-  final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
+
+  static const int _maxImages = 3;
+  static const int _maxBytes = 150 * 1024;
 
   bool get _isPasswordReset => widget.type == 'password_reset';
   int get _minDescriptionLength => _isPasswordReset ? 10 : 2;
@@ -56,78 +52,52 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
         .trim();
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
-      );
-      if (image == null) return;
-      final bytes = await image.readAsBytes();
+  Future<void> _pickAndAddImage() async {
+    if (_images.length >= _maxImages) return;
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 75,
+    );
+    if (picked == null || !mounted) return;
+
+    final bytes = await picked.readAsBytes();
+    if (bytes.length > _maxBytes) {
       if (!mounted) return;
-      setState(() {
-        _images.add(_PendingImage(bytes: bytes));
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.get('submit_failed')}: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('image_too_large_max_150kb'))),
+      );
+      return;
     }
+
+    final mime = picked.mimeType ?? 'image/jpeg';
+    final base64 = 'data:$mime;base64,${_bytesToBase64(bytes)}';
+    setState(() => _images.add(_PendingImage(bytes: bytes, dataUri: base64)));
+  }
+
+  String _bytesToBase64(Uint8List bytes) {
+    return base64Encode(bytes);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSubmitting = true);
 
     try {
       final auth = context.read<AuthProvider>();
-      final storage = StorageService();
-      final uploadService = UploadService(
-        storage: storage,
-        getApiUrl: () => auth.apiBaseUrl,
-      );
       final ticketService = TicketService(
-        storage: storage,
+        storage: StorageService(),
         getApiUrl: () => auth.apiBaseUrl,
         getToken: () => auth.token,
       );
-
-      // 1. 上传所有图片到 R2（不阻塞 UI 反馈）
-      final r2Urls = <String>[];
-      for (var i = 0; i < _images.length; i++) {
-        final img = _images[i];
-        if (img.uploadedUrl != null) {
-          r2Urls.add(img.uploadedUrl!);
-          continue;
-        }
-        try {
-          final url = await uploadService.uploadImage(
-            bytes: img.bytes,
-          );
-          img.uploadedUrl = url;
-          r2Urls.add(url);
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${l10n.get('submit_failed')}: $e')),
-            );
-          }
-          return; // 任一图上传失败，整体取消提交
-        }
-      }
-
-      // 2. 提交工单（只发 R2 URL，不带 base64）
       await ticketService.submitTicket(
         type: widget.type,
         subject: _sanitize(_subjectController.text),
         contact: _sanitize(_contactController.text),
         description: _sanitize(_descriptionController.text),
-        imageUrls: r2Urls,
+        imageUrls: _images.map((e) => e.dataUri).toList(),
       );
 
       if (mounted) {
@@ -248,7 +218,7 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
             const SizedBox(height: 16),
 
             Text(
-              l10n.get('upload_images_max5'),
+              l10n.getp('upload_images_max_n', {'count': _maxImages.toString()}),
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : Colors.black87,
@@ -260,36 +230,16 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
               runSpacing: 8,
               children: [
                 ..._images.asMap().entries.map((entry) {
-                  final img = entry.value;
                   return Stack(
                     children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isDark ? Colors.white24 : Colors.grey.shade300,
-                          ),
-                          image: DecorationImage(
-                            image: MemoryImage(img.bytes),
-                            fit: BoxFit.cover,
-                          ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          entry.value.bytes,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
                         ),
-                        child: img.uploadedUrl != null
-                            ? Align(
-                                alignment: Alignment.bottomRight,
-                                child: Container(
-                                  margin: const EdgeInsets.all(2),
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check, size: 10, color: Colors.white),
-                                ),
-                              )
-                            : null,
                       ),
                       Positioned(
                         top: 4,
@@ -309,9 +259,9 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
                     ],
                   );
                 }),
-                if (_images.length < 5)
+                if (_images.length < _maxImages)
                   GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _isSubmitting ? null : _pickAndAddImage,
                     child: Container(
                       width: 80,
                       height: 80,
@@ -348,4 +298,10 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
       ),
     );
   }
+}
+
+class _PendingImage {
+  _PendingImage({required this.bytes, required this.dataUri});
+  final Uint8List bytes;
+  final String dataUri;
 }

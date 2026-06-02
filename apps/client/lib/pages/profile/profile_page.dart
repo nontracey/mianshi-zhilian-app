@@ -16,9 +16,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
-import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
-import 'package:mianshi_zhilian/services/upload_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -579,22 +577,6 @@ class _AccountPanel extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onLogout;
 
-  /// 头像 URL 切换时清理 R2 上的孤儿文件：
-  /// - 仅清理本应用的 R2 头像（URL 含 '/avatars/' 路径）
-  /// - 仅在旧 URL 不等于新 URL 时触发
-  /// - fire-and-forget（不阻塞 UI，孤儿文件失败不影响本地）
-  void _deleteR2AvatarIfNeeded(String? oldUrl, String? newUrl) {
-    if (oldUrl == null || oldUrl == newUrl || oldUrl.isEmpty) return;
-    if (!oldUrl.contains('/avatars/')) return; // 只清理本应用 R2 头像
-    final upload = UploadService(
-      storage: StorageService(),
-      getApiUrl: () => authProvider.apiBaseUrl,
-      getToken: () => authProvider.token,
-    );
-    // 不 await — 失败也只是后端日志
-    upload.deleteAvatar(url: oldUrl);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -747,7 +729,7 @@ class _AccountPanel extends StatelessWidget {
     final hasSeed = profile.avatarSeed.isNotEmpty;
     final seedColor = _seedColor(profile.avatarSeed);
     final diceBearUrl = hasSeed && !hasAvatarUrl
-        ? 'https://api.dicebear.com/9.x/avataaars/png?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
+        ? 'https://api.dicebear.com/9.x/bottts/png?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
         : null;
     final showInitials = !hasAvatarUrl && !hasSeed;
 
@@ -869,7 +851,6 @@ class _AccountPanel extends StatelessWidget {
                     Navigator.pop(ctx);
                     final newSeed = DateTime.now().millisecondsSinceEpoch
                         .toString();
-                    _deleteR2AvatarIfNeeded(profile.avatarUrl, null);
                     onProfileChanged(
                       profile.copyWith(avatarSeed: newSeed, avatarUrl: null),
                     );
@@ -882,7 +863,6 @@ class _AccountPanel extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _deleteR2AvatarIfNeeded(profile.avatarUrl, null);
                   onProfileChanged(profile.copyWith(avatarUrl: null));
                 },
                 child: Text(
@@ -911,7 +891,6 @@ class _AccountPanel extends StatelessWidget {
       );
       if (image != null) {
         // 在移动端，直接使用文件路径
-        _deleteR2AvatarIfNeeded(profile.avatarUrl, image.path);
         onProfileChanged(profile.copyWith(avatarUrl: image.path));
       }
     } catch (e) {
@@ -946,11 +925,9 @@ class _AccountPanel extends StatelessWidget {
             bytes,
             mimeType: 'image/jpeg',
           ).toString();
-          _deleteR2AvatarIfNeeded(profile.avatarUrl, base64);
           onProfileChanged(profile.copyWith(avatarUrl: base64));
         } else {
           // 移动端直接使用文件路径
-          _deleteR2AvatarIfNeeded(profile.avatarUrl, image.path);
           onProfileChanged(profile.copyWith(avatarUrl: image.path));
         }
       }
@@ -1019,7 +996,6 @@ class _AccountPanel extends StatelessWidget {
             onPressed: () {
               final url = urlController.text.trim();
               if (url.isNotEmpty) {
-                _deleteR2AvatarIfNeeded(profile.avatarUrl, url);
                 onProfileChanged(profile.copyWith(avatarUrl: url));
               }
               Navigator.pop(ctx);
@@ -1181,24 +1157,52 @@ class _AccountPanel extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
+                onPressed: () async {
+                  final newNick = nicknameController.text.trim().isEmpty
+                      ? l10n.get('local_user')
+                      : nicknameController.text.trim() == l10n.get('local_user')
+                      ? l10n.get('local_user')
+                      : nicknameController.text.trim();
+                  final newEmail = emailController.text.trim();
+                  final oldNick = profile.nickname;
+
                   onProfileChanged(
                     LocalProfile(
-                      nickname: nicknameController.text.trim().isEmpty
-                          ? l10n.get('local_user')
-                          : nicknameController.text.trim() ==
-                                l10n.get('local_user')
-                          ? l10n.get('local_user')
-                          : nicknameController.text.trim(),
-                      email: emailController.text.trim(),
+                      nickname: newNick,
+                      email: newEmail,
                       avatarSeed: profile.avatarSeed,
                       avatarUrl: profile.avatarUrl,
                       emailBound: profile.emailBound,
                       wechatBound: profile.wechatBound,
                     ),
                   );
+
+                  // 登录态下同步到服务端（让 header_bar / 全局昵称立即刷新）
+                  if (authProvider.isLoggedIn) {
+                    final ok = await authProvider.updateProfile(
+                      nickname: newNick,
+                      email: newEmail,
+                    );
+                    if (!ctx.mounted) return;
+                    if (!ok) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            authProvider.error ?? '同步昵称到云端失败',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    // 昵称未实际变化时不重弹
+                    if (oldNick == newNick && emailController.text.trim() == newEmail) {
+                      return;
+                    }
+                  }
+
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       content: Text(
                         l10n.get('resource_material_already_update'),

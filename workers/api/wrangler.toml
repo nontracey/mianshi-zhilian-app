@@ -7,12 +7,7 @@ binding = "DB"
 database_name = "mianshi-zhilian-db"
 database_id = "PLACEHOLDER_DATABASE_ID"
 
-[[r2_buckets]]
-binding = "ASSETS"
-bucket_name = "PLACEHOLDER_R2_BUCKET_NAME"
-
 [vars]
 CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
 TEST_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
 PROD_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
-R2_PUBLIC_BASE_URL = "PLACEHOLDER_R2_PUBLIC_BASE_URL"
