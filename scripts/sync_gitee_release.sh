@@ -19,6 +19,10 @@ owner="${GITEE_OWNER:-nontracey}"
 repo="${GITEE_REPO:-mianshi-zhilian-app}"
 api_base="${GITEE_API_BASE_URL:-https://gitee.com/api/v5}"
 target_commitish="${GITEE_TARGET_COMMITISH:-master}"
+api_timeout="${GITEE_API_TIMEOUT_SECONDS:-120}"
+upload_timeout="${GITEE_UPLOAD_TIMEOUT_SECONDS:-1800}"
+low_speed_limit="${GITEE_UPLOAD_LOW_SPEED_LIMIT:-1024}"
+low_speed_time="${GITEE_UPLOAD_LOW_SPEED_TIME:-120}"
 
 if [ ! -d "$asset_dir" ]; then
   echo "Asset directory not found: $asset_dir" >&2
@@ -35,7 +39,9 @@ existing_assets="$(mktemp)"
 trap 'rm -f "$release_json" "$existing_assets"' EXIT
 
 status="$(
-  curl -sS -o "$release_json" -w "%{http_code}" \
+  curl -sS --connect-timeout 30 --max-time "$api_timeout" \
+    --retry 3 --retry-delay 5 --retry-all-errors \
+    -o "$release_json" -w "%{http_code}" \
     "$api_base/repos/$owner/$repo/releases/tags/$tag?access_token=$GITEE_TOKEN"
 )"
 
@@ -54,7 +60,9 @@ fi
 
 if [ "$status" = "404" ] || [ -z "$release_id" ]; then
   status="$(
-    curl -sS -o "$release_json" -w "%{http_code}" \
+    curl -sS --connect-timeout 30 --max-time "$api_timeout" \
+      --retry 3 --retry-delay 5 --retry-all-errors \
+      -o "$release_json" -w "%{http_code}" \
       -X POST "$api_base/repos/$owner/$repo/releases" \
       --data-urlencode "access_token=$GITEE_TOKEN" \
       --data-urlencode "tag_name=$tag" \
@@ -108,9 +116,13 @@ while IFS= read -r -d '' file; do
     echo "Skipping existing Gitee asset $name"
     continue
   fi
-  echo "Uploading $name to Gitee release $tag"
+  size="$(wc -c < "$file" | tr -d ' ')"
+  echo "Uploading $name ($size bytes) to Gitee release $tag"
   status="$(
-    curl -sS -o "$release_json" -w "%{http_code}" \
+    curl -sS --connect-timeout 30 --max-time "$upload_timeout" \
+      --speed-limit "$low_speed_limit" --speed-time "$low_speed_time" \
+      --retry 3 --retry-delay 10 --retry-all-errors \
+      -o "$release_json" -w "%{http_code}" \
       -X POST "$api_base/repos/$owner/$repo/releases/$release_id/attach_files" \
       -F "access_token=$GITEE_TOKEN" \
       -F "file=@$file"
