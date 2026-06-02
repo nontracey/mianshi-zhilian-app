@@ -110,7 +110,7 @@ for item in items:
         print(name)
 PY
 
-while IFS= read -r -d '' file; do
+while IFS= read -r file; do
   name="$(basename "$file")"
   if grep -Fxq "$name" "$existing_assets"; then
     echo "Skipping existing Gitee asset $name"
@@ -124,6 +124,7 @@ while IFS= read -r -d '' file; do
       --retry 3 --retry-delay 10 --retry-all-errors \
       -o "$release_json" -w "%{http_code}" \
       -X POST "$api_base/repos/$owner/$repo/releases/$release_id/attach_files" \
+      -H "Expect:" \
       -F "access_token=$GITEE_TOKEN" \
       -F "file=@$file"
   )"
@@ -132,6 +133,20 @@ while IFS= read -r -d '' file; do
     cat "$release_json" >&2
     exit 1
   fi
-done < <(find "$asset_dir" -maxdepth 1 -type f -print0 | sort -z)
+done < <(
+  python3 - "$asset_dir" <<'PY'
+import os
+import sys
+
+asset_dir = sys.argv[1]
+files = [
+    os.path.join(asset_dir, name)
+    for name in os.listdir(asset_dir)
+    if os.path.isfile(os.path.join(asset_dir, name))
+]
+for path in sorted(files, key=lambda p: (os.path.getsize(p), os.path.basename(p))):
+    print(path)
+PY
+)
 
 echo "Gitee release synced: https://gitee.com/$owner/$repo/releases/tag/$tag"
