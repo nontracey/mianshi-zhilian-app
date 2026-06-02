@@ -5,7 +5,7 @@ compatibility_date = "2026-05-27"
 [[d1_databases]]
 binding = "DB"
 database_name = "mianshi-zhilian-db"
-database_id = "3a10ced4-0cfd-41e0-aafd-480652eb4c47"
+database_id = "PLACEHOLDER_DATABASE_ID"
 
 [vars]
 CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
