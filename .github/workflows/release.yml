@@ -199,7 +199,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: apps/client/build/web
-          key: web-build-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/web/**') }}
+          key: web-build-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.yaml', 'apps/client/pubspec.lock', 'apps/client/lib/**', 'apps/client/web/**') }}
           restore-keys: |
             web-build-${{ runner.os }}-
       - run: flutter pub get

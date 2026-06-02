@@ -2443,22 +2443,24 @@ class _AboutPanelState extends State<_AboutPanel> {
 
     try {
       final updateService = _updateService;
-      final updateInfo = await updateService.checkForUpdate(_currentVersion);
+      final result = await updateService.checkForUpdate(_currentVersion);
 
       if (!mounted) return;
       setState(() {
         _isChecking = false;
-        if (updateInfo != null) {
+        if (result.hasUpdate) {
           _updateMessage = l10n.getp(
             'publish_current_new_version_v_version_2',
-            {'version': updateInfo.version},
+            {'version': result.updateInfo!.version},
           );
+        } else if (result.isError) {
+          _updateMessage = l10n.get('inspect_check_update_fail');
         } else {
           _updateMessage = l10n.get('already_is_most_new_version');
         }
       });
-      if (updateInfo != null) {
-        _showUpdateDialog(updateInfo);
+      if (result.hasUpdate) {
+        _showUpdateDialog(result.updateInfo!);
       }
     } catch (e) {
       if (mounted) {

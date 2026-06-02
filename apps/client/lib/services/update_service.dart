@@ -74,6 +74,25 @@ class PlatformUpdate {
   }
 }
 
+/// 更新检查结果
+class CheckUpdateResult {
+  final UpdateInfo? updateInfo;
+  final bool isError;
+
+  const CheckUpdateResult._(this.updateInfo, this.isError);
+
+  /// 发现新版本
+  const CheckUpdateResult.hasUpdate(UpdateInfo info) : this._(info, false);
+
+  /// 已是最新版本
+  const CheckUpdateResult.noUpdate() : this._(null, false);
+
+  /// 检查失败（网络等原因）
+  const CheckUpdateResult.error() : this._(null, true);
+
+  bool get hasUpdate => updateInfo != null;
+}
+
 /// 下载结果
 enum DownloadResult {
   /// 下载成功
@@ -143,14 +162,14 @@ class UpdateService {
   static const defaultMirrorPrefix = 'https://ghproxy.com';
 
   /// 检查是否有新版本
-  Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
+  Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
       final response = await http
           .get(Uri.parse(updateManifestUrl))
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         debugPrint('Failed to check update: ${response.statusCode}');
-        return null;
+        return const CheckUpdateResult.error();
       }
 
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -163,13 +182,13 @@ class UpdateService {
         localVersion: currentVersion.version,
         localBuildNumber: currentVersion.buildNumber,
       )) {
-        return UpdateInfo.fromJson(data);
+        return CheckUpdateResult.hasUpdate(UpdateInfo.fromJson(data));
       }
 
-      return null;
+      return const CheckUpdateResult.noUpdate();
     } catch (e) {
       debugPrint('Check update error: $e');
-      return null;
+      return const CheckUpdateResult.error();
     }
   }
 

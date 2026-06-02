@@ -33,7 +33,7 @@ EOF
 cat > "$WEB_DIR/version.json" << EOF
 {
   "version": "$VERSION",
-  "buildNumber": "$BUILD",
+  "build_number": "$BUILD",
   "releaseDate": "$(date -u +%Y-%m-%d)"
 }
 EOF
