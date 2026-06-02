@@ -349,19 +349,11 @@ jobs:
         env:
           MINIMUM_REQUIRED_VERSION: ${{ vars.MINIMUM_REQUIRED_VERSION }}
           RELEASE_NOTES: ${{ steps.notes.outputs.release_notes }}
-          GITEE_OWNER: ${{ vars.GITEE_OWNER || 'nontracey' }}
-          GITEE_REPO: ${{ vars.GITEE_REPO || 'mianshi-zhilian-app' }}
       - run: scripts/verify_release_assets.sh release-assets
       - name: Upload update manifest to release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/update.json
-      - name: Sync assets to Gitee release
-        run: scripts/sync_gitee_release.sh release-assets "${GITHUB_REF_NAME}" release_notes.md
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: ${{ vars.GITEE_OWNER || 'nontracey' }}
-          GITEE_REPO: ${{ vars.GITEE_REPO || 'mianshi-zhilian-app' }}
       - name: Publish release as latest
         env:
           GH_TOKEN: ${{ github.token }}

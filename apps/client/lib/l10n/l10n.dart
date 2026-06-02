@@ -1379,6 +1379,14 @@ class L10n {
     'lock': '锁',
     'tree': '树',
     'graph': '图',
+    'github_mirror_config': 'GitHub 镜像站',
+    'github_mirror_config_desc': '默认从 GitHub 下载更新，如无法访问可配置镜像站加速。留空则使用内置备用镜像。',
+    'custom_mirror_prefix': '自定义镜像站前缀',
+    'mirror_download_order': '下载顺序：GitHub 官方 → 自定义镜像 → ghproxy.com 备用镜像',
+    'download_fail_network_error_please_check_network_and_retry':
+        '下载失败，网络无法连接。请检查网络或配置 GitHub 镜像站后重试。',
+    'download_settings': '下载设置',
+    'downloading_from_source_2': '正在从 {source} 下载',
   };
 
   static const _en = {
@@ -2906,6 +2914,16 @@ class L10n {
     'lock': 'Lock',
     'tree': 'Tree',
     'graph': 'Graph',
+    'github_mirror_config': 'GitHub Mirror',
+    'github_mirror_config_desc':
+        'Updates are downloaded from GitHub by default. If inaccessible, configure a mirror to accelerate. Leave empty to use built-in fallback mirror.',
+    'custom_mirror_prefix': 'Custom mirror prefix',
+    'mirror_download_order':
+        'Download order: GitHub → Custom mirror → ghproxy.com fallback',
+    'download_fail_network_error_please_check_network_and_retry':
+        'Download failed due to network issues. Please check your network or configure a GitHub mirror and retry.',
+    'download_settings': 'Download Settings',
+    'downloading_from_source_2': 'Downloading from {source}',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {

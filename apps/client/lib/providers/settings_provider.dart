@@ -120,6 +120,15 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 设置自定义 GitHub 镜像站前缀（传空字符串恢复默认）
+  Future<void> setCustomGithubMirror(String? url) async {
+    _settings = _settings.copyWith(
+      customGithubMirror: (url != null && url.isEmpty) ? null : url,
+    );
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   // Convenience aliases used by profile page
   Future<void> updateThemeMode(ThemeMode mode) async => setThemeMode(mode);
   Future<void> updatePrimaryColor(Color color) async => setPrimaryColor(color);

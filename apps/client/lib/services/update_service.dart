@@ -74,8 +74,28 @@ class PlatformUpdate {
   }
 }
 
+/// 下载结果
+enum DownloadResult {
+  /// 下载成功
+  success,
+
+  /// 下载失败 — 网络原因
+  networkError,
+
+  /// 下载失败 — 校验不通过
+  verificationFailed,
+
+  /// 下载被取消
+  cancelled,
+}
+
 /// 下载进度回调
-typedef DownloadProgressCallback = void Function(int received, int total);
+/// [received] 已下载字节数, [total] 总字节数, [sourceLabel] 当前下载源描述
+typedef DownloadProgressCallback = void Function(
+  int received,
+  int total,
+  String sourceLabel,
+);
 
 class DownloadCancelToken {
   bool _isCancelled = false;
@@ -106,13 +126,21 @@ class DownloadCancelToken {
 class UpdateService {
   final String updateManifestUrl;
 
+  /// 用户自定义的 GitHub 镜像站前缀（如 https://mirror.example.com）
+  /// 如果设置了，下载时会优先插入自定义镜像到 mirrors 列表头部
+  final String? customMirrorPrefix;
+
   UpdateService({
     this.updateManifestUrl = const String.fromEnvironment(
       'UPDATE_MANIFEST_URL',
       defaultValue:
           'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
     ),
+    this.customMirrorPrefix,
   });
+
+  /// 默认备用镜像站
+  static const defaultMirrorPrefix = 'https://ghproxy.com';
 
   /// 检查是否有新版本
   Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
@@ -176,20 +204,75 @@ class UpdateService {
     return null;
   }
 
+  /// 根据 URL 生成用户可读的下载源描述
+  String _sourceLabelFromUrl(String url) {
+    if (url.contains('github.com')) return 'GitHub';
+    if (url.contains('ghproxy.com')) return 'ghproxy.com';
+    if (customMirrorPrefix != null && url.startsWith(customMirrorPrefix!)) {
+      // 从自定义镜像 URL 中提取域名
+      try {
+        final uri = Uri.parse(url);
+        return uri.host;
+      } catch (_) {
+        return customMirrorPrefix!;
+      }
+    }
+    // 其他镜像：提取域名
+    try {
+      final uri = Uri.parse(url);
+      return uri.host;
+    } catch (_) {
+      return url.substring(0, url.length.clamp(0, 30));
+    }
+  }
+
+  /// 构建下载 URL 列表：GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
+    final urls = <String>[];
+
+    // 1. 默认：GitHub 官方下载
+    if (platformUpdate.url.trim().isNotEmpty) {
+      urls.add(platformUpdate.url);
+    }
+
+    // 2. 用户自定义镜像站（设置中配置的）
+    if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
+      final mirrorUrl =
+          '${customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '')}/${platformUpdate.url}';
+      if (!urls.contains(mirrorUrl)) {
+        urls.add(mirrorUrl);
+      }
+    }
+
+    // 3. ghproxy.com 默认备用镜像
+    final ghproxyUrl = '$defaultMirrorPrefix/${platformUpdate.url}';
+    if (!urls.contains(ghproxyUrl)) {
+      urls.add(ghproxyUrl);
+    }
+
+    // 4. manifest 中的其他镜像
+    for (final mirror in platformUpdate.mirrors) {
+      if (mirror.trim().isNotEmpty && !urls.contains(mirror)) {
+        urls.add(mirror);
+      }
+    }
+
+    return urls;
+  }
+
   /// 下载更新文件
-  /// 返回下载文件的路径，失败返回 null
-  Future<String?> downloadUpdate({
+  /// 返回 (文件路径, 下载结果)，失败时路径为 null
+  Future<(String?, DownloadResult)> downloadUpdate({
     required PlatformUpdate platformUpdate,
     required String version,
     DownloadProgressCallback? onProgress,
     DownloadCancelToken? cancelToken,
   }) async {
-    final urls = [
-      platformUpdate.url,
-      ...platformUpdate.mirrors,
-    ].where((url) => url.trim().isNotEmpty).toList();
+    final urls = _buildDownloadUrls(platformUpdate);
 
-    if (urls.isEmpty) return null;
+    if (urls.isEmpty) {
+      return (null, DownloadResult.networkError);
+    }
 
     // 获取临时目录
     final tempDir = await getTemporaryDirectory();
@@ -197,24 +280,40 @@ class UpdateService {
     final filePath = '${tempDir.path}/$fileName';
 
     for (final url in urls) {
-      if (cancelToken?.isCancelled ?? false) return null;
-      final downloaded = await _downloadFromUrl(
+      if (cancelToken?.isCancelled ?? false) {
+        return (null, DownloadResult.cancelled);
+      }
+      final sourceLabel = _sourceLabelFromUrl(url);
+      final result = await _downloadFromUrl(
         url: url,
         filePath: filePath,
         platformUpdate: platformUpdate,
+        sourceLabel: sourceLabel,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
-      if (downloaded) return filePath;
+      switch (result) {
+        case _DownloadStatus.success:
+          return (filePath, DownloadResult.success);
+        case _DownloadStatus.cancelled:
+          return (null, DownloadResult.cancelled);
+        case _DownloadStatus.verificationFailed:
+          // 校验失败不重试其他镜像（文件内容可能不同）
+          return (null, DownloadResult.verificationFailed);
+        case _DownloadStatus.networkError:
+          continue;
+      }
     }
 
-    return null;
+    // 所有源都失败
+    return (null, DownloadResult.networkError);
   }
 
-  Future<bool> _downloadFromUrl({
+  Future<_DownloadStatus> _downloadFromUrl({
     required String url,
     required String filePath,
     required PlatformUpdate platformUpdate,
+    String sourceLabel = '',
     DownloadProgressCallback? onProgress,
     DownloadCancelToken? cancelToken,
   }) async {
@@ -234,8 +333,8 @@ class UpdateService {
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
-        debugPrint('Download failed: ${response.statusCode}');
-        return false;
+        debugPrint('Download failed from $url: ${response.statusCode}');
+        return _DownloadStatus.networkError;
       }
 
       sink = file.openWrite();
@@ -260,7 +359,7 @@ class UpdateService {
             }
             sink!.add(chunk);
             received += chunk.length;
-            onProgress?.call(received, total);
+            onProgress?.call(received, total, sourceLabel);
           })
           .timeout(const Duration(minutes: 20));
 
@@ -270,21 +369,30 @@ class UpdateService {
       // 校验 sha256
       final isValid = await verifySha256(filePath, platformUpdate.sha256);
       if (!isValid) {
-        debugPrint('SHA256 verification failed');
+        debugPrint('SHA256 verification failed for $url');
         await file.delete();
-        return false;
+        return _DownloadStatus.verificationFailed;
       }
 
-      return true;
-    } catch (e) {
-      debugPrint('Download error: $e');
+      return _DownloadStatus.success;
+    } on StateError catch (e) {
+      debugPrint('Download cancelled: $e');
       try {
         await sink?.close();
       } catch (_) {}
       if (await file.exists()) {
         await file.delete();
       }
-      return false;
+      return _DownloadStatus.cancelled;
+    } catch (e) {
+      debugPrint('Download error from $url: $e');
+      try {
+        await sink?.close();
+      } catch (_) {}
+      if (await file.exists()) {
+        await file.delete();
+      }
+      return _DownloadStatus.networkError;
     } finally {
       cancelToken?._unbind(client);
       client.close();
@@ -378,4 +486,12 @@ class UpdateService {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
   }
+}
+
+/// 下载状态内部枚举
+enum _DownloadStatus {
+  success,
+  networkError,
+  verificationFailed,
+  cancelled,
 }

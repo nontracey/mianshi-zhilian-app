@@ -119,6 +119,9 @@ class AppSettings {
   final String? customTestContentUrl;
   final String? customProdContentUrl;
 
+  // 更新下载配置
+  final String? customGithubMirror;
+
   const AppSettings({
     this.themeType = AppThemeType.system,
     this.primaryColor = const Color(0xFF1A2B4A),
@@ -146,6 +149,7 @@ class AppSettings {
     this.contentEnv = ContentEnv.production,
     this.customTestContentUrl,
     this.customProdContentUrl,
+    this.customGithubMirror,
   });
 
   /// 默认 Worker API 基地址
@@ -212,6 +216,7 @@ class AppSettings {
     ContentEnv? contentEnv,
     Object? customTestContentUrl = _unset,
     Object? customProdContentUrl = _unset,
+    Object? customGithubMirror = _unset,
   }) => AppSettings(
     themeType: themeType ?? this.themeType,
     primaryColor: primaryColor ?? this.primaryColor,
@@ -249,6 +254,9 @@ class AppSettings {
     customProdContentUrl: customProdContentUrl == _unset
         ? this.customProdContentUrl
         : customProdContentUrl as String?,
+    customGithubMirror: customGithubMirror == _unset
+        ? this.customGithubMirror
+        : customGithubMirror as String?,
   );
 
   /// 获取 ThemeMode（兼容旧代码）
@@ -319,6 +327,7 @@ class AppSettings {
     ),
     customTestContentUrl: json['customTestContentUrl'] as String?,
     customProdContentUrl: json['customProdContentUrl'] as String?,
+    customGithubMirror: json['customGithubMirror'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -348,5 +357,6 @@ class AppSettings {
     'contentEnv': contentEnv.key,
     'customTestContentUrl': customTestContentUrl,
     'customProdContentUrl': customProdContentUrl,
+    'customGithubMirror': customGithubMirror,
   };
 }

@@ -861,5 +861,12 @@
   "高低": "9ad8_4f4e",
   "高可用": "ha",
   "高可用方案": "ha_solution",
-  "高并发": "9ad8_concurrent"
+  "高并发": "9ad8_concurrent",
+  "GitHub 镜像站": "github_mirror_config",
+  "默认从 GitHub 下载更新_如无法访问可配置镜像站加速_留空则使用内置备用镜像": "github_mirror_config_desc",
+  "自定义镜像站前缀": "custom_mirror_prefix",
+  "下载顺序_GitHub 官方_自定义镜像_ghproxy_com 备用镜像": "mirror_download_order",
+  "下载失败_网络无法连接_请检查网络或配置 GitHub 镜像站后重试": "download_fail_network_error_please_check_network_and_retry",
+  "下载设置": "download_settings",
+  "正在从_source_下载": "downloading_from_source_2"
 }

@@ -2369,6 +2369,12 @@ class _AboutPanelState extends State<_AboutPanel> {
   StateSetter? _currentSetDialogState;
   AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
 
+  /// 统一获取 UpdateService 实例（避免重复创建导致设置不一致）
+  UpdateService get _updateService {
+    final settings = context.read<SettingsProvider>().settings;
+    return UpdateService(customMirrorPrefix: settings.customGithubMirror);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2392,7 +2398,7 @@ class _AboutPanelState extends State<_AboutPanel> {
     });
 
     try {
-      final updateService = UpdateService();
+      final updateService = _updateService;
       final updateInfo = await updateService.checkForUpdate(_currentVersion);
 
       if (!mounted) return;
@@ -2422,7 +2428,7 @@ class _AboutPanelState extends State<_AboutPanel> {
 
   void _showUpdateDialog(UpdateInfo updateInfo) {
     final l10n = context.read<LocalizationProvider>();
-    final updateService = UpdateService();
+    final updateService = _updateService;
     final isRequiredUpdate = updateService.isRequiredUpdate(
       updateInfo,
       _currentVersion,
@@ -2489,7 +2495,7 @@ class _AboutPanelState extends State<_AboutPanel> {
 
   Future<void> _downloadUpdate(UpdateInfo updateInfo) async {
     final l10n = context.read<LocalizationProvider>();
-    final updateService = UpdateService();
+    final updateService = _updateService;
 
     // Web 端提示刷新
     if (kIsWeb) {
@@ -2521,6 +2527,7 @@ class _AboutPanelState extends State<_AboutPanel> {
     // 显示下载进度
     int received = 0;
     int total = platformUpdate.size;
+    String currentSource = '';
     bool dialogOpen = true;
     final cancelToken = DownloadCancelToken();
 
@@ -2559,6 +2566,18 @@ class _AboutPanelState extends State<_AboutPanel> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                if (currentSource.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.getp('downloading_from_source_2', {
+                      'source': currentSource,
+                    }),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -2576,13 +2595,14 @@ class _AboutPanelState extends State<_AboutPanel> {
     ).then((_) => dialogOpen = false);
 
     // 实际下载和校验
-    final filePath = await updateService.downloadUpdate(
+    final (filePath, downloadResult) = await updateService.downloadUpdate(
       platformUpdate: platformUpdate,
       version: updateInfo.version,
       cancelToken: cancelToken,
-      onProgress: (r, t) {
+      onProgress: (r, t, source) {
         received = r;
         total = t;
+        currentSource = source;
         if (mounted && dialogOpen) {
           _currentSetDialogState?.call(() {});
         }
@@ -2607,13 +2627,26 @@ class _AboutPanelState extends State<_AboutPanel> {
         if (!mounted) return;
         _showInstallGuide(filePath, updateInfo.version);
       } else {
+        // 根据下载失败原因显示不同提示
+        final String errorMessage;
+        switch (downloadResult) {
+          case DownloadResult.networkError:
+            errorMessage = l10n.get(
+              'download_fail_network_error_please_check_network_and_retry',
+            );
+          case DownloadResult.verificationFailed:
+            errorMessage = l10n.get(
+              'download_fail_or_school_verify_not_open_pass_please_retry',
+            );
+          case DownloadResult.cancelled:
+            return;
+          case DownloadResult.success:
+            errorMessage = '';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              l10n.get(
-                'download_fail_or_school_verify_not_open_pass_please_retry',
-              ),
-            ),
+            content: Text(errorMessage),
+            backgroundColor: AppColors.danger,
           ),
         );
       }
@@ -2721,15 +2754,28 @@ class _AboutPanelState extends State<_AboutPanel> {
             'cloud_sync_fail_not_will_block_break_study_local_matter_condition',
           ),
         ),
-        InkWell(
-          onTap: _isChecking ? null : _checkUpdate,
-          child: InfoRow(
-            icon: Icons.system_update_alt_outlined,
-            title: l10n.get('inspect_check_update'),
-            subtitle:
-                _updateMessage ??
-                l10n.get('point_hit_inspect_check_is_or_has_new_version'),
-          ),
+        // 检查更新 + 下载设置入口
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: _isChecking ? null : _checkUpdate,
+                child: InfoRow(
+                  icon: Icons.system_update_alt_outlined,
+                  title: l10n.get('inspect_check_update'),
+                  subtitle:
+                      _updateMessage ??
+                      l10n.get('point_hit_inspect_check_is_or_has_new_version'),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, size: 20),
+              tooltip: l10n.get('download_settings'),
+              onPressed: () => _showMirrorConfigDialog(context),
+            ),
+          ],
         ),
         if (_isChecking)
           const Padding(
@@ -2738,6 +2784,88 @@ class _AboutPanelState extends State<_AboutPanel> {
           ),
       ],
     );
+  }
+
+  /// 显示下载设置弹窗（自定义镜像站配置）
+  void _showMirrorConfigDialog(BuildContext context) {
+    final l10n = context.read<LocalizationProvider>();
+    final settings = context.read<SettingsProvider>().settings;
+    final controller = TextEditingController(
+      text: settings.customGithubMirror ?? '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final hasCustom = controller.text.isNotEmpty;
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.settings_outlined, size: 20),
+                const SizedBox(width: 8),
+                Text(l10n.get('download_settings')),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.get('github_mirror_config_desc'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('custom_mirror_prefix'),
+                    hintText: 'https://ghproxy.com',
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                    suffixIcon: hasCustom
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              controller.clear();
+                              context
+                                  .read<SettingsProvider>()
+                                  .setCustomGithubMirror(null);
+                              setDialogState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (value) {
+                    context
+                        .read<SettingsProvider>()
+                        .setCustomGithubMirror(value.isEmpty ? null : value.trim());
+                    setDialogState(() {});
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.get('mirror_download_order'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(l10n.get('known_channel')),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => controller.dispose());
   }
 }
 

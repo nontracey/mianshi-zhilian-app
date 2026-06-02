@@ -29,9 +29,8 @@ void main(List<String> args) {
       .environment['MINIMUM_REQUIRED_VERSION']
       ?.trim();
   final notesEnv = Platform.environment['RELEASE_NOTES']?.trim();
-  final giteeOwner = Platform.environment['GITEE_OWNER']?.trim();
-  final giteeRepo = Platform.environment['GITEE_REPO']?.trim();
-  final giteeReleaseBaseUrl = Platform.environment['GITEE_RELEASE_BASE_URL']
+  // GitHub 镜像站前缀（用于生成备用下载链接）
+  final ghMirrorPrefix = Platform.environment['GH_MIRROR_PREFIX']
       ?.trim();
 
   // 从 pubspec.yaml 读取 buildNumber
@@ -75,21 +74,18 @@ void main(List<String> args) {
       };
     }
     final name = file.uri.pathSegments.last;
+    final githubUrl =
+        'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
     final mirrors = <String>[];
-    if (giteeOwner != null &&
-        giteeOwner.isNotEmpty &&
-        giteeRepo != null &&
-        giteeRepo.isNotEmpty) {
-      final baseUrl =
-          giteeReleaseBaseUrl != null && giteeReleaseBaseUrl.isNotEmpty
-          ? giteeReleaseBaseUrl
-          : 'https://gitee.com/$giteeOwner/$giteeRepo/releases/download';
-      mirrors.add('$baseUrl/$tag/$name');
+    // 备用镜像：ghproxy.com 加速
+    mirrors.add('https://ghproxy.com/$githubUrl');
+    // 自定义镜像站前缀（CI 环境变量 GH_MIRROR_PREFIX 可覆盖默认镜像）
+    if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
+      mirrors.add('$ghMirrorPrefix/$githubUrl');
     }
     return {
-      'url':
-          'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name',
-      if (mirrors.isNotEmpty) 'mirrors': mirrors,
+      'url': githubUrl,
+      'mirrors': mirrors,
       'sha256': sha256sum(file),
       'size': file.lengthSync(),
     };
