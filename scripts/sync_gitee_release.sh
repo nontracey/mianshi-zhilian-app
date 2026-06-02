@@ -18,6 +18,7 @@ fi
 owner="${GITEE_OWNER:-nontracey}"
 repo="${GITEE_REPO:-mianshi-zhilian-app}"
 api_base="${GITEE_API_BASE_URL:-https://gitee.com/api/v5}"
+target_commitish="${GITEE_TARGET_COMMITISH:-master}"
 
 if [ ! -d "$asset_dir" ]; then
   echo "Asset directory not found: $asset_dir" >&2
@@ -58,6 +59,7 @@ if [ "$status" = "404" ] || [ -z "$release_id" ]; then
       --data-urlencode "access_token=$GITEE_TOKEN" \
       --data-urlencode "tag_name=$tag" \
       --data-urlencode "name=$tag" \
+      --data-urlencode "target_commitish=$target_commitish" \
       --data-urlencode "body=$body"
   )"
 fi
