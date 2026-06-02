@@ -188,6 +188,9 @@ class StorageService {
           if (key == 'auth_token') {
             exportData['data'][key] = '[redacted]';
           }
+          if (key == 'auth_refresh_token') {
+            exportData['data'][key] = '[redacted]';
+          }
           if (key == 'auth_user') {
             exportData['data'][key] = '[redacted]';
           }

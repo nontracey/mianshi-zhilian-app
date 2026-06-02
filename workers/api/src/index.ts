@@ -37,6 +37,16 @@ export default {
       return handleLogin(request, env);
     }
 
+    // 刷新登录态
+    if (url.pathname === '/auth/refresh' && request.method === 'POST') {
+      return handleRefreshToken(request, env);
+    }
+
+    // 退出登录
+    if (url.pathname === '/auth/logout' && request.method === 'POST') {
+      return handleLogout(request, env);
+    }
+
     // 获取用户信息（需要认证）
     if (url.pathname === '/auth/me' && request.method === 'GET') {
       return handleGetMe(request, env);
@@ -163,12 +173,16 @@ async function legacyHash(password: string): Promise<string> {
   return toHex(hash);
 }
 
+const ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60; // 24 小时
+const REFRESH_TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 天未使用需重新登录
+const REFRESH_TOKEN_BYTES = 32;
+
 // 生成简单的 JWT token
 async function generateToken(userId: string, secret: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const payload = {
     userId,
-    exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 天过期
+    exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SECONDS,
   };
 
   const headerBase64 = btoa(JSON.stringify(header)).replace(/=/g, '');
@@ -190,6 +204,45 @@ async function generateToken(userId: string, secret: string): Promise<string> {
     .replace(/=/g, '');
 
   return `${message}.${signatureBase64}`;
+}
+
+function generateOpaqueToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(REFRESH_TOKEN_BYTES));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+async function hashRefreshToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const hash = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  return toHex(hash);
+}
+
+function refreshTokenExpiresAt(): string {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000).toISOString();
+}
+
+async function issueRefreshToken(db: D1Database, userId: string): Promise<string> {
+  const refreshToken = generateOpaqueToken();
+  const tokenHash = await hashRefreshToken(refreshToken);
+  const expiresAt = refreshTokenExpiresAt();
+
+  await db.prepare(`
+    INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
+    VALUES (?, ?, ?, ?)
+  `)
+    .bind(crypto.randomUUID(), userId, tokenHash, expiresAt)
+    .run();
+
+  return refreshToken;
+}
+
+async function issueAuthTokens(db: D1Database, userId: string, secret: string): Promise<{ token: string; refreshToken: string }> {
+  const token = await generateToken(userId, secret);
+  const refreshToken = await issueRefreshToken(db, userId);
+  return { token, refreshToken };
 }
 
 // 验证 JWT token
@@ -244,6 +297,19 @@ async function initDatabase(db: D1Database): Promise<void> {
       last_login_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token_hash TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_used_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
   `);
 }
 
@@ -290,12 +356,13 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       .run();
 
     // 生成 token
-    const token = await generateToken(userId, env.JWT_SECRET);
+    const { token, refreshToken } = await issueAuthTokens(env.DB, userId, env.JWT_SECRET);
 
     return json({
       success: true,
       user: { id: userId, username, nickname: finalNickname },
       token,
+      refreshToken,
     });
   } catch (e) {
     console.error('Register error:', e);
@@ -347,16 +414,99 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       .run();
 
     // 生成 token
-    const token = await generateToken(user.id, env.JWT_SECRET);
+    const { token, refreshToken } = await issueAuthTokens(env.DB, user.id, env.JWT_SECRET);
 
     return json({
       success: true,
       user: { id: user.id, username: user.username, nickname: user.nickname },
       token,
+      refreshToken,
     });
   } catch (e) {
     console.error('Login error:', e);
     return json({ error: '登录失败' }, 500);
+  }
+}
+
+// 刷新登录态，成功后轮换 refresh token
+async function handleRefreshToken(request: Request, env: Env): Promise<Response> {
+  try {
+    const body = await request.json() as any;
+    const { refreshToken } = body;
+
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      return json({ error: '缺少 refresh token' }, 400);
+    }
+
+    await initDatabase(env.DB);
+
+    const tokenHash = await hashRefreshToken(refreshToken);
+    const tokenRow = await env.DB.prepare(`
+      SELECT id, user_id, expires_at, revoked_at
+      FROM refresh_tokens
+      WHERE token_hash = ?
+    `)
+      .bind(tokenHash)
+      .first() as any;
+
+    if (!tokenRow || tokenRow.revoked_at || Date.parse(tokenRow.expires_at) <= Date.now()) {
+      return json({ error: '登录已过期，请重新登录' }, 401);
+    }
+
+    const user = await env.DB.prepare(
+      'SELECT id, username, nickname FROM users WHERE id = ?'
+    )
+      .bind(tokenRow.user_id)
+      .first() as any;
+
+    if (!user) {
+      return json({ error: '用户不存在' }, 404);
+    }
+
+    await env.DB.prepare(`
+      UPDATE refresh_tokens
+      SET revoked_at = datetime('now'), last_used_at = datetime('now')
+      WHERE id = ?
+    `)
+      .bind(tokenRow.id)
+      .run();
+
+    const { token, refreshToken: nextRefreshToken } = await issueAuthTokens(env.DB, user.id, env.JWT_SECRET);
+
+    return json({
+      success: true,
+      user: { id: user.id, username: user.username, nickname: user.nickname },
+      token,
+      refreshToken: nextRefreshToken,
+    });
+  } catch (e) {
+    console.error('RefreshToken error:', e);
+    return json({ error: '刷新登录状态失败' }, 500);
+  }
+}
+
+// 退出登录，撤销当前 refresh token
+async function handleLogout(request: Request, env: Env): Promise<Response> {
+  try {
+    const body = await request.json().catch(() => ({})) as any;
+    const { refreshToken } = body;
+
+    if (refreshToken && typeof refreshToken === 'string') {
+      await initDatabase(env.DB);
+      const tokenHash = await hashRefreshToken(refreshToken);
+      await env.DB.prepare(`
+        UPDATE refresh_tokens
+        SET revoked_at = COALESCE(revoked_at, datetime('now'))
+        WHERE token_hash = ?
+      `)
+        .bind(tokenHash)
+        .run();
+    }
+
+    return json({ success: true });
+  } catch (e) {
+    console.error('Logout error:', e);
+    return json({ error: '退出登录失败' }, 500);
   }
 }
 
@@ -425,6 +575,14 @@ async function handleChangePassword(request: Request, env: Env): Promise<Respons
     const newHash = await hashPassword(newPassword);
     await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
       .bind(newHash, userId)
+      .run();
+
+    await env.DB.prepare(`
+      UPDATE refresh_tokens
+      SET revoked_at = COALESCE(revoked_at, datetime('now'))
+      WHERE user_id = ?
+    `)
+      .bind(userId)
       .run();
 
     return json({ success: true, message: '密码修改成功' });

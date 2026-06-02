@@ -19,6 +19,8 @@ class AuthProvider extends ChangeNotifier {
 
   User? _user;
   String? _token;
+  String? _refreshToken;
+  Future<bool>? _refreshFuture;
   bool _isLoading = false;
   String? _error;
 
@@ -38,7 +40,11 @@ class AuthProvider extends ChangeNotifier {
       if (userData != null && userData is Map<String, dynamic>) {
         _user = User.fromJson(userData);
         _token = await _storage.load('auth_token') as String?;
+        _refreshToken = await _storage.load('auth_refresh_token') as String?;
         notifyListeners();
+        if (_refreshToken != null) {
+          await _refreshLogin();
+        }
       }
     } catch (e) {
       debugPrint('Failed to load user: $e');
@@ -71,6 +77,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200 && data['success'] == true) {
         _user = User.fromJson(data['user'] as Map<String, dynamic>);
         _token = data['token'] as String;
+        _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
         _isLoading = false;
         notifyListeners();
@@ -107,6 +114,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200 && data['success'] == true) {
         _user = User.fromJson(data['user'] as Map<String, dynamic>);
         _token = data['token'] as String;
+        _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
         _isLoading = false;
         notifyListeners();
@@ -127,21 +135,126 @@ class AuthProvider extends ChangeNotifier {
 
   /// 退出登录
   Future<void> logout() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken != null) {
+      try {
+        await http.post(
+          Uri.parse('$apiBaseUrl/auth/logout'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({'refreshToken': refreshToken}),
+        );
+      } catch (e) {
+        debugPrint('Logout revoke failed: $e');
+      }
+    }
+
     _user = null;
     _token = null;
+    _refreshToken = null;
     await _storage.save('auth_user', null);
     await _storage.save('auth_token', null);
+    await _storage.save('auth_refresh_token', null);
     notifyListeners();
   }
 
   /// 保存用户信息到本地
   Future<void> _saveUser() async {
-    if (_user != null) {
-      await _storage.save('auth_user', _user!.toJson());
+    await _storage.save('auth_user', _user?.toJson());
+    await _storage.save('auth_token', _token);
+    await _storage.save('auth_refresh_token', _refreshToken);
+  }
+
+  Future<void> _clearSavedUser() async {
+    _user = null;
+    _token = null;
+    _refreshToken = null;
+    await _storage.save('auth_user', null);
+    await _storage.save('auth_token', null);
+    await _storage.save('auth_refresh_token', null);
+    notifyListeners();
+  }
+
+  Future<bool> _refreshLogin() async {
+    final inFlight = _refreshFuture;
+    if (inFlight != null) return inFlight;
+
+    final refreshFuture = _doRefreshLogin();
+    _refreshFuture = refreshFuture;
+    try {
+      return await refreshFuture;
+    } finally {
+      _refreshFuture = null;
     }
-    if (_token != null) {
-      await _storage.save('auth_token', _token);
+  }
+
+  Future<bool> _doRefreshLogin() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refreshToken': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          _user = User.fromJson(data['user'] as Map<String, dynamic>);
+          _token = data['token'] as String;
+          _refreshToken = data['refreshToken'] as String?;
+          await _saveUser();
+          notifyListeners();
+          return true;
+        }
+      }
+
+      if (response.statusCode == 401) {
+        await _clearSavedUser();
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Refresh login failed: $e');
+      return false;
     }
+  }
+
+  Future<http.Response> _authorizedPost(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    Future<http.Response> send() {
+      return http.post(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: json.encode(body ?? {}),
+      );
+    }
+
+    var response = await send();
+    if (response.statusCode == 401 && await _refreshLogin()) {
+      response = await send();
+    }
+    return response;
+  }
+
+  Future<http.Response> _authorizedGet(String path) async {
+    Future<http.Response> send() {
+      return http.get(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+    }
+
+    var response = await send();
+    if (response.statusCode == 401 && await _refreshLogin()) {
+      response = await send();
+    }
+    return response;
   }
 
   /// 上传学习进度到云端
@@ -152,13 +265,9 @@ class AuthProvider extends ChangeNotifier {
     if (!isLoggedIn) return false;
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/sync/progress'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
-        body: json.encode({'progressMap': progressMap, 'settings': settings}),
+      final response = await _authorizedPost(
+        '/sync/progress',
+        body: {'progressMap': progressMap, 'settings': settings},
       );
 
       return response.statusCode == 200;
@@ -173,10 +282,7 @@ class AuthProvider extends ChangeNotifier {
     if (!isLoggedIn) return null;
 
     try {
-      final response = await http.get(
-        Uri.parse('$apiBaseUrl/sync/progress'),
-        headers: {'Authorization': 'Bearer $_token'},
-      );
+      final response = await _authorizedGet('/sync/progress');
 
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
@@ -200,19 +306,13 @@ class AuthProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/change-password'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
-        body: json.encode({
-          'oldPassword': oldPassword,
-          'newPassword': newPassword,
-        }),
+      final response = await _authorizedPost(
+        '/auth/change-password',
+        body: {'oldPassword': oldPassword, 'newPassword': newPassword},
       );
 
       if (response.statusCode == 200) {
+        await _clearSavedUser();
         return true;
       } else {
         final data = json.decode(response.body);
