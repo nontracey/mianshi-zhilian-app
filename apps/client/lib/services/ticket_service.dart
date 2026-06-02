@@ -45,6 +45,7 @@ class TicketService {
           'account_username': _sanitize(subject),
           'contact': _sanitize(contact ?? ''),
           'description': _sanitize(description),
+          'image_urls': imageUrls,
         }),
       );
       if (response.statusCode == 200) {

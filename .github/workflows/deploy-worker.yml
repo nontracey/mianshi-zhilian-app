@@ -28,6 +28,19 @@ jobs:
           sed -i "s/PLACEHOLDER_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/"
           wrangler.toml
 
+      - name: Inject R2 bucket name
+        run: >
+          sed -i "s/PLACEHOLDER_R2_BUCKET_NAME/${{ vars.R2_BUCKET_NAME }}/"
+          wrangler.toml
+
+      - name: Inject R2 public base URL
+        run: |
+          sed -i "s|PLACEHOLDER_R2_PUBLIC_BASE_URL|${{ vars.R2_PUBLIC_BASE_URL }}|" wrangler.toml
+          grep -q "PLACEHOLDER_" wrangler.toml && {
+            echo "::error::wrangler.toml still has unresolved PLACEHOLDER_ after injection"
+            exit 1
+          }
+
       - name: Put JWT secret
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}

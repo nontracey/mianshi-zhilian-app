@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
+import 'submit_ticket_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.onLoginSuccess});
@@ -222,7 +223,13 @@ class _LoginPageState extends State<LoginPage> {
                       if (!_isRegister) ...[
                         TextButton(
                           onPressed: () {
-                            // TODO: 跳转到忘记密码页面
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SubmitTicketPage(
+                                  type: 'password_reset',
+                                ),
+                              ),
+                            );
                           },
                           child: Text(l10n.get('forgot_password_q')),
                         ),

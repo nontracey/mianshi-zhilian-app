@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/ticket_service.dart';
+import 'package:mianshi_zhilian/services/upload_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -18,13 +22,20 @@ class SubmitTicketPage extends StatefulWidget {
   State<SubmitTicketPage> createState() => _SubmitTicketPageState();
 }
 
+class _PendingImage {
+  _PendingImage({required this.bytes});
+  final Uint8List bytes;
+  String? uploadedUrl; // 提交时上传 R2 后填入
+}
+
 class _SubmitTicketPageState extends State<SubmitTicketPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _contactController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final List<String> _imageUrls = [];
+  final List<_PendingImage> _images = [];
+  final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
 
   bool get _isPasswordReset => widget.type == 'password_reset';
@@ -38,12 +49,34 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
     super.dispose();
   }
 
-  // 防注入：清理输入
   String _sanitize(String input) {
     return input
         .replaceAll(RegExp(r'<script[^>]*>.*?</script>'), '')
         .replaceAll(RegExp(r'<[^>]*>'), '')
         .trim();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _images.add(_PendingImage(bytes: bytes));
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.get('submit_failed')}: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -53,17 +86,48 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
 
     try {
       final auth = context.read<AuthProvider>();
+      final storage = StorageService();
+      final uploadService = UploadService(
+        storage: storage,
+        getApiUrl: () => auth.apiBaseUrl,
+      );
       final ticketService = TicketService(
-        storage: StorageService(),
+        storage: storage,
         getApiUrl: () => auth.apiBaseUrl,
         getToken: () => auth.token,
       );
+
+      // 1. 上传所有图片到 R2（不阻塞 UI 反馈）
+      final r2Urls = <String>[];
+      for (var i = 0; i < _images.length; i++) {
+        final img = _images[i];
+        if (img.uploadedUrl != null) {
+          r2Urls.add(img.uploadedUrl!);
+          continue;
+        }
+        try {
+          final url = await uploadService.uploadImage(
+            bytes: img.bytes,
+          );
+          img.uploadedUrl = url;
+          r2Urls.add(url);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${l10n.get('submit_failed')}: $e')),
+            );
+          }
+          return; // 任一图上传失败，整体取消提交
+        }
+      }
+
+      // 2. 提交工单（只发 R2 URL，不带 base64）
       await ticketService.submitTicket(
         type: widget.type,
         subject: _sanitize(_subjectController.text),
         contact: _sanitize(_contactController.text),
         description: _sanitize(_descriptionController.text),
-        imageUrls: _imageUrls,
+        imageUrls: r2Urls,
       );
 
       if (mounted) {
@@ -104,7 +168,6 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // 提示信息
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -131,7 +194,6 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
             ),
             const SizedBox(height: 20),
 
-            // 主题
             TextFormField(
               controller: _subjectController,
               decoration: InputDecoration(
@@ -164,7 +226,6 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
               const SizedBox(height: 16),
             ],
 
-            // 详细描述
             TextFormField(
               controller: _descriptionController,
               maxLines: 6,
@@ -186,7 +247,6 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
             ),
             const SizedBox(height: 16),
 
-            // 上传图片
             Text(
               l10n.get('upload_images_max5'),
               style: TextStyle(
@@ -199,7 +259,8 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                ..._imageUrls.asMap().entries.map((entry) {
+                ..._images.asMap().entries.map((entry) {
+                  final img = entry.value;
                   return Stack(
                     children: [
                       Container(
@@ -210,14 +271,31 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
                           border: Border.all(
                             color: isDark ? Colors.white24 : Colors.grey.shade300,
                           ),
+                          image: DecorationImage(
+                            image: MemoryImage(img.bytes),
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                        child: const Icon(Icons.image, size: 32),
+                        child: img.uploadedUrl != null
+                            ? Align(
+                                alignment: Alignment.bottomRight,
+                                child: Container(
+                                  margin: const EdgeInsets.all(2),
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check, size: 10, color: Colors.white),
+                                ),
+                              )
+                            : null,
                       ),
                       Positioned(
                         top: 4,
                         right: 4,
                         child: GestureDetector(
-                          onTap: () => setState(() => _imageUrls.removeAt(entry.key)),
+                          onTap: () => setState(() => _images.removeAt(entry.key)),
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: const BoxDecoration(
@@ -231,12 +309,9 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
                     ],
                   );
                 }),
-                if (_imageUrls.length < 5)
+                if (_images.length < 5)
                   GestureDetector(
-                    onTap: () {
-                      // TODO: 实现图片选择
-                      setState(() => _imageUrls.add('placeholder'));
-                    },
+                    onTap: _pickImage,
                     child: Container(
                       width: 80,
                       height: 80,
@@ -258,7 +333,6 @@ class _SubmitTicketPageState extends State<SubmitTicketPage> {
             ),
             const SizedBox(height: 24),
 
-            // 提交按钮
             FilledButton(
               onPressed: _isSubmitting ? null : _submit,
               child: _isSubmitting

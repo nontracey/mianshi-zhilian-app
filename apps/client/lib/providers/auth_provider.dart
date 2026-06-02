@@ -78,7 +78,6 @@ class AuthProvider extends ChangeNotifier {
         body: json.encode({
           'username': username,
           'password_hash': passwordHash,
-          'password': password, // 临时兼容旧格式，后续移除
           'nickname': nickname,
         }),
       );
@@ -173,7 +172,6 @@ class AuthProvider extends ChangeNotifier {
         body: json.encode({
           'username': username,
           'password_hash': passwordHash,
-          'password': password, // 临时兼容旧格式，后续移除
         }),
       ).timeout(const Duration(seconds: 15));
 

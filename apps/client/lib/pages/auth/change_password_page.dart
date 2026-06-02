@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'submit_ticket_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -166,7 +167,41 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       children: [
                         OutlinedButton.icon(
                           onPressed: () {
-                            // TODO: 验证码重置
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: Text(
+                                  l10n.get('verification_code_reset'),
+                                ),
+                                content: Text(
+                                  l10n.get('bound_account_reset_desc'),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: Text(
+                                      l10n.get('cancel'),
+                                    ),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const SubmitTicketPage(
+                                            type: 'password_reset',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Text(
+                                      l10n.get('submit_ticket'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
                           },
                           icon: const Icon(Icons.sms_outlined, size: 16),
                           label: Text(l10n.get('verification_code_reset')),
@@ -174,7 +209,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         const SizedBox(width: 12),
                         OutlinedButton.icon(
                           onPressed: () {
-                            // 跳转到工单页面
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SubmitTicketPage(
+                                  type: 'password_reset',
+                                ),
+                              ),
+                            );
                           },
                           icon: const Icon(Icons.support_agent, size: 16),
                           label: Text(l10n.get('submit_ticket')),

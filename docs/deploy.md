@@ -71,6 +71,8 @@
 | Variable | 说明 |
 |----------|------|
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账号 ID |
+| `R2_BUCKET_NAME` | Cloudflare R2 桶名（用于工单图片和头像） |
+| `R2_PUBLIC_BASE_URL` | R2 桶的 Public Access URL，形如 `https://pub-xxx.r2.dev/<bucket_name>` |
 
 ### Cloudflare Secrets
 
@@ -101,6 +103,30 @@ npx wrangler d1 create mianshi-zhilian-db --location apac
 # 设置 JWT Secret
 echo "your-secret-key" | npx wrangler secret put JWT_SECRET
 ```
+
+### 创建 R2 桶（工单图片 + 头像）
+
+```bash
+# 创建桶
+npx wrangler r2 bucket create mianshi-zhilian-assets
+
+# 启用 Public Access（让 URL 可以直链访问）：
+#   1. 打开 https://dash.cloudflare.com → R2 → Object Storage
+#   2. 选择 `mianshi-zhilian-assets` → Settings → Public Access
+#   3. 点击 "Allow Access" → 记下 r2.dev 子域名（形如 `pub-xxx.r2.dev`）
+
+# 把你拿到的 r2.dev 子域名填到 GitHub Variables：
+#   R2_BUCKET_NAME = mianshi-zhilian-assets
+#   R2_PUBLIC_BASE_URL = https://pub-xxx.r2.dev/mianshi-zhilian-assets
+```
+
+R2 公共 URL 形如 `https://pub-xxx.r2.dev/<bucket>/<key>`，CI 会拼到 `R2_PUBLIC_BASE_URL`。如果以后要绑自定义域名（如 `cdn.example.com`），把它绑到 R2 bucket 后，把 `R2_PUBLIC_BASE_URL` 改成 `https://cdn.example.com` 即可（不要带 bucket 名前缀）。
+
+### R2 安全约束
+
+- **删除权限隔离**：`DELETE /uploads/avatar` 后端会校验 URL 必须在 `R2_PUBLIC_BASE_URL` 范围内、且 key 必须以 `avatars/{userId}/` 开头，**无法越权删别人头像**
+- **不允许 base64 直传**：`/tickets` 提交时的 `image_urls` 被 `parseImageUrls` 强制要求是 http(s) URL，长度上限约 200KB，**自动拒绝 `data:` URI**
+- **孤儿文件**：上传失败、网络中断可能留下孤儿 R2 对象，**不影响功能**，可以靠生命周期规则或手工清理
 
 ## App Worker 后台能力
 

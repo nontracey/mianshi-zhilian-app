@@ -66,6 +66,25 @@ export default {
       return handleChangePassword(request, env);
     }
 
+    // R2 图片上传 / 删除
+    if (url.pathname === '/uploads/image' && request.method === 'POST') {
+      return handleUploadImage(request, env);
+    }
+    if (url.pathname === '/uploads/avatar' && request.method === 'POST') {
+      return handleUploadAvatar(request, env);
+    }
+    if (url.pathname === '/uploads/avatar' && request.method === 'DELETE') {
+      return handleDeleteAvatar(request, env);
+    }
+
+    // 管理员操作
+    if (url.pathname.startsWith('/admin/users/') && url.pathname.endsWith('/reset-password') && request.method === 'POST') {
+      return handleAdminResetPassword(request, env);
+    }
+    if (url.pathname.startsWith('/admin/tickets/') && request.method === 'DELETE') {
+      return handleAdminDeleteTicket(request, env);
+    }
+
     if (url.pathname === '/tickets' && request.method === 'POST') {
       return handleCreateTicket(request, env);
     }
@@ -673,6 +692,13 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       .bind(username)
       .first() as any;
 
+    // 可选：要求特定角色（studio 复用此端点登录时传 requireRole: 'admin'）
+    const requireRole = typeof body.require_role === 'string' ? body.require_role.toLowerCase() : '';
+    if (requireRole && (!user || user.role !== requireRole)) {
+      // 同样返回"账号或密码错误"，避免暴露用户是否存在
+      return json({ error: '账号或密码错误' }, 401);
+    }
+
     if (!user) {
       return json({ error: '账号或密码错误' }, 401);
     }
@@ -917,28 +943,301 @@ const TICKET_STATUSES = new Set(['pending', 'processing', 'needs_info', 'rejecte
 const ANALYTICS_SECTIONS = new Set(['dashboard', 'catalog', 'practice', 'prep', 'mastery', 'profile']);
 const ANALYTICS_FEATURES = new Set(['ai_eval', 'manual_sync', 'ticket_submit', 'login']);
 
+// 单图最大字节数（200KB）— base64 data URI 提交时也会被拦截，要求先调 /uploads/* 拿 R2 URL
+const MAX_IMAGE_BYTES = 200 * 1024;
+const MAX_TICKET_IMAGES = 5;
+
 function asString(value: unknown, max = 200): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-function parseJsonArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((v) => String(v)).slice(0, 5);
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed.map((v) => String(v)).slice(0, 5) : [];
-    } catch {
-      return [];
-    }
+/**
+ * 把 image_urls 数组规整成 R2 URL 列表：
+ * - 最多 MAX_TICKET_IMAGES 张
+ * - 拒绝 base64 data URI（强制走 R2）
+ * - 单图字节数不超过 MAX_IMAGE_BYTES（通过 URL 长度粗略估算）
+ */
+function parseImageUrls(value: unknown): string[] {
+  const items: string[] = Array.isArray(value)
+    ? value.map((v) => String(v))
+    : typeof value === 'string'
+      ? (() => {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed.map((v) => String(v)) : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+  const out: string[] = [];
+  for (const raw of items) {
+    if (out.length >= MAX_TICKET_IMAGES) break;
+    const v = raw.trim();
+    if (!v) continue;
+    if (v.startsWith('data:')) continue; // 拒绝 base64 data URI
+    if (v.length > MAX_IMAGE_BYTES) continue; // 200KB 字节粗略按 1 字符 ≈ 1 字节估算
+    if (!/^https?:\/\//i.test(v)) continue;
+    out.push(v);
   }
-  return [];
+  return out;
+}
+
+/**
+ * 从 R2 公共 URL 解析出 bucket 内的 key。
+ * 例：https://pub-xxx.r2.dev/mianshi-zhilian-assets/tickets/abc.jpg
+ *   R2_PUBLIC_BASE_URL = "https://pub-xxx.r2.dev/mianshi-zhilian-assets"
+ *   → 返回 "tickets/abc.jpg"
+ * 失败返回 null（外链/非本 bucket 都不允许删）。
+ */
+function r2KeyFromUrl(url: string, publicBaseUrl: string): string | null {
+  try {
+    const u = new URL(url);
+    const base = new URL(publicBaseUrl);
+    if (u.host !== base.host) return null;
+    const prefix = base.pathname.replace(/\/+$/, '') + '/';
+    if (!u.pathname.startsWith(prefix)) return null;
+    const key = u.pathname.slice(prefix.length);
+    if (!key || key.includes('..') || key.startsWith('/')) return null;
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从 data URL 解析 (mime, bytes) — 用于 /uploads/* 接收 base64
+ * 例："data:image/jpeg;base64,XXX" → { mime: 'image/jpeg', bytes: Uint8Array }
+ */
+function parseDataUrl(dataUrl: string): { mime: string; bytes: Uint8Array } | null {
+  const m = /^data:([^;]+);base64,(.+)$/i.exec(dataUrl.trim());
+  if (!m) return null;
+  const mime = m[1].toLowerCase();
+  if (!/^image\/(png|jpe?g|webp|gif)$/.test(mime)) return null;
+  let bin: string;
+  try {
+    bin = atob(m[2]);
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { mime, bytes };
 }
 
 function normalizeTicket(row: any): any {
   return {
     ...row,
-    image_urls: parseJsonArray(row.image_urls),
+    image_urls: parseImageUrls(row.image_urls),
   };
+}
+
+// =====================================================================
+// R2 上传 / 删除
+// =====================================================================
+
+function extFromMime(mime: string): string {
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg';
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/gif') return 'gif';
+  return 'bin';
+}
+
+async function putR2Object(
+  env: Env,
+  key: string,
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await env.ASSETS.put(key, bytes, {
+    httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+  });
+}
+
+async function deleteR2Object(env: Env, key: string): Promise<void> {
+  try {
+    await env.ASSETS.delete(key);
+  } catch (e) {
+    console.error(`R2 delete [${key}] error:`, e);
+  }
+}
+
+function buildR2PublicUrl(env: Env, key: string): string {
+  const base = (env.R2_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+  return `${base}/${key}`;
+}
+
+/**
+ * 公共图片上传：用于工单附图。
+ * 请求体：{ data_url: "data:image/jpeg;base64,..." }
+ * 限制：≤ 200KB；mime 必须是 png/jpg/webp/gif。
+ * 不需要鉴权（工单提交可能发生在未登录用户的密码重置流程）。
+ */
+async function handleUploadImage(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!env.ASSETS || !env.R2_PUBLIC_BASE_URL || env.R2_PUBLIC_BASE_URL.startsWith('PLACEHOLDER')) {
+      return json({ error: '图片上传服务未配置' }, 503);
+    }
+    const body = await request.json() as any;
+    const dataUrl = asString(body.data_url, MAX_IMAGE_BYTES * 2);
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed) return json({ error: '图片格式无效（仅支持 png/jpg/webp/gif）' }, 400);
+    if (parsed.bytes.byteLength > MAX_IMAGE_BYTES) {
+      return json({ error: `图片超过 ${MAX_IMAGE_BYTES / 1024}KB 限制` }, 413);
+    }
+    const ext = extFromMime(parsed.mime);
+    const key = `tickets/${crypto.randomUUID()}.${ext}`;
+    await putR2Object(env, key, parsed.bytes, parsed.mime);
+    return json({ success: true, url: buildR2PublicUrl(env, key), key });
+  } catch (e) {
+    console.error('UploadImage error:', e);
+    return json({ error: '图片上传失败' }, 500);
+  }
+}
+
+/**
+ * 头像上传：需要登录。
+ * 请求体：{ data_url: "data:image/jpeg;base64,..." }
+ * 存储路径：avatars/{userId}/{uuid}.{ext}
+ * 返回：{ url }，调用方应把 url 写回本地 user_profile.avatarUrl。
+ */
+async function handleUploadAvatar(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!env.ASSETS || !env.R2_PUBLIC_BASE_URL || env.R2_PUBLIC_BASE_URL.startsWith('PLACEHOLDER')) {
+      return json({ error: '头像上传服务未配置' }, 503);
+    }
+    const user = await getActiveUserFromRequest(request, env);
+    if (!user) return json({ error: '未登录' }, 401);
+    const body = await request.json() as any;
+    const dataUrl = asString(body.data_url, MAX_IMAGE_BYTES * 2);
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed) return json({ error: '图片格式无效' }, 400);
+    if (parsed.bytes.byteLength > MAX_IMAGE_BYTES) {
+      return json({ error: `图片超过 ${MAX_IMAGE_BYTES / 1024}KB 限制` }, 413);
+    }
+    const ext = extFromMime(parsed.mime);
+    const key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`;
+    await putR2Object(env, key, parsed.bytes, parsed.mime);
+    return json({ success: true, url: buildR2PublicUrl(env, key), key });
+  } catch (e) {
+    console.error('UploadAvatar error:', e);
+    return json({ error: '头像上传失败' }, 500);
+  }
+}
+
+/**
+ * 头像删除：需要登录。
+ * 请求体：{ url: "https://pub-xxx.r2.dev/.../avatars/{userId}/xxx.jpg" }
+ * 安全约束：
+ *   1. URL 必须落在 env.R2_PUBLIC_BASE_URL 范围内（外链不能删）
+ *   2. 解析出的 key 必须以 avatars/{userId}/ 开头（不能删别人的头像）
+ *   3. 失败不抛错（孤儿文件不影响后续同步）
+ */
+async function handleDeleteAvatar(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!env.ASSETS || !env.R2_PUBLIC_BASE_URL || env.R2_PUBLIC_BASE_URL.startsWith('PLACEHOLDER')) {
+      return json({ success: true, skipped: 'not_configured' });
+    }
+    const user = await getActiveUserFromRequest(request, env);
+    if (!user) return json({ error: '未登录' }, 401);
+    const body = await request.json().catch(() => ({})) as any;
+    const url = asString(body.url, 1024);
+    if (!url) return json({ success: true, skipped: 'empty' });
+    const key = r2KeyFromUrl(url, env.R2_PUBLIC_BASE_URL);
+    if (!key) return json({ success: true, skipped: 'external_url' });
+    // 只允许删自己的头像
+    if (!key.startsWith(`avatars/${user.id}/`)) {
+      return json({ error: '无权删除该对象' }, 403);
+    }
+    await deleteR2Object(env, key);
+    return json({ success: true, key });
+  } catch (e) {
+    console.error('DeleteAvatar error:', e);
+    // 孤儿文件删除失败不应阻断 — 返回 success 让客户端继续
+    return json({ success: true, error: 'delete_failed' });
+  }
+}
+
+// =====================================================================
+// 管理员操作（共享给 app 后台和 studio）
+// =====================================================================
+
+async function requireAdmin(request: Request, env: Env): Promise<{ id: string; role: string } | Response> {
+  const user = await getActiveUserFromRequest(request, env);
+  if (!user) return json({ error: '未登录或 token 已过期' }, 401);
+  if (user.role !== 'admin') return json({ error: '需要管理员权限' }, 403);
+  return user;
+}
+
+/**
+ * Admin 重置用户密码（无原密码，仅管理员可调）。
+ * POST /admin/users/:id/reset-password  body: { new_password }
+ * 哈希到新格式并撤销该用户所有 refresh token。
+ */
+async function handleAdminResetPassword(request: Request, env: Env): Promise<Response> {
+  try {
+    const admin = await requireAdmin(request, env);
+    if (admin instanceof Response) return admin;
+    const userId = request.url.split('/admin/users/')[1]?.split('/')[0];
+    if (!userId) return json({ error: 'userId 无效' }, 400);
+    const body = await request.json() as any;
+    const newPassword = asString(body.new_password, 200);
+    if (newPassword.length < 6) return json({ error: '密码至少 6 个字符' }, 400);
+    await initDatabase(env.DB);
+    const target = await env.DB.prepare('SELECT id, username FROM users WHERE id = ?')
+      .bind(userId)
+      .first() as any;
+    if (!target) return json({ error: '用户不存在' }, 404);
+    const newHash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .bind(newHash, userId)
+      .run();
+    // 撤销该用户所有 refresh token
+    await env.DB.prepare(
+      "UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, datetime('now')) WHERE user_id = ?"
+    ).bind(userId).run();
+    return json({ success: true, userId, username: target.username });
+  } catch (e) {
+    console.error('AdminResetPassword error:', e);
+    return json({ error: '重置密码失败' }, 500);
+  }
+}
+
+/**
+ * Admin 删除工单。
+ * DELETE /admin/tickets/:id
+ * 删除前先把 image_urls 里的 R2 对象删掉（失败不阻断），再删 D1 行。
+ */
+async function handleAdminDeleteTicket(request: Request, env: Env): Promise<Response> {
+  try {
+    const admin = await requireAdmin(request, env);
+    if (admin instanceof Response) return admin;
+    const ticketId = request.url.split('/admin/tickets/')[1]?.split('?')[0]?.split('/')[0];
+    if (!ticketId) return json({ error: 'ticketId 无效' }, 400);
+    await initDatabase(env.DB);
+    const row = await env.DB.prepare('SELECT image_urls FROM tickets WHERE id = ?')
+      .bind(ticketId)
+      .first() as any;
+    if (!row) return json({ error: '工单不存在' }, 404);
+
+    // 删 R2 对象（容错：失败不阻断）
+    if (env.ASSETS && env.R2_PUBLIC_BASE_URL && !env.R2_PUBLIC_BASE_URL.startsWith('PLACEHOLDER')) {
+      const urls = parseImageUrls(row.image_urls);
+      await Promise.all(
+        urls
+          .map((u) => r2KeyFromUrl(u, env.R2_PUBLIC_BASE_URL))
+          .filter((k): k is string => !!k)
+          .map((k) => deleteR2Object(env, k)),
+      );
+    }
+
+    await env.DB.prepare('DELETE FROM tickets WHERE id = ?').bind(ticketId).run();
+    return json({ success: true, ticketId });
+  } catch (e) {
+    console.error('AdminDeleteTicket error:', e);
+    return json({ error: '删除工单失败' }, 500);
+  }
 }
 
 function isUuidLike(value: string): boolean {
@@ -953,7 +1252,7 @@ async function handleCreateTicket(request: Request, env: Env): Promise<Response>
     const type = asString(body.type, 40);
     const subject = asString(body.subject, 120);
     const description = asString(body.description, 4000);
-    const imageUrls = parseJsonArray(body.image_urls);
+    const imageUrls = parseImageUrls(body.image_urls);
 
     if (!TICKET_TYPES.has(type) || type === 'password_reset') {
       return json({ error: '工单类型无效' }, 400);
@@ -984,6 +1283,7 @@ async function handleCreatePasswordResetTicket(request: Request, env: Env): Prom
     const accountUsername = asString(body.account_username, 80).toLowerCase();
     const contact = asString(body.contact, 160);
     const description = asString(body.description, 2000);
+    const imageUrls = parseImageUrls(body.image_urls);
     if (!accountUsername || !contact || description.length < 10) {
       return json({ error: '请填写用户名、联系方式和至少 10 个字符的说明' }, 400);
     }
@@ -991,8 +1291,8 @@ async function handleCreatePasswordResetTicket(request: Request, env: Env): Prom
     const id = crypto.randomUUID();
     await env.DB.prepare(`
       INSERT INTO tickets (id, account_username, contact, type, subject, description, image_urls, status)
-      VALUES (?, ?, ?, 'password_reset', '密码重置申请', ?, '[]', 'pending')
-    `).bind(id, accountUsername, contact, description).run();
+      VALUES (?, ?, ?, 'password_reset', '密码重置申请', ?, ?, 'pending')
+    `).bind(id, accountUsername, contact, description, JSON.stringify(imageUrls)).run();
 
     return json({
       success: true,
@@ -1443,4 +1743,6 @@ interface Env {
   PROD_CONTENT_BASE_URL: string;
   DB: D1Database;
   JWT_SECRET: string;
+  ASSETS?: R2Bucket;
+  R2_PUBLIC_BASE_URL?: string;
 }
