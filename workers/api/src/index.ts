@@ -1,3 +1,5 @@
+import pkg from '../package.json';
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -14,7 +16,7 @@ export default {
     }
 
     if (url.pathname === '/health') {
-      return json({ ok: true, service: 'mianshi-zhilian-api', version: '0.2.0' });
+      return json({ ok: true, service: 'mianshi-zhilian-api', version: pkg.version });
     }
 
     if (url.pathname === '/config') {
@@ -586,9 +588,12 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   try {
     getJwtSecret(env);
     const body = await request.json() as any;
-    const { username, password, nickname } = body;
+    const { username, password_hash, password, nickname } = body;
 
-    if (!username || !password) {
+    // 优先用 password_hash（SHA-256），兼容旧客户端传 password
+    const effectivePassword = password_hash || password;
+
+    if (!username || !effectivePassword) {
       return json({ error: '用户名和密码不能为空' }, 400);
     }
 
@@ -596,7 +601,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       return json({ error: '用户名长度需要 3-20 个字符' }, 400);
     }
 
-    if (password.length < 6) {
+    // password 用于长度校验（密码原文），password_hash 是固定 64 位 hex
+    if (password && password.length < 6) {
       return json({ error: '密码长度至少 6 个字符' }, 400);
     }
 
@@ -614,7 +620,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 
     // 创建用户（统一转小写存储，PBKDF2 哈希密码，默认 role=user）
     const userId = crypto.randomUUID();
-    const passwordHash = await hashPassword(password);
+    // 新注册用户统一使用 SHA-256(password) 作为 PBKDF2 输入
+    const passwordHash = await hashPassword(effectivePassword);
     const finalNickname = nickname || username;
     const normalizedUsername = username.toLowerCase();
 
@@ -645,9 +652,14 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   try {
     getJwtSecret(env);
     const body = await request.json() as any;
-    const { username, password } = body;
+    const { username, password_hash, password } = body;
 
-    if (!username || !password) {
+    // 优先用 password_hash（SHA-256），兼容旧客户端传 password
+    const effectiveSecret = password_hash || password;
+    const hasHash = typeof password_hash === 'string' && password_hash.length > 0;
+    const hasPassword = typeof password === 'string' && password.length > 0;
+
+    if (!username || !effectiveSecret) {
       return json({ error: '用户名和密码不能为空' }, 400);
     }
 
@@ -668,15 +680,35 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       return json({ error: '账号已被禁用，请联系管理员' }, 403);
     }
 
-    // 验证密码（兼容旧 SHA-256 和新 PBKDF2 格式）
-    const passwordValid = await verifyPassword(password, user.password_hash);
+    // 验证密码：三层迁移
+    // 格式 3（最新）：PBKDF2(PBKDF2(password, static, 10000), random_salt)
+    // 格式 2（SHA-256 过渡）：PBKDF2(SHA-256(password), random_salt)
+    // 格式 1（原始）：PBKDF2(password, random_salt)
+    // 格式 0（遗留无 salt）：SHA-256(password)
+    const clientKey = password_hash; // PBKDF2(password, static, 10000)
+    const hashedPassword = hasPassword ? await legacyHash(password) : ''; // SHA-256(password)
+    let passwordValid = await verifyPassword(clientKey, user.password_hash);
+    let needsUpgrade = false;
+
+    if (!passwordValid && hashedPassword) {
+      // 格式 2 → 格式 3
+      passwordValid = await verifyPassword(hashedPassword, user.password_hash);
+      if (passwordValid) needsUpgrade = true;
+    }
+
+    if (!passwordValid && hasHash && hasPassword) {
+      // 格式 1 → 格式 3
+      passwordValid = await verifyPassword(password, user.password_hash);
+      if (passwordValid) needsUpgrade = true;
+    }
+
     if (!passwordValid) {
       return json({ error: '账号或密码错误' }, 401);
     }
 
-    // 如果是旧格式哈希，自动升级为 PBKDF2
-    if (!user.password_hash.includes(':')) {
-      const newHash = await hashPassword(password);
+    // 升级哈希格式到最新
+    if (needsUpgrade || !user.password_hash.includes(':')) {
+      const newHash = await hashPassword(clientKey);
       await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
         .bind(newHash, user.id)
         .run();
@@ -835,14 +867,14 @@ async function handleChangePassword(request: Request, env: Env): Promise<Respons
     const userId = activeUser.id;
 
     const body = await request.json() as any;
-    const { oldPassword, newPassword } = body;
+    const { old_password_hash, new_password_hash } = body;
 
-    if (!oldPassword || !newPassword) {
+    if (!old_password_hash || !new_password_hash) {
       return json({ error: '请输入原密码和新密码' }, 400);
     }
 
-    if (newPassword.length < 6) {
-      return json({ error: '新密码长度至少 6 个字符' }, 400);
+    if (!new_password_hash || new_password_hash.length < 10) {
+      return json({ error: '新密码哈希格式无效' }, 400);
     }
 
     await initDatabase(env.DB);
@@ -855,12 +887,12 @@ async function handleChangePassword(request: Request, env: Env): Promise<Respons
       return json({ error: '用户不存在' }, 404);
     }
 
-    const passwordValid = await verifyPassword(oldPassword, user.password_hash);
+    const passwordValid = await verifyPassword(old_password_hash, user.password_hash);
     if (!passwordValid) {
       return json({ error: '原密码错误' }, 401);
     }
 
-    const newHash = await hashPassword(newPassword);
+    const newHash = await hashPassword(new_password_hash);
     await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
       .bind(newHash, userId)
       .run();

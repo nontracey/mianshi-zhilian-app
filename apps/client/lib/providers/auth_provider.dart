@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
@@ -43,10 +44,16 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(userData);
         _token = await _storage.load('auth_token') as String?;
         _refreshToken = await _storage.load('auth_refresh_token') as String?;
-        notifyListeners();
+
+        // 先尝试 refresh 再通知 UI，避免闪一下「已登录」又被清空
         if (_refreshToken != null) {
-          await _refreshLogin();
+          final refreshed = await _refreshLogin();
+          if (!refreshed && _user == null) {
+            // 401/403 → _clearSavedUser 已清空状态，无需再 notify
+            return;
+          }
         }
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Failed to load user: $e');
@@ -64,12 +71,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final passwordHash = _hashPassword(password);
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/register'),
         headers: await ApiHeaders.build(_storage),
         body: json.encode({
           'username': username,
-          'password': password,
+          'password_hash': passwordHash,
+          'password': password, // 临时兼容旧格式，后续移除
           'nickname': nickname,
         }),
       );
@@ -82,7 +91,7 @@ class AuthProvider extends ChangeNotifier {
         _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
         await _storage.recordAnalyticsFeature('login');
-        await _bindDevice();
+        _bindDevice();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -100,6 +109,53 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // PBKDF2 参数（与服务端 CLIENT_PBKDF2_SALT 保持一致）
+  static const String _pbkdf2Salt = 'mianshi-zhilian-v1';
+  static const int _pbkdf2Iterations = 10000;
+  static const int _pbkdf2KeyLength = 32;
+
+  /// PBKDF2-HMAC-SHA256 客户端哈希（双层方案第一层）
+  String _hashPassword(String password) {
+    return _pbkdf2(password, _pbkdf2Salt, _pbkdf2Iterations, _pbkdf2KeyLength);
+  }
+
+  /// PBKDF2-HMAC-SHA256 手动实现（crypto 3.0.7 不含内置 Pbkdf2）
+  static String _pbkdf2(
+    String password,
+    String salt,
+    int iterations,
+    int keyLength,
+  ) {
+    const hLen = 32; // SHA-256 输出字节数
+    final passwordBytes = utf8.encode(password);
+    final saltBytes = utf8.encode(salt);
+    final blockCount = (keyLength / hLen).ceil();
+    final result = <int>[];
+
+    for (int block = 1; block <= blockCount; block++) {
+      // U₁ = HMAC-SHA256(Password, Salt || INT_32_BE(block))
+      final blockBytes = ByteData(4)..setUint32(0, block, Endian.big);
+      final input = Uint8List(saltBytes.length + 4)
+        ..setRange(0, saltBytes.length, saltBytes)
+        ..setRange(
+            saltBytes.length, saltBytes.length + 4, blockBytes.buffer.asUint8List());
+
+      var u = Hmac(sha256, passwordBytes).convert(input).bytes;
+      var t = Uint8List.fromList(u);
+
+      // T = U₁ ⊕ U₂ ⊕ ... ⊕ U_iterations
+      for (int i = 2; i <= iterations; i++) {
+        u = Hmac(sha256, passwordBytes).convert(u).bytes;
+        for (int j = 0; j < t.length; j++) {
+          t[j] ^= u[j];
+        }
+      }
+      result.addAll(t);
+    }
+
+    return base64.encode(result.sublist(0, keyLength));
+  }
+
   /// 登录
   Future<bool> login(String username, String password) async {
     _isLoading = true;
@@ -107,13 +163,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final passwordHash = _hashPassword(password);
       debugPrint('Login: building headers...');
       final headers = await ApiHeaders.build(_storage);
       debugPrint('Login: headers built, posting to $apiBaseUrl/auth/login');
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/login'),
         headers: headers,
-        body: json.encode({'username': username, 'password': password}),
+        body: json.encode({
+          'username': username,
+          'password_hash': passwordHash,
+          'password': password, // 临时兼容旧格式，后续移除
+        }),
       ).timeout(const Duration(seconds: 15));
 
       debugPrint('Login: response ${response.statusCode}');
@@ -125,7 +186,8 @@ class AuthProvider extends ChangeNotifier {
         _refreshToken = data['refreshToken'] as String?;
         await _saveUser();
         await _storage.recordAnalyticsFeature('login');
-        await _bindDevice();
+        // 设备绑定不阻塞登录返回
+        _bindDevice();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -222,7 +284,7 @@ class AuthProvider extends ChangeNotifier {
           _token = data['token'] as String;
           _refreshToken = data['refreshToken'] as String?;
           await _saveUser();
-          await _bindDevice();
+          _bindDevice();
           notifyListeners();
           return true;
         }
@@ -243,11 +305,13 @@ class AuthProvider extends ChangeNotifier {
     if (token == null || token.isEmpty) return;
     try {
       final deviceId = await _storage.getOrCreateDeviceId();
-      await http.post(
-        Uri.parse('$apiBaseUrl/analytics/bind-device'),
-        headers: await ApiHeaders.build(_storage, token: token),
-        body: json.encode({'device_id': deviceId}),
-      );
+      await http
+          .post(
+            Uri.parse('$apiBaseUrl/analytics/bind-device'),
+            headers: await ApiHeaders.build(_storage, token: token),
+            body: json.encode({'device_id': deviceId}),
+          )
+          .timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('Bind device failed: $e');
     }
@@ -338,7 +402,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _authorizedPost(
         '/auth/change-password',
-        body: {'oldPassword': oldPassword, 'newPassword': newPassword},
+        body: {
+          'old_password_hash': _hashPassword(oldPassword),
+          'new_password_hash': _hashPassword(newPassword),
+        },
       );
 
       if (response.statusCode == 200) {
