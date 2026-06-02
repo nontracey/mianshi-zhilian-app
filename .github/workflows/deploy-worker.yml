@@ -33,7 +33,12 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
+        run: |
+          if [ -z "$JWT_SECRET" ]; then
+            echo "::error::JWT_SECRET is not set in GitHub Secrets"
+            exit 1
+          fi
+          printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
