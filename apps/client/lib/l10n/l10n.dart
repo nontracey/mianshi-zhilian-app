@@ -824,7 +824,7 @@ class L10n {
         '目标已设置，App 会增强推荐权重。',
     'mutual_close_capability_sort': '互斥能力排序',
     'mutual_close_tech_extension': '互斥技术扩展',
-    'mutual_book': '互斥',
+    'mutual_book': '相册',
     'knowledge_check_read': '知识点检查',
     'knowledge_source_config': '知识来源配置',
     'knowledge_point': '知识点',

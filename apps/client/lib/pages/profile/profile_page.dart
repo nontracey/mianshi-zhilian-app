@@ -709,21 +709,47 @@ class _AccountPanel extends StatelessWidget {
   String get _displayName =>
       authProvider.isLoggedIn ? authProvider.user!.nickname : profile.nickname;
 
+  // 种子头像调色板
+  static const List<Color> _seedColors = [
+    Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
+    Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF009688),
+    Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFFF5722),
+    Color(0xFF795548), Color(0xFF607D8B), Color(0xFFE67E22),
+    Color(0xFF2ECC71), Color(0xFF3498DB), Color(0xFF9B59B6),
+    Color(0xFF1ABC9C),
+  ];
+
+  Color _seedColor(String seed) {
+    final hash = seed.hashCode.abs();
+    return _seedColors[hash % _seedColors.length];
+  }
+
   Widget _buildAvatar(BuildContext context, bool isDark) {
+    final hasAvatarUrl = profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
+    final hasSeed = profile.avatarSeed.isNotEmpty;
+    final seedColor = _seedColor(profile.avatarSeed);
+    final diceBearUrl = hasSeed && !hasAvatarUrl
+        ? 'https://api.dicebear.com/9.x/avataaars/png?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
+        : null;
+    final showInitials = !hasAvatarUrl && !hasSeed;
+
     return GestureDetector(
       onTap: () => _showAvatarPicker(context),
       child: Stack(
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.1),
-            backgroundImage:
-                profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+            backgroundColor: showInitials
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                : diceBearUrl != null
+                    ? seedColor.withValues(alpha: 0.15)
+                    : null,
+            backgroundImage: hasAvatarUrl
                 ? NetworkImage(profile.avatarUrl!)
-                : null,
-            child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
+                : diceBearUrl != null
+                    ? NetworkImage(diceBearUrl)
+                    : null,
+            child: showInitials
                 ? Builder(
                     builder: (context) {
                       final l10n = context.watch<LocalizationProvider>();
@@ -735,7 +761,7 @@ class _AccountPanel extends StatelessWidget {
                             ? name[0].toUpperCase()
                             : l10n.get('local'),
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: seedColor,
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),

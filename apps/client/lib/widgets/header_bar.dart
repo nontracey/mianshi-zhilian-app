@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
 
 class HeaderBar extends StatefulWidget {
   const HeaderBar({
@@ -490,19 +491,62 @@ class _HeaderBarState extends State<HeaderBar> {
     );
   }
 
+  // 种子头像调色板
+  static const List<Color> _seedColors = [
+    Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
+    Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF009688),
+    Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFFF5722),
+    Color(0xFF795548), Color(0xFF607D8B), Color(0xFFE67E22),
+    Color(0xFF2ECC71), Color(0xFF3498DB), Color(0xFF9B59B6),
+    Color(0xFF1ABC9C),
+  ];
+
+  Color _seedColor(String seed) {
+    final hash = seed.hashCode.abs();
+    return _seedColors[hash % _seedColors.length];
+  }
+
   Widget _buildUserAvatar(BuildContext context, bool isDark) {
-    // 这里可以后续接入用户头像
-    return IconButton.filledTonal(
-      onPressed: widget.onProfile,
-      icon: Icon(
-        Icons.person_outline,
-        size: 20,
-        color: isDark ? Colors.white70 : Colors.grey.shade700,
-      ),
-      style: IconButton.styleFrom(
-        backgroundColor: isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.05),
+    final progress = context.watch<ProgressProvider>();
+    final profile = progress.localProfile;
+    final hasAvatarUrl = profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
+    final hasSeed = profile.avatarSeed.isNotEmpty;
+    final seedColor = _seedColor(profile.avatarSeed);
+
+    // 无头像配置时显示默认图标
+    if (!hasAvatarUrl && !hasSeed) {
+      return IconButton.filledTonal(
+        onPressed: widget.onProfile,
+        icon: Icon(
+          Icons.person_outline,
+          size: 20,
+          color: isDark ? Colors.white70 : Colors.grey.shade700,
+        ),
+        style: IconButton.styleFrom(
+          backgroundColor: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+      );
+    }
+
+    final diceBearUrl = hasSeed && !hasAvatarUrl
+        ? 'https://api.dicebear.com/9.x/avataaars/png'
+            '?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
+        : null;
+
+    return GestureDetector(
+      onTap: widget.onProfile,
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: hasAvatarUrl
+            ? null
+            : seedColor.withValues(alpha: 0.15),
+        backgroundImage: hasAvatarUrl
+            ? NetworkImage(profile.avatarUrl!)
+            : diceBearUrl != null
+                ? NetworkImage(diceBearUrl)
+                : null,
       ),
     );
   }
