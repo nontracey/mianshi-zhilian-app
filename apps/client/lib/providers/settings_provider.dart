@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../l10n/l10n.dart';
 import '../models/app_settings.dart';
 import '../models/user_progress.dart';
+import '../services/data_sync_service.dart';
 import '../services/storage_service.dart';
-import '../services/webdav_sync_service.dart';
 
 // Web 端下载（条件导入）
 import 'web_download/web_download_stub.dart'
@@ -13,11 +14,9 @@ import 'web_download/web_download_stub.dart'
 
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
-  late final WebDavSyncService _webDavSync;
+  final DataSyncService _dataSync;
 
-  SettingsProvider(this._storage) {
-    _webDavSync = WebDavSyncService(_storage);
-  }
+  SettingsProvider(this._storage, this._dataSync);
 
   AppSettings _settings = const AppSettings();
   bool _isLoading = false;
@@ -144,40 +143,40 @@ class SettingsProvider extends ChangeNotifier {
   Future<String> syncData([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
     if (settings.method == 'local') {
-      return L10n.get('local_mode_data_saved', 'zh');
+      return 'local_mode_data_saved';
     }
     if (settings.method == 'file') {
       await exportData();
-      return L10n.get('local_export_generated', 'zh');
+      return 'local_export_generated';
     }
-    if (settings.method == 'webdav') {
-      if (settings.webDavUrl.isEmpty ||
-          settings.webDavUsername.isEmpty ||
-          settings.webDavPassword.isEmpty) {
-        return L10n.get('please_fill_webdav_credentials', 'zh');
-      }
-      final result = await _webDavSync.backup(
-        url: settings.webDavUrl,
-        username: settings.webDavUsername,
-        password: settings.webDavPassword,
-      );
+    if (settings.isAutomaticMethod) {
+      final result = await _dataSync.syncNow(settings);
       return result.l10nKey;
     }
     if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(settings.method)) {
-      return L10n.get('third_party_sync_coming_soon', 'zh');
+      return 'third_party_sync_coming_soon';
     }
-    return L10n.get('cloud_sync_unavailable', 'zh');
+    return 'cloud_sync_unavailable';
   }
 
   Future<void> exportData() async {
     try {
-      final data = await _storage.exportAllData();
+      final syncSettings = await _storage.loadSyncSettings();
+      final data = await _storage.exportSyncPackage(syncSettings);
       final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
       final fileName =
           'mianshi-zhilian-export-${DateTime.now().millisecondsSinceEpoch}.json';
 
       if (kIsWeb) {
         downloadFile(fileName, jsonStr);
+      } else {
+        await FilePicker.platform.saveFile(
+          dialogTitle: L10n.get('data_export', _settings.language),
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: Uint8List.fromList(utf8.encode(jsonStr)),
+        );
       }
 
       debugPrint('Data exported: $fileName');
@@ -186,34 +185,33 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
+  Future<SyncResult> importData(String content) async {
+    try {
+      final decoded = json.decode(content);
+      if (decoded is! Map<String, dynamic> ||
+          decoded['app'] != 'mianshi-zhilian' ||
+          decoded['data'] is! Map<String, dynamic>) {
+        return SyncResult.failure('import_invalid_file');
+      }
+      await _storage.importSyncPackage(decoded);
+      await _storage.clearSyncDirty();
+      await loadSettings();
+      return SyncResult.success('import_success');
+    } catch (e) {
+      return SyncResult.failure('import_failed', {'error': '$e'});
+    }
+  }
+
   /// 从 WebDAV 恢复数据
   Future<SyncResult> restoreFromWebDav([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
-    if (settings.webDavUrl.isEmpty ||
-        settings.webDavUsername.isEmpty ||
-        settings.webDavPassword.isEmpty) {
-      return SyncResult.failure(L10n.get('please_fill_webdav_credentials', 'zh'));
-    }
-    return _webDavSync.restore(
-      url: settings.webDavUrl,
-      username: settings.webDavUsername,
-      password: settings.webDavPassword,
-    );
+    return _dataSync.restoreFromRemote(settings);
   }
 
   /// 测试 WebDAV 连接
   Future<SyncResult> testWebDavConnection([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
-    if (settings.webDavUrl.isEmpty ||
-        settings.webDavUsername.isEmpty ||
-        settings.webDavPassword.isEmpty) {
-      return SyncResult.failure(L10n.get('please_fill_webdav_credentials', 'zh'));
-    }
-    return _webDavSync.testConnection(
-      url: settings.webDavUrl,
-      username: settings.webDavUsername,
-      password: settings.webDavPassword,
-    );
+    return _dataSync.testConnection(settings);
   }
 
   /// 获取上次同步时间

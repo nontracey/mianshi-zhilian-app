@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +15,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
+import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
@@ -47,24 +51,218 @@ class ProfilePage extends StatelessWidget {
           onLogout: () => authProvider.logout(),
         ),
         const SizedBox(height: 16),
+        _ProfileSectionGrid(
+          items: [
+            _ProfileSectionItem(
+              icon: Icons.cloud_sync_outlined,
+              title: l10n.get('sync_and_backup'),
+              subtitle: l10n.getp('profile_sync_summary', {
+                'method': _syncMethodLabel(
+                  progressProvider.syncSettings.method,
+                  l10n,
+                ),
+              }),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _SyncBackupPage()),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.smart_toy_outlined,
+              title: l10n.get('ai_and_voice'),
+              subtitle: l10n.get('ai_and_voice_desc'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _AiVoiceSettingsPage()),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.tune_outlined,
+              title: l10n.get('learning_preferences'),
+              subtitle: l10n.get('learning_preferences_desc'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const _LearningPreferencesPage(),
+                ),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.palette_outlined,
+              title: l10n.get('appearance_language'),
+              subtitle: l10n.getp('appearance_language_desc', {
+                'language': settings.language.toUpperCase(),
+              }),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const _AppearanceLanguagePage(),
+                ),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.source_outlined,
+              title: l10n.get('content_source'),
+              subtitle: l10n.get(settings.contentEnv.labelKey),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _ContentSourcePage()),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.info_outline,
+              title: l10n.get('about_update'),
+              subtitle: l10n.get('about_update_desc'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _AboutUpdatePage()),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _syncMethodLabel(String method, LocalizationProvider l10n) =>
+      switch (method) {
+        'file' => l10n.get('file_import_export'),
+        'webdav' => 'WebDAV',
+        'github' => 'GitHub',
+        'gitee' => 'Gitee',
+        'cloud' => l10n.get('account_cloud_sync'),
+        _ => l10n.get('local_mode'),
+      };
+}
+
+class _ProfileSectionItem {
+  const _ProfileSectionItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+}
+
+class _ProfileSectionGrid extends StatelessWidget {
+  const _ProfileSectionGrid({required this.items});
+
+  final List<_ProfileSectionItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 760;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: wide ? 2 : 1,
+        mainAxisExtent: 104,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemBuilder: (context, index) => _ProfileSectionCard(item: items[index]),
+    );
+  }
+}
+
+class _ProfileSectionCard extends StatelessWidget {
+  const _ProfileSectionCard({required this.item});
+
+  final _ProfileSectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(item.icon, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSubPage extends StatelessWidget {
+  const _ProfileSubPage({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: ListView(padding: const EdgeInsets.all(24), children: children),
+    );
+  }
+}
+
+class _ContentSourcePage extends StatelessWidget {
+  const _ContentSourcePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    return _ProfileSubPage(
+      title: l10n.get('content_source'),
+      children: [
         _ContentEnvPanel(
-          settings: settings,
+          settings: settingsProvider.settings,
           userRole: authProvider.userRole,
           onEnvChanged: (env) async {
             await settingsProvider.setContentEnv(env);
-            if (context.mounted) {
-              final contentProvider = context.read<ContentProvider>();
-              await contentProvider.switchContentEnv(
-                settingsProvider.settings.contentBaseUrl,
-              );
-            }
+            if (!context.mounted) return;
+            await context.read<ContentProvider>().switchContentEnv(
+              settingsProvider.settings.contentBaseUrl,
+            );
           },
-          onTestUrlChanged: (url) async {
-            await settingsProvider.setCustomTestContentUrl(url);
-          },
-          onProdUrlChanged: (url) async {
-            await settingsProvider.setCustomProdContentUrl(url);
-          },
+          onTestUrlChanged: settingsProvider.setCustomTestContentUrl,
+          onProdUrlChanged: settingsProvider.setCustomProdContentUrl,
           onApplyChanged: () async {
             final contentProvider = context.read<ContentProvider>();
             await contentProvider.clearAllDomainCache();
@@ -72,51 +270,85 @@ class ProfilePage extends StatelessWidget {
               settingsProvider.settings.contentBaseUrl,
               currentDomainId: settingsProvider.settings.currentDomain,
             );
-            if (context.mounted) {
-              final l10n = context.watch<LocalizationProvider>();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    l10n.get(
-                      'cache_already_clear_correct_at_restart_new_loading_current_domai',
-                    ),
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  l10n.get(
+                    'cache_already_clear_correct_at_restart_new_loading_current_domai',
                   ),
-                  duration: Duration(seconds: 2),
                 ),
-              );
-            }
+              ),
+            );
           },
         ),
-        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _AiVoiceSettingsPage extends StatelessWidget {
+  const _AiVoiceSettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    return _ProfileSubPage(
+      title: l10n.get('ai_and_voice'),
+      children: [
         _AiConfigPanel(
-          onNavigateToConfig: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const AiConfigPage()));
-          },
+          onNavigateToConfig: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const AiConfigPage())),
         ),
         const SizedBox(height: 16),
         _SttConfigPanel(
-          settings: settings,
-          onSettingsChanged: (next) => settingsProvider.updateSettings(next),
+          settings: settingsProvider.settings,
+          onSettingsChanged: settingsProvider.updateSettings,
         ),
-        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _LearningPreferencesPage extends StatelessWidget {
+  const _LearningPreferencesPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    return _ProfileSubPage(
+      title: l10n.get('learning_preferences'),
+      children: [
+        _LearningSettingsPanel(
+          settings: settingsProvider.settings,
+          onSettingsChanged: settingsProvider.updateSettings,
+        ),
+      ],
+    );
+  }
+}
+
+class _AppearanceLanguagePage extends StatelessWidget {
+  const _AppearanceLanguagePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    final settings = settingsProvider.settings;
+    return _ProfileSubPage(
+      title: l10n.get('appearance_language'),
+      children: [
         _AppearancePanel(
           settings: settings,
-          onThemeTypeChanged: (type) => settingsProvider.setThemeType(type),
-          onPrimaryColorChanged: (color) =>
-              settingsProvider.updatePrimaryColor(color),
-          onAccentColorChanged: (color) =>
-              settingsProvider.updateAccentColor(color),
-          onFontScaleChanged: (scale) =>
-              settingsProvider.updateFontScale(scale),
-          onDensityChanged: (density) =>
-              settingsProvider.updateDensity(density),
-        ),
-        const SizedBox(height: 16),
-        _LearningSettingsPanel(
-          settings: settings,
-          onSettingsChanged: (next) => settingsProvider.updateSettings(next),
+          onThemeTypeChanged: settingsProvider.setThemeType,
+          onPrimaryColorChanged: settingsProvider.updatePrimaryColor,
+          onAccentColorChanged: settingsProvider.updateAccentColor,
+          onFontScaleChanged: settingsProvider.updateFontScale,
+          onDensityChanged: settingsProvider.updateDensity,
         ),
         const SizedBox(height: 16),
         _LanguagePanel(
@@ -126,95 +358,187 @@ class ProfilePage extends StatelessWidget {
             context.read<LocalizationProvider>().setLanguage(lang);
           },
         ),
-        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _SyncBackupPage extends StatelessWidget {
+  const _SyncBackupPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    final progressProvider = context.watch<ProgressProvider>();
+    return _ProfileSubPage(
+      title: l10n.get('sync_and_backup'),
+      children: [
         _DataManagementPanel(
-          settings: settings,
+          settings: settingsProvider.settings,
           syncSettings: progressProvider.syncSettings,
           onSyncSettingsChanged: progressProvider.updateSyncSettings,
-          onSync: () async {
-            final message = await settingsProvider.syncData(
-              progressProvider.syncSettings,
-            );
-            await progressProvider.updateSyncSettings(
-              SyncSettings(
-                method: progressProvider.syncSettings.method,
-                webDavUrl: progressProvider.syncSettings.webDavUrl,
-                webDavUsername: progressProvider.syncSettings.webDavUsername,
-                webDavPassword: progressProvider.syncSettings.webDavPassword,
-                lastSyncAt: DateTime.now(),
-                lastSyncStatus: message,
-              ),
-            );
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(L10n.get(message, l10n.language))),
-              );
-            }
-          },
-          onTestConnection: () async {
-            final result = await settingsProvider.testWebDavConnection(
-              progressProvider.syncSettings,
-            );
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    L10n.getp(result.l10nKey, l10n.language, result.params),
-                  ),
-                  backgroundColor: result.success ? null : AppColors.danger,
-                ),
-              );
-            }
-          },
-          onRestore: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(l10n.get('from_cloud_restore')),
-                content: Text(
-                  l10n.get(
-                    'restore_will_overwrite_cover_current_all_has_local_data_this_operate',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(l10n.get('cancel')),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(l10n.get('confirm_restore')),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed != true) return;
-            final result = await settingsProvider.restoreFromWebDav(
-              progressProvider.syncSettings,
-            );
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    L10n.getp(result.l10nKey, l10n.language, result.params),
-                  ),
-                  backgroundColor: result.success
-                      ? AppColors.success
-                      : AppColors.danger,
-                ),
-              );
-              if (result.success) {
-                await context.read<ProgressProvider>().loadProgress();
-                await context.read<SettingsProvider>().loadSettings();
-                await context.read<AiProvider>().loadConfigs();
-              }
-            }
-          },
-          onExport: () => settingsProvider.exportData(),
+          onSync: () => _syncNow(context),
+          onTestConnection: () => _testConnection(context),
+          onRestore: () => _restoreRemote(context),
+          onExport: settingsProvider.exportData,
+          onImport: () => _importFile(context),
         ),
-        const SizedBox(height: 16),
-        const _AboutPanel(),
       ],
+    );
+  }
+
+  Future<void> _syncNow(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+    final message = await settingsProvider.syncData(
+      progressProvider.syncSettings,
+    );
+    await progressProvider.updateSyncSettings(
+      progressProvider.syncSettings.copyWith(
+        lastSyncAt: DateTime.now(),
+        lastSyncStatus: message,
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(L10n.get(message, l10n.language))));
+  }
+
+  Future<void> _testConnection(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final result = await context.read<SettingsProvider>().testWebDavConnection(
+      context.read<ProgressProvider>().syncSettings,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(L10n.getp(result.l10nKey, l10n.language, result.params)),
+        backgroundColor: result.success ? null : AppColors.danger,
+      ),
+    );
+  }
+
+  Future<void> _restoreRemote(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('from_cloud_restore')),
+        content: Text(
+          l10n.get(
+            'restore_will_overwrite_cover_current_all_has_local_data_this_operate',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.get('confirm_restore')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final settingsProvider = context.read<SettingsProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+    final aiProvider = context.read<AiProvider>();
+    final localizationProvider = context.read<LocalizationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await settingsProvider.restoreFromWebDav(
+      progressProvider.syncSettings,
+    );
+    await _reloadAfterImport(
+      progressProvider,
+      settingsProvider,
+      aiProvider,
+      localizationProvider,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(L10n.getp(result.l10nKey, l10n.language, result.params)),
+        backgroundColor: result.success ? AppColors.success : AppColors.danger,
+      ),
+    );
+  }
+
+  Future<void> _importFile(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+    final aiProvider = context.read<AiProvider>();
+    final localizationProvider = context.read<LocalizationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.single;
+      final bytes =
+          file.bytes ??
+          (file.path == null ? null : await readBytesFromPath(file.path!));
+      if (bytes == null) {
+        throw StateError('selected file has no readable bytes');
+      }
+      final importResult = await settingsProvider.importData(
+        utf8.decode(bytes),
+      );
+      await _reloadAfterImport(
+        progressProvider,
+        settingsProvider,
+        aiProvider,
+        localizationProvider,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            L10n.getp(importResult.l10nKey, l10n.language, importResult.params),
+          ),
+          backgroundColor: importResult.success
+              ? AppColors.success
+              : AppColors.danger,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.getp('import_failed', {'error': '$e'})),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _reloadAfterImport(
+    ProgressProvider progressProvider,
+    SettingsProvider settingsProvider,
+    AiProvider aiProvider,
+    LocalizationProvider localizationProvider,
+  ) async {
+    await progressProvider.loadProgress();
+    await settingsProvider.loadSettings();
+    await aiProvider.loadConfigs();
+    localizationProvider.setLanguage(settingsProvider.settings.language);
+  }
+}
+
+class _AboutUpdatePage extends StatelessWidget {
+  const _AboutUpdatePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    return _ProfileSubPage(
+      title: l10n.get('about_update'),
+      children: const [_AboutPanel()],
     );
   }
 }
@@ -643,6 +967,8 @@ class _AccountPanel extends StatelessWidget {
   String _syncLabel(String method, LocalizationProvider l10n) =>
       switch (method) {
         'webdav' => 'WebDAV',
+        'github' => 'GitHub',
+        'gitee' => 'Gitee',
         'cloud' => l10n.get('cloud_sync'),
         'file' => l10n.get('file'),
         _ => l10n.get('local'),
@@ -1617,8 +1943,8 @@ class _LanguagePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: l10n.get('about'),
-      icon: Icons.info_outline,
+      title: l10n.get('language_settings'),
+      icon: Icons.translate,
       children: [
         SegmentedButton<String>(
           segments: [
@@ -1640,6 +1966,7 @@ class _DataManagementPanel extends StatelessWidget {
     required this.onSyncSettingsChanged,
     required this.onSync,
     required this.onExport,
+    required this.onImport,
     this.onTestConnection,
     this.onRestore,
   });
@@ -1649,6 +1976,7 @@ class _DataManagementPanel extends StatelessWidget {
   final ValueChanged<SyncSettings> onSyncSettingsChanged;
   final VoidCallback onSync;
   final VoidCallback onExport;
+  final VoidCallback onImport;
   final VoidCallback? onTestConnection;
   final VoidCallback? onRestore;
 
@@ -1686,9 +2014,12 @@ class _DataManagementPanel extends StatelessWidget {
               value: 'webdav',
               child: Text(l10n.get('custom_webdav')),
             ),
+            const DropdownMenuItem(value: 'github', child: Text('GitHub')),
+            const DropdownMenuItem(value: 'gitee', child: Text('Gitee')),
             DropdownMenuItem(
               value: 'cloud',
-              child: Text(l10n.get('account_cloud_sync')),
+              enabled: false,
+              child: Text(l10n.get('account_cloud_sync_unavailable')),
             ),
             DropdownMenuItem(
               value: 'baidu',
@@ -1721,19 +2052,39 @@ class _DataManagementPanel extends StatelessWidget {
               );
             }
             onSyncSettingsChanged(
-              SyncSettings(
+              syncSettings.copyWith(
                 method: value,
-                webDavUrl: syncSettings.webDavUrl,
-                webDavUsername: syncSettings.webDavUsername,
-                webDavPassword: syncSettings.webDavPassword,
-                lastSyncAt: syncSettings.lastSyncAt,
                 lastSyncStatus: value == 'local'
-                    ? l10n.get('local_mode')
-                    : l10n.get('pending_config'),
+                    ? 'local_mode'
+                    : 'pending_config',
               ),
             );
           },
         ),
+        if (syncSettings.isAutomaticMethod) ...[
+          const SizedBox(height: 12),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            value: syncSettings.autoSyncEnabled,
+            title: Text(l10n.get('auto_sync')),
+            subtitle: Text(l10n.get('auto_sync_target_only')),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(autoSyncEnabled: value),
+            ),
+          ),
+          TextFormField(
+            initialValue: syncSettings.autoSyncIntervalMinutes.toString(),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.get('auto_sync_interval_minutes'),
+            ),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(
+                autoSyncIntervalMinutes: int.tryParse(value) ?? 5,
+              ),
+            ),
+          ),
+        ],
         if (syncSettings.method == 'webdav') ...[
           const SizedBox(height: 12),
           TextFormField(
@@ -1742,30 +2093,15 @@ class _DataManagementPanel extends StatelessWidget {
               labelText: l10n.get('webdav_address'),
               hintText: 'https://dav.example.com/remote.php/dav/files/me',
             ),
-            onChanged: (value) => onSyncSettingsChanged(
-              SyncSettings(
-                method: syncSettings.method,
-                webDavUrl: value,
-                webDavUsername: syncSettings.webDavUsername,
-                webDavPassword: syncSettings.webDavPassword,
-                lastSyncAt: syncSettings.lastSyncAt,
-                lastSyncStatus: syncSettings.lastSyncStatus,
-              ),
-            ),
+            onChanged: (value) =>
+                onSyncSettingsChanged(syncSettings.copyWith(webDavUrl: value)),
           ),
           const SizedBox(height: 8),
           TextFormField(
             initialValue: syncSettings.webDavUsername,
             decoration: InputDecoration(labelText: l10n.get('username')),
             onChanged: (value) => onSyncSettingsChanged(
-              SyncSettings(
-                method: syncSettings.method,
-                webDavUrl: syncSettings.webDavUrl,
-                webDavUsername: value,
-                webDavPassword: syncSettings.webDavPassword,
-                lastSyncAt: syncSettings.lastSyncAt,
-                lastSyncStatus: syncSettings.lastSyncStatus,
-              ),
+              syncSettings.copyWith(webDavUsername: value),
             ),
           ),
           const SizedBox(height: 8),
@@ -1776,14 +2112,7 @@ class _DataManagementPanel extends StatelessWidget {
               labelText: l10n.get('application_password'),
             ),
             onChanged: (value) => onSyncSettingsChanged(
-              SyncSettings(
-                method: syncSettings.method,
-                webDavUrl: syncSettings.webDavUrl,
-                webDavUsername: syncSettings.webDavUsername,
-                webDavPassword: value,
-                lastSyncAt: syncSettings.lastSyncAt,
-                lastSyncStatus: syncSettings.lastSyncStatus,
-              ),
+              syncSettings.copyWith(webDavPassword: value),
             ),
           ),
           const SizedBox(height: 8),
@@ -1796,26 +2125,197 @@ class _DataManagementPanel extends StatelessWidget {
             ),
           ),
         ],
+        if (syncSettings.method == 'github') ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            initialValue: syncSettings.githubToken,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'GitHub token'),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(githubToken: value.trim()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.githubOwner,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_owner'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(githubOwner: value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.githubRepo,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_name'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(githubRepo: value.trim()),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.githubBranch,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_branch'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(githubBranch: value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  initialValue: syncSettings.githubPath,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('sync_file_path'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(githubPath: value.trim()),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (syncSettings.method == 'gitee') ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            initialValue: syncSettings.giteeToken,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Gitee access token'),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(giteeToken: value.trim()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.giteeOwner,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_owner'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(giteeOwner: value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.giteeRepo,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_name'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(giteeRepo: value.trim()),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: syncSettings.giteeBranch,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('repository_branch'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(giteeBranch: value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  initialValue: syncSettings.giteePath,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('sync_file_path'),
+                  ),
+                  onChanged: (value) => onSyncSettingsChanged(
+                    syncSettings.copyWith(giteePath: value.trim()),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (syncSettings.isAutomaticMethod) ...[
+          const SizedBox(height: 12),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: syncSettings.syncFullPracticeText,
+            title: Text(l10n.get('sync_full_practice_answers')),
+            subtitle: Text(l10n.get('sync_full_practice_answers_desc')),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(syncFullPracticeText: value ?? false),
+            ),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: syncSettings.syncPrivatePrepData,
+            title: Text(l10n.get('sync_private_prep_data')),
+            subtitle: Text(l10n.get('sync_private_prep_data_desc')),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(syncPrivatePrepData: value ?? true),
+            ),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: syncSettings.syncAiConfigMetadata,
+            title: Text(l10n.get('sync_ai_config_metadata')),
+            subtitle: Text(l10n.get('sync_ai_config_metadata_desc')),
+            onChanged: (value) => onSyncSettingsChanged(
+              syncSettings.copyWith(syncAiConfigMetadata: value ?? true),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
           children: [
             FilledButton.tonalIcon(
               onPressed: onSync,
               icon: const Icon(Icons.cloud_upload),
               label: Text(l10n.get('backup_to_cloud')),
             ),
-            const SizedBox(width: 12),
-            if (syncSettings.method == 'webdav')
+            if (syncSettings.isAutomaticMethod)
               FilledButton.tonalIcon(
                 onPressed: onRestore,
                 icon: const Icon(Icons.cloud_download),
                 label: Text(l10n.get('from_cloud_restore')),
               ),
-            const SizedBox(width: 12),
             OutlinedButton.icon(
               onPressed: onExport,
               icon: const Icon(Icons.download),
               label: Text(l10n.get('data_export')),
+            ),
+            OutlinedButton.icon(
+              onPressed: onImport,
+              icon: const Icon(Icons.upload_file),
+              label: Text(l10n.get('data_import')),
             ),
           ],
         ),
@@ -1827,6 +2327,8 @@ class _DataManagementPanel extends StatelessWidget {
       switch (method) {
         'file' => l10n.get('file_import_export'),
         'webdav' => 'WebDAV',
+        'github' => 'GitHub',
+        'gitee' => 'Gitee',
         'cloud' => l10n.get('account_cloud_sync'),
         'baidu' => l10n.get('hundred_degree_web_disk'),
         'quark' => l10n.get('quark_web_disk'),

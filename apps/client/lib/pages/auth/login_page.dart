@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
-import 'package:mianshi_zhilian/providers/progress_provider.dart';
-import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class LoginPage extends StatefulWidget {
@@ -69,34 +67,26 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _mergeLocalDataToCloud() async {
-    final authProvider = context.read<AuthProvider>();
-    final progressProvider = context.read<ProgressProvider>();
-    final settingsProvider = context.read<SettingsProvider>();
-
-    final progressMap = progressProvider.exportProgress();
-    final settings = settingsProvider.settings.toJson();
-
-    await authProvider.syncToCloud(progressMap, settings);
-
-    final cloudData = await authProvider.getCloudProgress();
-    if (cloudData != null && cloudData['progressMap'] != null) {
-      await progressProvider.mergeFromCloud(
-        cloudData['progressMap'] as Map<String, dynamic>,
-      );
-    }
+    // Account cloud sync is temporarily unavailable to avoid platform quota use.
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isRegister ? l10n.get('register_account') : l10n.get('login'))),
+      appBar: AppBar(
+        title: Text(
+          _isRegister ? l10n.get('register_account') : l10n.get('login'),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: WorkPanel(
-              title: _isRegister ? l10n.get('create_new_account') : l10n.get('login_account'),
+              title: _isRegister
+                  ? l10n.get('create_new_account')
+                  : l10n.get('login_account'),
               children: [
                 Form(
                   key: _formKey,
@@ -123,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // 密码
                       TextFormField(
                         controller: _passwordController,
@@ -144,7 +134,7 @@ class _LoginPageState extends State<LoginPage> {
                           return null;
                         },
                       ),
-                      
+
                       // 确认密码（仅注册时显示）
                       if (_isRegister) ...[
                         const SizedBox(height: 16),
@@ -169,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                       ],
-                      
+
                       // 错误提示
                       if (_error != null) ...[
                         const SizedBox(height: 16),
@@ -187,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      
+
                       // 提交按钮
                       FilledButton(
                         onPressed: _isLoading ? null : _submit,
@@ -195,9 +185,15 @@ class _LoginPageState extends State<LoginPage> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
-                            : Text(_isRegister ? l10n.get('register') : l10n.get('login')),
+                            : Text(
+                                _isRegister
+                                    ? l10n.get('register')
+                                    : l10n.get('login'),
+                              ),
                       ),
                       const SizedBox(height: 12),
 
@@ -210,7 +206,11 @@ class _LoginPageState extends State<LoginPage> {
                                 _error = null;
                                 _confirmPasswordController.clear();
                               }),
-                        child: Text(_isRegister ? l10n.get('have_account_login') : l10n.get('no_account_register')),
+                        child: Text(
+                          _isRegister
+                              ? l10n.get('have_account_login')
+                              : l10n.get('no_account_register'),
+                        ),
                       ),
 
                       // 忘记密码

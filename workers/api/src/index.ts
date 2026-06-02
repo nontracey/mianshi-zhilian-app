@@ -66,6 +66,14 @@ export default {
       return handleGetProgress(request, env);
     }
 
+    if (url.pathname === '/sync/package' && request.method === 'POST') {
+      return json({ error: '账号云同步暂不开放' }, 403);
+    }
+
+    if (url.pathname === '/sync/package' && request.method === 'GET') {
+      return json({ error: '账号云同步暂不开放' }, 403);
+    }
+
     // 代理测试环境内容: /content/test/* → TEST_CONTENT_BASE_URL/*
     if (url.pathname.startsWith('/content/test/')) {
       const subPath = url.pathname.slice('/content/test/'.length);
@@ -708,6 +716,12 @@ async function initSyncTables(db: D1Database): Promise<void> {
       theme_mode TEXT DEFAULT 'system',
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS sync_snapshots (
+      user_id TEXT PRIMARY KEY,
+      package_json TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -818,6 +832,60 @@ async function handleGetProgress(request: Request, env: Env): Promise<Response> 
   } catch (e) {
     console.error('GetProgress error:', e);
     return json({ error: '获取进度失败' }, 500);
+  }
+}
+
+async function handleSyncPackage(request: Request, env: Env): Promise<Response> {
+  try {
+    const userId = await getUserIdFromRequest(request, env);
+    if (!userId) {
+      return json({ error: '未登录或 token 已过期' }, 401);
+    }
+    const body = await request.json() as any;
+    const syncPackage = body.package;
+    if (!syncPackage || typeof syncPackage !== 'object') {
+      return json({ error: '缺少同步快照' }, 400);
+    }
+    await initSyncTables(env.DB);
+    await env.DB.prepare(`
+      INSERT INTO sync_snapshots (user_id, package_json, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(user_id) DO UPDATE SET
+        package_json = excluded.package_json,
+        updated_at = datetime('now')
+    `)
+      .bind(userId, JSON.stringify(syncPackage))
+      .run();
+    return json({ success: true, syncedAt: new Date().toISOString() });
+  } catch (e) {
+    console.error('SyncPackage error:', e);
+    return json({ error: '同步快照失败' }, 500);
+  }
+}
+
+async function handleGetSyncPackage(request: Request, env: Env): Promise<Response> {
+  try {
+    const userId = await getUserIdFromRequest(request, env);
+    if (!userId) {
+      return json({ error: '未登录或 token 已过期' }, 401);
+    }
+    await initSyncTables(env.DB);
+    const row = await env.DB.prepare(
+      'SELECT package_json, updated_at FROM sync_snapshots WHERE user_id = ?'
+    )
+      .bind(userId)
+      .first() as any;
+    if (!row) {
+      return json({ package: null }, 200);
+    }
+    return json({
+      success: true,
+      package: JSON.parse(row.package_json),
+      updatedAt: row.updated_at,
+    });
+  } catch (e) {
+    console.error('GetSyncPackage error:', e);
+    return json({ error: '获取同步快照失败' }, 500);
   }
 }
 

@@ -368,10 +368,25 @@ class LocalProfile {
 }
 
 class SyncSettings {
-  final String method; // local, file, webdav, cloud, baidu, quark...
+  final String method; // local, file, webdav, github, gitee, cloud
   final String webDavUrl;
   final String webDavUsername;
   final String webDavPassword;
+  final String githubToken;
+  final String githubOwner;
+  final String githubRepo;
+  final String githubBranch;
+  final String githubPath;
+  final String giteeToken;
+  final String giteeOwner;
+  final String giteeRepo;
+  final String giteeBranch;
+  final String giteePath;
+  final bool autoSyncEnabled;
+  final int autoSyncIntervalMinutes;
+  final bool syncFullPracticeText;
+  final bool syncPrivatePrepData;
+  final bool syncAiConfigMetadata;
   final DateTime? lastSyncAt;
   final String lastSyncStatus;
 
@@ -380,19 +395,52 @@ class SyncSettings {
     this.webDavUrl = '',
     this.webDavUsername = '',
     this.webDavPassword = '',
+    this.githubToken = '',
+    this.githubOwner = '',
+    this.githubRepo = '',
+    this.githubBranch = 'main',
+    this.githubPath = 'mianshi-zhilian/sync-state.json',
+    this.giteeToken = '',
+    this.giteeOwner = '',
+    this.giteeRepo = '',
+    this.giteeBranch = 'master',
+    this.giteePath = 'mianshi-zhilian/sync-state.json',
+    this.autoSyncEnabled = true,
+    this.autoSyncIntervalMinutes = 5,
+    this.syncFullPracticeText = false,
+    this.syncPrivatePrepData = true,
+    this.syncAiConfigMetadata = true,
     this.lastSyncAt,
-    this.lastSyncStatus = '本地模式',
+    this.lastSyncStatus = 'local_mode',
   });
 
   factory SyncSettings.fromJson(Map<String, dynamic> json) => SyncSettings(
-    method: json['method'] as String? ?? 'local',
+    method: _normalizeMethod(json['method'] as String? ?? 'local'),
     webDavUrl: json['webDavUrl'] as String? ?? '',
     webDavUsername: json['webDavUsername'] as String? ?? '',
     webDavPassword: json['webDavPassword'] as String? ?? '',
+    githubToken: json['githubToken'] as String? ?? '',
+    githubOwner: json['githubOwner'] as String? ?? '',
+    githubRepo: json['githubRepo'] as String? ?? '',
+    githubBranch: json['githubBranch'] as String? ?? 'main',
+    githubPath:
+        json['githubPath'] as String? ?? 'mianshi-zhilian/sync-state.json',
+    giteeToken: json['giteeToken'] as String? ?? '',
+    giteeOwner: json['giteeOwner'] as String? ?? '',
+    giteeRepo: json['giteeRepo'] as String? ?? '',
+    giteeBranch: json['giteeBranch'] as String? ?? 'master',
+    giteePath:
+        json['giteePath'] as String? ?? 'mianshi-zhilian/sync-state.json',
+    autoSyncEnabled: json['autoSyncEnabled'] as bool? ?? true,
+    autoSyncIntervalMinutes:
+        (json['autoSyncIntervalMinutes'] as num?)?.toInt() ?? 5,
+    syncFullPracticeText: json['syncFullPracticeText'] as bool? ?? false,
+    syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? true,
+    syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? true,
     lastSyncAt: json['lastSyncAt'] != null
         ? DateTime.parse(json['lastSyncAt'] as String)
         : null,
-    lastSyncStatus: json['lastSyncStatus'] as String? ?? '本地模式',
+    lastSyncStatus: json['lastSyncStatus'] as String? ?? 'local_mode',
   );
 
   Map<String, dynamic> toJson() => {
@@ -400,7 +448,77 @@ class SyncSettings {
     'webDavUrl': webDavUrl,
     'webDavUsername': webDavUsername,
     'webDavPassword': webDavPassword,
+    'githubToken': githubToken,
+    'githubOwner': githubOwner,
+    'githubRepo': githubRepo,
+    'githubBranch': githubBranch,
+    'githubPath': githubPath,
+    'giteeToken': giteeToken,
+    'giteeOwner': giteeOwner,
+    'giteeRepo': giteeRepo,
+    'giteeBranch': giteeBranch,
+    'giteePath': giteePath,
+    'autoSyncEnabled': autoSyncEnabled,
+    'autoSyncIntervalMinutes': autoSyncIntervalMinutes,
+    'syncFullPracticeText': syncFullPracticeText,
+    'syncPrivatePrepData': syncPrivatePrepData,
+    'syncAiConfigMetadata': syncAiConfigMetadata,
     'lastSyncAt': lastSyncAt?.toIso8601String(),
     'lastSyncStatus': lastSyncStatus,
   };
+
+  bool get isAutomaticMethod =>
+      method == 'webdav' || method == 'github' || method == 'gitee';
+
+  static String _normalizeMethod(String method) {
+    if (method == 'cloud') return 'local';
+    return method;
+  }
+
+  SyncSettings copyWith({
+    String? method,
+    String? webDavUrl,
+    String? webDavUsername,
+    String? webDavPassword,
+    String? githubToken,
+    String? githubOwner,
+    String? githubRepo,
+    String? githubBranch,
+    String? githubPath,
+    String? giteeToken,
+    String? giteeOwner,
+    String? giteeRepo,
+    String? giteeBranch,
+    String? giteePath,
+    bool? autoSyncEnabled,
+    int? autoSyncIntervalMinutes,
+    bool? syncFullPracticeText,
+    bool? syncPrivatePrepData,
+    bool? syncAiConfigMetadata,
+    DateTime? lastSyncAt,
+    String? lastSyncStatus,
+  }) => SyncSettings(
+    method: method ?? this.method,
+    webDavUrl: webDavUrl ?? this.webDavUrl,
+    webDavUsername: webDavUsername ?? this.webDavUsername,
+    webDavPassword: webDavPassword ?? this.webDavPassword,
+    githubToken: githubToken ?? this.githubToken,
+    githubOwner: githubOwner ?? this.githubOwner,
+    githubRepo: githubRepo ?? this.githubRepo,
+    githubBranch: githubBranch ?? this.githubBranch,
+    githubPath: githubPath ?? this.githubPath,
+    giteeToken: giteeToken ?? this.giteeToken,
+    giteeOwner: giteeOwner ?? this.giteeOwner,
+    giteeRepo: giteeRepo ?? this.giteeRepo,
+    giteeBranch: giteeBranch ?? this.giteeBranch,
+    giteePath: giteePath ?? this.giteePath,
+    autoSyncEnabled: autoSyncEnabled ?? this.autoSyncEnabled,
+    autoSyncIntervalMinutes:
+        autoSyncIntervalMinutes ?? this.autoSyncIntervalMinutes,
+    syncFullPracticeText: syncFullPracticeText ?? this.syncFullPracticeText,
+    syncPrivatePrepData: syncPrivatePrepData ?? this.syncPrivatePrepData,
+    syncAiConfigMetadata: syncAiConfigMetadata ?? this.syncAiConfigMetadata,
+    lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+    lastSyncStatus: lastSyncStatus ?? this.lastSyncStatus,
+  );
 }

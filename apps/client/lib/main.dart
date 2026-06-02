@@ -15,6 +15,7 @@ import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/content_api_service.dart';
 import 'services/ai_service.dart';
+import 'services/data_sync_service.dart';
 import 'services/storage_service.dart';
 import 'services/update_service.dart';
 import 'pages/learning/dashboard_page.dart';
@@ -38,10 +39,12 @@ void main() async {
   final contentApi = ContentApiService(baseUrl: savedSettings.contentBaseUrl);
   final aiService = AiService();
   final updateService = UpdateService();
+  final dataSyncService = DataSyncService(storage)..start();
 
   runApp(
     MianshiZhilianApp(
       storage: storage,
+      dataSyncService: dataSyncService,
       contentApi: contentApi,
       aiService: aiService,
       updateService: updateService,
@@ -54,6 +57,7 @@ enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 
 class MianshiZhilianApp extends StatefulWidget {
   final StorageService storage;
+  final DataSyncService dataSyncService;
   final ContentApiService contentApi;
   final AiService aiService;
   final UpdateService updateService;
@@ -62,6 +66,7 @@ class MianshiZhilianApp extends StatefulWidget {
   const MianshiZhilianApp({
     super.key,
     required this.storage,
+    required this.dataSyncService,
     required this.contentApi,
     required this.aiService,
     required this.updateService,
@@ -76,11 +81,19 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   bool _contentLoaded = false;
 
   @override
+  void dispose() {
+    widget.dataSyncService.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(widget.storage)..loadSettings(),
+          create: (_) =>
+              SettingsProvider(widget.storage, widget.dataSyncService)
+                ..loadSettings(),
         ),
         ChangeNotifierProvider(
           create: (_) => ContentProvider(widget.contentApi, widget.storage),
@@ -95,7 +108,10 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(widget.storage)..loadUser(),
         ),
-        ChangeNotifierProvider(create: (_) => LocalizationProvider(initialLanguage: widget.initialLanguage)),
+        ChangeNotifierProvider(
+          create: (_) =>
+              LocalizationProvider(initialLanguage: widget.initialLanguage),
+        ),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -104,8 +120,22 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           if (!settings.isLoading && !_contentLoaded) {
             _contentLoaded = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
+              final progressProvider = context.read<ProgressProvider>();
+              final settingsProvider = context.read<SettingsProvider>();
+              final aiProvider = context.read<AiProvider>();
+              final localizationProvider = context.read<LocalizationProvider>();
+              widget.dataSyncService.onDataImported = () async {
+                await progressProvider.loadProgress();
+                await settingsProvider.loadSettings();
+                await aiProvider.loadConfigs();
+                localizationProvider.setLanguage(
+                  settingsProvider.settings.language,
+                );
+              };
               // 同步语言设置到 LocalizationProvider
-              context.read<LocalizationProvider>().setLanguage(settings.settings.language);
+              context.read<LocalizationProvider>().setLanguage(
+                settings.settings.language,
+              );
               // 加载内容
               final contentProvider = context.read<ContentProvider>();
               contentProvider.loadContent(
@@ -117,7 +147,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           // 获取系统亮度
           final systemBrightness = MediaQuery.platformBrightnessOf(context);
           final systemIsDark = systemBrightness == Brightness.dark;
-          
+
           // 构建主题
           final theme = buildTheme(
             settings.settings.primaryColor,
@@ -182,7 +212,8 @@ class _LearningShellState extends State<LearningShell> {
               totalHours: progress.totalHours,
               todayHoursGrowth: progress.todayHoursGrowth,
               isCollapsed: _isSidebarCollapsed,
-              onToggleCollapse: () => setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
+              onToggleCollapse: () =>
+                  setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
             ),
           Expanded(
             child: Column(
@@ -202,15 +233,21 @@ class _LearningShellState extends State<LearningShell> {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(userRole == UserRole.guest
-                              ? l10n.get('login_after_optional_check_view_test_version_content')
-                              : l10n.get('demand_key_management_member_permission_check_view_draft_con')),
+                          content: Text(
+                            userRole == UserRole.guest
+                                ? l10n.get(
+                                    'login_after_optional_check_view_test_version_content',
+                                  )
+                                : l10n.get(
+                                    'demand_key_management_member_permission_check_view_draft_con',
+                                  ),
+                          ),
                           duration: const Duration(seconds: 2),
                         ),
                       );
                       return;
                     }
-                    
+
                     // 切换内容环境
                     final contentEnv = ContentEnv.fromKey(stage);
                     await settings.setContentEnv(contentEnv);
@@ -395,12 +432,13 @@ class _LearningShellState extends State<LearningShell> {
     });
   }
 
-  String _sectionTitle(AppSection section, LocalizationProvider l10n) => switch (section) {
-    AppSection.dashboard => l10n.get('dashboard_title'),
-    AppSection.catalog => l10n.get('catalog_title'),
-    AppSection.practice => l10n.get('practice_title'),
-    AppSection.prep => l10n.get('interview_preparation'),
-    AppSection.mastery => l10n.get('mastery_title'),
-    AppSection.profile => l10n.get('profile_title'),
-  };
+  String _sectionTitle(AppSection section, LocalizationProvider l10n) =>
+      switch (section) {
+        AppSection.dashboard => l10n.get('dashboard_title'),
+        AppSection.catalog => l10n.get('catalog_title'),
+        AppSection.practice => l10n.get('practice_title'),
+        AppSection.prep => l10n.get('interview_preparation'),
+        AppSection.mastery => l10n.get('mastery_title'),
+        AppSection.profile => l10n.get('profile_title'),
+      };
 }
