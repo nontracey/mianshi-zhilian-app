@@ -303,6 +303,7 @@ class L10n {
     'must_include': '必须包含',
     'name': '名称',
     'network_error': '网络错误：{error}',
+    'network_timeout': '网络超时，请稍后重试',
     'new_password': '新密码',
     'new_password_same_as_old': '新密码不能与旧密码相同',
     'no_account_register': '没有账号？去注册',
@@ -1670,6 +1671,7 @@ class L10n {
     'must_include': 'Must Include',
     'name': 'Name',
     'network_error': 'Network error: {error}',
+    'network_timeout': 'Network timeout, please try again later',
     'new_password': 'New Password',
     'new_password_same_as_old':
         'New password cannot be the same as old password',

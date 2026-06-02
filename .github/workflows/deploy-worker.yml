@@ -38,7 +38,6 @@ jobs:
             echo "::error::JWT_SECRET is not set in GitHub Secrets"
             exit 1
           fi
-          npx wrangler secret delete JWT_SECRET 2>/dev/null || true
           printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
 
       - name: Deploy to Cloudflare Workers

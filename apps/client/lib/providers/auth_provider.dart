@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
@@ -106,12 +107,16 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('Login: building headers...');
+      final headers = await ApiHeaders.build(_storage);
+      debugPrint('Login: headers built, posting to $apiBaseUrl/auth/login');
       final response = await http.post(
         Uri.parse('$apiBaseUrl/auth/login'),
-        headers: await ApiHeaders.build(_storage),
+        headers: headers,
         body: json.encode({'username': username, 'password': password}),
-      );
+      ).timeout(const Duration(seconds: 15));
 
+      debugPrint('Login: response ${response.statusCode}');
       final data = json.decode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && data['success'] == true) {
@@ -130,7 +135,14 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+    } on TimeoutException {
+      debugPrint('Login: timeout');
+      _error = L10n.get('network_timeout', 'zh');
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
+      debugPrint('Login error: $e');
       _error = L10n.getp('network_error', 'zh', {'error': '$e'});
       _isLoading = false;
       notifyListeners();
