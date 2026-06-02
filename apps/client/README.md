@@ -9,6 +9,7 @@
 - **本地存储**: SharedPreferences
 - **网络**: http 包 + 自定义 AI/STT 服务
 - **语音识别**: record 录音 + Whisper STT
+- **系统权限**: permission_handler + 平台权限声明
 - **数据同步**: WebDAV + Worker API
 
 ## 项目结构
@@ -39,6 +40,7 @@ lib/
 │   ├── ai_service.dart          # AI API 调用（流式/非流式）
 │   ├── storage_service.dart     # 本地数据存储和导出
 │   ├── data_sync_service.dart   # 多后端备份/恢复
+│   ├── app_permission_service.dart # 相机、相册、麦克风、安装包权限引导
 │   ├── whisper_stt_service.dart # Whisper 语音转文字
 │   └── update_service.dart      # 手动检查更新和安装包校验
 ├── widgets/                     # 通用组件
@@ -88,3 +90,6 @@ flutter run -d android
 - **Web**: 不支持 `dart:io`，使用 `platform_file_reader.dart` 条件导出处理
 - **Web 语音**: Whisper STT 暂不支持 Web 端，会降级为文本输入
 - **临时文件**: 使用 `path_provider` 获取平台临时目录，不硬编码路径
+- **系统权限**: 语音、拍照、相册、Android 安装包会在用户触发功能时请求权限；拒绝或永久拒绝后提示用户前往系统设置授权。
+- **Android 权限声明**: `AndroidManifest.xml` 声明网络、安装 APK、麦克风、相机和图片读取权限。
+- **macOS 权限声明**: `Info.plist` 声明相机、麦克风、相册、语音识别用途；沙盒 entitlements 开启相机和麦克风。

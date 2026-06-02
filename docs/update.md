@@ -82,7 +82,7 @@
 | 平台 | MVP 策略 | 正式策略 |
 |------|---------|---------|
 | Web | 刷新即更新 | Cloudflare Pages 自动更新 |
-| Android | 下载 APK，用户确认安装 | 后续可接应用商店 |
+| Android | 下载 APK，用户确认安装 | 首次安装第三方 APK 时可能需要系统授权“允许安装未知应用”；后续可接应用商店 |
 | Windows | 下载 exe/zip，引导安装 | MSIX App Installer |
 | macOS | 下载 dmg/zip，引导安装 | 后续可做 Sparkle 自动更新 |
 
@@ -106,6 +106,8 @@ https://mianshi-zhilian-api.nontracey.workers.dev/update.json
 ## 隐私说明
 
 检查更新只发起匿名 `GET update.json` 请求，不会主动上传账号、设备 ID、学习数据或当前版本号。和所有网络请求一样，Cloudflare/GitHub 仍会接收到基础网络元数据，例如 IP 和 User-Agent。
+
+下载安装包后，客户端会先校验 `sha256`，校验通过才启动系统安装流程。Android 如果未授权安装第三方 APK，会在用户点击安装时提示并引导前往系统设置开启权限；该授权只影响系统安装器，不会授予 App 读取用户学习数据的额外能力。
 
 ## 代码实现
 
