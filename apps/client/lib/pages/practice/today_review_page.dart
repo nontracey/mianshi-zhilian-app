@@ -166,8 +166,9 @@ class TodayReviewPage extends StatelessWidget {
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.isEmpty)
+              if (attempts.isEmpty) {
                 return l10n.get('never_practiced_high_forgetting_risk');
+              }
               final lastDate = attempts.first.createdAt;
               final days = DateTime.now().difference(lastDate).inDays;
               return l10n.getp(
@@ -203,10 +204,11 @@ class TodayReviewPage extends StatelessWidget {
             progressProvider: progress,
             reasonBuilder: (topic) {
               final attempts = progress.getAttemptsForTopic(topic.id);
-              if (attempts.length < 2)
+              if (attempts.length < 2) {
                 return l10n.get(
                   'score_lower_drop_demand_key_reinforce_consolidate',
                 );
+              }
               final latest = attempts[0].score ?? 0;
               final previous = attempts[1].score ?? 0;
               final diff = previous - latest;
@@ -276,27 +278,30 @@ class TodayReviewPage extends StatelessWidget {
     if (p?.nextReviewAt == null) return l10n.get('demand_key_review');
     final now = DateTime.now();
     final daysOverdue = now.difference(p!.nextReviewAt!).inDays;
-    if (daysOverdue > 3)
+    if (daysOverdue > 3) {
       return l10n.getp(
         'already_overdue_day_daysoverdue_forgetting_wind_risk_678_2',
         {'daysOverdue': daysOverdue},
       );
-    if (daysOverdue > 0)
+    }
+    if (daysOverdue > 0) {
       return l10n.getp(
         'already_overdue_day_daysoverdue_forgetting_wind_risk_589_2',
         {'daysOverdue': daysOverdue},
       );
+    }
     if (daysOverdue == 0) {
       final attempts = progress.getAttemptsForTopic(topic.id);
       if (attempts.isNotEmpty) {
         final daysSincePractice = now
             .difference(attempts.first.createdAt)
             .inDays;
-        if (daysSincePractice > 0)
+        if (daysSincePractice > 0) {
           return l10n.getp(
             'distance_last_practice_dayssincepractice_day_press_forgetting_c_2',
             {'daysSincePractice': daysSincePractice},
           );
+        }
       }
       return l10n.get('today_due_by_forgetting_curve');
     }

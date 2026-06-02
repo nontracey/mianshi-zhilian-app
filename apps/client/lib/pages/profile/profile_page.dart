@@ -15,6 +15,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
+import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
@@ -393,9 +394,18 @@ class _SyncBackupPage extends StatelessWidget {
     final l10n = context.read<LocalizationProvider>();
     final settingsProvider = context.read<SettingsProvider>();
     final progressProvider = context.read<ProgressProvider>();
+    final aiProvider = context.read<AiProvider>();
     final message = await settingsProvider.syncData(
       progressProvider.syncSettings,
     );
+    await progressProvider.loadProgress();
+    await settingsProvider.loadSettings();
+    await aiProvider.loadConfigs();
+    if (context.mounted) {
+      context.read<LocalizationProvider>().setLanguage(
+        settingsProvider.settings.language,
+      );
+    }
     await progressProvider.updateSyncSettings(
       progressProvider.syncSettings.copyWith(
         lastSyncAt: DateTime.now(),
@@ -841,8 +851,11 @@ class _AccountPanel extends StatelessWidget {
   }
 
   Future<void> _pickImageFromCamera(BuildContext context) async {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     try {
+      final granted = await AppPermissionService.ensureCamera(context);
+      if (!granted || !context.mounted) return;
+
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.camera,
@@ -866,8 +879,11 @@ class _AccountPanel extends StatelessWidget {
   }
 
   Future<void> _pickImageFromGallery(BuildContext context) async {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     try {
+      final granted = await AppPermissionService.ensurePhotos(context);
+      if (!granted || !context.mounted) return;
+
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
@@ -2369,6 +2385,7 @@ class _AboutPanelState extends State<_AboutPanel> {
   }
 
   Future<void> _checkUpdate() async {
+    final l10n = context.read<LocalizationProvider>();
     setState(() {
       _isChecking = true;
       _updateMessage = null;
@@ -2378,24 +2395,23 @@ class _AboutPanelState extends State<_AboutPanel> {
       final updateService = UpdateService();
       final updateInfo = await updateService.checkForUpdate(_currentVersion);
 
-      if (mounted) {
-        final l10n = context.watch<LocalizationProvider>();
-        setState(() {
-          _isChecking = false;
-          if (updateInfo != null) {
-            _updateMessage = l10n.getp(
-              'publish_current_new_version_v_version_2',
-              {'version': updateInfo.version},
-            );
-            _showUpdateDialog(updateInfo);
-          } else {
-            _updateMessage = l10n.get('already_is_most_new_version');
-          }
-        });
+      if (!mounted) return;
+      setState(() {
+        _isChecking = false;
+        if (updateInfo != null) {
+          _updateMessage = l10n.getp(
+            'publish_current_new_version_v_version_2',
+            {'version': updateInfo.version},
+          );
+        } else {
+          _updateMessage = l10n.get('already_is_most_new_version');
+        }
+      });
+      if (updateInfo != null) {
+        _showUpdateDialog(updateInfo);
       }
     } catch (e) {
       if (mounted) {
-        final l10n = context.watch<LocalizationProvider>();
         setState(() {
           _isChecking = false;
           _updateMessage = l10n.get('inspect_check_update_fail');
@@ -2405,14 +2421,18 @@ class _AboutPanelState extends State<_AboutPanel> {
   }
 
   void _showUpdateDialog(UpdateInfo updateInfo) {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     final updateService = UpdateService();
     final isRequiredUpdate = updateService.isRequiredUpdate(
       updateInfo,
       _currentVersion,
     );
     final platformUpdate = updateService.getPlatformUpdate(updateInfo);
-    final size = platformUpdate?.size ?? updateInfo.platforms.values.first.size;
+    final size =
+        platformUpdate?.size ??
+        (updateInfo.platforms.isEmpty
+            ? 0
+            : updateInfo.platforms.values.first.size);
     showDialog(
       context: context,
       barrierDismissible: !isRequiredUpdate,
@@ -2468,7 +2488,7 @@ class _AboutPanelState extends State<_AboutPanel> {
   }
 
   Future<void> _downloadUpdate(UpdateInfo updateInfo) async {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     final updateService = UpdateService();
 
     // Web 端提示刷新
@@ -2559,11 +2579,15 @@ class _AboutPanelState extends State<_AboutPanel> {
     );
 
     if (mounted) {
-      final l10n = context.watch<LocalizationProvider>();
       Navigator.pop(context); // 关闭下载对话框
 
       if (filePath != null) {
+        final canInstall = await AppPermissionService.ensureInstallPackages(
+          context,
+        );
+        if (!canInstall || !mounted) return;
         await updateService.openInstaller(filePath);
+        if (!mounted) return;
         _showInstallGuide(filePath, updateInfo.version);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

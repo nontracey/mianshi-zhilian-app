@@ -237,14 +237,16 @@ class InterviewPrepPage extends StatelessWidget {
   String _targetDescription(BuildContext context, PrepPlan plan) {
     final l10n = context.watch<LocalizationProvider>();
     final parts = <String>[];
-    if (plan.techStack.isNotEmpty)
+    if (plan.techStack.isNotEmpty) {
       parts.add(
         l10n.getp('tech_stack_techstack_2', {'techStack': plan.techStack}),
       );
-    if (plan.dailyMinutes > 0)
+    }
+    if (plan.dailyMinutes > 0) {
       parts.add(
         l10n.getp('daily_minutes_min_2', {'minutes': plan.dailyMinutes}),
       );
+    }
     if (plan.interviewDate != null) {
       final days = plan.interviewDate!.difference(DateTime.now()).inDays + 1;
       parts.add(

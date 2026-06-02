@@ -26,6 +26,14 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>用于拍摄头像或练习图片。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用于录制语音复述并转写为文本。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择头像或练习图片。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用于将语音复述识别为文字。</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

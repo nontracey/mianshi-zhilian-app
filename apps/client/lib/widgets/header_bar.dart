@@ -113,194 +113,198 @@ class _HeaderBarState extends State<HeaderBar> {
             right: 16, // 右对齐
             width: 300,
             child: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(10),
-          shadowColor: Colors.black.withValues(alpha: 0.15),
-          child: Container(
-            constraints: const BoxConstraints(maxHeight: 400),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF161B22) : Colors.white,
+              elevation: 8,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark
-                    ? const Color(0xFF30363D)
-                    : const Color(0xFFE0E0E0),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 搜索结果标题
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        l10n.get('search_results'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white54 : Colors.grey,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        l10n.getp('count_items_2', {
-                          'count': _searchResults.length,
-                        }),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.white38 : Colors.grey.shade400,
-                        ),
-                      ),
-                    ],
+              shadowColor: Colors.black.withValues(alpha: 0.15),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 400),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF161B22) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF30363D)
+                        : const Color(0xFFE0E0E0),
                   ),
                 ),
-                Divider(
-                  height: 1,
-                  color: isDark
-                      ? const Color(0xFF30363D)
-                      : const Color(0xFFF0F0F0),
-                ),
-                // 搜索结果列表
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: _searchResults.length,
-                    separatorBuilder: (_, __) => Divider(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 搜索结果标题
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            l10n.get('search_results'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white54 : Colors.grey,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            l10n.getp('count_items_2', {
+                              'count': _searchResults.length,
+                            }),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.white38
+                                  : Colors.grey.shade400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(
                       height: 1,
-                      indent: 52,
                       color: isDark
                           ? const Color(0xFF30363D)
                           : const Color(0xFFF0F0F0),
                     ),
-                    itemBuilder: (context, index) {
-                      final topic = _searchResults[index];
-                      return InkWell(
-                        onTap: () {
-                          _removeOverlay();
-                          _searchController.clear();
-                          setState(() {
-                            _isSearching = false;
-                            _searchResults = [];
-                          });
-                          if (widget.onTopicTap != null) {
-                            widget.onTopicTap!(topic.id);
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              // 图标
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.menu_book_outlined,
-                                  size: 18,
-                                  color: AppColors.accent,
-                                ),
+                    // 搜索结果列表
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          indent: 52,
+                          color: isDark
+                              ? const Color(0xFF30363D)
+                              : const Color(0xFFF0F0F0),
+                        ),
+                        itemBuilder: (context, index) {
+                          final topic = _searchResults[index];
+                          return InkWell(
+                            onTap: () {
+                              _removeOverlay();
+                              _searchController.clear();
+                              setState(() {
+                                _isSearching = false;
+                                _searchResults = [];
+                              });
+                              if (widget.onTopicTap != null) {
+                                widget.onTopicTap!(topic.id);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
                               ),
-                              const SizedBox(width: 12),
-                              // 内容
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      topic.title,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1A1A1A),
+                              child: Row(
+                                children: [
+                                  // 图标
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent.withValues(
+                                        alpha: 0.1,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Row(
+                                    child: const Icon(
+                                      Icons.menu_book_outlined,
+                                      size: 18,
+                                      color: AppColors.accent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // 内容
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Icon(
-                                          Icons.folder_outlined,
-                                          size: 12,
-                                          color: isDark
-                                              ? Colors.white38
-                                              : Colors.grey,
-                                        ),
-                                        const SizedBox(width: 4),
                                         Text(
-                                          topic.domain,
+                                          topic.title,
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
                                             color: isDark
-                                                ? Colors.white38
-                                                : Colors.grey,
+                                                ? Colors.white
+                                                : const Color(0xFF1A1A1A),
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        if (topic.highFrequency) ...[
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 1,
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.folder_outlined,
+                                              size: 12,
+                                              color: isDark
+                                                  ? Colors.white38
+                                                  : Colors.grey,
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.warning
-                                                  .withValues(alpha: 0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(3),
-                                            ),
-                                            child: Text(
-                                              l10n.get('high_frequency'),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              topic.domain,
                                               style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.warning,
+                                                fontSize: 12,
+                                                color: isDark
+                                                    ? Colors.white38
+                                                    : Colors.grey,
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                            if (topic.highFrequency) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 1,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.warning
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(3),
+                                                ),
+                                                child: Text(
+                                                  l10n.get('high_frequency'),
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.warning,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  // 箭头
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 14,
+                                    color: isDark
+                                        ? Colors.white24
+                                        : Colors.grey.shade300,
+                                  ),
+                                ],
                               ),
-                              // 箭头
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                size: 14,
-                                color: isDark
-                                    ? Colors.white24
-                                    : Colors.grey.shade300,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  ),
-);
+    );
 
     Overlay.of(context).insert(_overlayEntry!);
   }
@@ -506,10 +510,7 @@ class _HeaderBarState extends State<HeaderBar> {
 
 // AI 模型选择器（窄屏图标按钮）
 class _AiModelIconButton extends StatelessWidget {
-  const _AiModelIconButton({
-    required this.hasConfig,
-    required this.isDark,
-  });
+  const _AiModelIconButton({required this.hasConfig, required this.isDark});
 
   final bool hasConfig;
   final bool isDark;
@@ -518,9 +519,9 @@ class _AiModelIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AiConfigPage()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const AiConfigPage()));
       },
       icon: Icon(
         Icons.smart_toy_outlined,
@@ -529,11 +530,15 @@ class _AiModelIconButton extends StatelessWidget {
             ? const Color(0xFF3078F0)
             : (isDark ? Colors.white38 : Colors.grey),
       ),
-      tooltip: hasConfig ? l10nOf(context).get('ai_model') : l10nOf(context).get('ai_not_config'),
+      tooltip: hasConfig
+          ? l10nOf(context).get('ai_model')
+          : l10nOf(context).get('ai_not_config'),
       style: IconButton.styleFrom(
         backgroundColor: hasConfig
             ? const Color(0xFF3078F0).withValues(alpha: 0.1)
-            : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04)),
+            : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.04)),
         minimumSize: const Size(32, 32),
         padding: EdgeInsets.zero,
       ),

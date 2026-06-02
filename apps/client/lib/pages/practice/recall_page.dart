@@ -12,6 +12,7 @@ import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
+import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -590,6 +591,14 @@ class _RecallPageState extends State<RecallPage> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      bool granted;
+      if (source == ImageSource.camera) {
+        granted = await AppPermissionService.ensureCamera(context);
+      } else {
+        granted = await AppPermissionService.ensurePhotos(context);
+      }
+      if (!granted || !mounted) return;
+
       final picker = ImagePicker();
       final file = await picker.pickImage(
         source: source,
@@ -681,6 +690,7 @@ class _RecallPageState extends State<RecallPage> {
         dataDescription: l10n.get('selected_image_will_be_sent_to_ai'),
       );
       if (!confirmed) return;
+      if (!mounted) return;
     }
 
     setState(() {

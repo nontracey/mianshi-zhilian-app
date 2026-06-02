@@ -504,13 +504,13 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
           ),
           FilledButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               setState(() {
                 _versions.removeAt(index);
               });
               await _saveVersions();
-              if (!context.mounted) return;
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.of(context).pop();
+              if (!ctx.mounted) return;
+              Navigator.of(ctx).pop();
               messenger.showSnackBar(
                 SnackBar(content: Text(l10n.get('version_already_delete'))),
               );
@@ -599,6 +599,7 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             ),
             FilledButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 setState(() {
                   _versions[index] = {
                     'type': _selectedVersionType,
@@ -608,9 +609,8 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   };
                 });
                 await _saveVersions();
-                if (!context.mounted) return;
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.of(context).pop();
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop();
                 messenger.showSnackBar(
                   SnackBar(content: Text(l10n.get('version_already_update'))),
                 );

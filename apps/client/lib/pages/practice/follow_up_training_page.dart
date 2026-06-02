@@ -49,8 +49,9 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final topic = _getCurrentTopic();
     if (topic == null || topic.followUps.isEmpty) return null;
     if (_currentFollowUpIndex < 0 ||
-        _currentFollowUpIndex >= topic.followUps.length)
+        _currentFollowUpIndex >= topic.followUps.length) {
       return null;
+    }
     return topic.followUps[_currentFollowUpIndex];
   }
 

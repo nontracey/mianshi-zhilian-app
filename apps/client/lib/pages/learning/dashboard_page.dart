@@ -506,12 +506,15 @@ class _AIFeedbackItem extends StatelessWidget {
   String _timeAgo(DateTime dateTime, LocalizationProvider l10n) {
     final diff = DateTime.now().difference(dateTime);
     if (diff.inMinutes < 1) return l10n.get('just');
-    if (diff.inMinutes < 60)
+    if (diff.inMinutes < 60) {
       return l10n.getp('minutes_min_ago_2', {'minutes': diff.inMinutes});
-    if (diff.inHours < 24)
+    }
+    if (diff.inHours < 24) {
       return l10n.getp('hours_hour_ago_2', {'hours': diff.inHours});
-    if (diff.inDays < 7)
+    }
+    if (diff.inDays < 7) {
       return l10n.getp('days_day_ago_2', {'days': diff.inDays});
+    }
     return '${dateTime.month}/${dateTime.day}';
   }
 }

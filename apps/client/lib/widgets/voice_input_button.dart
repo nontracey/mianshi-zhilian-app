@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/whisper_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -46,9 +47,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   @override
   void initState() {
     super.initState();
-    if (widget.sttMode == 'system') {
-      _initSystemSpeech();
-    }
   }
 
   Future<void> _initSystemSpeech() async {
@@ -99,6 +97,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   // ── System STT ──
 
   Future<void> _startSystemListening() async {
+    if (!await AppPermissionService.ensureSpeechRecognition(context)) return;
+    if (!mounted) return;
+
+    if (!_isAvailable) {
+      await _initSystemSpeech();
+      if (!mounted) return;
+    }
+
     if (!_isAvailable) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,15 +159,8 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
 
     try {
-      final hasPermission = await _recorder.hasPermission();
-      if (!hasPermission) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.get('voice_grant_permission'))),
-          );
-        }
-        return;
-      }
+      if (!await AppPermissionService.ensureMicrophone(context)) return;
+      if (!mounted) return;
 
       setState(() => _isListening = true);
       widget.onListeningChanged?.call(true);

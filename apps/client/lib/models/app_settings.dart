@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const Object _unset = Object();
+
 /// 知识源环境
 enum ContentEnv {
   test,
@@ -77,8 +79,10 @@ enum AppThemeType {
   /// 获取实际的亮度（用于跟随系统）
   Brightness get resolvedBrightness {
     if (this == AppThemeType.elegantWhite) return Brightness.light;
-    if (this == AppThemeType.qualityBlack || this == AppThemeType.midnightBlue)
+    if (this == AppThemeType.qualityBlack ||
+        this == AppThemeType.midnightBlue) {
       return Brightness.dark;
+    }
     return Brightness.light; // system 默认，实际由系统决定
   }
 }
@@ -202,12 +206,12 @@ class AppSettings {
     double? fontScale,
     String? cardDensity,
     String? sttMode,
-    String? whisperBaseUrl,
-    String? whisperApiKey,
+    Object? whisperBaseUrl = _unset,
+    Object? whisperApiKey = _unset,
     String? whisperModel,
     ContentEnv? contentEnv,
-    String? customTestContentUrl,
-    String? customProdContentUrl,
+    Object? customTestContentUrl = _unset,
+    Object? customProdContentUrl = _unset,
   }) => AppSettings(
     themeType: themeType ?? this.themeType,
     primaryColor: primaryColor ?? this.primaryColor,
@@ -231,12 +235,20 @@ class AppSettings {
     fontScale: fontScale ?? this.fontScale,
     cardDensity: cardDensity ?? this.cardDensity,
     sttMode: sttMode ?? this.sttMode,
-    whisperBaseUrl: whisperBaseUrl ?? this.whisperBaseUrl,
-    whisperApiKey: whisperApiKey ?? this.whisperApiKey,
+    whisperBaseUrl: whisperBaseUrl == _unset
+        ? this.whisperBaseUrl
+        : whisperBaseUrl as String?,
+    whisperApiKey: whisperApiKey == _unset
+        ? this.whisperApiKey
+        : whisperApiKey as String?,
     whisperModel: whisperModel ?? this.whisperModel,
     contentEnv: contentEnv ?? this.contentEnv,
-    customTestContentUrl: customTestContentUrl ?? this.customTestContentUrl,
-    customProdContentUrl: customProdContentUrl ?? this.customProdContentUrl,
+    customTestContentUrl: customTestContentUrl == _unset
+        ? this.customTestContentUrl
+        : customTestContentUrl as String?,
+    customProdContentUrl: customProdContentUrl == _unset
+        ? this.customProdContentUrl
+        : customProdContentUrl as String?,
   );
 
   /// 获取 ThemeMode（兼容旧代码）

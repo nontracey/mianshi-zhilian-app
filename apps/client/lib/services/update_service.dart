@@ -84,7 +84,9 @@ class UpdateService {
   /// 检查是否有新版本
   Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
-      final response = await http.get(Uri.parse(updateManifestUrl));
+      final response = await http
+          .get(Uri.parse(updateManifestUrl))
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         debugPrint('Failed to check update: ${response.statusCode}');
         return null;
@@ -148,6 +150,7 @@ class UpdateService {
     required String version,
     DownloadProgressCallback? onProgress,
   }) async {
+    final client = http.Client();
     try {
       // 获取临时目录
       final tempDir = await getTemporaryDirectory();
@@ -156,7 +159,9 @@ class UpdateService {
 
       // 下载文件
       final request = http.Request('GET', Uri.parse(platformUpdate.url));
-      final response = await http.Client().send(request);
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         debugPrint('Download failed: ${response.statusCode}');
@@ -188,6 +193,8 @@ class UpdateService {
     } catch (e) {
       debugPrint('Download error: $e');
       return null;
+    } finally {
+      client.close();
     }
   }
 
@@ -206,8 +213,7 @@ class UpdateService {
       final file = File(filePath);
       if (!await file.exists()) return false;
 
-      final bytes = await file.readAsBytes();
-      final digest = sha256.convert(bytes);
+      final digest = await sha256.bind(file.openRead()).first;
       final actualSha256 = digest.toString();
 
       debugPrint('Expected SHA256: $expectedSha256');
