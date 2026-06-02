@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -49,11 +50,13 @@ class UpdateInfo {
 
 class PlatformUpdate {
   final String url;
+  final List<String> mirrors;
   final String sha256;
   final int size;
 
   const PlatformUpdate({
     required this.url,
+    this.mirrors = const [],
     required this.sha256,
     required this.size,
   });
@@ -61,6 +64,10 @@ class PlatformUpdate {
   factory PlatformUpdate.fromJson(Map<String, dynamic> json) {
     return PlatformUpdate(
       url: json['url'] as String? ?? '',
+      mirrors: (json['mirrors'] as List<dynamic>? ?? [])
+          .map((item) => item.toString())
+          .where((item) => item.isNotEmpty)
+          .toList(),
       sha256: json['sha256'] as String? ?? '',
       size: json['size'] as int? ?? 0,
     );
@@ -69,6 +76,32 @@ class PlatformUpdate {
 
 /// 下载进度回调
 typedef DownloadProgressCallback = void Function(int received, int total);
+
+class DownloadCancelToken {
+  bool _isCancelled = false;
+  http.Client? _client;
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    _isCancelled = true;
+    _client?.close();
+  }
+
+  void _bind(http.Client client) {
+    if (_isCancelled) {
+      client.close();
+      return;
+    }
+    _client = client;
+  }
+
+  void _unbind(http.Client client) {
+    if (_client == client) {
+      _client = null;
+    }
+  }
+}
 
 class UpdateService {
   final String updateManifestUrl;
@@ -149,51 +182,111 @@ class UpdateService {
     required PlatformUpdate platformUpdate,
     required String version,
     DownloadProgressCallback? onProgress,
+    DownloadCancelToken? cancelToken,
+  }) async {
+    final urls = [
+      platformUpdate.url,
+      ...platformUpdate.mirrors,
+    ].where((url) => url.trim().isNotEmpty).toList();
+
+    if (urls.isEmpty) return null;
+
+    // 获取临时目录
+    final tempDir = await getTemporaryDirectory();
+    final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
+    final filePath = '${tempDir.path}/$fileName';
+
+    for (final url in urls) {
+      if (cancelToken?.isCancelled ?? false) return null;
+      final downloaded = await _downloadFromUrl(
+        url: url,
+        filePath: filePath,
+        platformUpdate: platformUpdate,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      if (downloaded) return filePath;
+    }
+
+    return null;
+  }
+
+  Future<bool> _downloadFromUrl({
+    required String url,
+    required String filePath,
+    required PlatformUpdate platformUpdate,
+    DownloadProgressCallback? onProgress,
+    DownloadCancelToken? cancelToken,
   }) async {
     final client = http.Client();
+    cancelToken?._bind(client);
+    final file = File(filePath);
+    IOSink? sink;
     try {
-      // 获取临时目录
-      final tempDir = await getTemporaryDirectory();
-      final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
-      final filePath = '${tempDir.path}/$fileName';
+      if (await file.exists()) {
+        await file.delete();
+      }
 
       // 下载文件
-      final request = http.Request('GET', Uri.parse(platformUpdate.url));
+      final request = http.Request('GET', Uri.parse(url));
       final response = await client
           .send(request)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         debugPrint('Download failed: ${response.statusCode}');
-        return null;
+        return false;
       }
 
-      final file = File(filePath);
-      final sink = file.openWrite();
+      sink = file.openWrite();
       int received = 0;
-      final total = platformUpdate.size;
+      final total = platformUpdate.size > 0
+          ? platformUpdate.size
+          : response.contentLength ?? 0;
 
-      await response.stream.forEach((chunk) {
-        sink.add(chunk);
-        received += chunk.length;
-        onProgress?.call(received, total);
-      });
+      await response.stream
+          .timeout(
+            const Duration(seconds: 45),
+            onTimeout: (controller) {
+              controller.addError(
+                TimeoutException('Download stalled for 45 seconds'),
+              );
+              controller.close();
+            },
+          )
+          .forEach((chunk) {
+            if (cancelToken?.isCancelled ?? false) {
+              throw StateError('Download cancelled');
+            }
+            sink!.add(chunk);
+            received += chunk.length;
+            onProgress?.call(received, total);
+          })
+          .timeout(const Duration(minutes: 20));
 
       await sink.close();
+      sink = null;
 
       // 校验 sha256
       final isValid = await verifySha256(filePath, platformUpdate.sha256);
       if (!isValid) {
         debugPrint('SHA256 verification failed');
         await file.delete();
-        return null;
+        return false;
       }
 
-      return filePath;
+      return true;
     } catch (e) {
       debugPrint('Download error: $e');
-      return null;
+      try {
+        await sink?.close();
+      } catch (_) {}
+      if (await file.exists()) {
+        await file.delete();
+      }
+      return false;
     } finally {
+      cancelToken?._unbind(client);
       client.close();
     }
   }

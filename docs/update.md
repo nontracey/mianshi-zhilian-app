@@ -35,6 +35,9 @@
   "platforms": {
     "android": {
       "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk",
+      "mirrors": [
+        "https://gitee.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
+      ],
       "sha256": "abc123...",
       "size": 52428800
     },
@@ -76,6 +79,7 @@
 - 各平台并行构建，不等待全部完成
 - 单个平台构建完成后立即上传到 GitHub Release
 - 所有平台完成后生成并上传 `update.json`
+- 如果配置了 `GITEE_TOKEN`，CI 会把安装包和 `update.json` 同步到 Gitee Release；客户端弱网下载失败时会尝试 `mirrors` 备用地址
 
 ## 平台更新策略
 
@@ -102,6 +106,8 @@ https://mianshi-zhilian-api.nontracey.workers.dev/update.json
 ```
 
 也可以通过 `UPDATE_MANIFEST_URL` 编译参数改为其他稳定地址。
+
+Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发，客户端会直接请求 `update.json` 中的平台 `url`，失败后再依次尝试 `mirrors`，避免把 GitHub/Gitee Release 安装包下载流量计入 Cloudflare Worker。
 
 ## 隐私说明
 

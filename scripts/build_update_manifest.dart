@@ -29,6 +29,10 @@ void main(List<String> args) {
       .environment['MINIMUM_REQUIRED_VERSION']
       ?.trim();
   final notesEnv = Platform.environment['RELEASE_NOTES']?.trim();
+  final giteeOwner = Platform.environment['GITEE_OWNER']?.trim();
+  final giteeRepo = Platform.environment['GITEE_REPO']?.trim();
+  final giteeReleaseBaseUrl = Platform.environment['GITEE_RELEASE_BASE_URL']
+      ?.trim();
 
   // 从 pubspec.yaml 读取 buildNumber
   final pubspecFile = File('apps/client/pubspec.yaml');
@@ -71,9 +75,21 @@ void main(List<String> args) {
       };
     }
     final name = file.uri.pathSegments.last;
+    final mirrors = <String>[];
+    if (giteeOwner != null &&
+        giteeOwner.isNotEmpty &&
+        giteeRepo != null &&
+        giteeRepo.isNotEmpty) {
+      final baseUrl =
+          giteeReleaseBaseUrl != null && giteeReleaseBaseUrl.isNotEmpty
+          ? giteeReleaseBaseUrl
+          : 'https://gitee.com/$giteeOwner/$giteeRepo/releases/download';
+      mirrors.add('$baseUrl/$tag/$name');
+    }
     return {
       'url':
           'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name',
+      if (mirrors.isNotEmpty) 'mirrors': mirrors,
       'sha256': sha256sum(file),
       'size': file.lengthSync(),
     };
@@ -84,7 +100,11 @@ void main(List<String> args) {
     'buildNumber': buildNumber,
     'releaseDate': DateTime.now().toIso8601String().split('T').first,
     'notes': notesEnv != null && notesEnv.isNotEmpty
-        ? notesEnv.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        ? notesEnv
+              .split('|')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList()
         : ['版本更新'],
     'platforms': {
       'android': platformAsset('android'),

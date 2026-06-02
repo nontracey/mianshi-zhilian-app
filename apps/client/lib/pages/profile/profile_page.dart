@@ -2522,6 +2522,7 @@ class _AboutPanelState extends State<_AboutPanel> {
     int received = 0;
     int total = platformUpdate.size;
     bool dialogOpen = true;
+    final cancelToken = DownloadCancelToken();
 
     showDialog(
       context: context,
@@ -2560,6 +2561,15 @@ class _AboutPanelState extends State<_AboutPanel> {
                   ),
               ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  cancelToken.cancel();
+                  Navigator.pop(ctx);
+                },
+                child: Text(l10n.get('cancel')),
+              ),
+            ],
           );
         },
       ),
@@ -2569,6 +2579,7 @@ class _AboutPanelState extends State<_AboutPanel> {
     final filePath = await updateService.downloadUpdate(
       platformUpdate: platformUpdate,
       version: updateInfo.version,
+      cancelToken: cancelToken,
       onProgress: (r, t) {
         received = r;
         total = t;
@@ -2579,7 +2590,13 @@ class _AboutPanelState extends State<_AboutPanel> {
     );
 
     if (mounted) {
-      Navigator.pop(context); // 关闭下载对话框
+      if (dialogOpen) {
+        Navigator.pop(context); // 关闭下载对话框
+      }
+
+      if (cancelToken.isCancelled) {
+        return;
+      }
 
       if (filePath != null) {
         final canInstall = await AppPermissionService.ensureInstallPackages(
