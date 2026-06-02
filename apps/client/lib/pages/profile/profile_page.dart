@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
@@ -2350,6 +2351,29 @@ class _AboutPanelState extends State<_AboutPanel> {
   bool _isChecking = false;
   String? _updateMessage;
   StateSetter? _currentSetDialogState;
+  String _currentVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      setState(() {
+        _currentVersion = info.version;
+      });
+    } catch (e) {
+      debugPrint('Failed to load package info: $e');
+      // 兜底：读取编译时注入的版本号，无需手动维护
+      const definedVersion = String.fromEnvironment('APP_VERSION', defaultValue: '0.1.0');
+      setState(() {
+        _currentVersion = definedVersion;
+      });
+    }
+  }
 
   Future<void> _checkUpdate() async {
     setState(() {
@@ -2359,7 +2383,9 @@ class _AboutPanelState extends State<_AboutPanel> {
 
     try {
       final updateService = UpdateService();
-      final updateInfo = await updateService.checkForUpdate('0.1.0');
+      final versionToCheck =
+          _currentVersion.isNotEmpty ? _currentVersion : '0.1.0';
+      final updateInfo = await updateService.checkForUpdate(versionToCheck);
 
       if (mounted) {
         final l10n = context.watch<LocalizationProvider>();
@@ -2645,7 +2671,7 @@ class _AboutPanelState extends State<_AboutPanel> {
       children: [
         InfoRow(
           icon: Icons.info_outline,
-          title: l10n.get('version_010'),
+          title: '${l10n.get('version_prefix')} ${_currentVersion.isNotEmpty ? _currentVersion : "0.1.0"}',
           subtitle: l10n.get('ai_main_dynamic_back_memory_study_work_platform'),
         ),
         InfoRow(
