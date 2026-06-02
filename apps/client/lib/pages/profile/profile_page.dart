@@ -622,7 +622,7 @@ class _AccountPanel extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout, size: 18),
-                label: Text(l10n.get('regression_output')),
+                label: Text(l10n.get('logout')),
               )
             else
               FilledButton.icon(
