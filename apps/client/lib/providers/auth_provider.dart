@@ -349,25 +349,6 @@ class AuthProvider extends ChangeNotifier {
     return response;
   }
 
-  Future<http.Response> _authorizedPut(
-    String path, {
-    Map<String, dynamic>? body,
-  }) async {
-    Future<http.Response> send() async {
-      return http.put(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: await ApiHeaders.build(_storage, token: _token),
-        body: json.encode(body ?? {}),
-      );
-    }
-
-    var response = await send();
-    if (response.statusCode == 401 && await _refreshLogin()) {
-      response = await send();
-    }
-    return response;
-  }
-
   /// 上传学习进度到云端
   Future<bool> syncToCloud(
     Map<String, dynamic> progressMap,
@@ -402,40 +383,6 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Get cloud progress failed: $e');
       return null;
-    }
-  }
-
-  /// 更新自己的昵称/邮箱（持久化到服务端），成功后会刷新本地 user。
-  /// 任一字段传 null 表示不修改；传空字符串表示清空。
-  Future<bool> updateProfile({String? nickname, String? email}) async {
-    if (!isLoggedIn) {
-      _error = L10n.get('please_login_first', 'zh');
-      notifyListeners();
-      return false;
-    }
-
-    try {
-      final body = <String, dynamic>{};
-      if (nickname != null) body['nickname'] = nickname;
-      if (email != null) body['email'] = email;
-
-      final response = await _authorizedPut('/auth/me', body: body);
-      final data = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        _user = User.fromJson(data['user'] as Map<String, dynamic>);
-        await _saveUser();
-        notifyListeners();
-        return true;
-      }
-
-      _error = data['error'] as String? ?? '更新资料失败';
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
-      notifyListeners();
-      return false;
     }
   }
 

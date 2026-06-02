@@ -61,11 +61,6 @@ export default {
       return handleGetMe(request, env);
     }
 
-    // 更新自己的资料（昵称/邮箱），需要认证
-    if (url.pathname === '/auth/me' && request.method === 'PUT') {
-      return handleUpdateMe(request, env);
-    }
-
     // 修改密码（需要认证）
     if (url.pathname === '/auth/change-password' && request.method === 'POST') {
       return handleChangePassword(request, env);
@@ -418,7 +413,6 @@ async function initDatabase(db: D1Database): Promise<void> {
       is_disabled: `ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0`,
       disabled_at: `ALTER TABLE users ADD COLUMN disabled_at TEXT DEFAULT NULL`,
       updated_at: `ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT NULL`,
-      email: `ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL`,
     };
     for (const [column, sql] of Object.entries(userMigrations)) {
       if (!userColumns.has(column)) {
@@ -875,58 +869,6 @@ async function handleGetMe(request: Request, env: Env): Promise<Response> {
   } catch (e) {
     console.error('GetMe error:', e);
     return json({ error: '获取用户信息失败' }, 500);
-  }
-}
-
-// 更新自己的资料（昵称 / 邮箱）；不能改 role / is_disabled / username
-async function handleUpdateMe(request: Request, env: Env): Promise<Response> {
-  try {
-    const userId = await getUserIdFromRequest(request, env);
-    if (!userId) return json({ error: '未登录或 token 已过期' }, 401);
-
-    const body = (await request.json().catch(() => ({}))) as any;
-    const fields: string[] = [];
-    const values: any[] = [];
-
-    if (Object.prototype.hasOwnProperty.call(body, 'nickname')) {
-      const nick = asString(body.nickname, 40);
-      if (nick.length > 40) return json({ error: '昵称过长' }, 400);
-      fields.push('nickname = ?');
-      values.push(nick);
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'email')) {
-      const email = asString(body.email, 120).toLowerCase();
-      if (email.length > 120) return json({ error: '邮箱过长' }, 400);
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return json({ error: '邮箱格式不正确' }, 400);
-      }
-      fields.push('email = ?');
-      values.push(email);
-    }
-
-    if (fields.length === 0) {
-      return json({ error: '没有可更新的字段' }, 400);
-    }
-
-    await initDatabase(env.DB);
-    const target = await env.DB.prepare('SELECT id, username, is_disabled FROM users WHERE id = ?')
-      .bind(userId).first() as any;
-    if (!target) return json({ error: '用户不存在' }, 404);
-    if (target.is_disabled === 1) return json({ error: '账号已被禁用' }, 403);
-
-    values.push(userId);
-    await env.DB.prepare(
-      `UPDATE users SET ${fields.join(', ')}, updated_at = datetime('now') WHERE id = ?`
-    ).bind(...values).run();
-
-    const user = await env.DB.prepare(
-      'SELECT id, username, nickname, email, COALESCE(role, \'user\') as role, COALESCE(is_disabled, 0) as is_disabled FROM users WHERE id = ?'
-    ).bind(userId).first();
-
-    return json({ success: true, user });
-  } catch (e) {
-    console.error('UpdateMe error:', e);
-    return json({ error: '更新资料失败' }, 500);
   }
 }
 

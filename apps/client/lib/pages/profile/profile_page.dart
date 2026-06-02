@@ -706,8 +706,21 @@ class _AccountPanel extends StatelessWidget {
     );
   }
 
-  String get _displayName =>
-      authProvider.isLoggedIn ? authProvider.user!.nickname : profile.nickname;
+  /// 显示名优先级：localProfile.nickname（本地，可被 sync 流程回填）
+  /// > authProvider.user.nickname（服务端，仅在本地未设置时兜底）
+  /// > authProvider.user.username
+  /// 不再用 user.nickname 直接覆盖本地（之前是 bug：本地改完昵称不生效）
+  String get _displayName {
+    if (profile.nickname.isNotEmpty) return profile.nickname;
+    if (authProvider.isLoggedIn) {
+      final u = authProvider.user;
+      if (u != null) {
+        if (u.nickname.isNotEmpty) return u.nickname;
+        return u.username;
+      }
+    }
+    return '本地用户';
+  }
 
   // 种子头像调色板
   static const List<Color> _seedColors = [
@@ -1157,15 +1170,17 @@ class _AccountPanel extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () async {
+                onPressed: () {
                   final newNick = nicknameController.text.trim().isEmpty
                       ? l10n.get('local_user')
                       : nicknameController.text.trim() == l10n.get('local_user')
                       ? l10n.get('local_user')
                       : nicknameController.text.trim();
                   final newEmail = emailController.text.trim();
-                  final oldNick = profile.nickname;
 
+                  // 本地优先：写 localProfile（localStorage）→ UI 立即刷新
+                  // 不打任何云端 API；后台 sync 流程（webdav/github/gitee）会按
+                  // local 覆盖 remote 的策略把变更推上去。
                   onProfileChanged(
                     LocalProfile(
                       nickname: newNick,
@@ -1176,31 +1191,6 @@ class _AccountPanel extends StatelessWidget {
                       wechatBound: profile.wechatBound,
                     ),
                   );
-
-                  // 登录态下同步到服务端（让 header_bar / 全局昵称立即刷新）
-                  if (authProvider.isLoggedIn) {
-                    final ok = await authProvider.updateProfile(
-                      nickname: newNick,
-                      email: newEmail,
-                    );
-                    if (!ctx.mounted) return;
-                    if (!ok) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            authProvider.error ?? '同步昵称到云端失败',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    // 昵称未实际变化时不重弹
-                    if (oldNick == newNick && emailController.text.trim() == newEmail) {
-                      return;
-                    }
-                  }
-
-                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
