@@ -916,29 +916,6 @@ async function handleGetSyncPackage(request: Request, env: Env): Promise<Respons
   }
 }
 
-async function proxyUpdateManifest(): Promise<Response> {
-  try {
-    const res = await fetch(
-      'https://github.com/nontracey/mianshi-zhilian-app/releases/latest/download/update.json',
-      { redirect: 'follow' }
-    );
-    if (!res.ok) {
-      return json({ error: 'update manifest not found' }, 404);
-    }
-    const data = await res.json();
-    return new Response(JSON.stringify(data), {
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=300',
-      },
-    });
-  } catch (e) {
-    console.error('proxyUpdateManifest error:', e);
-    return json({ error: '上游请求失败' }, 502);
-  }
-}
-
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {
     status,
