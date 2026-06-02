@@ -78,9 +78,11 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as f:
     data = json.load(f)
 
-items = data.get("attach_files") or data.get("assets") or []
+items = data.get("attach_files") or data.get("assets") or data.get("files") or []
 for item in items:
-    name = item.get("name")
+    if not isinstance(item, dict):
+        continue
+    name = item.get("name") or item.get("filename")
     if name:
         print(name)
 PY
