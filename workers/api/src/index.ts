@@ -373,7 +373,8 @@ async function getActiveUserFromRequest(request: Request, env: Env): Promise<any
 // 初始化数据库表
 async function execSafely(db: D1Database, sql: string, label: string): Promise<void> {
   try {
-    await db.exec(sql);
+    // D1 的 db.exec 对某些 DDL 有限制，改用 prepare + run
+    await db.prepare(sql).run();
   } catch (e) {
     console.error(`initDatabase [${label}] error:`, e);
     // 单条语句失败不中断整体初始化
