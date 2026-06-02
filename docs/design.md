@@ -535,9 +535,9 @@ AI 评分维度建议：
 | 方案 | 说明 |
 | --- | --- |
 | GitHub Releases | 安装包和历史版本放在 `nontracey/mianshi-zhilian-app/releases` |
-| Cloudflare Pages/R2 | 托管稳定的 `latest.json`，避免 GitHub API 限流 |
+| Cloudflare Worker | 提供稳定的 `/update.json`，代理 GitHub latest release 中的更新清单 |
 
-第一版推荐：安装包放 GitHub Releases，`latest.json` 放 Cloudflare Pages/R2，里面的下载 URL 指向 GitHub Release 资产。
+第一版推荐：安装包放 GitHub Releases，`update.json` 随 Release 上传，Worker 的 `/update.json` 代理 latest release 资产。
 
 `update.json` 示例：
 
@@ -559,7 +559,7 @@ AI 评分维度建议：
       "size": 52428800
     },
     "windows": {
-      "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-windows.msix",
+      "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-windows-setup.exe",
       "sha256": "待生成",
       "size": 73400320
     },
@@ -578,7 +578,7 @@ AI 评分维度建议：
 sequenceDiagram
   participant U as 用户
   participant APP as 面试智练 App
-  participant UPDATE as latest.json/update.json
+  participant UPDATE as Worker /update.json
   participant GH as GitHub Release
 
   U->>APP: 点击检查更新
@@ -601,7 +601,7 @@ sequenceDiagram
 | 平台 | MVP 策略 | 正式策略 |
 | --- | --- | --- |
 | Android | 下载 APK，用户确认安装 | 后续可接应用商店或内置 APK 更新 |
-| Windows | 下载 `.msix`/`.exe` 并启动安装器 | MSIX App Installer 或专业更新器 |
+| Windows | 下载 `.exe`/`.zip` 并启动安装器 | MSIX App Installer 或专业更新器 |
 | macOS | 下载 `.dmg`/`.zip` 并引导安装 | Sparkle 自动更新，需要签名和 notarization |
 | Web | Cloudflare Pages 自动更新 | 刷新即更新，配合缓存策略 |
 
@@ -1301,7 +1301,7 @@ AI 输出格式：
 | P1 | 文件导入恢复 | 是，文件模式必须完整闭环 | ✅ 已实现 |
 | P1 | 个人中心分组子页面 | 是，设置项复杂后避免长表单 | ✅ 已实现 |
 | P1 | 掌握度看板 | 是 | ✅ 已实现 |
-| P1 | 下载更新包并校验 sha256 | 是，桌面和 Android 引导安装 | ❌ 暂缓 |
+| P1 | 下载更新包并校验 sha256 | 是，桌面和 Android 引导安装 | ✅ 已实现 |
 | P2 | 语音复述 | 暂缓 | ✅ 已实现 |
 | P2 | 模拟面试 | 暂缓 | ✅ 已实现 |
 | P2 | API Key 云端加密同步 | 暂缓 | ❌ 不同步 |
@@ -1379,7 +1379,7 @@ interview-study-app/
 | Flutter Web 首包偏大 | 首次打开较慢 | Web 端做加载页和缓存，核心体验以 App 为主 |
 | 桌面端签名和分发 | 用户安装门槛 | MVP 先用压缩包/安装包，正式版再做签名 |
 | 更新包被篡改 | 安全风险 | 下载后校验 `sha256`，正式版增加签名校验 |
-| GitHub API 限流或访问慢 | 检查更新失败 | `latest.json` 托管到 Cloudflare Pages/R2，安装包仍走 GitHub Release |
+| GitHub 访问慢或 latest release 资产不可用 | 检查更新失败 | Worker 提供稳定 `/update.json` 代理；安装包仍走 GitHub Release |
 | 多端数据冲突 | 进度覆盖 | 使用 `updatedAt` + eventId，按知识点合并最高掌握状态和最新练习记录 |
 | 游客登录后进度丢失 | 用户信任受损 | 登录前生成本地快照，默认把游客进度合并到账号 |
 

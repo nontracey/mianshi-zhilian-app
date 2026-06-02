@@ -1,6 +1,6 @@
 # 软件更新
 
-面试智练支持检查更新和下载安装包功能。
+面试智练支持应用内手动检查更新和下载安装包功能。
 
 ## 更新机制
 
@@ -9,7 +9,7 @@
 ```
 用户点击"检查更新"
        ↓
-请求 update.json（Cloudflare Worker 或 GitHub）
+请求 update.json（默认走 Cloudflare Worker 代理 GitHub Release）
        ↓
 对比 version 和 buildNumber
        ↓
@@ -95,13 +95,17 @@
 
 ## 稳定更新地址
 
-建议把 `update.json` 同步到 Cloudflare Pages/R2 的稳定路径：
+客户端默认使用 Cloudflare Worker 的稳定路径。Worker 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
 
 ```
 https://mianshi-zhilian-api.nontracey.workers.dev/update.json
 ```
 
-避免依赖 GitHub API（有限流）。
+也可以通过 `UPDATE_MANIFEST_URL` 编译参数改为其他稳定地址。
+
+## 隐私说明
+
+检查更新只发起匿名 `GET update.json` 请求，不会主动上传账号、设备 ID、学习数据或当前版本号。和所有网络请求一样，Cloudflare/GitHub 仍会接收到基础网络元数据，例如 IP 和 User-Agent。
 
 ## 代码实现
 
@@ -111,12 +115,18 @@ https://mianshi-zhilian-api.nontracey.workers.dev/update.json
 class UpdateService {
   final String updateManifestUrl;
 
-  Future<UpdateInfo?> checkForUpdate(String currentVersion) async {
+  Future<UpdateInfo?> checkForUpdate(AppBuildInfo currentVersion) async {
     final response = await http.get(Uri.parse(updateManifestUrl));
     final data = json.decode(response.body);
     final remoteVersion = data['version'];
+    final remoteBuildNumber = data['buildNumber'];
     
-    if (_isNewerVersion(remoteVersion, currentVersion)) {
+    if (_isNewerVersion(
+      remoteVersion: remoteVersion,
+      remoteBuildNumber: remoteBuildNumber,
+      localVersion: currentVersion.version,
+      localBuildNumber: currentVersion.buildNumber,
+    )) {
       return UpdateInfo.fromJson(data);
     }
     return null;

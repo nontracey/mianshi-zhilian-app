@@ -65,7 +65,7 @@
 - **语言设置**：中英文切换
 - **数据管理**：导出/清除本地数据
 - **WebDAV 同步**：备份到/恢复自 WebDAV 服务器
-- **OTA 更新**：应用内检查更新 + SHA256 校验
+- **软件更新**：应用内手动检查更新 + 安装包下载 + SHA256 校验
 
 ### 用户系统
 - **注册登录**：确认密码校验、防注入处理
@@ -98,7 +98,7 @@ mianshi-zhilian-app/
 │   │   │   └── auth/           # 登录注册
 │   │   ├── providers/          # 状态管理
 │   │   ├── services/           # 服务层
-│   │   │   ├── webdav_sync_service.dart
+│   │   │   ├── data_sync_service.dart
 │   │   │   ├── whisper_stt_service.dart
 │   │   │   └── update_service.dart
 │   │   ├── widgets/            # 通用组件

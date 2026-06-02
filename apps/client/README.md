@@ -38,9 +38,9 @@ lib/
 ├── services/                    # 服务层
 │   ├── ai_service.dart          # AI API 调用（流式/非流式）
 │   ├── storage_service.dart     # 本地数据存储和导出
-│   ├── webdav_sync_service.dart # WebDAV 备份/恢复
+│   ├── data_sync_service.dart   # 多后端备份/恢复
 │   ├── whisper_stt_service.dart # Whisper 语音转文字
-│   └── update_service.dart      # OTA 更新检查
+│   └── update_service.dart      # 手动检查更新和安装包校验
 ├── widgets/                     # 通用组件
 │   ├── voice_input_button.dart  # 语音输入按钮
 │   ├── header_bar.dart          # 顶部导航栏

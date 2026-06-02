@@ -240,7 +240,7 @@ git push origin vx.x.x
 1. 在 GitHub 仓库配置 `CLOUDFLARE_API_TOKEN` secret 后，Web 和 Worker 部署会在 push 到 `main` 时自动触发。
 2. 在 Cloudflare Workers 配置 D1 数据库绑定和 JWT Secret。
 3. 正式分发前补 Android keystore、Windows 代码签名、macOS Developer ID 签名和 notarization。
-4. 如需稳定更新地址，把 release 生成的 `update.json` 同步到 Cloudflare Pages/R2 的 `latest.json`。
+4. 更新检查默认使用 Worker 稳定地址 `https://mianshi-zhilian-api.nontracey.workers.dev/update.json`，由 Worker 代理 GitHub latest release 中的 `update.json`。如需更换更新源，可配置 GitHub Variable `UPDATE_MANIFEST_URL`。
 
 ## 免费额度与用户量估算
 
@@ -271,4 +271,4 @@ git push origin vx.x.x
 2. 进度本地优先，批量同步，不每答一题写云数据库
 3. D1 表必须加索引，避免全表扫描
 4. 用户默认自带 API Key
-5. `latest.json`、`manifest.json` 使用短缓存，具体 topic 使用长缓存
+5. `update.json`、`manifest.json` 使用短缓存，具体 topic 使用长缓存
