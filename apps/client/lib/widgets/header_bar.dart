@@ -531,7 +531,7 @@ class _HeaderBarState extends State<HeaderBar> {
     }
 
     final diceBearUrl = hasSeed && !hasAvatarUrl
-        ? 'https://api.dicebear.com/9.x/bottts/png'
+        ? 'https://api.dicebear.com/9.x/fun-emoji/png'
             '?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
         : null;
 

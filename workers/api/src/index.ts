@@ -584,22 +584,14 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   try {
     getJwtSecret(env);
     const body = await request.json() as any;
-    const { username, password_hash, password, nickname } = body;
+    const { username, password_hash, nickname } = body;
 
-    // 优先用 password_hash（SHA-256），兼容旧客户端传 password
-    const effectivePassword = password_hash || password;
-
-    if (!username || !effectivePassword) {
+    if (!username || !password_hash) {
       return json({ error: '用户名和密码不能为空' }, 400);
     }
 
     if (username.length < 3 || username.length > 20) {
       return json({ error: '用户名长度需要 3-20 个字符' }, 400);
-    }
-
-    // password 用于长度校验（密码原文），password_hash 是固定 64 位 hex
-    if (password && password.length < 6) {
-      return json({ error: '密码长度至少 6 个字符' }, 400);
     }
 
     // 初始化数据库表
@@ -617,7 +609,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     // 创建用户（统一转小写存储，PBKDF2 哈希密码，默认 role=user）
     const userId = crypto.randomUUID();
     // 新注册用户统一使用 SHA-256(password) 作为 PBKDF2 输入
-    const passwordHash = await hashPassword(effectivePassword);
+    const passwordHash = await hashPassword(password_hash);
     const finalNickname = nickname || username;
     const normalizedUsername = username.toLowerCase();
 
@@ -648,14 +640,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   try {
     getJwtSecret(env);
     const body = await request.json() as any;
-    const { username, password_hash, password, require_role } = body;
+    const { username, password_hash, require_role } = body;
 
-    // 优先用 password_hash（SHA-256），兼容旧客户端传 password
-    const effectiveSecret = password_hash || password;
-    const hasHash = typeof password_hash === 'string' && password_hash.length > 0;
-    const hasPassword = typeof password === 'string' && password.length > 0;
-
-    if (!username || !effectiveSecret) {
+    if (!username || !password_hash) {
       return json({ error: '用户名和密码不能为空' }, 400);
     }
 
@@ -683,28 +670,17 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
       return json({ error: '账号或密码错误' }, 401);
     }
 
-    // 验证密码：多层迁移
-    // 格式 3（最新）：PBKDF2(PBKDF2(password, static, 10000), random_salt)
-    // 格式 2（SHA-256 过渡）：PBKDF2(SHA-256(password), random_salt)
-    // 格式 0（遗留无 salt）：SHA-256(password)
-    // 格式 1（PBKDF2 明文）已移除 —— 所有用户登录时自动升级，不再接受明文穿越网络。
-    const clientKey = password_hash; // PBKDF2(password, static, 10000)
-    const hashedPassword = hasPassword ? await legacyHash(password) : ''; // SHA-256(password)
-    let passwordValid = await verifyPassword(clientKey, user.password_hash);
-    let needsUpgrade = false;
-
-    if (!passwordValid && hashedPassword) {
-      // 格式 2 → 格式 3
-      passwordValid = await verifyPassword(hashedPassword, user.password_hash);
-      if (passwordValid) needsUpgrade = true;
-    }
+    // 验证密码：PBKDF2 双层方案
+    // client 发送 PBKDF2(password, static_salt, 10000)，服务端存储 PBKDF2(clientKey, random_salt)
+    const clientKey = password_hash;
+    const passwordValid = await verifyPassword(clientKey, user.password_hash);
 
     if (!passwordValid) {
       return json({ error: '账号或密码错误' }, 401);
     }
 
-    // 升级哈希格式到最新
-    if (needsUpgrade || !user.password_hash.includes(':')) {
+    // 旧格式升级到最新 PBKDF2 格式
+    if (!user.password_hash.includes(':')) {
       const newHash = await hashPassword(clientKey);
       await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
         .bind(newHash, user.id)

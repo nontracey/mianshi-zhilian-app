@@ -742,7 +742,7 @@ class _AccountPanel extends StatelessWidget {
     final hasSeed = profile.avatarSeed.isNotEmpty;
     final seedColor = _seedColor(profile.avatarSeed);
     final diceBearUrl = hasSeed && !hasAvatarUrl
-        ? 'https://api.dicebear.com/9.x/bottts/png?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
+        ? 'https://api.dicebear.com/9.x/fun-emoji/png?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
         : null;
     final showInitials = !hasAvatarUrl && !hasSeed;
 
