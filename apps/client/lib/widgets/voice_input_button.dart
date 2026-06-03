@@ -100,35 +100,46 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (!await AppPermissionService.ensureSpeechRecognition(context)) return;
     if (!mounted) return;
 
-    if (!_isAvailable) {
-      await _initSystemSpeech();
-      if (!mounted) return;
-    }
+    try {
+      if (!_isAvailable) {
+        await _initSystemSpeech();
+        if (!mounted) return;
+      }
 
-    if (!_isAvailable) {
+      if (!_isAvailable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.get('voice_not_available'))),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isListening = true);
+      widget.onListeningChanged?.call(true);
+
+      await _speech.listen(
+        onResult: (result) {
+          if (result.finalResult) {
+            widget.onResult(result.recognizedWords);
+          }
+        },
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          cancelOnError: true,
+          localeId: 'zh_CN',
+        ),
+      );
+    } catch (e) {
+      debugPrint('System STT error: $e');
       if (mounted) {
+        setState(() => _isListening = false);
+        widget.onListeningChanged?.call(false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.get('voice_not_available'))),
         );
       }
-      return;
     }
-
-    setState(() => _isListening = true);
-    widget.onListeningChanged?.call(true);
-
-    await _speech.listen(
-      onResult: (result) {
-        if (result.finalResult) {
-          widget.onResult(result.recognizedWords);
-        }
-      },
-      listenOptions: stt.SpeechListenOptions(
-        listenMode: stt.ListenMode.dictation,
-        cancelOnError: true,
-        localeId: 'zh_CN',
-      ),
-    );
   }
 
   Future<void> _stopSystemListening() async {

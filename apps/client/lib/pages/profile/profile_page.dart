@@ -27,6 +27,7 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
+import 'package:mianshi_zhilian/widgets/voice_diagnostic_sheet.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -1661,7 +1662,7 @@ class _AiConfigPanel extends StatelessWidget {
 
 // ── 语音识别配置面板 ──────────────────────────────────────────────
 
-class _SttConfigPanel extends StatelessWidget {
+class _SttConfigPanel extends StatefulWidget {
   const _SttConfigPanel({
     required this.settings,
     required this.onSettingsChanged,
@@ -1671,9 +1672,58 @@ class _SttConfigPanel extends StatelessWidget {
   final ValueChanged<AppSettings> onSettingsChanged;
 
   @override
+  State<_SttConfigPanel> createState() => _SttConfigPanelState();
+}
+
+class _SttConfigPanelState extends State<_SttConfigPanel> {
+  late TextEditingController _baseUrlCtrl;
+  late TextEditingController _apiKeyCtrl;
+  late TextEditingController _modelCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initControllers();
+  }
+
+  void _initControllers() {
+    _baseUrlCtrl =
+        TextEditingController(text: widget.settings.whisperBaseUrl ?? '');
+    _apiKeyCtrl =
+        TextEditingController(text: widget.settings.whisperApiKey ?? '');
+    _modelCtrl = TextEditingController(text: widget.settings.whisperModel);
+  }
+
+  @override
+  void didUpdateWidget(_SttConfigPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 外部 settings 变化时同步 controller，避免覆盖用户正在编辑的内容
+    if (oldWidget.settings.whisperBaseUrl != widget.settings.whisperBaseUrl &&
+        _baseUrlCtrl.text != (widget.settings.whisperBaseUrl ?? '')) {
+      _baseUrlCtrl.text = widget.settings.whisperBaseUrl ?? '';
+    }
+    if (oldWidget.settings.whisperApiKey != widget.settings.whisperApiKey &&
+        _apiKeyCtrl.text != (widget.settings.whisperApiKey ?? '')) {
+      _apiKeyCtrl.text = widget.settings.whisperApiKey ?? '';
+    }
+    if (oldWidget.settings.whisperModel != widget.settings.whisperModel &&
+        _modelCtrl.text != widget.settings.whisperModel) {
+      _modelCtrl.text = widget.settings.whisperModel;
+    }
+  }
+
+  @override
+  void dispose() {
+    _baseUrlCtrl.dispose();
+    _apiKeyCtrl.dispose();
+    _modelCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final isWhisper = settings.sttMode == 'whisper';
+    final isWhisper = widget.settings.sttMode == 'whisper';
 
     return WorkPanel(
       title: l10n.get('speech_voice_identify_distinct'),
@@ -1692,8 +1742,8 @@ class _SttConfigPanel extends StatelessWidget {
                     'use_design_alternate_internal_set_speech_voice_identify_distinct',
                   ),
                   selected: !isWhisper,
-                  onTap: () =>
-                      onSettingsChanged(settings.copyWith(sttMode: 'system')),
+                  onTap: () => widget.onSettingsChanged(
+                      widget.settings.copyWith(sttMode: 'system')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1703,8 +1753,8 @@ class _SttConfigPanel extends StatelessWidget {
                   icon: Icons.cloud_outlined,
                   description: l10n.get('use_whisper_also_capacity_api'),
                   selected: isWhisper,
-                  onTap: () =>
-                      onSettingsChanged(settings.copyWith(sttMode: 'whisper')),
+                  onTap: () => widget.onSettingsChanged(
+                      widget.settings.copyWith(sttMode: 'whisper')),
                 ),
               ),
             ],
@@ -1718,43 +1768,37 @@ class _SttConfigPanel extends StatelessWidget {
             child: Column(
               children: [
                 TextField(
-                  controller: TextEditingController(
-                    text: settings.whisperBaseUrl ?? '',
-                  ),
+                  controller: _baseUrlCtrl,
                   decoration: InputDecoration(
                     labelText: l10n.get('api_address'),
                     hintText: 'https://api.openai.com/v1',
                     isDense: true,
                   ),
-                  onChanged: (v) =>
-                      onSettingsChanged(settings.copyWith(whisperBaseUrl: v)),
+                  onChanged: (v) => widget.onSettingsChanged(
+                      widget.settings.copyWith(whisperBaseUrl: v)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                  controller: TextEditingController(
-                    text: settings.whisperApiKey ?? '',
-                  ),
+                  controller: _apiKeyCtrl,
                   decoration: const InputDecoration(
                     labelText: 'API Key',
                     hintText: 'sk-...',
                     isDense: true,
                   ),
                   obscureText: true,
-                  onChanged: (v) =>
-                      onSettingsChanged(settings.copyWith(whisperApiKey: v)),
+                  onChanged: (v) => widget.onSettingsChanged(
+                      widget.settings.copyWith(whisperApiKey: v)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                  controller: TextEditingController(
-                    text: settings.whisperModel,
-                  ),
+                  controller: _modelCtrl,
                   decoration: InputDecoration(
                     labelText: l10n.get('mode_type_name'),
                     hintText: 'whisper-1',
                     isDense: true,
                   ),
-                  onChanged: (v) =>
-                      onSettingsChanged(settings.copyWith(whisperModel: v)),
+                  onChanged: (v) => widget.onSettingsChanged(
+                      widget.settings.copyWith(whisperModel: v)),
                 ),
               ],
             ),
@@ -1773,6 +1817,17 @@ class _SttConfigPanel extends StatelessWidget {
               fontSize: 12,
               color: Theme.of(context).textTheme.bodySmall?.color,
             ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              builder: (_) => const VoiceDiagnosticSheet(),
+            ),
+            icon: const Icon(Icons.bug_report_outlined, size: 16),
+            label: Text(l10n.get('voice_diagnostic_title')),
           ),
         ),
       ],
