@@ -26,18 +26,38 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_macos_podfile_setup
 
-# whisper_kit declares macOS: ffiPlugin: true but ships no macOS podspec.
-# Provide a local stub podspec so CocoaPods install succeeds on macOS.
-def whisper_kit_stub_podspec
-  File.join(File.dirname(File.realpath(__FILE__)), 'LocalPods', 'whisper_kit', 'whisper_kit.podspec')
+# whisper_kit declares macOS: ffiPlugin: true in pubspec.yaml but ships no
+# macOS podspec. Place a stub podspec at the resolved pub-cache path of the
+# symlink so CocoaPods can find it. Writing to the real path (not the symlink)
+# ensures it survives Flutter's ephemeral directory recreation.
+def ensure_whisper_kit_podspec
+  podfile_dir = File.dirname(File.realpath(__FILE__))
+  symlink = File.join(podfile_dir, 'Flutter', 'ephemeral', '.symlinks', 'plugins', 'whisper_kit')
+
+  # If the symlink exists, resolve to its real target (pub cache).
+  # Otherwise fall back to the symlink path itself (may not exist yet).
+  real_plugin_dir = if File.symlink?(symlink)
+                      File.expand_path(File.readlink(symlink), File.dirname(symlink))
+                    else
+                      symlink
+                    end
+
+  macos_dir = File.join(real_plugin_dir, 'macos')
+  podspec_path = File.join(macos_dir, 'whisper_kit.podspec')
+
+  return if File.exist?(podspec_path)
+
+  FileUtils.mkdir_p(macos_dir)
+  FileUtils.mkdir_p(File.join(macos_dir, 'Classes'))
+
+  stub_src = File.join(podfile_dir, 'LocalPods', 'whisper_kit', 'whisper_kit.podspec')
+  FileUtils.cp(stub_src, podspec_path)
 end
+
+ensure_whisper_kit_podspec
 
 target 'Runner' do
   use_frameworks!
-
-  # Supply the stub podspec for whisper_kit before Flutter's plugin helper
-  # tries to resolve it from the ephemeral symlink (which lacks a podspec).
-  pod 'whisper_kit', :podspec => whisper_kit_stub_podspec
 
   flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
