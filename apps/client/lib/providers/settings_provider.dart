@@ -37,7 +37,7 @@ class SettingsProvider extends ChangeNotifier {
   /// 首次使用（无已保存设置）时，按平台选择合理的默认语音模式：
   /// Android → whisper_kit（本机离线免费）
   /// macOS   → system（NSSpeechRecognizer，原生免费流式）
-  /// Web     → whisper（云端 API）
+  /// Web     → system（Web Speech API，Chrome/Safari 免费无限流式）
   /// 其他    → system（如 Windows/Linux 有内置引擎则可用）
   AppSettings _applyPlatformDefaults(AppSettings s) {
     // 只在用户从未主动选择过 sttMode 时才覆盖为平台默认值
@@ -45,8 +45,8 @@ class SettingsProvider extends ChangeNotifier {
     const hardcodedDefault = 'whisper_kit';
     if (s.sttMode != hardcodedDefault) return s;
 
-    // Web 端没有本地引擎，默认走云端
-    if (kIsWeb) return s.copyWith(sttMode: 'whisper');
+    // Web 端使用 Web Speech API，Chrome/Safari 免费无限流式
+    if (kIsWeb) return s.copyWith(sttMode: 'system');
 
     // macOS 原生语音识别可靠，用 system
     if (defaultTargetPlatform == TargetPlatform.macOS) {
