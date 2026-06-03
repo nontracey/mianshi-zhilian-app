@@ -1725,28 +1725,49 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final mode = widget.settings.sttMode;
+    final isSystem = mode == 'system';
     final isWhisper = mode == 'whisper';
     final isWhisperKit = mode == 'whisper_kit';
+
+    // 按平台决定可选模式
+    final bool showLocalCard;
+    final Widget localCard;
+    if (isWhisperKit || (!isSystem && !isWhisper && defaultTargetPlatform == TargetPlatform.android)) {
+      // Android / 已选 whisper_kit → 显示本机 Whisper
+      showLocalCard = true;
+      localCard = _SttModeCard(
+        label: l10n.get('whisper_kit_mode_label'),
+        icon: Icons.memory,
+        description: l10n.get('whisper_kit_mode_desc'),
+        selected: isWhisperKit,
+        onTap: () => widget.onSettingsChanged(
+            widget.settings.copyWith(sttMode: 'whisper_kit')),
+      );
+    } else {
+      // macOS / 桌面 → 显示系统语音
+      showLocalCard = true;
+      localCard = _SttModeCard(
+        label: l10n.get('system_speech_voice'),
+        icon: Icons.phone_android,
+        description: l10n.get('system_speech_voice_desc'),
+        selected: isSystem,
+        onTap: () => widget.onSettingsChanged(
+            widget.settings.copyWith(sttMode: 'system')),
+      );
+    }
 
     return WorkPanel(
       title: l10n.get('speech_voice_identify_distinct'),
       icon: Icons.mic_outlined,
       children: [
-        // STT 模式切换 — 两卡片
+        // STT 模式切换
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              _SttModeCard(
-                label: l10n.get('whisper_kit_mode_label'),
-                icon: Icons.memory,
-                description: l10n.get('whisper_kit_mode_desc'),
-                selected: isWhisperKit,
-                onTap: () => widget.onSettingsChanged(
-                    widget.settings.copyWith(sttMode: 'whisper_kit')),
-              ),
+              if (showLocalCard) localCard,
               _SttModeCard(
                 label: 'Whisper API',
                 icon: Icons.cloud_outlined,
@@ -1762,6 +1783,20 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         if (isWhisperKit) ...[
           const SizedBox(height: 12),
           _WhisperKitModelManager(),
+        ],
+        // 系统语音提示（仅 macOS / 桌面端显示）
+        if (isSystem) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              l10n.get('system_speech_voice_desc'),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         ],
         // Whisper API 配置（仅 whisper 模式显示）
         if (isWhisper) ...[
@@ -1897,17 +1932,38 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
           _downloading = false;
           _statusText = l10n.get('whisper_kit_download_failed');
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context
-                      .read<LocalizationProvider>()
-                      .get('whisper_kit_download_failed'),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // 非 Android 平台大概率是平台不支持，给出降级引导
+        if (defaultTargetPlatform != TargetPlatform.android) {
+          _showWhisperKitUnavailableDialog(l10n);
+        }
       }
+    }
+  }
+
+  Future<void> _showWhisperKitUnavailableDialog(LocalizationProvider l10n) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('voice_not_available')),
+        content: Text(l10n.get('whisper_kit_unsupported_platform')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'switch'),
+            child: Text(l10n.get('switch_to_whisper_api')),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'switch' && mounted) {
+      context
+          .read<SettingsProvider>()
+          .updateSettings(
+            context.read<SettingsProvider>().settings.copyWith(sttMode: 'whisper'),
+          );
     }
   }
 

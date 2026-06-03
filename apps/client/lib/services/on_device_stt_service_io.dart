@@ -74,29 +74,37 @@ class OnDeviceSttService {
     void Function(int received, int total)? onProgress,
   }) async {
     if (_modelReady) return;
+    if (_modelDownloading) return;
 
     _modelDownloading = true;
     _modelStatus = 'downloading';
 
-    _whisper = Whisper(
-      model: WhisperModel.tiny,
-      downloadHost:
-          'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main',
-      onDownloadProgress: (received, total) {
-        onProgress?.call(received, total);
-        if (total > 0) {
-          final pct = (received / total * 100).toStringAsFixed(0);
-          _modelStatus = 'downloading:$pct';
-        }
-      },
-    );
+    try {
+      _whisper = Whisper(
+        model: WhisperModel.tiny,
+        downloadHost:
+            'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main',
+        onDownloadProgress: (received, total) {
+          onProgress?.call(received, total);
+          if (total > 0) {
+            final pct = (received / total * 100).toStringAsFixed(0);
+            _modelStatus = 'downloading:$pct';
+          }
+        },
+      );
 
-    // 触发模型初始化（调用 getVersion 会内部触发模型下载/加载）
-    await _whisper!.getVersion();
+      // 触发模型初始化（调用 getVersion 会内部触发模型下载/加载）
+      await _whisper!.getVersion();
 
-    _modelReady = true;
-    _modelDownloading = false;
-    _modelStatus = 'ready';
+      _modelReady = true;
+      _modelStatus = 'ready';
+    } catch (e) {
+      _modelReady = false;
+      _modelStatus = 'not_downloaded';
+      debugPrint('OnDeviceStt: initModel failed (platform may not support native whisper): $e');
+    } finally {
+      _modelDownloading = false;
+    }
   }
 
   /// 开始边说边转

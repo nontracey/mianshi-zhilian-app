@@ -1411,3 +1411,66 @@ interview-study-app/
 13. 微信小程序不再作为主路线，只作为后续可选轻量入口。
 
 这样第一版可以先把“学习 -> 复述 -> AI 纠错 -> 掌握度更新 -> 下一个知识点”的核心闭环做出来，同时把服务器和数据库成本压到接近免费。
+
+## 17. 语音识别实现
+
+### 17.1 三种模式
+
+| 模式 | 引擎 | 平台支持 | 免费 | 离线 |
+|------|------|---------|------|------|
+| `system` | 平台内置语音引擎（macOS NSSpeechRecognizer / Android GMS RecognizerIntent） | macOS ✅、Android（需 GMS）⚠️、Windows ❌、Web ❌ | ✅ | ✅ |
+| `whisper_kit` | whisper.cpp 本地模型（`package:whisper_kit`） | Android ✅、iOS ✅、macOS ❌（见下文） | ✅ | ✅ |
+| `whisper` | 用户自配 Whisper API（云端） | 全平台 | ❌ | ❌ |
+
+### 17.2 平台感知默认值
+
+首次使用时（无已保存设置），`SettingsProvider._applyPlatformDefaults` 按平台选择合理默认模式，避免用户在不支持的模式上遇到失败：
+
+- **macOS** → `system`（NSSpeechRecognizer 稳定可靠）
+- **Android** → `whisper_kit`（无 GMS 设备会降级，见 17.4）
+- **Web** → `whisper`（Web 端没有本地引擎）
+
+判断依据：检查 `s.sttMode` 是否等于 `AppSettings` 中的硬编码默认值 `'whisper_kit'`，是则覆盖为平台默认，否则保留用户已选择的模式。
+
+### 17.3 条件导入架构
+
+```
+on_device_stt_service.dart
+  ├── export if (dart.library.io) → on_device_stt_service_io.dart (真实实现)
+  └── export else                 → on_device_stt_service_stub.dart (空桩，仅 Web 编译)
+```
+
+- `on_device_stt_service_io.dart` 中 `import 'package:whisper_kit/whisper_kit.dart'` 仅在 native 平台编译
+- Web 编译时不解析 `whisper_kit` 包，因此 Web 的 `flutter build` 不会因该包的平台限制失败
+- 空桩方法全部抛出 `UnsupportedError`
+
+### 17.4 降级与错误处理
+
+两种本地模式（`system` 和 `whisper_kit`）初始化失败时：
+
+1. 弹出 `AlertDialog`，文案提示"当前平台不支持，建议切换到 Whisper API"
+2. 提供两个按钮：`取消` 和 `切换到 Whisper API`
+3. 点击"切换到 Whisper API"时，直接更新 `SettingsProvider` 的 `sttMode` 为 `'whisper'`
+4. 用户再次打开语音输入时将自动使用 Whisper API 配置
+
+触发降级的场景：
+- 系统语音初始化返回 `!isAvailable`（如 Windows、无 GMS 的 Android）
+- 系统语音 `listen()` 抛出异常（如 Web 端的 `SpeechToText` 初始化失败）
+- `whisper_kit` 模型下载/初始化失败（如 macOS 虽已声明支持，但实际 whisper.cpp 模型不可用）
+
+### 17.5 macOS 构建约束
+
+`whisper_kit` 在 `pubspec.yaml` 中声明了 `macos: ffiPlugin: true`，但实际没有提供 `macos/whisper_kit.podspec`。Flutter macOS 构建流程中 `flutter_install_all_macos_pods` 会遍历所有声明 macOS 支持的插件并查找其 podspec，找不到时 CocoaPods 报错退出。
+
+修复位置：`macos/Podfile` 在 `flutter_install_all_macos_pods` 执行前检查 `.symlinks/plugins/whisper_kit/macos/whisper_kit.podspec`，不存在时写入桩文件（仅含 `FlutterMacOS` 依赖和必要元信息）。这是第三包包缺陷，桩文件使构建通过，桩 pod 不会在运行时链接任何实际代码。
+
+### 17.6 l10n Key 约定
+
+STT 相关文案遵循项目 l10n 规范，新增 keys：
+
+| Key | 用途 |
+|-----|------|
+| `whisper_kit_unsupported_platform` | 本机 Whisper 不支持当前平台 |
+| `system_speech_voice_desc` | 系统语音模式描述文案 |
+| `system_speech_unsupported` | 系统语音不支持当前平台 |
+| `switch_to_whisper_api` | 降级弹窗中"切换到 Whisper API"按钮文案 |

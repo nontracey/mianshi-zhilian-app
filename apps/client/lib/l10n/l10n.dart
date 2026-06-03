@@ -406,6 +406,8 @@ class L10n {
     'whisper_kit_delete_model': '删除模型',
     'whisper_kit_download_complete': '模型下载完成，可以开始语音输入了',
     'whisper_kit_download_failed': '模型下载失败，请检查网络后重试',
+    'whisper_kit_unsupported_platform':
+        '当前平台不支持本机语音识别，建议切换到 Whisper API。',
     'whisper_kit_download_model': '下载模型（~75MB）',
     'whisper_kit_download_now': '现在下载',
     'whisper_kit_download_prompt_desc':
@@ -1353,6 +1355,10 @@ class L10n {
     'surface_structure_design': '表结构设计',
     'system_design_interview_finger_south': '系统设计面试指南',
     'system_speech_voice': '系统语音',
+    'system_speech_voice_desc': '使用设备内置语音引擎，免费离线，流式识别。',
+    'system_speech_unsupported':
+        '当前平台不支持内置语音引擎，建议切换到 Whisper API。',
+    'switch_to_whisper_api': '切换到 Whisper API',
     'thread_pool': '线程池',
     'three_method_account_bind': '第三方账号绑定',
     'today_review': '今日复习',
@@ -1857,6 +1863,8 @@ class L10n {
     'whisper_kit_need_download_tooltip': 'Download model to use',
     'whisper_kit_web_unsupported':
         'On-device speech recognition is not supported on Web',
+    'whisper_kit_unsupported_platform':
+        'On-device speech recognition is not supported on this platform. Please switch to Whisper API.',
     'login_offline_description':
         'You can learn and practice fully without logging in. Login is only for cloud backup and cross-device recovery. You will be prompted to merge local data after login.',
     'ai_tech_stack_description':
@@ -2530,6 +2538,10 @@ class L10n {
     'system_design_interview_finger_south': 'System Design Interview Guide',
     'system_design_interview_practice': 'System Design Interview Practice',
     'system_speech_voice': 'System Voice',
+    'system_speech_voice_desc': 'Built-in speech engine, free, offline, streaming.',
+    'system_speech_unsupported':
+        'Built-in speech engine is not supported on this platform. Please switch to Whisper API.',
+    'switch_to_whisper_api': 'Switch to Whisper API',
     'index': 'Index',
     'index_design': 'Index Design',
     'compact': 'Compact',

@@ -8,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
 import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
@@ -105,6 +106,38 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   // ── System STT ──
 
+  /// 本地模式不可用时的降级弹窗
+  Future<void> _showLocalModeUnavailable({
+    required String messageKey,
+    required String currentMode,
+  }) async {
+    if (!mounted) return;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('voice_not_available')),
+        content: Text(l10n.get(messageKey)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'switch'),
+            child: Text(l10n.get('switch_to_whisper_api')),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'switch' && mounted) {
+      context
+          .read<SettingsProvider>()
+          .updateSettings(
+            context.read<SettingsProvider>().settings.copyWith(sttMode: 'whisper'),
+          );
+    }
+  }
+
   Future<void> _startSystemListening() async {
     if (!await AppPermissionService.ensureSpeechRecognition(context)) return;
     if (!mounted) return;
@@ -117,8 +150,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
       if (!_isAvailable) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.get('voice_not_available'))),
+          _showLocalModeUnavailable(
+            messageKey: 'system_speech_unsupported',
+            currentMode: 'system',
           );
         }
         return;
@@ -129,9 +163,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
       await _speech.listen(
         onResult: (result) {
-          if (result.finalResult) {
-            widget.onResult(result.recognizedWords);
-          }
+          widget.onResult(result.recognizedWords);
         },
         listenOptions: stt.SpeechListenOptions(
           listenMode: stt.ListenMode.dictation,
@@ -144,8 +176,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       if (mounted) {
         setState(() => _isListening = false);
         widget.onListeningChanged?.call(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('voice_not_available'))),
+        _showLocalModeUnavailable(
+          messageKey: 'system_speech_unsupported',
+          currentMode: 'system',
         );
       }
     }
@@ -380,11 +413,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.get('whisper_kit_download_failed')),
-            backgroundColor: Colors.red,
-          ),
+        _showLocalModeUnavailable(
+          messageKey: 'whisper_kit_unsupported_platform',
+          currentMode: 'whisper_kit',
         );
       }
     }

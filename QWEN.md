@@ -255,6 +255,27 @@ git push origin vx.x.x
 - API Key 默认仅保存在本地，不上传云端
 - 支持流式输出（打字机模式）
 
+### 语音识别（STT）
+
+三种模式，按平台自动选择默认值：
+
+| 模式 | 说明 | 默认平台 |
+|------|------|---------|
+| `system` | 系统内置语音引擎（macOS NSSpeechRecognizer / Android GMS） | macOS |
+| `whisper_kit` | 本地 whisper.cpp 离线模型 | Android |
+| `whisper` | 用户自配 Whisper API（云端） | Web |
+
+**平台约束与降级：**
+- iOS 尚未启用，`whisper_kit` 声明了 `macos: ffiPlugin: true` 但缺少 macOS podspec → 见下方 macOS 构建说明
+- macOS 系统语音引擎可靠，但无 GMS 的 Android 设备系统语音不可用，会自动跳 Whisper API
+- 首次使用（无已保存设置）时 `SettingsProvider._applyPlatformDefaults` 按平台选择合理默认值
+
+**条件导入模式：**
+`on_device_stt_service.dart` 使用 `export if (dart.library.io)` 在 native 平台导出真实实现（`on_device_stt_service_io.dart`），Web 导出空桩（`on_device_stt_service_stub.dart`）。这是 `whisper_kit` 的 `package:whisper_kit` import 放在 IO 实现文件而非入口文件的原因——Web 编译时不会尝试解析该包。
+
+**macOS 构建注意事项：**
+`whisper_kit` 在 pubspec.yaml 中声明了 `macos: ffiPlugin: true`，但实际没有提供 `macos/whisper_kit.podspec`，导致 `flutter build macos --release` 时 CocoaPods 报错。修复方式：`macos/Podfile` 在 `flutter_install_all_macos_pods` 执行前检查 `.symlinks/plugins/whisper_kit/macos/whisper_kit.podspec`，不存在时自动创建桩文件。这是第三包包缺陷，非本项目问题。
+
 ### 设计理念
 
 - **不花哨，像一个认真备战面试的控制台**

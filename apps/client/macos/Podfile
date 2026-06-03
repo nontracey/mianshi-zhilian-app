@@ -32,6 +32,7 @@ whisper_kit_macos = File.join(File.dirname(File.realpath(__FILE__)), 'Flutter', 
 podspec = File.join(whisper_kit_macos, 'whisper_kit.podspec')
 unless File.exist?(podspec)
   FileUtils.mkdir_p(whisper_kit_macos)
+  FileUtils.mkdir_p(File.join(whisper_kit_macos, 'Classes'))
   File.write(podspec, <<~PODSPEC)
     Pod::Spec.new do |s|
       s.name             = 'whisper_kit'
