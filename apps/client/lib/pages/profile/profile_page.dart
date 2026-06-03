@@ -1921,9 +1921,7 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              context.read<LocalizationProvider>().get('cancel'),
-            ),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),

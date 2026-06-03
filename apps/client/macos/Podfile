@@ -26,6 +26,30 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_macos_podfile_setup
 
+# whisper_kit declares macOS: ffiPlugin: true in pubspec.yaml but ships no
+# macOS podspec. Create a stub so CocoaPods install succeeds on macOS.
+whisper_kit_macos = File.join(File.dirname(File.realpath(__FILE__)), 'Flutter', 'ephemeral', '.symlinks', 'plugins', 'whisper_kit', 'macos')
+podspec = File.join(whisper_kit_macos, 'whisper_kit.podspec')
+unless File.exist?(podspec)
+  FileUtils.mkdir_p(whisper_kit_macos)
+  File.write(podspec, <<~PODSPEC)
+    Pod::Spec.new do |s|
+      s.name             = 'whisper_kit'
+      s.version          = '0.3.1'
+      s.summary          = 'whisper_kit macOS stub'
+      s.homepage         = 'https://github.com/CodeSagePath/whisper_kit'
+      s.license          = { :type => 'MIT' }
+      s.author           = { 'whisper_kit' => 'https://github.com/CodeSagePath/whisper_kit' }
+      s.source           = { :path => '.' }
+      s.source_files     = 'Classes/**/*'
+      s.dependency 'FlutterMacOS'
+      s.platform = :osx, '10.15'
+      s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+      s.swift_version = '5.0'
+    end
+  PODSPEC
+end
+
 target 'Runner' do
   use_frameworks!
 

@@ -435,14 +435,21 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   /// 将服务层 modelStatus 码解析为 UI 可显示文本
   /// modelStatus 格式: 'ready' | 'not_downloaded' | 'downloading' | 'downloading:45'
-  String _formatModelStatus(LocalizationProvider l10n, String status) {
+  String _formatModelStatus(LocalizationProvider l10n_, String status) {
     if (status.startsWith('downloading:')) {
       final pct = status.split(':').last;
-      return l10n.getp('whisper_kit_downloading_percent', {'percent': pct});
+      return l10n_.getp('whisper_kit_downloading_percent', {'percent': pct});
     }
-    // downloading 无进度、ready、not_downloaded 等状态在 showModelProgress
-    // 条件下（只有 isModelDownloading 为 true）不应出现，兜底返回原始码
-    return status;
+    switch (status) {
+      case 'ready':
+        return l10n_.get('whisper_kit_model_downloaded');
+      case 'not_downloaded':
+        return l10n_.get('whisper_kit_model_not_downloaded');
+      case 'downloading':
+        return l10n_.get('whisper_kit_model_downloading');
+      default:
+        return status;
+    }
   }
 
   @override
