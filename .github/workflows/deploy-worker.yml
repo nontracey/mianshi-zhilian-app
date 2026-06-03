@@ -28,6 +28,11 @@ jobs:
           sed -i "s/PLACEHOLDER_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/"
           wrangler.toml
 
+      - name: Inject KV namespace ID
+        run: >
+          sed -i "s/PLACEHOLDER_KV_NAMESPACE_ID/${{ secrets.KV_NAMESPACE_ID }}/"
+          wrangler.toml
+
       - name: Put JWT secret
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}

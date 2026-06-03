@@ -2,6 +2,12 @@ name = "mianshi-zhilian-api"
 main = "src/index.ts"
 compatibility_date = "2026-05-27"
 
+[[kv_namespaces]]
+binding = "KV"
+# PLACEHOLDER_KV_NAMESPACE_ID 由 CI（deploy-worker.yml）在部署前通过 sed 替换为
+# GitHub Secrets 中的 KV_NAMESPACE_ID，避免将真实 namespace_id 硬编码在仓库中。
+id = "PLACEHOLDER_KV_NAMESPACE_ID"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "mianshi-zhilian-db"

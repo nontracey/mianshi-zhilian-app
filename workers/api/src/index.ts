@@ -380,6 +380,7 @@ async function execSafely(db: D1Database, sql: string, label: string): Promise<v
 }
 
 async function initDatabase(db: D1Database): Promise<void> {
+  if (dbInitialized) return;
   // 逐条执行 D1 DDL，避免多语句 exec 兼容性问题
   await execSafely(db, `CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -536,7 +537,16 @@ async function initDatabase(db: D1Database): Promise<void> {
     )`, 'create security_block_rules');
   await execSafely(db, `CREATE INDEX IF NOT EXISTS idx_security_block_rules_lookup ON security_block_rules(type, value, is_active)`, 'idx security_block_rules lookup');
   await execSafely(db, `CREATE INDEX IF NOT EXISTS idx_security_block_rules_created ON security_block_rules(created_at)`, 'idx security_block_rules created');
+
+  dbInitialized = true;
 }
+
+// 模块级标志，避免每次请求重复执行 DDL
+let dbInitialized = false;
+let syncTablesInitialized = false;
+
+const SECURITY_RULES_KV_KEY = 'security_block_rules:v1';
+const SECURITY_RULES_CACHE_TTL = 300; // 5 分钟
 
 function getClientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP')
@@ -544,35 +554,61 @@ function getClientIp(request: Request): string {
     || '';
 }
 
+// 从 KV 或 D1 获取活跃封禁规则，结果不含过期或已停用规则
+async function getActiveSecurityRules(env: Env): Promise<any[]> {
+  // 优先 KV
+  try {
+    const cached = await env.KV.get(SECURITY_RULES_KV_KEY, 'json');
+    if (Array.isArray(cached) && cached.length > 0) {
+      return cached;
+    }
+  } catch {
+    // KV 不可用，回源 D1
+  }
+  // D1 回源并回填 KV
+  const allRules = await env.DB.prepare(`
+    SELECT id, type, value, reason
+    FROM security_block_rules
+    WHERE is_active = 1
+      AND (expires_at IS NULL OR expires_at > datetime('now'))
+  `).all();
+  const rules = (allRules.results || []) as any[];
+  try {
+    await env.KV.put(SECURITY_RULES_KV_KEY, JSON.stringify(rules), {
+      expirationTtl: SECURITY_RULES_CACHE_TTL,
+    });
+  } catch {
+    // 写缓存失败不阻塞请求
+  }
+  return rules;
+}
+
 async function checkSecurityBlock(request: Request, env: Env): Promise<Response | null> {
   try {
     await initDatabase(env.DB);
-    const checks = [
+    const checks: [string, string][] = [
       ['device_id', request.headers.get('X-Device-Id') || ''],
       ['ip', getClientIp(request)],
       ['platform', request.headers.get('X-Platform') || ''],
       ['app_version', request.headers.get('X-App-Version') || ''],
       ['os_version', request.headers.get('X-OS-Version') || ''],
       ['device_model', request.headers.get('X-Device-Model') || ''],
-    ].filter(([, value]) => value);
+    ].filter(([, value]) => value.length > 0) as [string, string][];
     if (checks.length === 0) return null;
-    const conditions = checks.map(() => '(type = ? AND value = ?)').join(' OR ');
-    const params = checks.flatMap(([type, value]) => [type, value]);
-    const rule = await env.DB.prepare(`
-      SELECT id, type, value, reason
-      FROM security_block_rules
-      WHERE is_active = 1
-        AND (expires_at IS NULL OR expires_at > datetime('now'))
-        AND (${conditions})
-      LIMIT 1
-    `).bind(...params).first() as any;
-    if (!rule) return null;
-    return json({
-      error: '当前设备或访问环境已被限制，请联系管理员',
-      blocked: true,
-      type: rule.type,
-      reason: rule.reason || undefined,
-    }, 403);
+    const rules = await getActiveSecurityRules(env);
+    for (const rule of rules) {
+      for (const [type, value] of checks) {
+        if (rule.type === type && rule.value === value) {
+          return json({
+            error: '当前设备或访问环境已被限制，请联系管理员',
+            blocked: true,
+            type: rule.type,
+            reason: rule.reason || undefined,
+          }, 403);
+        }
+      }
+    }
+    return null;
   } catch (e) {
     console.error('SecurityBlock check error:', e);
     return null;
@@ -1217,6 +1253,7 @@ async function upsertCountMap(db: D1Database, table: string, column: string, dat
 
 // 初始化同步表
 async function initSyncTables(db: D1Database): Promise<void> {
+  if (syncTablesInitialized) return;
   await db.exec(`
     CREATE TABLE IF NOT EXISTS user_progress (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1241,6 +1278,7 @@ async function initSyncTables(db: D1Database): Promise<void> {
       updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
+  syncTablesInitialized = true;
 }
 
 // 上传学习进度
@@ -1371,4 +1409,5 @@ interface Env {
   PROD_CONTENT_BASE_URL: string;
   DB: D1Database;
   JWT_SECRET: string;
+  KV: KVNamespace;
 }
