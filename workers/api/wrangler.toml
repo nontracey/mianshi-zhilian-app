@@ -1,9 +1,10 @@
 name = "mianshi-zhilian-api"
 compatibility_date = "2026-05-27"
+pages_build_output_dir = "src"
 
 # Pages Functions 的绑定配置与 Workers 格式一致。
 # 本地开发：wrangler pages dev src/
-# 生产部署：wrangler pages deploy --project-name=mianshi-zhilian-api src/
+# 生产部署：wrangler pages deploy --project-name=mianshi-zhilian-api
 
 [[kv_namespaces]]
 binding = "KV"
@@ -18,9 +19,9 @@ database_name = "mianshi-zhilian-db"
 # GitHub Secrets 中的 D1_DATABASE_ID，避免将真实 database_id 硬编码在仓库中。
 database_id = "PLACEHOLDER_DATABASE_ID"
 
+# 注意：JWT_SECRET 已在 Cloudflare Pages Dashboard 中配置为加密环境变量，
+# 不在 wrangler.toml 中重复定义（否则部署时会冲突：'already in use'）。
 [vars]
 CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
 TEST_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
 PROD_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
-# PLACEHOLDER_JWT_SECRET 由 CI 在部署前替换
-JWT_SECRET = "PLACEHOLDER_JWT_SECRET"
