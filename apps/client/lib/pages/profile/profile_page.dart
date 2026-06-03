@@ -2810,6 +2810,7 @@ class _AboutPanelState extends State<_AboutPanel> {
               TextButton(
                 onPressed: () {
                   cancelToken.cancel();
+                  dialogOpen = false;
                   Navigator.pop(ctx);
                 },
                 child: Text(l10n.get('cancel')),
@@ -2818,31 +2819,27 @@ class _AboutPanelState extends State<_AboutPanel> {
           );
         },
       ),
-    ).then((_) => dialogOpen = false);
-
-    // 实际下载和校验
-    final (filePath, downloadResult) = await updateService.downloadUpdate(
-      platformUpdate: platformUpdate,
-      version: updateInfo.version,
-      cancelToken: cancelToken,
-      onProgress: (r, t, source) {
-        received = r;
-        total = t;
-        currentSource = source;
-        if (mounted && dialogOpen) {
-          _currentSetDialogState?.call(() {});
-        }
-      },
     );
 
-    if (mounted) {
-      if (dialogOpen) {
-        Navigator.pop(context); // 关闭下载对话框
-      }
+    try {
+      // 实际下载和校验
+      final (filePath, downloadResult) = await updateService.downloadUpdate(
+        platformUpdate: platformUpdate,
+        version: updateInfo.version,
+        cancelToken: cancelToken,
+        onProgress: (r, t, source) {
+          received = r;
+          total = t;
+          currentSource = source;
+          if (mounted) {
+            _currentSetDialogState?.call(() {});
+          }
+        },
+      );
 
-      if (cancelToken.isCancelled) {
-        return;
-      }
+      if (!mounted) return;
+
+      if (cancelToken.isCancelled) return;
 
       if (filePath != null) {
         final canInstall = await AppPermissionService.ensureInstallPackages(
@@ -2875,6 +2872,29 @@ class _AboutPanelState extends State<_AboutPanel> {
             backgroundColor: AppColors.danger,
           ),
         );
+      }
+    } catch (e) {
+      debugPrint('Download error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.get(
+                'download_fail_network_error_please_check_network_and_retry',
+              ),
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      _currentSetDialogState = null;
+      if (mounted && dialogOpen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
       }
     }
   }
