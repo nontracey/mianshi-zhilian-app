@@ -106,9 +106,9 @@ class RouteResolver {
   static RouteLane? laneFromUrl(String url) {
     final host = Uri.tryParse(url)?.host;
     if (host == null) return null;
-    return host.endsWith('nontracey.de5.net')
-        ? RouteLane.backup
-        : RouteLane.primary;
+    if (host.endsWith('nontracey.de5.net')) return RouteLane.backup;
+    if (host.endsWith('pages.dev')) return RouteLane.primary;
+    return null;
   }
 
   static String _normalizePath(String path) {

@@ -154,10 +154,10 @@ class AppSettings {
     this.customGithubMirror,
   });
 
-  /// 默认 Worker API 基地址
+  /// 官方 App API 主用地址。业务请求会经 RouteResolver 自动纳入主备路由。
   static const defaultWorkerApiUrl = RouteResolver.appApiPrimary;
 
-  /// Cloudflare Pages 上的内容仓库（不走 Worker 代理）
+  /// 官方发布版内容 CDN 主用地址。为空自定义源时会经 RouteResolver 纳入主备路由。
   static const defaultProdContentUrl = RouteResolver.contentPrimary;
 
   /// 获取当前内容源的基础 URL
@@ -185,7 +185,7 @@ class AppSettings {
   /// 发布版 URL（显示用）
   String get effectiveProdContentUrl => customProdContentUrl?.isNotEmpty == true
       ? customProdContentUrl!
-      : '$defaultWorkerApiUrl/content/production';
+      : defaultProdContentUrl;
 
   AppSettings copyWith({
     AppThemeType? themeType,

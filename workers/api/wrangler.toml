@@ -22,9 +22,5 @@ database_id = "PLACEHOLDER_DATABASE_ID"
 # 注意：JWT_SECRET 已在 Cloudflare Pages Dashboard 中配置为加密环境变量，
 # 不在 wrangler.toml 中重复定义（否则部署时会冲突：'already in use'）。
 [vars]
-CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
 CONTENT_PRIMARY_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
 CONTENT_BACKUP_BASE_URL = "https://mianshizhilian-content.nontracey.de5.net"
-# Legacy aliases kept for local compatibility; runtime proxy uses CONTENT_*_BASE_URL.
-TEST_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
-PROD_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"

@@ -226,6 +226,8 @@ App 启动 → 加载 manifest 检查 contentVersion → 有变化则记录 pend
 所需 GitHub Secrets：`CLOUDFLARE_API_TOKEN`、`D1_DATABASE_ID`、`JWT_SECRET`
 所需 GitHub Variables：`CLOUDFLARE_ACCOUNT_ID`
 
+Android release 支持可选正式签名 secrets：`ANDROID_RELEASE_KEYSTORE_BASE64`、`ANDROID_RELEASE_STORE_PASSWORD`、`ANDROID_RELEASE_KEY_ALIAS`、`ANDROID_RELEASE_KEY_PASSWORD`。未配置时会使用 debug signing 作为本地/预览兜底，不阻塞构建。
+
 ### 发布流程
 
 ```bash

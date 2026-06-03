@@ -1477,7 +1477,7 @@ class _ContentEnvPanel extends StatelessWidget {
               Expanded(
                 child: Text(
                   l10n.getp('current_url_2', {
-                    'url': _contentRouteLabel(settings),
+                    'url': _contentRouteLabel(settings, l10n),
                   }),
                   style: const TextStyle(fontSize: 12),
                   overflow: TextOverflow.ellipsis,
@@ -1552,14 +1552,14 @@ class _ContentEnvPanel extends StatelessWidget {
     );
   }
 
-  String _contentRouteLabel(AppSettings settings) {
+  String _contentRouteLabel(AppSettings settings, LocalizationProvider l10n) {
     if (settings.contentEnv == ContentEnv.production &&
         settings.customProdContentUrl?.isNotEmpty == true) {
-      return '${settings.customProdContentUrl} (custom, no official fallback)';
+      return '${settings.customProdContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
     if (settings.contentEnv != ContentEnv.production &&
         settings.customTestContentUrl?.isNotEmpty == true) {
-      return '${settings.customTestContentUrl} (custom, no official fallback)';
+      return '${settings.customTestContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
     if (settings.contentEnv == ContentEnv.production) {
       return '${RouteResolver.contentPrimary} / ${RouteResolver.contentBackup}';

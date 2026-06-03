@@ -524,7 +524,7 @@ AI 评分维度建议：
 目标：
 
 1. 用户可以手动点击“检查更新”。
-2. App 自动请求远程 `update.json` 或 latest update manifest。
+2. App 通过 `RouteResolver.appApi + /update.json` 自动请求远程更新清单。
 3. 如果有新版本，展示版本号、发布时间、更新内容、安装包大小。
 4. 用户确认后下载当前平台对应安装包。
 5. 下载完成后校验 `sha256`。
@@ -536,8 +536,9 @@ AI 评分维度建议：
 | --- | --- |
 | GitHub Releases | 安装包和历史版本放在 `nontracey/mianshi-zhilian-app/releases` |
 | Cloudflare Worker | 提供稳定的 `/update.json`，代理 GitHub latest release 中的更新清单 |
+| App Web 主备镜像 | 通过 `assetPath` 生成 pages.dev / de5.net 官方下载候选 |
 
-第一版推荐：安装包放 GitHub Releases，`update.json` 随 Release 上传，Worker 的 `/update.json` 代理 latest release 资产。
+第一版推荐：安装包放 GitHub Releases，`update.json` 随 Release 上传，Worker 的 `/update.json` 代理 latest release 资产。生产构建不再注入 `UPDATE_MANIFEST_URL` 固定域名，官方主备地址由客户端 route resolver 统一维护。
 
 `update.json` 示例：
 
@@ -555,6 +556,7 @@ AI 评分维度建议：
   "platforms": {
     "android": {
       "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk",
+      "assetPath": "/releases/latest/download/mianshi-zhilian-v0.1.0-android.apk",
       "sha256": "待生成",
       "size": 52428800
     },

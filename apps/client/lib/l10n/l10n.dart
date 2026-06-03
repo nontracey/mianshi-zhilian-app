@@ -829,6 +829,7 @@ class L10n {
     'mutual_book': '相册',
     'knowledge_check_read': '知识点检查',
     'knowledge_source_config': '知识来源配置',
+    'custom_content_source_no_official_fallback': '自定义内容源，不使用官方主备',
     'knowledge_point': '知识点',
     'knowledge_point_loading_fail': '知识点加载失败',
     'knowledge_point_mastery_not_enough': '知识点掌握不足',
@@ -1608,7 +1609,8 @@ class L10n {
     'connection_failed_with_error': 'Connection failed: {error}',
     'connection_success': 'Connection successful',
     'contact_method': 'Contact Method',
-    'contact_method_hint': 'Enter an email, WeChat, or another way to reach you',
+    'contact_method_hint':
+        'Enter an email, WeChat, or another way to reach you',
     'create_new_account': 'Create New Account',
     'current_password': 'Current Password',
     'data_cleared': 'Data Cleared',
@@ -2384,6 +2386,8 @@ class L10n {
     'mutual_book': 'Album',
     'knowledge_check_read': 'Knowledge Reference',
     'knowledge_source_config': 'Knowledge Source Config',
+    'custom_content_source_no_official_fallback':
+        'custom source, no official fallback',
     'knowledge_point': 'Topics',
     'knowledge_point_loading_fail': 'Topic Load Failed',
     'knowledge_point_mastery_not_enough': 'Insufficient Topic Mastery',

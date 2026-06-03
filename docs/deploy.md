@@ -65,6 +65,10 @@
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token，需要 Pages 和 Workers 权限 |
 | `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio 后台使用同一个 D1 |
 | `JWT_SECRET` | 用户认证 JWT 签名密钥，需要在 Cloudflare Pages Dashboard 中手动配置为加密环境变量 |
+| `ANDROID_RELEASE_KEYSTORE_BASE64` | 可选，Android 正式签名 keystore 的 base64 内容 |
+| `ANDROID_RELEASE_STORE_PASSWORD` | 可选，Android keystore 密码 |
+| `ANDROID_RELEASE_KEY_ALIAS` | 可选，Android 签名 key alias |
+| `ANDROID_RELEASE_KEY_PASSWORD` | 可选，Android 签名 key 密码 |
 
 ### GitHub Variables（非加密）
 
@@ -257,7 +261,7 @@ git push origin vx.x.x
 
 1. 在 GitHub 仓库配置 `CLOUDFLARE_API_TOKEN` secret 后，Web 和 Pages Functions 部署会在 push 到 `main` 时自动触发。
 2. 在 Cloudflare Pages Dashboard 中配置 D1 数据库绑定、KV 命名空间绑定和环境变量。
-3. 正式分发前补 Android keystore、Windows 代码签名、macOS Developer ID 签名和 notarization。
+3. Android release 构建已支持 keystore secrets；未配置时使用 debug 签名兜底以保证本地和预览构建可用。正式分发前仍需补 Windows 代码签名、macOS Developer ID 签名和 notarization。
 4. 更新检查使用 `RouteResolver.appApi + /update.json`，由客户端自动在 `https://mianshi-zhilian-api.pages.dev` 与 `https://mianshizhilian-api.nontracey.de5.net` 间选择。生产构建不再使用 `API_BASE_URL` / `UPDATE_MANIFEST_URL`。下载安装包时优先尝试官方 Web 主备镜像路径，再尝试 GitHub 官方、用户自定义镜像和 ghproxy.com；用户可在 App 的"关于与更新 → ⚙️ 下载设置"中配置自定义镜像站前缀。
 
 ## 免费额度与用户量估算

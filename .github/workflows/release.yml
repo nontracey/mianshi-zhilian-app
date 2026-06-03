@@ -152,6 +152,23 @@ jobs:
             android-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
+      - name: Configure Android release signing
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -z "${ANDROID_RELEASE_KEYSTORE_BASE64}" ]; then
+            echo "Android release keystore is not configured; using local debug signing fallback."
+            exit 0
+          fi
+          mkdir -p android/app/keystore
+          echo "${ANDROID_RELEASE_KEYSTORE_BASE64}" | base64 --decode > android/app/keystore/release.jks
+          echo "ANDROID_RELEASE_STORE_FILE=${PWD}/android/app/keystore/release.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_RELEASE_STORE_PASSWORD=${ANDROID_RELEASE_STORE_PASSWORD}" >> "$GITHUB_ENV"
+          echo "ANDROID_RELEASE_KEY_ALIAS=${ANDROID_RELEASE_KEY_ALIAS}" >> "$GITHUB_ENV"
+          echo "ANDROID_RELEASE_KEY_PASSWORD=${ANDROID_RELEASE_KEY_PASSWORD}" >> "$GITHUB_ENV"
       - run: flutter build apk --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk "mianshi-zhilian-${GITHUB_REF_NAME}-android.apk"
       - uses: actions/upload-artifact@v4

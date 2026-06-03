@@ -9,11 +9,13 @@ import 'route_resolver.dart';
 class ContentApiService {
   String baseUrl;
   final EndpointFallbackClient? routeClient;
+  final http.Client _httpClient;
 
   ContentApiService({
     this.baseUrl = RouteResolver.contentPrimary,
     this.routeClient,
-  });
+    http.Client? httpClient,
+  }) : _httpClient = httpClient ?? http.Client();
 
   /// 切换内容源 baseUrl，返回 this 以便链式调用
   ContentApiService switchBaseUrl(String newBaseUrl) {
@@ -79,7 +81,7 @@ class ContentApiService {
         timeout: const Duration(seconds: 8),
       );
     }
-    return http
+    return _httpClient
         .get(Uri.parse('${baseUrl.replaceAll(RegExp(r'/+$'), '')}$path'))
         .timeout(const Duration(seconds: 8));
   }

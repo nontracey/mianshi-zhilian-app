@@ -26,7 +26,10 @@ export default {
 
     if (url.pathname === "/config") {
       return json({
-        contentManifestUrl: env.CONTENT_MANIFEST_URL,
+        contentManifestUrls: [
+          `${contentPrimaryBaseUrl(env)}/manifest.json`,
+          `${contentBackupBaseUrl(env)}/manifest.json`,
+        ],
         contentPrimaryBaseUrl: contentPrimaryBaseUrl(env),
         contentBackupBaseUrl: contentBackupBaseUrl(env),
         updateManifestUrl:
@@ -122,7 +125,7 @@ export default {
       return handleGetProgress(request, env);
     }
 
-    // 代理测试环境内容: /content/test/* → TEST_CONTENT_BASE_URL/*
+    // 代理测试环境内容: /content/test/* → staging-manifest / topics 等静态内容
     if (url.pathname.startsWith("/content/test/")) {
       const subPath = contentStageSubPath(
         "test",
@@ -140,7 +143,7 @@ export default {
       return proxyFetchWithFallback(contentTargetUrls(env, subPath), request);
     }
 
-    // 代理发布环境内容: /content/production/* → PROD_CONTENT_BASE_URL/*
+    // 代理发布环境内容: /content/production/* → production manifest / topics 等静态内容
     if (url.pathname.startsWith("/content/production/")) {
       const subPath = url.pathname.slice("/content/production/".length);
       return proxyFetchWithFallback(contentTargetUrls(env, subPath), request);
@@ -157,7 +160,6 @@ export default {
 function contentPrimaryBaseUrl(env: Env): string {
   return (
     env.CONTENT_PRIMARY_BASE_URL ||
-    env.PROD_CONTENT_BASE_URL ||
     "https://mianshi-zhilian-content.pages.dev"
   );
 }
@@ -193,6 +195,8 @@ async function proxyFetchWithFallback(
   let lastError: unknown;
   for (let i = 0; i < targetUrls.length; i++) {
     const targetUrl = targetUrls[i];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetch(targetUrl, {
         method: originalRequest.method,
@@ -200,7 +204,9 @@ async function proxyFetchWithFallback(
           Accept: originalRequest.headers.get("Accept") || "application/json",
         },
         redirect: "follow",
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (i < targetUrls.length - 1 && response.status >= 500) {
         lastError = `HTTP ${response.status} from ${targetUrl}`;
         continue;
@@ -217,6 +223,7 @@ async function proxyFetchWithFallback(
         },
       });
     } catch (e) {
+      clearTimeout(timeoutId);
       lastError = e;
       if (i < targetUrls.length - 1) continue;
     }
@@ -226,10 +233,12 @@ async function proxyFetchWithFallback(
 }
 
 async function proxyUpdateManifest(): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
       "https://github.com/nontracey/mianshi-zhilian-app/releases/latest/download/update.json",
-      { redirect: "follow" },
+      { redirect: "follow", signal: controller.signal },
     );
     if (!res.ok) {
       return json({ error: "update manifest not found" }, 404);
@@ -246,6 +255,8 @@ async function proxyUpdateManifest(): Promise<Response> {
   } catch (e) {
     console.error("proxyUpdateManifest error:", e);
     return json({ error: "上游请求失败" }, 502);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -258,10 +269,17 @@ function normalizeUpdateManifest(data: any): void {
     const rawUrl = typeof platform.url === "string" ? platform.url : "";
     try {
       const url = new URL(rawUrl);
-      const marker = "/releases/latest/download/";
-      const index = url.pathname.indexOf(marker);
-      if (index >= 0) {
-        platform.assetPath = url.pathname.slice(index);
+      const latestMarker = "/releases/latest/download/";
+      const latestIndex = url.pathname.indexOf(latestMarker);
+      if (latestIndex >= 0) {
+        platform.assetPath = url.pathname.slice(latestIndex);
+        continue;
+      }
+      const versionedMatch = url.pathname.match(
+        /^\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/(.+)$/,
+      );
+      if (versionedMatch?.[1]) {
+        platform.assetPath = `${latestMarker}${versionedMatch[1]}`;
       }
     } catch {
       // Ignore non-URL asset values; clients will keep using url/mirrors.
@@ -1936,11 +1954,8 @@ function json(data: unknown, status = 200): Response {
 }
 
 interface Env {
-  CONTENT_MANIFEST_URL: string;
   CONTENT_PRIMARY_BASE_URL?: string;
   CONTENT_BACKUP_BASE_URL?: string;
-  TEST_CONTENT_BASE_URL: string;
-  PROD_CONTENT_BASE_URL: string;
   DB: D1Database;
   JWT_SECRET: string;
   KV: KVNamespace;

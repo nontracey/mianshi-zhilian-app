@@ -255,6 +255,11 @@ class UpdateService {
   }
 
   /// 构建下载 URL 列表：官方 Pages/de5 镜像 → GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  @visibleForTesting
+  List<String> buildDownloadUrlsForTest(PlatformUpdate platformUpdate) {
+    return _buildDownloadUrls(platformUpdate);
+  }
+
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
     final urls = <String>[];
 

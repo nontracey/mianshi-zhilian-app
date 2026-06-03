@@ -51,15 +51,19 @@ class EndpointFallbackClient {
           lastError = 'HTTP ${response.statusCode} from ${candidate.url.host}';
           continue;
         }
-        await _stateStore.rememberActiveLane(
-          service,
-          candidate.endpoint.lane,
-          ttl: _ttlFor(service),
-        );
+        if (_isHealthyRouteResponse(response.statusCode)) {
+          await _stateStore.rememberActiveLane(
+            service,
+            candidate.endpoint.lane,
+            ttl: _ttlFor(service),
+          );
+        }
         return response;
       } on TimeoutException catch (e) {
         lastError = e;
       } on http.ClientException catch (e) {
+        lastError = e;
+      } catch (e) {
         lastError = e;
       }
     }
@@ -102,6 +106,10 @@ class EndpointFallbackClient {
   bool _canReplayOnHttpStatus(String method, int statusCode) {
     final normalized = method.toUpperCase();
     return (normalized == 'GET' || normalized == 'HEAD') && statusCode >= 500;
+  }
+
+  bool _isHealthyRouteResponse(int statusCode) {
+    return statusCode < 500;
   }
 
   Duration _ttlFor(RouteService service) {

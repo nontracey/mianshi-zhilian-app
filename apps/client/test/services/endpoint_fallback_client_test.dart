@@ -88,4 +88,29 @@ void main() {
     expect(response.statusCode, 500);
     expect(client.requests, hasLength(1));
   });
+
+  test('does not remember a lane from a final 5xx response', () async {
+    final storage = StorageService();
+    final client = _QueuedClient([
+      http.Response('primary failed', 502),
+      http.Response('backup also failed', 503),
+    ]);
+    final fallbackClient = EndpointFallbackClient(
+      stateStore: RouteStateStore(storage),
+      httpClient: client,
+    );
+
+    final response = await fallbackClient.request(
+      RouteService.content,
+      'GET',
+      '/manifest.json',
+    );
+
+    expect(response.statusCode, 503);
+    expect(client.requests, hasLength(2));
+    expect(
+      await RouteStateStore(storage).loadActiveLane(RouteService.content),
+      isNull,
+    );
+  });
 }

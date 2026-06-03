@@ -208,9 +208,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final passwordHash = _hashPassword(password);
-      debugPrint('Login: building headers...');
       final headers = await ApiHeaders.build(_storage);
-      debugPrint('Login: headers built, posting to appApi/auth/login');
       final response = await _routeClient.request(
         RouteService.appApi,
         'POST',
@@ -223,7 +221,6 @@ class AuthProvider extends ChangeNotifier {
         timeout: const Duration(seconds: 15),
       );
 
-      debugPrint('Login: response ${response.statusCode}');
       final data = json.decode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && data['success'] == true) {

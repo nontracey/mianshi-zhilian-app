@@ -38,6 +38,7 @@
   "platforms": {
     "android": {
       "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk",
+      "assetPath": "/releases/latest/download/mianshi-zhilian-v0.1.0-android.apk",
       "mirrors": [
         "https://ghproxy.com/https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
       ],
@@ -130,7 +131,7 @@ https://mianshizhilian-api.nontracey.de5.net/update.json
 
 生产构建不再支持通过 `UPDATE_MANIFEST_URL` 固定官方更新域名；官方主备域名由客户端路由表统一维护。
 
-Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发；客户端会优先使用 `assetPath` 生成官方 Web 主备下载候选，再依次尝试 GitHub Release、用户自定义镜像和默认镜像源。
+`scripts/build_update_manifest.dart` 会为每个平台写入 `assetPath`，格式为 `/releases/latest/download/<asset>`。Worker 只代理体积很小的 `update.json`，并对旧 manifest 做兜底规范化；各平台安装包不会经过 Worker 转发。客户端会优先使用 `assetPath` 生成官方 Web 主备下载候选，再依次尝试 GitHub Release、用户自定义镜像和默认镜像源。
 
 ## 隐私说明
 

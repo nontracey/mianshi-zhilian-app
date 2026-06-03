@@ -197,6 +197,8 @@ git push origin vx.x.x
 
 客户端官方请求使用 `RouteResolver` + `EndpointFallbackClient`，按服务名和路径自动选择 pages.dev / de5.net。用户自定义内容源仍然直连自定义 URL，不参与官方主备切换。
 
+更新检查固定走 `appApi + /update.json`，release manifest 会写入 `assetPath` 以生成官方 Web 主备下载候选；Android release 构建支持可选 keystore secrets，未配置时使用本地签名兜底。
+
 ## 支持项目
 
 如果这个项目对你有帮助，欢迎[请作者喝杯咖啡 ☕](docs/sponsor.md)。

@@ -30,8 +30,7 @@ void main(List<String> args) {
       ?.trim();
   final notesEnv = Platform.environment['RELEASE_NOTES']?.trim();
   // GitHub 镜像站前缀（用于生成备用下载链接）
-  final ghMirrorPrefix = Platform.environment['GH_MIRROR_PREFIX']
-      ?.trim();
+  final ghMirrorPrefix = Platform.environment['GH_MIRROR_PREFIX']?.trim();
 
   // 从 pubspec.yaml 读取 buildNumber
   final pubspecFile = File('apps/client/pubspec.yaml');
@@ -76,6 +75,7 @@ void main(List<String> args) {
     final name = file.uri.pathSegments.last;
     final githubUrl =
         'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
+    final assetPath = '/releases/latest/download/$name';
     final mirrors = <String>[];
     // 备用镜像：ghproxy.com 加速
     mirrors.add('https://ghproxy.com/$githubUrl');
@@ -85,6 +85,7 @@ void main(List<String> args) {
     }
     return {
       'url': githubUrl,
+      'assetPath': assetPath,
       'mirrors': mirrors,
       'sha256': sha256sum(file),
       'size': file.lengthSync(),
