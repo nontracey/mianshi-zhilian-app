@@ -40,3 +40,14 @@ jobs:
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy --project-name=mianshi-zhilian-api
           workingDirectory: workers/api
+      - name: Verify primary and backup API routes
+        run: |
+          set -euo pipefail
+          for base in \
+            "https://mianshi-zhilian-api.pages.dev" \
+            "https://mianshizhilian-api.nontracey.de5.net"
+          do
+            curl --fail --silent --show-error --retry 3 "$base/health" >/tmp/api-health.json
+            curl --fail --silent --show-error --retry 3 "$base/update.json" >/tmp/update.json
+            curl --fail --silent --show-error --retry 3 "$base/content/production/manifest.json" >/tmp/content-manifest.json
+          done

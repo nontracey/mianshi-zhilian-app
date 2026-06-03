@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/route_resolver.dart';
+
 const Object _unset = Object();
 
 /// 知识源环境
@@ -153,14 +155,10 @@ class AppSettings {
   });
 
   /// 默认 Worker API 基地址
-  static const defaultWorkerApiUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://mianshi-zhilian-api.pages.dev',
-  );
+  static const defaultWorkerApiUrl = RouteResolver.appApiPrimary;
 
   /// Cloudflare Pages 上的内容仓库（不走 Worker 代理）
-  static const defaultProdContentUrl =
-      'https://mianshi-zhilian-content.pages.dev';
+  static const defaultProdContentUrl = RouteResolver.contentPrimary;
 
   /// 获取当前内容源的基础 URL
   String get contentBaseUrl {

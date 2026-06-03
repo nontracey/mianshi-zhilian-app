@@ -15,8 +15,6 @@ jobs:
       release_notes: ${{ steps.generate_notes.outputs.notes }}
       app_version: ${{ steps.pubspec_version.outputs.version }}
       app_build_number: ${{ steps.pubspec_version.outputs.build_number }}
-      api_base_url: ${{ steps.resolve_urls.outputs.api_base_url }}
-      update_manifest_url: ${{ steps.resolve_urls.outputs.update_manifest_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,18 +35,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve API URLs
-        id: resolve_urls
-        run: |
-          # 如果 GitHub Variable 未设置，回退到代码中的默认值
-          API_URL="${API_BASE_URL_VAR:-https://mianshi-zhilian-api.pages.dev}"
-          UPDATE_URL="${UPDATE_MANIFEST_URL_VAR:-https://mianshi-zhilian-api.pages.dev/update.json}"
-          echo "api_base_url=$API_URL" >> "$GITHUB_OUTPUT"
-          echo "update_manifest_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
-        env:
-          API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
-          UPDATE_MANIFEST_URL_VAR: ${{ vars.UPDATE_MANIFEST_URL }}
-      
       - name: Get previous tag
         id: prev_tag
         run: |
@@ -166,7 +152,7 @@ jobs:
             android-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
-      - run: flutter build apk --release --dart-define=API_BASE_URL=${{ needs.prepare-release.outputs.api_base_url }} --dart-define=UPDATE_MANIFEST_URL=${{ needs.prepare-release.outputs.update_manifest_url }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build apk --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk "mianshi-zhilian-${GITHUB_REF_NAME}-android.apk"
       - uses: actions/upload-artifact@v4
         with:
@@ -204,7 +190,7 @@ jobs:
             web-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
-      - run: flutter build web --release --dart-define=API_BASE_URL=${{ needs.prepare-release.outputs.api_base_url }} --dart-define=UPDATE_MANIFEST_URL=${{ needs.prepare-release.outputs.update_manifest_url }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build web --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cd build/web && zip -r "../../mianshi-zhilian-${GITHUB_REF_NAME}-web.zip" .
       - uses: actions/upload-artifact@v4
         with:
@@ -247,7 +233,7 @@ jobs:
           key: innosetup-${{ runner.os }}
       - run: flutter pub get
       - run: bash tool/generate_version.sh
-      - run: flutter build windows --release --dart-define=API_BASE_URL=${{ needs.prepare-release.outputs.api_base_url }} --dart-define=UPDATE_MANIFEST_URL=${{ needs.prepare-release.outputs.update_manifest_url }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build windows --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup -y
@@ -332,7 +318,7 @@ jobs:
             macos-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
-      - run: flutter build macos --release --dart-define=API_BASE_URL=${{ needs.prepare-release.outputs.api_base_url }} --dart-define=UPDATE_MANIFEST_URL=${{ needs.prepare-release.outputs.update_manifest_url }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build macos --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Build drag-install DMG
         run: |
           rm -rf dmg-root

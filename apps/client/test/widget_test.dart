@@ -8,6 +8,8 @@ import 'package:mianshi_zhilian/services/content_api_service.dart';
 import 'package:mianshi_zhilian/services/ai_service.dart';
 import 'package:mianshi_zhilian/services/data_sync_service.dart';
 import 'package:mianshi_zhilian/services/analytics_service.dart';
+import 'package:mianshi_zhilian/services/endpoint_fallback_client.dart';
+import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 
@@ -15,12 +17,73 @@ import 'package:mianshi_zhilian/services/update_service.dart';
 /// 否则 widget tree 里的 DiceBear 头像会让 pumpAndSettle 失败。
 class _StubHttpOverrides extends HttpOverrides {
   static final Uint8List _png1x1 = Uint8List.fromList(const <int>[
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-    0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
-    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
-    0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x48,
+    0x44,
+    0x52,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x08,
+    0x06,
+    0x00,
+    0x00,
+    0x00,
+    0x1F,
+    0x15,
+    0xC4,
+    0x89,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x44,
+    0x41,
+    0x54,
+    0x78,
+    0x9C,
+    0x62,
+    0x00,
+    0x01,
+    0x00,
+    0x00,
+    0x05,
+    0x00,
+    0x01,
+    0x0D,
+    0x0A,
+    0x2D,
+    0xB4,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x49,
+    0x45,
+    0x4E,
+    0x44,
+    0xAE,
+    0x42,
+    0x60,
+    0x82,
   ]);
 
   @override
@@ -65,9 +128,12 @@ class _StubResponse implements HttpClientResponse {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
-    return Stream<List<int>>.fromIterable(
-      [_StubHttpOverrides._png1x1],
-    ).listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+    return Stream<List<int>>.fromIterable([_StubHttpOverrides._png1x1]).listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
   }
 
   @override
@@ -80,7 +146,10 @@ void main() {
 
   testWidgets('renders learning workspace', (tester) async {
     final storage = StorageService();
-    final contentApi = ContentApiService();
+    final routeClient = EndpointFallbackClient(
+      stateStore: RouteStateStore(storage),
+    );
+    final contentApi = ContentApiService(routeClient: routeClient);
     final aiService = AiService();
     final dataSyncService = DataSyncService(storage);
     final analyticsService = AnalyticsService(storage);
@@ -94,6 +163,7 @@ void main() {
         aiService: aiService,
         analyticsService: analyticsService,
         updateService: updateService,
+        routeClient: routeClient,
         initialLanguage: 'zh',
       ),
     );

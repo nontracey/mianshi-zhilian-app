@@ -17,6 +17,8 @@ import 'services/content_api_service.dart';
 import 'services/ai_service.dart';
 import 'services/analytics_service.dart';
 import 'services/data_sync_service.dart';
+import 'services/endpoint_fallback_client.dart';
+import 'services/route_state_store.dart';
 import 'services/storage_service.dart';
 import 'services/update_service.dart';
 import 'pages/learning/dashboard_page.dart';
@@ -35,13 +37,20 @@ import 'widgets/header_bar.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final storage = StorageService();
+  final routeClient = EndpointFallbackClient(
+    stateStore: RouteStateStore(storage),
+  );
   // 先加载已保存的设置，获取正确的 contentBaseUrl
   final savedSettings = await storage.loadSettings();
-  final contentApi = ContentApiService(baseUrl: savedSettings.contentBaseUrl);
+  final contentApi = ContentApiService(
+    baseUrl: savedSettings.contentBaseUrl,
+    routeClient: routeClient,
+  );
   final aiService = AiService();
-  final updateService = UpdateService();
+  final updateService = UpdateService(routeClient: routeClient);
   final dataSyncService = DataSyncService(storage)..start();
-  final analyticsService = AnalyticsService(storage)..start();
+  final analyticsService = AnalyticsService(storage, routeClient: routeClient)
+    ..start();
 
   runApp(
     MianshiZhilianApp(
@@ -51,6 +60,7 @@ void main() async {
       contentApi: contentApi,
       aiService: aiService,
       updateService: updateService,
+      routeClient: routeClient,
       initialLanguage: savedSettings.language,
     ),
   );
@@ -65,6 +75,7 @@ class MianshiZhilianApp extends StatefulWidget {
   final ContentApiService contentApi;
   final AiService aiService;
   final UpdateService updateService;
+  final EndpointFallbackClient routeClient;
   final String initialLanguage;
 
   const MianshiZhilianApp({
@@ -75,6 +86,7 @@ class MianshiZhilianApp extends StatefulWidget {
     required this.contentApi,
     required this.aiService,
     required this.updateService,
+    required this.routeClient,
     required this.initialLanguage,
   });
 
@@ -112,7 +124,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           create: (_) => ProgressProvider(widget.storage)..loadProgress(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(widget.storage)..loadUser(),
+          create: (_) =>
+              AuthProvider(widget.storage, routeClient: widget.routeClient)
+                ..loadUser(),
         ),
         ChangeNotifierProvider(
           create: (_) =>

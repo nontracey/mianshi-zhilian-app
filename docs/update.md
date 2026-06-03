@@ -121,15 +121,16 @@
 
 ## 稳定更新地址
 
-客户端默认使用 Cloudflare Pages Functions 的稳定路径。Pages Functions 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
+客户端默认使用 `RouteResolver.appApi + /update.json`。Pages Functions 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
 
 ```
 https://mianshi-zhilian-api.pages.dev/update.json
+https://mianshizhilian-api.nontracey.de5.net/update.json
 ```
 
-也可以通过 `UPDATE_MANIFEST_URL` 编译参数改为其他稳定地址。
+生产构建不再支持通过 `UPDATE_MANIFEST_URL` 固定官方更新域名；官方主备域名由客户端路由表统一维护。
 
-Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发，客户端会直接请求 `update.json` 中的平台 `url`，失败后再依次尝试镜像源，避免把 GitHub Release 安装包下载流量计入 Cloudflare Worker。
+Worker 只代理体积很小的 `update.json`。各平台安装包不会经过 Worker 转发；客户端会优先使用 `assetPath` 生成官方 Web 主备下载候选，再依次尝试 GitHub Release、用户自定义镜像和默认镜像源。
 
 ## 隐私说明
 

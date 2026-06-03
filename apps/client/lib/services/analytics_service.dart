@@ -2,25 +2,24 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import 'api_headers.dart';
 import 'device_info_helper.dart';
+import 'endpoint_fallback_client.dart';
+import 'route_resolver.dart';
+import 'route_state_store.dart';
 import 'storage_service.dart';
 
 class AnalyticsService {
-  AnalyticsService(
-    this._storage, {
-    this.apiBaseUrl = const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'https://mianshi-zhilian-api.pages.dev',
-    ),
-  });
+  AnalyticsService(this._storage, {EndpointFallbackClient? routeClient})
+    : _routeClient =
+          routeClient ??
+          EndpointFallbackClient(stateStore: RouteStateStore(_storage));
 
   final StorageService _storage;
-  final String apiBaseUrl;
+  final EndpointFallbackClient _routeClient;
   Timer? _timer;
   DateTime? _activeStartedAt;
   String? _currentBatchId;
@@ -37,12 +36,7 @@ class AnalyticsService {
     'mastery',
     'profile',
   };
-  static const _features = {
-    'ai_eval',
-    'manual_sync',
-    'ticket_submit',
-    'login',
-  };
+  static const _features = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
 
   void start() {
     _activeStartedAt ??= DateTime.now();
@@ -100,13 +94,14 @@ class AnalyticsService {
         }).toList(),
       };
       final headers = await ApiHeaders.build(_storage, token: token);
-      final response = await http
-          .post(
-            Uri.parse('$apiBaseUrl/analytics/batch'),
-            headers: headers,
-            body: json.encode(payload),
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/analytics/batch',
+        headers: headers,
+        body: json.encode(payload),
+        timeout: const Duration(seconds: 10),
+      );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // 重新加载 buffer，仅移除已成功发送的日期，
         // 保留 flush 期间并发写入的新数据
@@ -133,13 +128,14 @@ class AnalyticsService {
   Future<void> bindDevice(String token) async {
     try {
       final deviceId = await _storage.getOrCreateDeviceId();
-      await http
-          .post(
-            Uri.parse('$apiBaseUrl/analytics/bind-device'),
-            headers: await ApiHeaders.build(_storage, token: token),
-            body: json.encode({'device_id': deviceId}),
-          )
-          .timeout(const Duration(seconds: 10));
+      await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/analytics/bind-device',
+        headers: await ApiHeaders.build(_storage, token: token),
+        body: json.encode({'device_id': deviceId}),
+        timeout: const Duration(seconds: 10),
+      );
     } catch (e) {
       debugPrint('Analytics bind failed: $e');
     }

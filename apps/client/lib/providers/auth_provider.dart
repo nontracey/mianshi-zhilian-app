@@ -6,6 +6,9 @@ import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
 import '../models/user.dart';
 import '../services/api_headers.dart';
+import '../services/endpoint_fallback_client.dart';
+import '../services/route_resolver.dart';
+import '../services/route_state_store.dart';
 import '../services/storage_service.dart';
 
 /// Access token 有效期为 24h，按一半间隔 12h 主动刷新，确保 token 不过期。
@@ -14,15 +17,12 @@ const _refreshInterval = Duration(hours: 12);
 
 class AuthProvider extends ChangeNotifier {
   final StorageService _storage;
-  final String apiBaseUrl;
+  final EndpointFallbackClient _routeClient;
 
-  AuthProvider(
-    this._storage, {
-    this.apiBaseUrl = const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'https://mianshi-zhilian-api.pages.dev',
-    ),
-  });
+  AuthProvider(this._storage, {EndpointFallbackClient? routeClient})
+    : _routeClient =
+          routeClient ??
+          EndpointFallbackClient(stateStore: RouteStateStore(_storage));
 
   User? _user;
   String? _token;
@@ -38,6 +38,7 @@ class AuthProvider extends ChangeNotifier {
 
   User? get user => _user;
   String? get token => _token;
+  String get apiBaseUrl => RouteResolver.appApiPrimary;
   bool get isLoggedIn => _user != null && _token != null;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -110,8 +111,10 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final passwordHash = _hashPassword(password);
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/register'),
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/auth/register',
         headers: await ApiHeaders.build(_storage),
         body: json.encode({
           'username': username,
@@ -176,7 +179,10 @@ class AuthProvider extends ChangeNotifier {
       final input = Uint8List(saltBytes.length + 4)
         ..setRange(0, saltBytes.length, saltBytes)
         ..setRange(
-            saltBytes.length, saltBytes.length + 4, blockBytes.buffer.asUint8List());
+          saltBytes.length,
+          saltBytes.length + 4,
+          blockBytes.buffer.asUint8List(),
+        );
 
       var u = Hmac(sha256, passwordBytes).convert(input).bytes;
       var t = Uint8List.fromList(u);
@@ -204,15 +210,18 @@ class AuthProvider extends ChangeNotifier {
       final passwordHash = _hashPassword(password);
       debugPrint('Login: building headers...');
       final headers = await ApiHeaders.build(_storage);
-      debugPrint('Login: headers built, posting to $apiBaseUrl/auth/login');
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/login'),
+      debugPrint('Login: headers built, posting to appApi/auth/login');
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/auth/login',
         headers: headers,
         body: json.encode({
           'username': username,
           'password_hash': passwordHash,
         }),
-      ).timeout(const Duration(seconds: 15));
+        timeout: const Duration(seconds: 15),
+      );
 
       debugPrint('Login: response ${response.statusCode}');
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -255,8 +264,10 @@ class AuthProvider extends ChangeNotifier {
     final refreshToken = _refreshToken;
     if (refreshToken != null) {
       try {
-        await http.post(
-          Uri.parse('$apiBaseUrl/auth/logout'),
+        await _routeClient.request(
+          RouteService.appApi,
+          'POST',
+          '/auth/logout',
           headers: await ApiHeaders.build(_storage),
           body: json.encode({'refreshToken': refreshToken}),
         );
@@ -313,8 +324,10 @@ class AuthProvider extends ChangeNotifier {
     if (refreshToken == null) return false;
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/refresh'),
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/auth/refresh',
         headers: await ApiHeaders.build(_storage),
         body: json.encode({'refreshToken': refreshToken}),
       );
@@ -348,13 +361,14 @@ class AuthProvider extends ChangeNotifier {
     if (token == null || token.isEmpty) return;
     try {
       final deviceId = await _storage.getOrCreateDeviceId();
-      await http
-          .post(
-            Uri.parse('$apiBaseUrl/analytics/bind-device'),
-            headers: await ApiHeaders.build(_storage, token: token),
-            body: json.encode({'device_id': deviceId}),
-          )
-          .timeout(const Duration(seconds: 8));
+      await _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        '/analytics/bind-device',
+        headers: await ApiHeaders.build(_storage, token: token),
+        body: json.encode({'device_id': deviceId}),
+        timeout: const Duration(seconds: 8),
+      );
     } catch (e) {
       debugPrint('Bind device failed: $e');
     }
@@ -365,8 +379,10 @@ class AuthProvider extends ChangeNotifier {
     Map<String, dynamic>? body,
   }) async {
     Future<http.Response> send() async {
-      return http.post(
-        Uri.parse('$apiBaseUrl$path'),
+      return _routeClient.request(
+        RouteService.appApi,
+        'POST',
+        path,
         headers: await ApiHeaders.build(_storage, token: _token),
         body: json.encode(body ?? {}),
       );
@@ -381,8 +397,10 @@ class AuthProvider extends ChangeNotifier {
 
   Future<http.Response> _authorizedGet(String path) async {
     Future<http.Response> send() async {
-      return http.get(
-        Uri.parse('$apiBaseUrl$path'),
+      return _routeClient.request(
+        RouteService.appApi,
+        'GET',
+        path,
         headers: await ApiHeaders.build(_storage, token: _token, json: false),
       );
     }

@@ -58,6 +58,7 @@ class _LoginPageState extends State<LoginPage> {
     if (success && mounted) {
       setState(() => _isLoading = false);
       await _mergeLocalDataToCloud();
+      if (!mounted) return;
       if (widget.onLoginSuccess != null) {
         widget.onLoginSuccess!.call();
       } else if (Navigator.of(context).canPop()) {

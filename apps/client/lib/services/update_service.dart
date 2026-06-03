@@ -8,6 +8,10 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_version_service.dart';
+import 'endpoint_fallback_client.dart';
+import 'route_resolver.dart';
+import 'route_state_store.dart';
+import 'storage_service.dart';
 
 class UpdateInfo {
   final String version;
@@ -50,12 +54,14 @@ class UpdateInfo {
 
 class PlatformUpdate {
   final String url;
+  final String? assetPath;
   final List<String> mirrors;
   final String sha256;
   final int size;
 
   const PlatformUpdate({
     required this.url,
+    this.assetPath,
     this.mirrors = const [],
     required this.sha256,
     required this.size,
@@ -64,6 +70,7 @@ class PlatformUpdate {
   factory PlatformUpdate.fromJson(Map<String, dynamic> json) {
     return PlatformUpdate(
       url: json['url'] as String? ?? '',
+      assetPath: json['assetPath'] as String?,
       mirrors: (json['mirrors'] as List<dynamic>? ?? [])
           .map((item) => item.toString())
           .where((item) => item.isNotEmpty)
@@ -110,11 +117,8 @@ enum DownloadResult {
 
 /// 下载进度回调
 /// [received] 已下载字节数, [total] 总字节数, [sourceLabel] 当前下载源描述
-typedef DownloadProgressCallback = void Function(
-  int received,
-  int total,
-  String sourceLabel,
-);
+typedef DownloadProgressCallback =
+    void Function(int received, int total, String sourceLabel);
 
 class DownloadCancelToken {
   bool _isCancelled = false;
@@ -144,19 +148,21 @@ class DownloadCancelToken {
 
 class UpdateService {
   final String updateManifestUrl;
+  final EndpointFallbackClient _routeClient;
 
   /// 用户自定义的 GitHub 镜像站前缀（如 https://mirror.example.com）
   /// 如果设置了，下载时会优先插入自定义镜像到 mirrors 列表头部
   final String? customMirrorPrefix;
 
   UpdateService({
-    this.updateManifestUrl = const String.fromEnvironment(
-      'UPDATE_MANIFEST_URL',
-      defaultValue:
-          'https://mianshi-zhilian-api.pages.dev/update.json',
-    ),
+    this.updateManifestUrl = '',
     this.customMirrorPrefix,
-  });
+    EndpointFallbackClient? routeClient,
+  }) : _routeClient =
+           routeClient ??
+           EndpointFallbackClient(
+             stateStore: RouteStateStore(StorageService()),
+           );
 
   /// 默认备用镜像站
   static const defaultMirrorPrefix = 'https://ghproxy.com';
@@ -164,9 +170,12 @@ class UpdateService {
   /// 检查是否有新版本
   Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
-      final response = await http
-          .get(Uri.parse(updateManifestUrl))
-          .timeout(const Duration(seconds: 15));
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'GET',
+        '/update.json',
+        timeout: const Duration(seconds: 15),
+      );
       if (response.statusCode != 200) {
         debugPrint('Failed to check update: ${response.statusCode}');
         return const CheckUpdateResult.error();
@@ -245,11 +254,18 @@ class UpdateService {
     }
   }
 
-  /// 构建下载 URL 列表：GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  /// 构建下载 URL 列表：官方 Pages/de5 镜像 → GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
     final urls = <String>[];
 
-    // 1. 默认：GitHub 官方下载
+    final officialAssetPath = _officialAssetPath(platformUpdate);
+    if (officialAssetPath != null) {
+      urls.addAll(
+        _routeClient.resolveUrls(RouteService.appWeb, officialAssetPath),
+      );
+    }
+
+    // GitHub 官方下载
     if (platformUpdate.url.trim().isNotEmpty) {
       urls.add(platformUpdate.url);
     }
@@ -277,6 +293,21 @@ class UpdateService {
     }
 
     return urls;
+  }
+
+  String? _officialAssetPath(PlatformUpdate platformUpdate) {
+    final assetPath = platformUpdate.assetPath?.trim();
+    if (assetPath != null && assetPath.isNotEmpty) {
+      return assetPath.startsWith('/') ? assetPath : '/$assetPath';
+    }
+
+    final uri = Uri.tryParse(platformUpdate.url);
+    if (uri == null) return null;
+    if (uri.host == Uri.parse(RouteResolver.appWebPrimary).host ||
+        uri.host == Uri.parse(RouteResolver.appWebBackup).host) {
+      return uri.path;
+    }
+    return null;
   }
 
   /// 下载更新文件
@@ -508,9 +539,4 @@ class UpdateService {
 }
 
 /// 下载状态内部枚举
-enum _DownloadStatus {
-  success,
-  networkError,
-  verificationFailed,
-  cancelled,
-}
+enum _DownloadStatus { success, networkError, verificationFailed, cancelled }

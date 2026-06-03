@@ -33,15 +33,7 @@ jobs:
           FULL_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           echo "APP_VERSION=${FULL_VERSION%%+*}" >> "$GITHUB_ENV"
           echo "APP_BUILD_NUMBER=${FULL_VERSION##*+}" >> "$GITHUB_ENV"
-      - name: Resolve dart-define variables
-        run: |
-          # 如果 GitHub Variable 未设置，回退到代码中的默认值
-          echo "RESOLVED_API_BASE_URL=${API_BASE_URL:-https://mianshi-zhilian-api.pages.dev}" >> "$GITHUB_ENV"
-          echo "RESOLVED_UPDATE_MANIFEST_URL=${UPDATE_MANIFEST_URL:-https://mianshi-zhilian-api.pages.dev/update.json}" >> "$GITHUB_ENV"
-        env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
-          UPDATE_MANIFEST_URL: ${{ vars.UPDATE_MANIFEST_URL }}
-      - run: flutter build web --release --dart-define=API_BASE_URL=${{ env.RESOLVED_API_BASE_URL }} --dart-define=UPDATE_MANIFEST_URL=${{ env.RESOLVED_UPDATE_MANIFEST_URL }} --dart-define=APP_VERSION=${{ env.APP_VERSION }} --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
+      - run: flutter build web --release --dart-define=APP_VERSION=${{ env.APP_VERSION }} --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
@@ -49,3 +41,12 @@ jobs:
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy build/web --project-name=mianshi-zhilian-app --commit-dirty=true --commit-message="deploy ${{ github.sha }}"
           workingDirectory: apps/client
+      - name: Verify primary and backup web routes
+        run: |
+          set -euo pipefail
+          for base in \
+            "https://mianshi-zhilian-app.pages.dev" \
+            "https://mianshizhilian-app.nontracey.de5.net"
+          do
+            curl --fail --silent --show-error --retry 3 "$base/" >/tmp/app-index.html
+          done

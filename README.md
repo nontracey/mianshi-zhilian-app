@@ -189,11 +189,13 @@ git push origin vx.x.x
 
 ## 访问地址
 
-| 服务 | 地址 |
-|------|------|
-| Web App | https://mianshi-zhilian-app.pages.dev |
-| 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.pages.dev |
+| 服务 | 主用 | 备用 |
+|------|------|------|
+| Web App | https://mianshi-zhilian-app.pages.dev | https://mianshizhilian-app.nontracey.de5.net |
+| 内容 CDN | https://mianshi-zhilian-content.pages.dev | https://mianshizhilian-content.nontracey.de5.net |
+| Worker API | https://mianshi-zhilian-api.pages.dev | https://mianshizhilian-api.nontracey.de5.net |
+
+客户端官方请求使用 `RouteResolver` + `EndpointFallbackClient`，按服务名和路径自动选择 pages.dev / de5.net。用户自定义内容源仍然直连自定义 URL，不参与官方主备切换。
 
 ## 支持项目
 

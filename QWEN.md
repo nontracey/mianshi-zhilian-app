@@ -26,11 +26,13 @@
 
 ### 访问地址
 
-| 服务 | 地址 |
-|------|------|
-| Web App | https://mianshi-zhilian-app.pages.dev |
-| 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.pages.dev |
+| 服务 | 主用 | 备用 |
+|------|------|------|
+| Web App | https://mianshi-zhilian-app.pages.dev | https://mianshizhilian-app.nontracey.de5.net |
+| 内容 CDN | https://mianshi-zhilian-content.pages.dev | https://mianshizhilian-content.nontracey.de5.net |
+| Worker API | https://mianshi-zhilian-api.pages.dev | https://mianshizhilian-api.nontracey.de5.net |
+
+官方 App API、Content CDN、更新清单和官方下载镜像统一走 `RouteResolver` + `EndpointFallbackClient`。生产构建不再注入 `API_BASE_URL` / `UPDATE_MANIFEST_URL`；本地线路偏好和最近可用线路只存当前设备，不进入账号同步。
 
 ---
 

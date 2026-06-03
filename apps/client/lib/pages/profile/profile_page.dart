@@ -16,6 +16,9 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
+import 'package:mianshi_zhilian/services/route_resolver.dart';
+import 'package:mianshi_zhilian/services/route_state_store.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
@@ -107,6 +110,14 @@ class ProfilePage extends StatelessWidget {
               ),
             ),
             _ProfileSectionItem(
+              icon: Icons.route_outlined,
+              title: '线路诊断',
+              subtitle: '自动 / pages.dev / de5.net',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _RoutePreferencePage()),
+              ),
+            ),
+            _ProfileSectionItem(
               icon: Icons.info_outline,
               title: l10n.get('about_update'),
               subtitle: l10n.get('about_update_desc'),
@@ -129,6 +140,115 @@ class ProfilePage extends StatelessWidget {
         'cloud' => l10n.get('account_cloud_sync'),
         _ => l10n.get('local_mode'),
       };
+}
+
+class _RoutePreferencePage extends StatelessWidget {
+  const _RoutePreferencePage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('线路诊断')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: const [_RoutePreferencePanel()],
+      ),
+    );
+  }
+}
+
+class _RoutePreferencePanel extends StatefulWidget {
+  const _RoutePreferencePanel();
+
+  @override
+  State<_RoutePreferencePanel> createState() => _RoutePreferencePanelState();
+}
+
+class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
+  late final RouteStateStore _store;
+  RouteMode _appApiMode = RouteMode.auto;
+  RouteMode _contentMode = RouteMode.auto;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _store = RouteStateStore(StorageService());
+    _load();
+  }
+
+  Future<void> _load() async {
+    final appApiMode = await _store.loadMode(RouteService.appApi);
+    final contentMode = await _store.loadMode(RouteService.content);
+    if (!mounted) return;
+    setState(() {
+      _appApiMode = appApiMode;
+      _contentMode = contentMode;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return WorkPanel(
+      title: '官方线路偏好',
+      icon: Icons.route_outlined,
+      children: [
+        _buildSelector(
+          label: 'App API',
+          value: _appApiMode,
+          onChanged: (mode) async {
+            await _store.saveMode(RouteService.appApi, mode);
+            setState(() => _appApiMode = mode);
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildSelector(
+          label: '内容 CDN',
+          value: _contentMode,
+          onChanged: (mode) async {
+            await _store.saveMode(RouteService.content, mode);
+            setState(() => _contentMode = mode);
+          },
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '该设置只保存在当前设备。自动模式会按入口域名和最近可用线路选择，失败后短期记忆成功线路。',
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelector({
+    required String label,
+    required RouteMode value,
+    required ValueChanged<RouteMode> onChanged,
+  }) {
+    return DropdownButtonFormField<RouteMode>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      items: const [
+        DropdownMenuItem(value: RouteMode.auto, child: Text('自动（推荐）')),
+        DropdownMenuItem(value: RouteMode.backupFirst, child: Text('国内线路优先')),
+        DropdownMenuItem(value: RouteMode.primaryFirst, child: Text('国际线路优先')),
+        DropdownMenuItem(value: RouteMode.backupOnly, child: Text('仅国内线路')),
+        DropdownMenuItem(value: RouteMode.primaryOnly, child: Text('仅国际线路')),
+      ],
+      onChanged: (mode) {
+        if (mode != null) onChanged(mode);
+      },
+    );
+  }
 }
 
 class _ProfileSectionItem {
@@ -724,11 +844,21 @@ class _AccountPanel extends StatelessWidget {
 
   // 种子头像调色板
   static const List<Color> _seedColors = [
-    Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
-    Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF009688),
-    Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFFF5722),
-    Color(0xFF795548), Color(0xFF607D8B), Color(0xFFE67E22),
-    Color(0xFF2ECC71), Color(0xFF3498DB), Color(0xFF9B59B6),
+    Color(0xFFE91E63),
+    Color(0xFF9C27B0),
+    Color(0xFF673AB7),
+    Color(0xFF3F51B5),
+    Color(0xFF2196F3),
+    Color(0xFF009688),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFFFF5722),
+    Color(0xFF795548),
+    Color(0xFF607D8B),
+    Color(0xFFE67E22),
+    Color(0xFF2ECC71),
+    Color(0xFF3498DB),
+    Color(0xFF9B59B6),
     Color(0xFF1ABC9C),
   ];
 
@@ -738,7 +868,8 @@ class _AccountPanel extends StatelessWidget {
   }
 
   Widget _buildAvatar(BuildContext context, bool isDark) {
-    final hasAvatarUrl = profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
+    final hasAvatarUrl =
+        profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
     final hasSeed = profile.avatarSeed.isNotEmpty;
     final seedColor = _seedColor(profile.avatarSeed);
     final diceBearUrl = hasSeed && !hasAvatarUrl
@@ -755,13 +886,13 @@ class _AccountPanel extends StatelessWidget {
             backgroundColor: showInitials
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                 : diceBearUrl != null
-                    ? seedColor.withValues(alpha: 0.15)
-                    : null,
+                ? seedColor.withValues(alpha: 0.15)
+                : null,
             backgroundImage: hasAvatarUrl
                 ? NetworkImage(profile.avatarUrl!)
                 : diceBearUrl != null
-                    ? NetworkImage(diceBearUrl)
-                    : null,
+                ? NetworkImage(diceBearUrl)
+                : null,
             child: showInitials
                 ? Builder(
                     builder: (context) {
@@ -1345,7 +1476,9 @@ class _ContentEnvPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.getp('current_url_2', {'url': settings.contentBaseUrl}),
+                  l10n.getp('current_url_2', {
+                    'url': _contentRouteLabel(settings),
+                  }),
                   style: const TextStyle(fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1366,7 +1499,8 @@ class _ContentEnvPanel extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           l10n.getp('default_url_content_test_2', {
-            'url': AppSettings.defaultWorkerApiUrl,
+            'url':
+                '${AppSettings.defaultWorkerApiUrl}/content/test / ${RouteResolver.appApiBackup}/content/test',
           }),
           style: TextStyle(
             fontSize: 11,
@@ -1395,7 +1529,10 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.getp('default_url', {'url': AppSettings.defaultProdContentUrl}),
+          l10n.getp('default_url', {
+            'url':
+                '${AppSettings.defaultProdContentUrl} / ${RouteResolver.contentBackup}',
+          }),
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1413,6 +1550,22 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _contentRouteLabel(AppSettings settings) {
+    if (settings.contentEnv == ContentEnv.production &&
+        settings.customProdContentUrl?.isNotEmpty == true) {
+      return '${settings.customProdContentUrl} (custom, no official fallback)';
+    }
+    if (settings.contentEnv != ContentEnv.production &&
+        settings.customTestContentUrl?.isNotEmpty == true) {
+      return '${settings.customTestContentUrl} (custom, no official fallback)';
+    }
+    if (settings.contentEnv == ContentEnv.production) {
+      return '${RouteResolver.contentPrimary} / ${RouteResolver.contentBackup}';
+    }
+    final stage = settings.contentEnv == ContentEnv.draft ? 'draft' : 'test';
+    return '${RouteResolver.appApiPrimary}/content/$stage / ${RouteResolver.appApiBackup}/content/$stage';
   }
 }
 
@@ -2886,9 +3039,9 @@ class _AboutPanelState extends State<_AboutPanel> {
                         : null,
                   ),
                   onChanged: (value) {
-                    context
-                        .read<SettingsProvider>()
-                        .setCustomGithubMirror(value.isEmpty ? null : value.trim());
+                    context.read<SettingsProvider>().setCustomGithubMirror(
+                      value.isEmpty ? null : value.trim(),
+                    );
                     setDialogState(() {});
                   },
                 ),
