@@ -35,10 +35,14 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Get previous tag
+      - name: Get previous tag via GitHub Releases API
         id: prev_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+          # 使用 GitHub Releases API 获取上一个 release 的 tag（不受 force-push 影响）
+          # 当前 release 尚未创建，limit=1 取到的是上一个
+          PREV_TAG=$(gh release list --json tagName --jq '.[0].tagName // ""' --limit 1)
           if [ -z "$PREV_TAG" ]; then
             echo "tag=$GITHUB_SHA" >> $GITHUB_OUTPUT
           else
@@ -116,11 +120,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           NOTES=$(cat release_notes.md)
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            # Release 已存在（如 force-push 场景），更新指向和 notes
+            gh release edit "${GITHUB_REF_NAME}" \
+              --target "${GITHUB_SHA}" \
+              --notes-file release_notes.md
+          else
             gh release create "${GITHUB_REF_NAME}" \
               --target "${GITHUB_SHA}" \
               --title "${GITHUB_REF_NAME}" \
               --notes-file release_notes.md
+          fi
 
   android:
     runs-on: ubuntu-latest
@@ -152,6 +162,15 @@ jobs:
             android-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
+      - name: Embed release notes
+        run: |
+          mkdir -p lib/generated
+          cat > lib/generated/release_notes.dart << 'DARTEOF'
+// Auto-generated during release build by CI. Do not edit manually.
+class ReleaseNotes {
+  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
+}
+DARTEOF
       - name: Configure Android release signing
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -207,6 +226,15 @@ jobs:
             web-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
+      - name: Embed release notes
+        run: |
+          mkdir -p lib/generated
+          cat > lib/generated/release_notes.dart << 'DARTEOF'
+// Auto-generated during release build by CI. Do not edit manually.
+class ReleaseNotes {
+  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
+}
+DARTEOF
       - run: flutter build web --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cd build/web && zip -r "../../mianshi-zhilian-${GITHUB_REF_NAME}-web.zip" .
       - uses: actions/upload-artifact@v4
@@ -250,6 +278,15 @@ jobs:
           key: innosetup-${{ runner.os }}
       - run: flutter pub get
       - run: bash tool/generate_version.sh
+      - name: Embed release notes
+        run: |
+          mkdir -p lib/generated
+          cat > lib/generated/release_notes.dart << 'DARTEOF'
+// Auto-generated during release build by CI. Do not edit manually.
+class ReleaseNotes {
+  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
+}
+DARTEOF
       - run: flutter build windows --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
@@ -335,6 +372,15 @@ jobs:
             macos-build-${{ runner.os }}-
       - run: flutter pub get
       - run: bash tool/generate_version.sh
+      - name: Embed release notes
+        run: |
+          mkdir -p lib/generated
+          cat > lib/generated/release_notes.dart << 'DARTEOF'
+// Auto-generated during release build by CI. Do not edit manually.
+class ReleaseNotes {
+  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
+}
+DARTEOF
       - run: flutter build macos --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Build drag-install DMG
         run: |
@@ -374,8 +420,12 @@ jobs:
           cache: true
       - name: Extract release notes from git log
         id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+          # 使用 GitHub Releases API 获取上一个 release 的 tag（不受 force-push 影响）
+          # 当前 release 已存在，limit=2 并取第二个
+          PREV_TAG=$(gh release list --json tagName --jq '.[1].tagName // ""' --limit 2)
           if [ -z "$PREV_TAG" ]; then
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi

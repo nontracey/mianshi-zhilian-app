@@ -838,6 +838,7 @@ class L10n {
         '知识点正在加载中，请稍等片刻再试',
     'knowledge_catalog': '知识目录',
     'known_channel': '已知通道',
+    'no_release_notes': '暂无更新说明',
     'short_link_system': '短链接系统',
     'confirm_fixed': '确认固定',
     'confirm_fixed_data_consistency_key_requirement': '确认数据一致性是关键要求',
@@ -2261,6 +2262,7 @@ class L10n {
     'weakness_training_finger_south': 'Weakness Training Guide',
     'wrong_type_description': 'Error Type Description',
     'known_channel': 'Got It',
+    'no_release_notes': 'No release notes',
     'mode_type_name': 'Model Name',
     'mode_mock_interview': 'Mock Interview',
     'mode_mock_interview_official_follow_up_deep_enter_practice_knowle':

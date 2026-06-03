@@ -15,6 +15,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
+import 'package:mianshi_zhilian/generated/release_notes.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/services/route_state_store.dart';
@@ -2587,6 +2588,32 @@ class _AboutPanelState extends State<_AboutPanel> {
     }
   }
 
+  void _showCurrentVersionNotes() {
+    final l10n = context.read<LocalizationProvider>();
+    final notes = ReleaseNotes.notes;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          l10n.getp('publish_current_new_version_v_version_2', {
+            'version': _currentVersion.displayVersion,
+          }),
+        ),
+        content: notes.isNotEmpty
+            ? SingleChildScrollView(
+                child: Text(notes),
+              )
+            : Text(l10n.get('no_release_notes')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.get('known_channel')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _checkUpdate() async {
     final l10n = context.read<LocalizationProvider>();
     setState(() {
@@ -2940,11 +2967,16 @@ class _AboutPanelState extends State<_AboutPanel> {
     return WorkPanel(
       title: l10n.get('about_interview_intelligence_training'),
       children: [
-        InfoRow(
-          icon: Icons.info_outline,
-          title:
-              '${l10n.get('version_prefix')} ${_currentVersion.displayVersion}',
-          subtitle: l10n.get('ai_main_dynamic_back_memory_study_work_platform'),
+        InkWell(
+          onTap: _showCurrentVersionNotes,
+          child: InfoRow(
+            icon: Icons.info_outline,
+            title:
+                '${l10n.get('version_prefix')} ${_currentVersion.displayVersion}',
+            subtitle: l10n.get(
+              'ai_main_dynamic_back_memory_study_work_platform',
+            ),
+          ),
         ),
         InfoRow(
           icon: Icons.cloud_sync_outlined,
