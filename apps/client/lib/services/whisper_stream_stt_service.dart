@@ -115,4 +115,42 @@ class WhisperStreamSttService {
       client.close();
     }
   }
+
+  /// 测试 API 连通性：发送极小的静音 WAV，验证端点是否可达
+  Future<bool> testConnection({
+    required String baseUrl,
+    required String apiKey,
+    String model = 'mimo-v2.5-asr',
+  }) async {
+    try {
+      // 最小 WAV: 44 bytes header + 4 bytes data
+      final silentWav = Uint8List(48);
+      final data = ByteData.view(silentWav.buffer);
+      data.setUint8(0, 0x52); data.setUint8(1, 0x49); data.setUint8(2, 0x46); data.setUint8(3, 0x46);
+      data.setUint32(4, 40, Endian.little);
+      data.setUint8(8, 0x57); data.setUint8(9, 0x41); data.setUint8(10, 0x56); data.setUint8(11, 0x45);
+      data.setUint8(12, 0x66); data.setUint8(13, 0x6D); data.setUint8(14, 0x74); data.setUint8(15, 0x20);
+      data.setUint32(16, 16, Endian.little);
+      data.setUint16(20, 1, Endian.little); data.setUint16(22, 1, Endian.little);
+      data.setUint32(24, 16000, Endian.little); data.setUint32(28, 32000, Endian.little);
+      data.setUint16(32, 2, Endian.little); data.setUint16(34, 16, Endian.little);
+      data.setUint8(36, 0x64); data.setUint8(37, 0x61); data.setUint8(38, 0x74); data.setUint8(39, 0x61);
+      data.setUint32(40, 4, Endian.little);
+      data.setInt16(44, 0, Endian.little); data.setInt16(46, 0, Endian.little);
+
+      // 接收至少一个 chunk 就算连通
+      final stream = transcribeStream(
+        audioBytes: silentWav,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        model: model,
+      );
+      await for (final _ in stream) {
+        return true;
+      }
+      return true; // 空流也算连通（有些 API 对静音返回空）
+    } catch (_) {
+      return false;
+    }
+  }
 }

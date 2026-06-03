@@ -22,6 +22,7 @@ import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
+import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -1729,11 +1730,14 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     final isWhisper = mode == 'whisper';
     final isWhisperKit = mode == 'whisper_kit';
 
-    // 按平台决定可选模式
+    // 按平台决定本地语音模式的卡片内容和可用性
+    // Android → 本机 Whisper（whisper_kit），系统语音无 GMS 不可用
+    // macOS   → 系统语音（NSSpeechRecognizer），whisper_kit 无 podspec 不可用
+    // Web     → 系统语音（浏览器 Web Speech API）
+    // Windows/Linux → 系统语音（有内置引擎则可用）
     final bool showLocalCard;
     final Widget localCard;
-    if (isWhisperKit || (!isSystem && !isWhisper && defaultTargetPlatform == TargetPlatform.android)) {
-      // Android / 已选 whisper_kit → 显示本机 Whisper
+    if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {
       showLocalCard = true;
       localCard = _SttModeCard(
         label: l10n.get('whisper_kit_mode_label'),
@@ -1744,7 +1748,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
             widget.settings.copyWith(sttMode: 'whisper_kit')),
       );
     } else {
-      // macOS / 桌面 → 显示系统语音
+      // macOS / Web / Windows / Linux → 系统语音
       showLocalCard = true;
       localCard = _SttModeCard(
         label: l10n.get('system_speech_voice'),
@@ -1832,13 +1836,23 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
                   controller: _modelCtrl,
                   decoration: InputDecoration(
                     labelText: l10n.get('mode_type_name'),
-                    hintText: 'whisper-1',
+                    hintText: l10n.get('please_enter_model_name'),
                     isDense: true,
                   ),
                   onChanged: (v) => widget.onSettingsChanged(
                       widget.settings.copyWith(whisperModel: v)),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // API 连通性测试按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _WhisperApiTestButton(
+              baseUrl: widget.settings.whisperBaseUrl ?? '',
+              apiKey: widget.settings.whisperApiKey ?? '',
+              model: widget.settings.whisperModel,
             ),
           ),
           const SizedBox(height: 8),
@@ -2069,6 +2083,91 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Whisper API 连通性测试按钮 ──────────────────────────────────────
+
+class _WhisperApiTestButton extends StatefulWidget {
+  const _WhisperApiTestButton({
+    required this.baseUrl,
+    required this.apiKey,
+    required this.model,
+  });
+
+  final String baseUrl;
+  final String apiKey;
+  final String model;
+
+  @override
+  State<_WhisperApiTestButton> createState() => _WhisperApiTestButtonState();
+}
+
+class _WhisperApiTestButtonState extends State<_WhisperApiTestButton> {
+  bool _testing = false;
+  bool? _result; // null=未测试, true=连通, false=不可达
+
+  Future<void> _test() async {
+    if (widget.baseUrl.isEmpty || widget.apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先填写 API 地址和密钥')),
+      );
+      return;
+    }
+
+    setState(() {
+      _testing = true;
+      _result = null;
+    });
+
+    try {
+      final svc = WhisperStreamSttService();
+      final ok = await svc.testConnection(
+        baseUrl: widget.baseUrl,
+        apiKey: widget.apiKey,
+        model: widget.model,
+      );
+      if (mounted) setState(() => _result = ok);
+    } catch (_) {
+      if (mounted) setState(() => _result = false);
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _testing ? null : _test,
+      icon: _testing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(
+              _result == null
+                  ? Icons.wifi_find
+                  : _result!
+                      ? Icons.check_circle
+                      : Icons.error,
+              size: 18,
+              color: _result == null
+                  ? null
+                  : _result!
+                      ? Colors.green
+                      : Colors.red,
+            ),
+      label: Text(
+        _testing
+            ? '测试中...'
+            : _result == null
+                ? '测试连通性'
+                : _result!
+                    ? 'API 连通正常'
+                    : 'API 不可达',
       ),
     );
   }

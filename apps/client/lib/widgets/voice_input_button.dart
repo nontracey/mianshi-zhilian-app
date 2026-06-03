@@ -293,6 +293,18 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           }
         } catch (e) {
           debugPrint('Whisper stream chunk error: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '转写失败: ${e.toString().length > 100 ? '${e.toString().substring(0, 100)}...' : e}',
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+          break; // 停止重试，一次失败说明 API 不可用
         }
       }
     } catch (e) {
