@@ -275,6 +275,7 @@ jobs:
       - run: flutter pub get
       - run: bash tool/generate_version.sh
       - name: Embed release notes
+        shell: bash
         run: |
           mkdir -p lib/generated
           echo '// Auto-generated during release build by CI. Do not edit manually.' > lib/generated/release_notes.dart
