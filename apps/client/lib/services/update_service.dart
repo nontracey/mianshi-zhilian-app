@@ -153,7 +153,7 @@ class UpdateService {
     this.updateManifestUrl = const String.fromEnvironment(
       'UPDATE_MANIFEST_URL',
       defaultValue:
-          'https://mianshi-zhilian-api.nontracey.workers.dev/update.json',
+          'https://mianshi-zhilian-api.pages.dev/update.json',
     ),
     this.customMirrorPrefix,
   });

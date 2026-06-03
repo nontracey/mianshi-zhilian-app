@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "dev": "wrangler pages dev src/",
+    "deploy": "wrangler pages deploy --project-name=mianshi-zhilian-api src/"
   },
   "devDependencies": {
     "wrangler": "^4.49.0"

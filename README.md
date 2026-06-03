@@ -193,7 +193,7 @@ git push origin vx.x.x
 |------|------|
 | Web App | https://mianshi-zhilian-app.pages.dev |
 | 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.nontracey.workers.dev |
+| Worker API | https://mianshi-zhilian-api.pages.dev |
 
 ## 支持项目
 

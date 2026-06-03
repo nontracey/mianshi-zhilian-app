@@ -15,7 +15,7 @@ class AnalyticsService {
     this._storage, {
     this.apiBaseUrl = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'https://mianshi-zhilian-api.nontracey.workers.dev',
+      defaultValue: 'https://mianshi-zhilian-api.pages.dev',
     ),
   });
 

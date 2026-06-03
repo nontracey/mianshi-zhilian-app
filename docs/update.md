@@ -121,10 +121,10 @@
 
 ## 稳定更新地址
 
-客户端默认使用 Cloudflare Worker 的稳定路径。Worker 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
+客户端默认使用 Cloudflare Pages Functions 的稳定路径。Pages Functions 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
 
 ```
-https://mianshi-zhilian-api.nontracey.workers.dev/update.json
+https://mianshi-zhilian-api.pages.dev/update.json
 ```
 
 也可以通过 `UPDATE_MANIFEST_URL` 编译参数改为其他稳定地址。

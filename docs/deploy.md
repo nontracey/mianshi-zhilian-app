@@ -54,7 +54,7 @@
 |------|------|
 | Web App | https://mianshi-zhilian-app.pages.dev |
 | 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.nontracey.workers.dev |
+| Worker API | https://mianshi-zhilian-api.pages.dev |
 
 ## 必需配置
 
@@ -256,10 +256,10 @@ git push origin vx.x.x
 
 ## 还需要人工配置
 
-1. 在 GitHub 仓库配置 `CLOUDFLARE_API_TOKEN` secret 后，Web 和 Worker 部署会在 push 到 `main` 时自动触发。
-2. 在 Cloudflare Workers 配置 D1 数据库绑定和 JWT Secret。
+1. 在 GitHub 仓库配置 `CLOUDFLARE_API_TOKEN` secret 后，Web 和 Pages Functions 部署会在 push 到 `main` 时自动触发。
+2. 在 Cloudflare Pages Dashboard 中配置 D1 数据库绑定、KV 命名空间绑定和环境变量。
 3. 正式分发前补 Android keystore、Windows 代码签名、macOS Developer ID 签名和 notarization。
-4. 更新检查默认使用 Worker 稳定地址 `https://mianshi-zhilian-api.nontracey.workers.dev/update.json`，由 Worker 代理 GitHub latest release 中的 `update.json`。如需更换更新源，可配置 GitHub Variable `UPDATE_MANIFEST_URL`。下载安装包时默认走 GitHub 官方，失败后自动尝试用户自定义镜像 → ghproxy.com 备用镜像；用户可在 App 的"关于与更新 → ⚙️ 下载设置"中配置自定义镜像站前缀。
+4. 更新检查默认使用 API 稳定地址 `https://mianshi-zhilian-api.pages.dev/update.json`，由 Cloudflare Pages Functions 代理 GitHub latest release 中的 `update.json`。如需更换更新源，可配置 GitHub Variable `UPDATE_MANIFEST_URL`。下载安装包时默认走 GitHub 官方，失败后自动尝试用户自定义镜像 → ghproxy.com 备用镜像；用户可在 App 的"关于与更新 → ⚙️ 下载设置"中配置自定义镜像站前缀。
 
 ## 免费额度与用户量估算
 

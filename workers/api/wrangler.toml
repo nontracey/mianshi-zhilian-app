@@ -1,6 +1,9 @@
 name = "mianshi-zhilian-api"
-main = "src/index.ts"
 compatibility_date = "2026-05-27"
+
+# Pages Functions 的绑定配置与 Workers 格式一致。
+# 本地开发：wrangler pages dev src/
+# 生产部署：wrangler pages deploy --project-name=mianshi-zhilian-api src/
 
 [[kv_namespaces]]
 binding = "KV"
@@ -19,3 +22,5 @@ database_id = "PLACEHOLDER_DATABASE_ID"
 CONTENT_MANIFEST_URL = "https://mianshi-zhilian-content.pages.dev/manifest.json"
 TEST_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
 PROD_CONTENT_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
+# PLACEHOLDER_JWT_SECRET 由 CI 在部署前替换
+JWT_SECRET = "PLACEHOLDER_JWT_SECRET"

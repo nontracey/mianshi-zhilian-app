@@ -17,7 +17,7 @@
 | 模块 | 技术 |
 |------|------|
 | 客户端 | Flutter (Web / Android / macOS / Windows) |
-| 后端 API | Cloudflare Workers (TypeScript) |
+| 后端 API | Cloudflare Pages Functions (TypeScript) |
 | 数据库 | Cloudflare D1 + 本地 SQLite |
 | 内容 CDN | Cloudflare Pages 静态 JSON |
 | 状态管理 | Provider |
@@ -30,7 +30,7 @@
 |------|------|
 | Web App | https://mianshi-zhilian-app.pages.dev |
 | 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.nontracey.workers.dev |
+| Worker API | https://mianshi-zhilian-api.pages.dev |
 
 ---
 
