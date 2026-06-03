@@ -148,8 +148,9 @@ class _RoutePreferencePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return Scaffold(
-      appBar: AppBar(title: const Text('线路诊断')),
+      appBar: AppBar(title: Text(l10n.get('route_diagnosis'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: const [_RoutePreferencePanel()],
@@ -169,6 +170,7 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
   late final RouteStateStore _store;
   RouteMode _appApiMode = RouteMode.auto;
   RouteMode _contentMode = RouteMode.auto;
+  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.githubFirst;
   bool _loading = true;
 
   @override
@@ -179,12 +181,16 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
   }
 
   Future<void> _load() async {
-    final appApiMode = await _store.loadMode(RouteService.appApi);
-    final contentMode = await _store.loadMode(RouteService.content);
+    final results = await Future.wait([
+      _store.loadMode(RouteService.appApi),
+      _store.loadMode(RouteService.content),
+      _store.loadDownloadSourceMode(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _appApiMode = appApiMode;
-      _contentMode = contentMode;
+      _appApiMode = results[0] as RouteMode;
+      _contentMode = results[1] as RouteMode;
+      _downloadSourceMode = results[2] as DownloadSourceMode;
       _loading = false;
     });
   }
@@ -194,8 +200,9 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final l10n = context.watch<LocalizationProvider>();
     return WorkPanel(
-      title: '官方线路偏好',
+      title: l10n.get('route_official_preference'),
       icon: Icons.route_outlined,
       children: [
         _buildSelector(
@@ -208,16 +215,18 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
         ),
         const SizedBox(height: 16),
         _buildSelector(
-          label: '内容 CDN',
+          label: l10n.get('route_content_cdn'),
           value: _contentMode,
           onChanged: (mode) async {
             await _store.saveMode(RouteService.content, mode);
             setState(() => _contentMode = mode);
           },
         ),
+        const SizedBox(height: 16),
+        _buildDownloadSourceSelector(),
         const SizedBox(height: 12),
         Text(
-          '该设置只保存在当前设备。自动模式会按入口域名和最近可用线路选择，失败后短期记忆成功线路。',
+          l10n.get('route_setting_local_only'),
           style: TextStyle(
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -227,23 +236,55 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
     );
   }
 
+  Widget _buildDownloadSourceSelector() {
+    final l10n = context.watch<LocalizationProvider>();
+    return DropdownButtonFormField<DownloadSourceMode>(
+      initialValue: _downloadSourceMode,
+      decoration: InputDecoration(
+        labelText: l10n.get('download_source_mode'),
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        DropdownMenuItem(
+          value: DownloadSourceMode.githubFirst,
+          child: Text(l10n.get('download_github_first')),
+        ),
+        DropdownMenuItem(
+          value: DownloadSourceMode.mirrorFirst,
+          child: Text(l10n.get('download_mirror_first')),
+        ),
+        DropdownMenuItem(
+          value: DownloadSourceMode.githubOnly,
+          child: Text(l10n.get('download_github_only')),
+        ),
+      ],
+      onChanged: (mode) {
+        if (mode != null) {
+          _store.saveDownloadSourceMode(mode);
+          setState(() => _downloadSourceMode = mode);
+        }
+      },
+    );
+  }
+
   Widget _buildSelector({
     required String label,
     required RouteMode value,
     required ValueChanged<RouteMode> onChanged,
   }) {
+    final l10n = context.watch<LocalizationProvider>();
     return DropdownButtonFormField<RouteMode>(
       initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
       ),
-      items: const [
-        DropdownMenuItem(value: RouteMode.auto, child: Text('自动（推荐）')),
-        DropdownMenuItem(value: RouteMode.backupFirst, child: Text('国内线路优先')),
-        DropdownMenuItem(value: RouteMode.primaryFirst, child: Text('国际线路优先')),
-        DropdownMenuItem(value: RouteMode.backupOnly, child: Text('仅国内线路')),
-        DropdownMenuItem(value: RouteMode.primaryOnly, child: Text('仅国际线路')),
+      items: [
+        DropdownMenuItem(value: RouteMode.auto, child: Text(l10n.get('route_auto'))),
+        DropdownMenuItem(value: RouteMode.backupFirst, child: Text(l10n.get('route_backup_first'))),
+        DropdownMenuItem(value: RouteMode.primaryFirst, child: Text(l10n.get('route_primary_first'))),
+        DropdownMenuItem(value: RouteMode.backupOnly, child: Text(l10n.get('route_backup_only'))),
+        DropdownMenuItem(value: RouteMode.primaryOnly, child: Text(l10n.get('route_primary_only'))),
       ],
       onChanged: (mode) {
         if (mode != null) onChanged(mode);
@@ -2566,17 +2607,22 @@ class _AboutPanelState extends State<_AboutPanel> {
   String? _updateMessage;
   StateSetter? _currentSetDialogState;
   AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
+  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.githubFirst;
 
   /// 统一获取 UpdateService 实例（避免重复创建导致设置不一致）
   UpdateService get _updateService {
     final settings = context.read<SettingsProvider>().settings;
-    return UpdateService(customMirrorPrefix: settings.customGithubMirror);
+    return UpdateService(
+      customMirrorPrefix: settings.customGithubMirror,
+      downloadSourceMode: _downloadSourceMode,
+    );
   }
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _loadSettings();
   }
 
   Future<void> _loadVersion() async {
@@ -2585,6 +2631,14 @@ class _AboutPanelState extends State<_AboutPanel> {
       setState(() {
         _currentVersion = version;
       });
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    final store = RouteStateStore(StorageService());
+    final mode = await store.loadDownloadSourceMode();
+    if (mounted) {
+      setState(() => _downloadSourceMode = mode);
     }
   }
 

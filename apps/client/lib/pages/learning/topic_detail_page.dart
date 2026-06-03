@@ -37,6 +37,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   late TabController _tabController;
   final _answerController = TextEditingController();
   bool _isEvaluating = false;
+  bool _isVoiceListening = false;
   Map<String, dynamic>? _evaluationResult;
 
   @override
@@ -47,6 +48,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       initialIndex: widget.initialTabIndex.clamp(0, 1),
       vsync: this,
     );
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -253,8 +257,12 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                 topic: topic,
                 answerController: _answerController,
                 isEvaluating: _isEvaluating,
+                isVoiceListening: _isVoiceListening,
                 evaluationResult: _evaluationResult,
                 onEvaluate: _handleEvaluate,
+                onVoiceListeningChanged: (listening) {
+                  setState(() => _isVoiceListening = listening);
+                },
               ),
             ],
           ),
@@ -278,8 +286,12 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                 topic: topic,
                 answerController: _answerController,
                 isEvaluating: _isEvaluating,
+                isVoiceListening: _isVoiceListening,
                 evaluationResult: _evaluationResult,
                 onEvaluate: _handleEvaluate,
+                onVoiceListeningChanged: (listening) {
+                  setState(() => _isVoiceListening = listening);
+                },
               ),
             ],
           ),
@@ -3157,26 +3169,28 @@ class _RecallTab extends StatelessWidget {
     required this.topic,
     required this.answerController,
     required this.isEvaluating,
+    required this.isVoiceListening,
     required this.evaluationResult,
     required this.onEvaluate,
+    required this.onVoiceListeningChanged,
   });
 
   final Topic topic;
   final TextEditingController answerController;
   final bool isEvaluating;
+  final bool isVoiceListening;
   final Map<String, dynamic>? evaluationResult;
   final VoidCallback onEvaluate;
+  final ValueChanged<bool> onVoiceListeningChanged;
 
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 960;
 
     if (wide) {
-      // 宽屏：左右分栏
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 左侧：Prompt（题目 + checklist）
           Expanded(
             flex: 5,
             child: SingleChildScrollView(
@@ -3185,7 +3199,6 @@ class _RecallTab extends StatelessWidget {
             ),
           ),
           const VerticalDivider(width: 1),
-          // 右侧：Answer（输入 + 评估）
           Expanded(
             flex: 5,
             child: SingleChildScrollView(
@@ -3194,8 +3207,10 @@ class _RecallTab extends StatelessWidget {
                 topic: topic,
                 answerController: answerController,
                 isEvaluating: isEvaluating,
+                isVoiceListening: isVoiceListening,
                 evaluationResult: evaluationResult,
                 onEvaluate: onEvaluate,
+                onVoiceListeningChanged: onVoiceListeningChanged,
               ),
             ),
           ),
@@ -3203,7 +3218,6 @@ class _RecallTab extends StatelessWidget {
       );
     }
 
-    // 窄屏：上下排列
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -3215,8 +3229,10 @@ class _RecallTab extends StatelessWidget {
             topic: topic,
             answerController: answerController,
             isEvaluating: isEvaluating,
+            isVoiceListening: isVoiceListening,
             evaluationResult: evaluationResult,
             onEvaluate: onEvaluate,
+            onVoiceListeningChanged: onVoiceListeningChanged,
           ),
         ],
       ),
@@ -3445,15 +3461,19 @@ class _AnswerPanel extends StatelessWidget {
     required this.topic,
     required this.answerController,
     required this.isEvaluating,
+    required this.isVoiceListening,
     required this.evaluationResult,
     required this.onEvaluate,
+    required this.onVoiceListeningChanged,
   });
 
   final Topic topic;
   final TextEditingController answerController;
   final bool isEvaluating;
+  final bool isVoiceListening;
   final Map<String, dynamic>? evaluationResult;
   final VoidCallback onEvaluate;
+  final ValueChanged<bool> onVoiceListeningChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -3504,6 +3524,24 @@ class _AnswerPanel extends StatelessWidget {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                      width: isVoiceListening ? 2 : 1,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                      width: isVoiceListening ? 2 : 1,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isVoiceListening ? Colors.green : Theme.of(context).colorScheme.primary,
+                      width: isVoiceListening ? 2 : 2,
+                    ),
                   ),
                   suffixIcon: VoiceInputButton(
                     onResult: (text) {
@@ -3518,6 +3556,7 @@ class _AnswerPanel extends StatelessWidget {
                         TextPosition(offset: newValue.length),
                       );
                     },
+                    onListeningChanged: onVoiceListeningChanged,
                     sttMode: context.read<SettingsProvider>().settings.sttMode,
                     whisperBaseUrl: context
                         .read<SettingsProvider>()

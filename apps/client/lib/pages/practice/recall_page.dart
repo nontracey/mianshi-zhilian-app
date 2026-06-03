@@ -37,6 +37,7 @@ class _RecallPageState extends State<RecallPage> {
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
   bool _voiceTranscribed = false;
+  bool _isVoiceListening = false;
   final _voiceTranscriptController = TextEditingController();
 
   // 流式输出相关
@@ -359,9 +360,15 @@ class _RecallPageState extends State<RecallPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.06),
+        color: _isVoiceListening
+            ? Colors.green.withValues(alpha: 0.06)
+            : AppColors.accent.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: _isVoiceListening
+              ? Colors.green.withValues(alpha: 0.5)
+              : AppColors.accent.withValues(alpha: 0.2),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,6 +382,9 @@ class _RecallPageState extends State<RecallPage> {
                         '${_voiceTranscriptController.text}$text';
                     _voiceTranscribed = true;
                   });
+                },
+                onListeningChanged: (listening) {
+                  setState(() => _isVoiceListening = listening);
                 },
                 sttMode: context.read<SettingsProvider>().settings.sttMode,
                 whisperBaseUrl: context
@@ -409,10 +419,15 @@ class _RecallPageState extends State<RecallPage> {
                       ),
                     ),
                     Text(
-                      l10n.get(
-                        'transfer_write_text_local_optional_independent_establish_edit_confirm_after_add_523',
+                      _isVoiceListening
+                          ? l10n.get('voice_recording_hint')
+                          : l10n.get(
+                              'transfer_write_text_local_optional_independent_establish_edit_confirm_after_add_523',
+                            ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _isVoiceListening ? Colors.green : Colors.grey,
                       ),
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
                 ),

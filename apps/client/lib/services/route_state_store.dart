@@ -8,6 +8,7 @@ class RouteStateStore {
 
   static const _stateKey = '_routeState';
   static const _modeKey = '_routeMode';
+  static const _downloadSourceModeKey = '_downloadSourceMode';
 
   Future<RouteMode> loadMode(RouteService service) async {
     final data = await _storage.loadJsonObject(_modeKey);
@@ -53,5 +54,18 @@ class RouteStateStore {
       'expiresAt': DateTime.now().add(ttl).toIso8601String(),
     };
     await _storage.saveJsonObject(_stateKey, data);
+  }
+
+  Future<DownloadSourceMode> loadDownloadSourceMode() async {
+    final data = await _storage.loadJsonObject(_downloadSourceModeKey);
+    final raw = data?['mode'] as String?;
+    return DownloadSourceMode.values.firstWhere(
+      (mode) => mode.name == raw,
+      orElse: () => DownloadSourceMode.githubFirst,
+    );
+  }
+
+  Future<void> saveDownloadSourceMode(DownloadSourceMode mode) async {
+    await _storage.saveJsonObject(_downloadSourceModeKey, {'mode': mode.name});
   }
 }

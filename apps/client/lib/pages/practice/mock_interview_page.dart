@@ -32,6 +32,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   bool _isCompleted = false;
   bool _formalMode = false;
   bool _savedSession = false;
+  bool _isVoiceListening = false;
   String _scenario = 'mixed';
   late final DateTime _startedAt = DateTime.now();
 
@@ -802,6 +803,24 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               hintText: l10n.get('please_input_your_answer'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: _isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                  width: _isVoiceListening ? 2 : 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: _isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                  width: _isVoiceListening ? 2 : 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: _isVoiceListening ? Colors.green : Theme.of(context).colorScheme.primary,
+                  width: _isVoiceListening ? 2 : 2,
+                ),
               ),
               filled: true,
               suffixIcon: VoiceInputButton(
@@ -815,6 +834,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                   _answerController.selection = TextSelection.fromPosition(
                     TextPosition(offset: newValue.length),
                   );
+                },
+                onListeningChanged: (listening) {
+                  setState(() => _isVoiceListening = listening);
                 },
                 sttMode: context.read<SettingsProvider>().settings.sttMode,
                 whisperBaseUrl: context

@@ -154,9 +154,13 @@ class UpdateService {
   /// 如果设置了，下载时会优先插入自定义镜像到 mirrors 列表头部
   final String? customMirrorPrefix;
 
+  /// 下载源模式，控制各来源的尝试顺序
+  final DownloadSourceMode downloadSourceMode;
+
   UpdateService({
     this.updateManifestUrl = '',
     this.customMirrorPrefix,
+    this.downloadSourceMode = DownloadSourceMode.githubFirst,
     EndpointFallbackClient? routeClient,
   }) : _routeClient =
            routeClient ??
@@ -254,43 +258,49 @@ class UpdateService {
     }
   }
 
-  /// 构建下载 URL 列表：GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  /// 构建下载 URL 列表，按 [downloadSourceMode] 排序
   @visibleForTesting
   List<String> buildDownloadUrlsForTest(PlatformUpdate platformUpdate) {
     return _buildDownloadUrls(platformUpdate);
   }
 
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
-    final urls = <String>[];
+    final githubUrl = platformUpdate.url.trim();
+    final mirrorPrefix =
+        (customMirrorPrefix ?? '').replaceAll(RegExp(r'/+$'), '');
+    final customMirrorUrl =
+        mirrorPrefix.isNotEmpty ? '$mirrorPrefix/$githubUrl' : '';
+    final ghproxyUrl = githubUrl.isNotEmpty ? '$defaultMirrorPrefix/$githubUrl' : '';
+    final manifestMirrors =
+        platformUpdate.mirrors.where((m) => m.trim().isNotEmpty).toList();
 
-    // GitHub 官方下载
-    if (platformUpdate.url.trim().isNotEmpty) {
-      urls.add(platformUpdate.url);
-    }
-
-    // 用户自定义镜像站（设置中配置的）
-    if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
-      final mirrorUrl =
-          '${customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '')}/${platformUpdate.url}';
-      if (!urls.contains(mirrorUrl)) {
-        urls.add(mirrorUrl);
+    // 按模式构造 URL 列表
+    List<String> buildList(bool mirrorFirst) {
+      final urls = <String>[];
+      if (mirrorFirst) {
+        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
+        if (githubUrl.isNotEmpty) urls.add(githubUrl);
+      } else {
+        if (githubUrl.isNotEmpty) urls.add(githubUrl);
+        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
       }
-    }
-
-    // ghproxy.com 默认备用镜像
-    final ghproxyUrl = '$defaultMirrorPrefix/${platformUpdate.url}';
-    if (!urls.contains(ghproxyUrl)) {
-      urls.add(ghproxyUrl);
-    }
-
-    // manifest 中的其他镜像
-    for (final mirror in platformUpdate.mirrors) {
-      if (mirror.trim().isNotEmpty && !urls.contains(mirror)) {
-        urls.add(mirror);
+      if (ghproxyUrl.isNotEmpty && !urls.contains(ghproxyUrl)) {
+        urls.add(ghproxyUrl);
       }
+      for (final mirror in manifestMirrors) {
+        if (!urls.contains(mirror)) urls.add(mirror);
+      }
+      return urls;
     }
 
-    return urls;
+    switch (downloadSourceMode) {
+      case DownloadSourceMode.githubOnly:
+        return githubUrl.isNotEmpty ? [githubUrl] : [];
+      case DownloadSourceMode.githubFirst:
+        return buildList(false);
+      case DownloadSourceMode.mirrorFirst:
+        return buildList(true);
+    }
   }
 
   /// 下载更新文件

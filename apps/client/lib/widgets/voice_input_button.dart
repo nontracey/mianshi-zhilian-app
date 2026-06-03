@@ -149,7 +149,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       return;
     }
 
-    if (widget.whisperBaseUrl == null || widget.whisperApiKey == null) {
+    if (widget.whisperBaseUrl == null ||
+        widget.whisperApiKey == null ||
+        widget.whisperBaseUrl!.trim().isEmpty ||
+        widget.whisperApiKey!.trim().isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.get('voice_no_whisper_key'))),
@@ -261,7 +264,12 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       onPressed: _toggleListening,
       icon: Icon(
         _isListening ? Icons.mic : Icons.mic_none,
-        color: _isListening ? Colors.red : null,
+        color: _isListening ? Colors.green : null,
+      ),
+      style: IconButton.styleFrom(
+        backgroundColor: _isListening
+            ? Colors.green.withValues(alpha: 0.12)
+            : null,
       ),
       tooltip: _isListening
           ? l10n.get('voice_stop_recording')
