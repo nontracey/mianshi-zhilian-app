@@ -80,7 +80,7 @@ class ProfilePage extends StatelessWidget {
               title: l10n.get('ai_and_voice'),
               subtitle: l10n.get('ai_and_voice_desc'),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const _AiVoiceSettingsPage()),
+                MaterialPageRoute(builder: (_) => const AiVoiceSettingsPage()),
               ),
             ),
             _ProfileSectionItem(
@@ -454,8 +454,8 @@ class _ContentSourcePage extends StatelessWidget {
   }
 }
 
-class _AiVoiceSettingsPage extends StatelessWidget {
-  const _AiVoiceSettingsPage();
+class AiVoiceSettingsPage extends StatelessWidget {
+  const AiVoiceSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1898,6 +1898,7 @@ class _WhisperKitModelManager extends StatefulWidget {
 class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
   final OnDeviceSttService _svc = OnDeviceSttService();
   bool _modelReady = false;
+  bool _modelOnDisk = false; // 模型文件是否存在于磁盘
   bool _downloading = false;
   String _statusText = '';
 
@@ -1907,12 +1908,21 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
     _checkStatus();
   }
 
-  void _checkStatus() {
-    setState(() {
-      _modelReady = _svc.isModelReady;
-      _downloading = _svc.isModelDownloading;
-      _statusText = _svc.modelStatus;
-    });
+  Future<void> _checkStatus() async {
+    // 先检查文件系统，再检查内存状态
+    final onDisk = await _svc.isModelFilePresent();
+    if (mounted) {
+      setState(() {
+        _modelOnDisk = onDisk;
+        _modelReady = _svc.isModelReady;
+        _downloading = _svc.isModelDownloading;
+        _statusText = _svc.modelStatus;
+        // 如果文件存在但内存未加载，显示为"已下载（未加载）"
+        if (onDisk && !_modelReady && !_downloading) {
+          _statusText = 'ready'; // 文件已存在，标记为 ready
+        }
+      });
+    }
   }
 
   Future<void> _download() async {
@@ -2013,6 +2023,7 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final theme = Theme.of(context);
+    final isAvailable = _modelReady || _modelOnDisk;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2027,8 +2038,8 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
         child: Row(
           children: [
             Icon(
-              _modelReady ? Icons.check_circle : Icons.download_outlined,
-              color: _modelReady ? Colors.green : theme.colorScheme.secondary,
+              isAvailable ? Icons.check_circle : Icons.download_outlined,
+              color: isAvailable ? Colors.green : theme.colorScheme.secondary,
               size: 20,
             ),
             const SizedBox(width: 10),
@@ -2045,7 +2056,7 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _modelReady
+                    isAvailable
                         ? l10n.get('whisper_kit_model_downloaded')
                         : _downloading
                             ? _statusText
@@ -2068,7 +2079,7 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            else if (!_modelReady)
+            else if (!isAvailable)
               TextButton(
                 onPressed: _download,
                 child: Text(l10n.get('whisper_kit_download_model')),
@@ -2108,11 +2119,12 @@ class _WhisperApiTestButton extends StatefulWidget {
 class _WhisperApiTestButtonState extends State<_WhisperApiTestButton> {
   bool _testing = false;
   bool? _result; // null=未测试, true=连通, false=不可达
+  String _detail = ''; // 测试结果详情
 
   Future<void> _test() async {
     if (widget.baseUrl.isEmpty || widget.apiKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先填写 API 地址和密钥')),
+        SnackBar(content: Text(l10n.get('whisper_api_fill_required'))),
       );
       return;
     }
@@ -2120,55 +2132,96 @@ class _WhisperApiTestButtonState extends State<_WhisperApiTestButton> {
     setState(() {
       _testing = true;
       _result = null;
+      _detail = '';
     });
 
     try {
       final svc = WhisperStreamSttService();
-      final ok = await svc.testConnection(
+      final result = await svc.testConnection(
         baseUrl: widget.baseUrl,
         apiKey: widget.apiKey,
         model: widget.model,
       );
-      if (mounted) setState(() => _result = ok);
-    } catch (_) {
-      if (mounted) setState(() => _result = false);
+      if (mounted) {
+        setState(() {
+          _result = result.reachable;
+          _detail = result.detail ?? '';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _result = false;
+          _detail = e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() => _testing = false);
     }
   }
 
+  LocalizationProvider get l10n => context.read<LocalizationProvider>();
+
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: _testing ? null : _test,
-      icon: _testing
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(
-              _result == null
-                  ? Icons.wifi_find
-                  : _result!
-                      ? Icons.check_circle
-                      : Icons.error,
-              size: 18,
-              color: _result == null
-                  ? null
-                  : _result!
-                      ? Colors.green
-                      : Colors.red,
+    final l10n_ = l10n;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _testing ? null : _test,
+          icon: _testing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  _result == null
+                      ? Icons.wifi_find
+                      : _result!
+                          ? Icons.check_circle
+                          : Icons.error,
+                  size: 18,
+                  color: _result == null
+                      ? null
+                      : _result!
+                          ? Colors.green
+                          : Colors.red,
+                ),
+          label: Text(
+            _testing
+                ? l10n_.get('stt_testing')
+                : _result == null
+                    ? l10n_.get('whisper_api_test_connection')
+                    : _result!
+                        ? l10n_.get('whisper_api_standard_ok')
+                        : l10n_.get('whisper_kit_endpoint_unreachable'),
+          ),
+        ),
+        if (_detail.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (_result == true)
+                  ? Colors.green.withValues(alpha: 0.08)
+                  : Colors.red.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
             ),
-      label: Text(
-        _testing
-            ? '测试中...'
-            : _result == null
-                ? '测试连通性'
-                : _result!
-                    ? 'API 连通正常'
-                    : 'API 不可达',
-      ),
+            child: Text(
+              _detail,
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

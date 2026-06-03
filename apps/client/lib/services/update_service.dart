@@ -269,20 +269,29 @@ class UpdateService {
   }
 
   /// 根据 URL 生成用户可读的下载源描述
+  ///
+  /// 注意：镜像 URL 格式为 `mirrorPrefix/https://github.com/...`，
+  /// 镜像 URL 中也包含 `github.com`，必须先检查镜像前缀再检查 GitHub。
   String _sourceLabelFromUrl(String url) {
-    if (url.contains('github.com')) return 'GitHub';
-    if (url.contains('ghfast.top')) return 'ghfast.top';
-    if (url.contains('ghproxy.com')) return 'ghproxy.com';
-    if (customMirrorPrefix != null && url.startsWith(customMirrorPrefix!)) {
-      // 从自定义镜像 URL 中提取域名
-      try {
-        final uri = Uri.parse(url);
-        return uri.host;
-      } catch (_) {
-        return customMirrorPrefix!;
+    // 优先检查自定义镜像前缀（URL 以镜像域名开头，说明走的是镜像）
+    if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
+      final prefix = customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '');
+      if (url.startsWith(prefix)) {
+        try {
+          final uri = Uri.parse(url);
+          return uri.host;
+        } catch (_) {
+          return prefix;
+        }
       }
     }
-    // 其他镜像：提取域名
+    // 内置默认镜像
+    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
+    // ghproxy.com 已废弃但保留兼容
+    if (url.startsWith('https://ghproxy.com')) return 'ghproxy.com';
+    // 最后才检查是否为 GitHub 官方源
+    if (url.contains('github.com')) return 'GitHub';
+    // 其他：提取域名
     try {
       final uri = Uri.parse(url);
       return uri.host;

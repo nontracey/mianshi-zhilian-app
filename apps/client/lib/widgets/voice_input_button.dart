@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
 
 class VoiceInputButton extends StatefulWidget {
   const VoiceInputButton({
@@ -294,17 +295,34 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         } catch (e) {
           debugPrint('Whisper stream chunk error: $e');
           if (mounted) {
+            // 解析错误信息，给用户更具体的建议
+            final errMsg = e.toString();
+            String userMsg;
+            if (errMsg.contains('401') || errMsg.contains('Unauthorized')) {
+              userMsg = l10n.get('whisper_api_auth_error');
+            } else if (errMsg.contains('404') || errMsg.contains('Not Found')) {
+              userMsg = l10n.get('whisper_api_not_found');
+            } else if (errMsg.contains('429') || errMsg.contains('rate limit')) {
+              userMsg = l10n.get('whisper_api_rate_limit');
+            } else if (errMsg.contains('SocketException') ||
+                errMsg.contains('Connection refused')) {
+              userMsg = l10n.get('whisper_api_network_error');
+            } else if (errMsg.contains('TimeoutException') ||
+                errMsg.contains('timed out')) {
+              userMsg = l10n.get('whisper_api_timeout');
+            } else {
+              userMsg = '${l10n.get('whisper_api_transcribe_failed')}: '
+                  '${errMsg.length > 80 ? '${errMsg.substring(0, 80)}...' : errMsg}';
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                  '转写失败: ${e.toString().length > 100 ? '${e.toString().substring(0, 100)}...' : e}',
-                ),
+                content: Text(userMsg),
                 backgroundColor: Colors.red,
-                duration: const Duration(seconds: 4),
+                duration: const Duration(seconds: 5),
               ),
             );
           }
-          break; // 停止重试，一次失败说明 API 不可用
+          break; // 停止重试
         }
       }
     } catch (e) {
@@ -337,6 +355,21 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (_whisperKit!.isModelReady) {
       _whisperKitReady = true;
       return;
+    }
+
+    // 模型文件可能已存在于磁盘但未加载到内存
+    // 先检查文件系统，如果存在则直接加载（无需弹下载提示）
+    if (await _whisperKit!.isModelFilePresent()) {
+      try {
+        await _whisperKit!.initModel();
+        if (_whisperKit!.isModelReady) {
+          _whisperKitReady = true;
+          return;
+        }
+      } catch (e) {
+        debugPrint('WhisperKit: load existing model failed: $e');
+        // 加载失败，继续走下载流程
+      }
     }
 
     if (_whisperKit!.isModelDownloading) {
@@ -390,8 +423,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
     if (!mounted) return;
     if (choice == 'settings') {
-      // 导航到个人中心设置页
-      Navigator.of(context).pushNamed('/profile');
+      // 导航到 AI & 语音设置页
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AiVoiceSettingsPage()),
+      );
       return;
     }
     if (choice != 'download') return;
@@ -453,7 +488,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     setState(() => _isListening = true);
     widget.onListeningChanged?.call(true);
 
-    // 在后台启动边说边转循环
+    // 在后台启动边说边转循环（捕获异常并提示用户）
     unawaited(_whisperKit!.startStreaming(
       onResult: (text) {
         if (mounted) {
@@ -462,7 +497,24 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         }
       },
       onStatus: (_) {},
-    ));
+    ).catchError((e) {
+      debugPrint('WhisperKit streaming error: $e');
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+        widget.onListeningChanged?.call(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l10n.get('voice_not_available')}: $e',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }));
   }
 
   Future<void> _stopWhisperKitStreaming() async {

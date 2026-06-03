@@ -8,6 +8,8 @@ class OnDeviceSttService {
   String get modelStatus => 'not_downloaded';
   bool get isRunning => false;
 
+  Future<bool> isModelFilePresent() async => false;
+
   Future<void> deleteModel() async {}
 
   Future<void> initModel({void Function(int received, int total)? onProgress}) async {

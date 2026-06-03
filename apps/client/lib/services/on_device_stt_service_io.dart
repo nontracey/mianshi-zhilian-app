@@ -29,7 +29,7 @@ class OnDeviceSttService {
   /// 当前积累的全部转写结果
   final List<String> _allResults = [];
 
-  /// 模型是否已就绪
+  /// 模型是否已就绪（内存中已加载）
   bool get isModelReady => _modelReady;
 
   /// 是否正在下载模型
@@ -40,6 +40,21 @@ class OnDeviceSttService {
     if (_modelReady) return 'ready';
     if (_modelDownloading) return _modelStatus;
     return 'not_downloaded';
+  }
+
+  /// 检查模型文件是否已存在于磁盘（不加载到内存）
+  ///
+  /// 路径逻辑与 [deleteModel] 保持一致。
+  Future<bool> isModelFilePresent() async {
+    try {
+      final dir = Platform.isAndroid
+          ? await getApplicationSupportDirectory()
+          : await getLibraryDirectory();
+      final modelFile = File('${dir.path}/ggml-tiny.bin');
+      return await modelFile.exists();
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 删除已下载的模型文件，释放 ~75MB 存储空间

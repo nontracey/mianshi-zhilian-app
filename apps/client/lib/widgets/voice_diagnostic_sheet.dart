@@ -9,7 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../providers/localization_provider.dart';
 import '../providers/settings_provider.dart';
-import '../services/whisper_stt_service.dart';
+import '../services/whisper_stream_stt_service.dart';
 
 enum _DiagStatus { checking, pass, fail }
 
@@ -43,27 +43,27 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
 
     // 在 async 间隙前捕获 settings，避免 use_build_context_synchronously
     final settings = context.read<SettingsProvider>().settings;
+    final currentMode = settings.sttMode;
 
-    // 麦克风权限
+    // ── 麦克风权限（所有模式都检查）──
     _micStatus = await _checkMicPermission()
         ? _DiagStatus.pass
         : _DiagStatus.fail;
     if (mounted) setState(() {});
 
-    // 系统语音引擎（非 Web）
-    if (!kIsWeb) {
+    // ── 系统语音引擎（仅 system 模式需要检查；其他模式下跳过）──
+    if (currentMode == 'system') {
       final (ok, detail) = await _checkSpeechEngine();
       _speechStatus = ok ? _DiagStatus.pass : _DiagStatus.fail;
       _speechDetail = detail;
-      if (mounted) setState(() {});
     } else {
-      _speechStatus = _DiagStatus.fail;
-      _speechDetail = 'Web platform';
-      if (mounted) setState(() {});
+      _speechStatus = _DiagStatus.checking;
+      _speechDetail = '';
     }
+    if (mounted) setState(() {});
 
-    // Whisper 配置检测（仅检查字段是否填写，不代表 API 一定可用）
-    if (settings.sttMode == 'whisper') {
+    // ── Whisper API 配置检测（仅 whisper 模式）──
+    if (currentMode == 'whisper') {
       final baseUrlOk =
           settings.whisperBaseUrl != null && settings.whisperBaseUrl!.trim().isNotEmpty;
       final apiKeyOk =
@@ -79,8 +79,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       _whisperConfigStatus = _DiagStatus.checking;
     }
 
-    // WhisperKit 本机模型检测
-    if (settings.sttMode == 'whisper_kit') {
+    // ── WhisperKit 本机模型检测（仅 whisper_kit 模式）──
+    if (currentMode == 'whisper_kit') {
       await _checkWhisperKitModel();
     } else {
       _whisperKitModelStatus = _DiagStatus.checking;
@@ -114,22 +114,22 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
   }
 
-  /// 后台静默测试 Whisper API 实际连通性
+  /// 测试 Whisper API 连通性（与实际使用同一服务）
   Future<void> _testWhisperConnection(dynamic settings) async {
     final l10n = context.read<LocalizationProvider>();
     try {
-      final svc = WhisperSttService();
-      final ok = await svc.testConnection(
+      final svc = WhisperStreamSttService();
+      final result = await svc.testConnection(
         baseUrl: settings.whisperBaseUrl!,
         apiKey: settings.whisperApiKey!,
         model: settings.whisperModel,
       );
       if (mounted) {
         setState(() {
-          _whisperConnStatus = ok ? _DiagStatus.pass : _DiagStatus.fail;
-          _whisperConnDetail = ok
+          _whisperConnStatus = result.reachable ? _DiagStatus.pass : _DiagStatus.fail;
+          _whisperConnDetail = result.detail ?? (result.reachable
               ? ''
-              : l10n.get('whisper_kit_endpoint_unreachable');
+              : l10n.get('whisper_kit_endpoint_unreachable'));
         });
       }
     } catch (e) {
@@ -146,7 +146,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   Future<void> _checkWhisperKitModel() async {
     final l10n = context.read<LocalizationProvider>();
     try {
-      // 路径逻辑与 whisper_kit 内部 _getModelDir() 保持一致
       final dir = Platform.isAndroid
           ? await getApplicationSupportDirectory()
           : await getLibraryDirectory();
@@ -197,6 +196,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     final settings = context.watch<SettingsProvider>().settings;
     final isWhisper = settings.sttMode == 'whisper';
     final isWhisperKit = settings.sttMode == 'whisper_kit';
+    final isSystem = settings.sttMode == 'system';
 
     return SafeArea(
       child: Padding(
@@ -264,26 +264,27 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
               ),
             ),
 
-            // 系统语音引擎诊断（仅供参考）
-            _DiagRow(
-              icon: _iconFor(_speechStatus),
-              color: _colorFor(_speechStatus),
-              label: l10n.get('system_speech_voice'),
-              trailing: Text(
-                _speechStatus == _DiagStatus.checking
-                    ? l10n.get('stt_testing')
-                    : (_speechStatus == _DiagStatus.pass
-                        ? l10n.get('stt_available')
-                        : l10n.get('stt_unavailable')),
-                style: TextStyle(
-                  color: _colorFor(_speechStatus),
-                  fontWeight: FontWeight.w500,
+            // 系统语音引擎诊断（仅 system 模式）
+            if (isSystem)
+              _DiagRow(
+                icon: _iconFor(_speechStatus),
+                color: _colorFor(_speechStatus),
+                label: l10n.get('system_speech_voice'),
+                trailing: Text(
+                  _speechStatus == _DiagStatus.checking
+                      ? l10n.get('stt_testing')
+                      : (_speechStatus == _DiagStatus.pass
+                          ? l10n.get('stt_available')
+                          : l10n.get('stt_unavailable')),
+                  style: TextStyle(
+                    color: _colorFor(_speechStatus),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                detail: _speechDetail.isNotEmpty ? _speechDetail : null,
               ),
-              detail: _speechDetail.isNotEmpty ? _speechDetail : null,
-            ),
 
-            // Whisper 配置检测（仅 whisper 模式下显示）
+            // Whisper API 配置检测 + 连通性（仅 whisper 模式）
             if (isWhisper) ...[
               _DiagRow(
                 icon: _iconFor(_whisperConfigStatus),
@@ -299,7 +300,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                   ),
                 ),
               ),
-              // 只有配置正确后才尝试 API 连通性检测
+              // 配置正确后才检测连通性
               if (_whisperConfigStatus == _DiagStatus.pass)
                 _DiagRow(
                   icon: _iconFor(_whisperConnStatus),
@@ -322,7 +323,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 ),
             ],
 
-            // WhisperKit 模型状态（仅 whisper_kit 模式显示）
+            // WhisperKit 模型状态（仅 whisper_kit 模式）
             if (isWhisperKit)
               _DiagRow(
                 icon: _iconFor(_whisperKitModelStatus),
@@ -345,12 +346,36 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
             const SizedBox(height: 20),
 
             // 提示信息
-            if (_speechStatus == _DiagStatus.fail && !isWhisper && !isWhisperKit)
+            if (_speechStatus == _DiagStatus.fail && isSystem)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   '${l10n.get('system_speech_voice')}${l10n.get('stt_unavailable')}。'
                   '${l10n.get('stt_system_unavailable_tip_whisper_kit')}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+
+            if (_whisperKitModelStatus == _DiagStatus.fail && isWhisperKit)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  l10n.get('whisper_kit_model_not_downloaded'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+
+            if (_whisperConfigStatus == _DiagStatus.fail && isWhisper)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  l10n.get('stt_not_configured'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
