@@ -165,12 +165,10 @@ jobs:
       - name: Embed release notes
         run: |
           mkdir -p lib/generated
-          cat > lib/generated/release_notes.dart << 'DARTEOF'
-// Auto-generated during release build by CI. Do not edit manually.
-class ReleaseNotes {
-  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
-}
-DARTEOF
+          echo '// Auto-generated during release build by CI. Do not edit manually.' > lib/generated/release_notes.dart
+          echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
+          echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
+          echo '}' >> lib/generated/release_notes.dart
       - name: Configure Android release signing
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -229,12 +227,10 @@ DARTEOF
       - name: Embed release notes
         run: |
           mkdir -p lib/generated
-          cat > lib/generated/release_notes.dart << 'DARTEOF'
-// Auto-generated during release build by CI. Do not edit manually.
-class ReleaseNotes {
-  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
-}
-DARTEOF
+          echo '// Auto-generated during release build by CI. Do not edit manually.' > lib/generated/release_notes.dart
+          echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
+          echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
+          echo '}' >> lib/generated/release_notes.dart
       - run: flutter build web --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: cd build/web && zip -r "../../mianshi-zhilian-${GITHUB_REF_NAME}-web.zip" .
       - uses: actions/upload-artifact@v4
@@ -281,12 +277,10 @@ DARTEOF
       - name: Embed release notes
         run: |
           mkdir -p lib/generated
-          cat > lib/generated/release_notes.dart << 'DARTEOF'
-// Auto-generated during release build by CI. Do not edit manually.
-class ReleaseNotes {
-  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
-}
-DARTEOF
+          echo '// Auto-generated during release build by CI. Do not edit manually.' > lib/generated/release_notes.dart
+          echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
+          echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
+          echo '}' >> lib/generated/release_notes.dart
       - run: flutter build windows --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
@@ -375,12 +369,10 @@ DARTEOF
       - name: Embed release notes
         run: |
           mkdir -p lib/generated
-          cat > lib/generated/release_notes.dart << 'DARTEOF'
-// Auto-generated during release build by CI. Do not edit manually.
-class ReleaseNotes {
-  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';
-}
-DARTEOF
+          echo '// Auto-generated during release build by CI. Do not edit manually.' > lib/generated/release_notes.dart
+          echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
+          echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
+          echo '}' >> lib/generated/release_notes.dart
       - run: flutter build macos --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Build drag-install DMG
         run: |
