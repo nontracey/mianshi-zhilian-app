@@ -197,6 +197,35 @@ class _LearningShellState extends State<LearningShell> {
   String? _selectedTopicId;
   int _selectedTopicInitialTab = 0;
   bool _isSidebarCollapsed = false;
+  late final AuthProvider _auth;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _auth = context.read<AuthProvider>();
+    _auth.autoLogoutReason.removeListener(_onAutoLogout);
+    _auth.autoLogoutReason.addListener(_onAutoLogout);
+  }
+
+  @override
+  void dispose() {
+    _auth.autoLogoutReason.removeListener(_onAutoLogout);
+    super.dispose();
+  }
+
+  void _onAutoLogout() {
+    final reason = _auth.autoLogoutReason.value;
+    if (reason != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(reason),
+          duration: const Duration(seconds: 6),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _auth.autoLogoutReason.value = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -8,6 +8,10 @@ import '../models/user.dart';
 import '../services/api_headers.dart';
 import '../services/storage_service.dart';
 
+/// Access token 有效期为 24h，按一半间隔 12h 主动刷新，确保 token 不过期。
+/// 定时器只在登录后启动，登出/刷新失败时自动取消。
+const _refreshInterval = Duration(hours: 12);
+
 class AuthProvider extends ChangeNotifier {
   final StorageService _storage;
   final String apiBaseUrl;
@@ -24,8 +28,13 @@ class AuthProvider extends ChangeNotifier {
   String? _token;
   String? _refreshToken;
   Future<bool>? _refreshFuture;
+  Timer? _refreshTimer;
   bool _isLoading = false;
   String? _error;
+
+  /// 当 token 过期且刷新失败、用户被静默登出时，发出原因通知。
+  /// UI 可以监听此 notifier 以弹出非侵入式提示。
+  final autoLogoutReason = ValueNotifier<String?>(null);
 
   User? get user => _user;
   String? get token => _token;
@@ -35,6 +44,32 @@ class AuthProvider extends ChangeNotifier {
 
   /// 获取用户角色，未登录返回 guest
   UserRole get userRole => _user?.role ?? UserRole.guest;
+
+  /// 公开的刷新方法，供外部（如其他 Provider）在收到 401 时调用。
+  Future<bool> refreshLogin() => _refreshLogin();
+
+  /// 启动定时刷新周期。每次刷新成功后重置计时器。
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      // 后台静默刷新，不阻塞 UI
+      if (_refreshToken != null) {
+        _refreshLogin();
+      }
+    });
+  }
+
+  void _stopRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _stopRefreshTimer();
+    autoLogoutReason.dispose();
+    super.dispose();
+  }
 
   /// 加载已保存的用户信息
   Future<void> loadUser() async {
@@ -48,6 +83,9 @@ class AuthProvider extends ChangeNotifier {
         // 先尝试 refresh 再通知 UI，避免闪一下「已登录」又被清空
         if (_refreshToken != null) {
           final refreshed = await _refreshLogin();
+          if (refreshed) {
+            _startRefreshTimer();
+          }
           if (!refreshed && _user == null) {
             // 401/403 → _clearSavedUser 已清空状态，无需再 notify
             return;
@@ -91,6 +129,7 @@ class AuthProvider extends ChangeNotifier {
         await _saveUser();
         await _storage.recordAnalyticsFeature('login');
         _bindDevice();
+        _startRefreshTimer();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -186,6 +225,7 @@ class AuthProvider extends ChangeNotifier {
         await _storage.recordAnalyticsFeature('login');
         // 设备绑定不阻塞登录返回
         _bindDevice();
+        _startRefreshTimer();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -228,6 +268,8 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _token = null;
     _refreshToken = null;
+    _stopRefreshTimer();
+    autoLogoutReason.value = null;
     await _storage.save('auth_user', null);
     await _storage.save('auth_token', null);
     await _storage.save('auth_refresh_token', null);
@@ -245,6 +287,8 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _token = null;
     _refreshToken = null;
+    _stopRefreshTimer();
+    autoLogoutReason.value = '登录已过期，可继续学习，但云端同步等账号功能将不可用';
     await _storage.save('auth_user', null);
     await _storage.save('auth_token', null);
     await _storage.save('auth_refresh_token', null);
@@ -283,6 +327,7 @@ class AuthProvider extends ChangeNotifier {
           _refreshToken = data['refreshToken'] as String?;
           await _saveUser();
           _bindDevice();
+          _startRefreshTimer(); // 刷新成功后重置计时器
           notifyListeners();
           return true;
         }
