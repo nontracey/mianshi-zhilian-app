@@ -69,8 +69,7 @@ jobs:
             # 获取 commit messages，按类型分组
             FEAT_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^feat" | sed -E 's/^[Ff]eat(\([^)]*\))?: //' || true)
             FIX_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^fix" | sed -E 's/^[Ff]ix(\([^)]*\))?: //' || true)
-            DOCS_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^docs" | sed -E 's/^[Dd]ocs(\([^)]*\))?: //' || true)
-            OTHER_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -ivE "^(feat|fix|docs|ci|Revert|merge)" | sed -E 's/^(refactor|perf|test|chore|revert|style|build)(\([^)]*\))?:? //' || true)
+            # DOCS_COMMITS 和 OTHER_COMMITS 已移除——只保留用户关心的 feat/fix
             
             if [ -n "$FEAT_COMMITS" ]; then
               echo "#### ✨ 新功能"
@@ -88,28 +87,11 @@ jobs:
               echo ""
             fi
             
-            if [ -n "$DOCS_COMMITS" ]; then
-              echo "#### 📝 文档更新"
-              echo "$DOCS_COMMITS" | while read -r line; do
-                [ -n "$line" ] && echo "- $line"
-              done
-              echo ""
+            if [ -z "$FEAT_COMMITS" ] && [ -z "$FIX_COMMITS" ]; then
+              echo "无用户可见变更（内部构建号更新）"
             fi
-            
-            if [ -n "$OTHER_COMMITS" ]; then
-              echo "#### 🔧 其他改动"
-              echo "$OTHER_COMMITS" | while read -r line; do
-                [ -n "$line" ] && echo "- $line"
-              done
-              echo ""
-            fi
-            
-            # 统计
-            TOTAL=$(git log ${PREV_TAG}..${CURRENT_TAG} --oneline | wc -l)
-            echo "---"
-            echo "**共 ${TOTAL} 个提交**"
           } > release_notes.md
-          
+
           # 输出内容
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           cat release_notes.md >> $GITHUB_OUTPUT
