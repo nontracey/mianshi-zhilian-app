@@ -79,7 +79,7 @@ mianshi-zhilian-app/
 └── .github/workflows/             # CI/CD（4 个 workflow）
     ├── ci.yml                     # PR/main push：analyze + test + build web
     ├── deploy-web.yml             # main push：Flutter Web → Cloudflare Pages
-    ├── deploy-worker.yml          # main push：Worker → Cloudflare Workers
+    ├── deploy-worker.yml          # main push：Worker → Cloudflare Pages Functions
     └── release.yml                # tag push：多平台并行构建 → GitHub Releases
 ```
 
@@ -135,6 +135,42 @@ npx wrangler dev
 - 发布 tag（`vx.x.x`）必须与 pubspec.yaml 中的版本号一致
 - `tool/generate_version.sh` 生成版本文件供运行时使用
 
+### 提交规范
+
+使用 **Conventional Commits** 格式，**消息正文（description）统一用中文**，确保 release notes 和 App 内更新弹窗展示一致的中文内容。
+
+```
+<type>: <中文描述>
+```
+
+| Type | 说明 | Release notes 分组 |
+|------|------|-------------------|
+| `feat` | 新功能 | ✨ 新功能 |
+| `fix` | 问题修复 | 🐛 问题修复 |
+| `docs` | 文档更新 | 📝 文档更新 |
+| `refactor` | 重构（非功能变更） | 🔧 其他改动 |
+| `perf` | 性能优化 | 🔧 其他改动 |
+| `test` | 测试相关 | 🔧 其他改动 |
+| `chore` | 构建/工具/配置 | 🔧 其他改动 |
+| `ci` | CI/CD 变更 | **排除**（不出现于 release notes） |
+| `revert` | 回退操作 | **排除** |
+| `merge` | 合并分支 | **排除** |
+
+原则：
+- **描述聚焦"为什么做"和"做了什么"**，而非实现细节 — release notes 直接复用 commit 描述
+- 一行写完，不用 body 段落。需要额外上下文写代码注释或 PR description
+- `ci:` / `revert:` / `merge` 不会出现在 release notes 中，适合 CI 调参、回退等不关心用户的变更
+
+示例：
+
+```
+feat: 掌握度看板支持按月筛选
+fix: 登录页键盘弹起后按钮被遮挡
+refactor: AuthProvider 改用 ChangeNotifierProxyProvider 同步语言设置
+chore: buildNumber 103→104
+ci: 添加 pub-cache 缓存加速依赖安装
+```
+
 ### 国际化（L10n）
 
 使用**自定义静态类**方案（非 flutter_intl / easy_localization）：
@@ -182,7 +218,7 @@ App 启动 → 加载 manifest 检查 contentVersion → 有变化则记录 pend
 |--------|---------|------|
 | `CI` | PR / main push | flutter analyze + test + build web |
 | `Deploy web` | main push（apps/client 变更） | Cloudflare Pages 部署 |
-| `Deploy worker` | main push（workers/api 变更） | Cloudflare Workers 部署 |
+| `Deploy worker` | main push（workers/api 变更） | Cloudflare Pages Functions 部署 |
 | `Release` | 推送 `v*` tag | 并行构建 Android/Windows/macOS/Web → GitHub Releases |
 
 所需 GitHub Secrets：`CLOUDFLARE_API_TOKEN`、`D1_DATABASE_ID`、`JWT_SECRET`

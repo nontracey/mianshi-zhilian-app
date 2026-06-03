@@ -8,7 +8,7 @@
 |--------|---------|------|
 | `CI` | PR 和 `main` push | `flutter pub get`、`flutter analyze`、`flutter test`、`flutter build web --release` |
 | `Deploy web` | `main` push 且 `apps/client/**` 变更 | 构建 Flutter Web 后通过 `wrangler pages deploy` 部署到 Cloudflare Pages |
-| `Deploy worker` | `main` push 且 `workers/api/**` 变更 | 通过 `wrangler deploy` 发布 Worker API |
+| `Deploy worker` | `main` push 且 `workers/api/**` 变更 | 通过 `wrangler pages deploy` 部署 Cloudflare Pages Functions (API) |
 | `Deploy content` | 内容仓库 `main` push | 验证内容格式后部署到 Cloudflare Pages |
 | `Release` | 推送 `v*` tag | 并行构建各平台安装包并上传到 GitHub Releases |
 
@@ -35,9 +35,9 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                    Cloudflare                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Pages (App)  │  │ Pages        │  │ Workers      │      │
-│  │              │  │ (Content)    │  │ (API)        │      │
-│  │ app.pages.   │  │ content.     │  │ api.workers. │      │
+│  │ Pages (App)  │  │ Pages        │  │ Pages Func-  │      │
+│  │              │  │ (Content)    │  │ tions (API)  │      │
+│  │ app.pages.   │  │ content.     │  │ api.pages.   │      │
 │  │ dev          │  │ pages.dev    │  │ dev          │      │
 │  └──────────────┘  └──────────────┘  └──────┬───────┘      │
 │                                             │               │
@@ -64,7 +64,7 @@
 |--------|------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token，需要 Pages 和 Workers 权限 |
 | `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio 后台使用同一个 D1 |
-| `JWT_SECRET` | 用户认证 JWT 签名密钥，CI 会写入 Cloudflare Worker Secret |
+| `JWT_SECRET` | 用户认证 JWT 签名密钥，需要在 Cloudflare Pages Dashboard 中手动配置为加密环境变量 |
 
 ### GitHub Variables（非加密）
 
@@ -72,11 +72,13 @@
 |----------|------|
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账号 ID |
 
-### Cloudflare Secrets
+### Cloudflare Pages Dashboard 配置
 
-| Secret | 说明 |
+| 配置项 | 说明 |
 |--------|------|
-| `JWT_SECRET` | 用户认证 JWT 签名密钥 |
+| `JWT_SECRET` | 用户认证 JWT 签名密钥，在 Pages Dashboard 中设为加密环境变量 |
+| D1 database binding | 绑定 `mianshi-zhilian-db` 数据库 |
+| KV namespace binding | 绑定内容缓存 KV 命名空间 |
 
 ### 创建 Cloudflare API Token
 
@@ -97,9 +99,6 @@ npx wrangler login
 
 # 创建数据库（亚太区域）
 npx wrangler d1 create mianshi-zhilian-db --location apac
-
-# 设置 JWT Secret
-echo "your-secret-key" | npx wrangler secret put JWT_SECRET
 ```
 
 ## App Worker 后台能力
@@ -271,7 +270,7 @@ git push origin vx.x.x
 | GitHub Actions | 公共仓库标准 runner 免费 |
 | Flutter Web 静态站点 | Cloudflare Pages 免费额度可用 |
 | 内容 JSON 静态分发 | Cloudflare Pages 免费额度可用 |
-| Cloudflare Worker API | Free 计划每天 100,000 次请求 |
+| Cloudflare Pages Functions API | Free 计划每天 100,000 次请求 |
 | Cloudflare D1 | Free 计划每天 5,000,000 行读取、100,000 行写入、总存储 5GB |
 | AI 模型调用 | 用户自带 API Key，平台不承担费用 |
 

@@ -77,10 +77,10 @@ jobs:
             echo ""
             
             # 获取 commit messages，按类型分组
-            FEAT_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^feat" | sed 's/^feat: //; s/^feat(.*)//' || true)
-            FIX_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^fix" | sed 's/^fix: //; s/^fix(.*)//' || true)
-            DOCS_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^docs" | sed 's/^docs: //; s/^docs(.*)//' || true)
-            OTHER_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -ivE "^(feat|fix|docs)" || true)
+            FEAT_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^feat" | sed -E 's/^[Ff]eat(\([^)]*\))?: //' || true)
+            FIX_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^fix" | sed -E 's/^[Ff]ix(\([^)]*\))?: //' || true)
+            DOCS_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -i "^docs" | sed -E 's/^[Dd]ocs(\([^)]*\))?: //' || true)
+            OTHER_COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -ivE "^(feat|fix|docs|ci|Revert|merge)" | sed -E 's/^(refactor|perf|test|chore|revert|style|build)(\([^)]*\))?:? //' || true)
             
             if [ -n "$FEAT_COMMITS" ]; then
               echo "#### ✨ 新功能"
@@ -378,7 +378,7 @@ jobs:
           fi
           CURRENT_TAG=${GITHUB_REF_NAME}
           # 提取 feat/fix 提交的标题，用 | 分隔
-          NOTES=$(git log "${PREV_TAG}..${CURRENT_TAG}" --pretty=format:"%s" | grep -iE "^(feat|fix)" | sed 's/^feat: //;s/^feat(.*)//;s/^fix: //;s/^fix(.*)//' | head -10 | tr '\n' '|' | sed 's/|$//')
+          NOTES=$(git log "${PREV_TAG}..${CURRENT_TAG}" --pretty=format:"%s" | grep -iE "^(feat|fix)" | sed -E 's/^(feat|fix)(\([^)]*\))?: //' | head -10 | tr '\n' '|' | sed 's/|$//')
           echo "release_notes=$NOTES" >> "$GITHUB_OUTPUT"
       - run: dart scripts/build_update_manifest.dart "${GITHUB_REF_NAME}" release-assets
         env:

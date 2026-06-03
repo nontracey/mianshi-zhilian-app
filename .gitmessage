@@ -1,0 +1,23 @@
+# <type>: <中文描述>
+#
+# 类型（必填）:
+#   feat     新功能          → ✨ 新功能
+#   fix      问题修复        → 🐛 问题修复
+#   docs     文档更新        → 📝 文档更新
+#   refactor 重构            → 🔧 其他改动
+#   perf     性能优化        → 🔧 其他改动
+#   test     测试相关        → 🔧 其他改动
+#   chore    构建/工具/配置  → 🔧 其他改动
+#   ci       CI/CD 变更      → （排除，不出现在 release notes）
+#   revert   回退操作        → （排除）
+#
+# 描述（必填）:
+#   用中文，一个点一行写完，多个点可以多行。
+#   聚焦"为什么做"和"做了什么"，非实现细节。
+#
+# 示例:
+#   feat: 掌握度看板支持按月筛选
+#   fix: 登录页键盘弹起后按钮被遮挡
+#   refactor: AuthProvider 改用 ProxyProvider 同步语言设置
+#   chore: buildNumber 103→104
+#   ci: 添加 pub-cache 缓存加速依赖安装
