@@ -334,6 +334,8 @@ class UpdateService {
     final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
     final filePath = '${tempDir.path}/$fileName';
 
+    bool lastVerificationFailed = false;
+
     for (final url in urls) {
       if (cancelToken?.isCancelled ?? false) {
         return (null, DownloadResult.cancelled);
@@ -353,14 +355,19 @@ class UpdateService {
         case _DownloadStatus.cancelled:
           return (null, DownloadResult.cancelled);
         case _DownloadStatus.verificationFailed:
-          // 校验失败不重试其他镜像（文件内容可能不同）
-          return (null, DownloadResult.verificationFailed);
+          // 前一个候选 URL 内容可能不是真正的安装包（如 Pages CDN 返回 SPA），
+          // 继续尝试后续镜像（GitHub 直链 / ghproxy）
+          lastVerificationFailed = true;
+          continue;
         case _DownloadStatus.networkError:
           continue;
       }
     }
 
     // 所有源都失败
+    if (lastVerificationFailed) {
+      return (null, DownloadResult.verificationFailed);
+    }
     return (null, DownloadResult.networkError);
   }
 

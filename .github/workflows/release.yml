@@ -40,11 +40,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 使用 GitHub Releases API 获取上一个 release 的 tag（不受 force-push 影响）
-          # 当前 release 尚未创建，limit=1 取到的是上一个
-          PREV_TAG=$(gh release list --json tagName --jq '.[0].tagName // ""' --limit 1)
+          # 当前 release 可能已存在（force-push 重跑），取第二个
+          PREV_TAG=$(gh release list --json tagName --jq '.[1].tagName // ""' --limit 2)
           if [ -z "$PREV_TAG" ]; then
-            echo "tag=$GITHUB_SHA" >> $GITHUB_OUTPUT
+            # 第一个 release，从 root commit 开始
+            echo "tag=$(git rev-list --max-parents=0 HEAD)" >> $GITHUB_OUTPUT
           else
             echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
           fi
