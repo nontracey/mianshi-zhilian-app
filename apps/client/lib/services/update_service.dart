@@ -254,7 +254,7 @@ class UpdateService {
     }
   }
 
-  /// 构建下载 URL 列表：官方 Pages/de5 镜像 → GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  /// 构建下载 URL 列表：GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
   @visibleForTesting
   List<String> buildDownloadUrlsForTest(PlatformUpdate platformUpdate) {
     return _buildDownloadUrls(platformUpdate);
@@ -263,19 +263,12 @@ class UpdateService {
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
     final urls = <String>[];
 
-    final officialAssetPath = _officialAssetPath(platformUpdate);
-    if (officialAssetPath != null) {
-      urls.addAll(
-        _routeClient.resolveUrls(RouteService.appWeb, officialAssetPath),
-      );
-    }
-
     // GitHub 官方下载
     if (platformUpdate.url.trim().isNotEmpty) {
       urls.add(platformUpdate.url);
     }
 
-    // 2. 用户自定义镜像站（设置中配置的）
+    // 用户自定义镜像站（设置中配置的）
     if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
       final mirrorUrl =
           '${customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '')}/${platformUpdate.url}';
@@ -284,13 +277,13 @@ class UpdateService {
       }
     }
 
-    // 3. ghproxy.com 默认备用镜像
+    // ghproxy.com 默认备用镜像
     final ghproxyUrl = '$defaultMirrorPrefix/${platformUpdate.url}';
     if (!urls.contains(ghproxyUrl)) {
       urls.add(ghproxyUrl);
     }
 
-    // 4. manifest 中的其他镜像
+    // manifest 中的其他镜像
     for (final mirror in platformUpdate.mirrors) {
       if (mirror.trim().isNotEmpty && !urls.contains(mirror)) {
         urls.add(mirror);
@@ -298,21 +291,6 @@ class UpdateService {
     }
 
     return urls;
-  }
-
-  String? _officialAssetPath(PlatformUpdate platformUpdate) {
-    final assetPath = platformUpdate.assetPath?.trim();
-    if (assetPath != null && assetPath.isNotEmpty) {
-      return assetPath.startsWith('/') ? assetPath : '/$assetPath';
-    }
-
-    final uri = Uri.tryParse(platformUpdate.url);
-    if (uri == null) return null;
-    if (uri.host == Uri.parse(RouteResolver.appWebPrimary).host ||
-        uri.host == Uri.parse(RouteResolver.appWebBackup).host) {
-      return uri.path;
-    }
-    return null;
   }
 
   /// 下载更新文件

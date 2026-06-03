@@ -3,7 +3,7 @@ import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 
 void main() {
-  test('download candidates start with official app web primary and backup', () {
+  test('download candidates start with GitHub URL, then custom mirror, ghproxy, manifest mirrors', () {
     const update = PlatformUpdate(
       url:
           'https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.3/mianshi-zhilian-v0.1.3-android.apk',
@@ -16,17 +16,17 @@ void main() {
 
     final urls = service.buildDownloadUrlsForTest(update);
 
-    expect(urls.take(2), [
-      '${RouteResolver.appWebPrimary}/releases/latest/download/mianshi-zhilian-v0.1.3-android.apk',
-      '${RouteResolver.appWebBackup}/releases/latest/download/mianshi-zhilian-v0.1.3-android.apk',
-    ]);
+    expect(urls.first, update.url);
     expect(urls, contains(update.url));
     expect(urls, contains('https://mirror.local/${update.url}'));
     expect(urls, contains('https://ghproxy.com/${update.url}'));
     expect(urls, contains('https://mirror.example.test/android.apk'));
+    // 不应包含 Pages CDN 域名
+    expect(urls.any((u) => u.startsWith(RouteResolver.appWebPrimary)), isFalse);
+    expect(urls.any((u) => u.startsWith(RouteResolver.appWebBackup)), isFalse);
   });
 
-  test('app web URLs can still provide a normalized official asset path', () {
+  test('URL pointing directly to any host is used as-is in the list', () {
     const update = PlatformUpdate(
       url:
           '${RouteResolver.appWebBackup}/releases/latest/download/mianshi-zhilian-v0.1.3-macos.dmg',
@@ -37,13 +37,7 @@ void main() {
 
     final urls = service.buildDownloadUrlsForTest(update);
 
-    expect(
-      urls.first,
-      '${RouteResolver.appWebPrimary}/releases/latest/download/mianshi-zhilian-v0.1.3-macos.dmg',
-    );
-    expect(
-      urls[1],
-      '${RouteResolver.appWebBackup}/releases/latest/download/mianshi-zhilian-v0.1.3-macos.dmg',
-    );
+    // url 字段直接原样加入列表（不再做 Pages CDN 解析）
+    expect(urls.first, update.url);
   });
 }
