@@ -17,12 +17,14 @@ class HeaderBar extends StatefulWidget {
     required this.onProfile,
     this.onTopicTap,
     this.onContentStageChanged,
+    this.sectionIndex = 0,
   });
 
   final String title;
   final VoidCallback onProfile;
   final ValueChanged<String>? onTopicTap;
   final ValueChanged<String>? onContentStageChanged;
+  final int sectionIndex;
 
   @override
   State<HeaderBar> createState() => _HeaderBarState();
@@ -35,6 +37,20 @@ class _HeaderBarState extends State<HeaderBar> {
   List<Topic> _searchResults = [];
   bool _isSearching = false;
   OverlayEntry? _overlayEntry;
+
+  @override
+  void didUpdateWidget(HeaderBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sectionIndex != widget.sectionIndex &&
+        (_isSearching || _overlayEntry != null)) {
+      _removeOverlay();
+      _searchController.clear();
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+    }
+  }
 
   @override
   void dispose() {

@@ -40,9 +40,9 @@ jobs:
       - name: Resolve API URLs
         id: resolve_urls
         run: |
-          # 如果 GitHub Variable 未设置，回退到默认值
-          API_URL="${API_BASE_URL_VAR:-https://mianshi-zhilian-api.nontracey.workers.dev}"
-          UPDATE_URL="${UPDATE_MANIFEST_URL_VAR:-https://mianshi-zhilian-api.nontracey.workers.dev/update.json}"
+          # 如果 GitHub Variable 未设置，回退到代码中的默认值
+          API_URL="${API_BASE_URL_VAR:-https://mianshi-zhilian-api.pages.dev}"
+          UPDATE_URL="${UPDATE_MANIFEST_URL_VAR:-https://mianshi-zhilian-api.pages.dev/update.json}"
           echo "api_base_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "update_manifest_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
         env:

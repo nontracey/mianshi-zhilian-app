@@ -35,9 +35,9 @@ jobs:
           echo "APP_BUILD_NUMBER=${FULL_VERSION##*+}" >> "$GITHUB_ENV"
       - name: Resolve dart-define variables
         run: |
-          # 如果 GitHub Variable 未设置，回退到默认值，避免传空字符串覆盖代码里的默认值
-          echo "RESOLVED_API_BASE_URL=${API_BASE_URL:-https://mianshi-zhilian-api.nontracey.workers.dev}" >> "$GITHUB_ENV"
-          echo "RESOLVED_UPDATE_MANIFEST_URL=${UPDATE_MANIFEST_URL:-https://mianshi-zhilian-api.nontracey.workers.dev/update.json}" >> "$GITHUB_ENV"
+          # 如果 GitHub Variable 未设置，回退到代码中的默认值
+          echo "RESOLVED_API_BASE_URL=${API_BASE_URL:-https://mianshi-zhilian-api.pages.dev}" >> "$GITHUB_ENV"
+          echo "RESOLVED_UPDATE_MANIFEST_URL=${UPDATE_MANIFEST_URL:-https://mianshi-zhilian-api.pages.dev/update.json}" >> "$GITHUB_ENV"
         env:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
           UPDATE_MANIFEST_URL: ${{ vars.UPDATE_MANIFEST_URL }}

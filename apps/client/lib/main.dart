@@ -197,7 +197,7 @@ class _LearningShellState extends State<LearningShell> {
   String? _selectedTopicId;
   int _selectedTopicInitialTab = 0;
   bool _isSidebarCollapsed = false;
-  late final AuthProvider _auth;
+  late AuthProvider _auth;
 
   @override
   void didChangeDependencies() {
@@ -256,6 +256,7 @@ class _LearningShellState extends State<LearningShell> {
               children: [
                 HeaderBar(
                   title: _sectionTitle(_section, l10n),
+                  sectionIndex: _section.index,
                   onProfile: () => _setSection(AppSection.profile),
                   onTopicTap: (topicId) => setState(() {
                     _selectedTopicId = topicId;
