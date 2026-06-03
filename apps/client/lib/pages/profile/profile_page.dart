@@ -21,6 +21,7 @@ import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
+import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -1723,44 +1724,46 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final isWhisper = widget.settings.sttMode == 'whisper';
+    final mode = widget.settings.sttMode;
+    final isWhisper = mode == 'whisper';
+    final isWhisperKit = mode == 'whisper_kit';
 
     return WorkPanel(
       title: l10n.get('speech_voice_identify_distinct'),
       icon: Icons.mic_outlined,
       children: [
-        // STT 模式切换
+        // STT 模式切换 — 两卡片
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
-                child: _SttModeCard(
-                  label: l10n.get('system_speech_voice'),
-                  icon: Icons.phone_android,
-                  description: l10n.get(
-                    'use_design_alternate_internal_set_speech_voice_identify_distinct',
-                  ),
-                  selected: !isWhisper,
-                  onTap: () => widget.onSettingsChanged(
-                      widget.settings.copyWith(sttMode: 'system')),
-                ),
+              _SttModeCard(
+                label: l10n.get('whisper_kit_mode_label'),
+                icon: Icons.memory,
+                description: l10n.get('whisper_kit_mode_desc'),
+                selected: isWhisperKit,
+                onTap: () => widget.onSettingsChanged(
+                    widget.settings.copyWith(sttMode: 'whisper_kit')),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SttModeCard(
-                  label: 'Whisper API',
-                  icon: Icons.cloud_outlined,
-                  description: l10n.get('use_whisper_also_capacity_api'),
-                  selected: isWhisper,
-                  onTap: () => widget.onSettingsChanged(
-                      widget.settings.copyWith(sttMode: 'whisper')),
-                ),
+              _SttModeCard(
+                label: 'Whisper API',
+                icon: Icons.cloud_outlined,
+                description: l10n.get('whisper_api_description'),
+                selected: isWhisper,
+                onTap: () => widget.onSettingsChanged(
+                    widget.settings.copyWith(sttMode: 'whisper')),
               ),
             ],
           ),
         ),
-        // Whisper 配置
+        // 本机 Whisper 模型管理
+        if (isWhisperKit) ...[
+          const SizedBox(height: 12),
+          _WhisperKitModelManager(),
+        ],
+        // Whisper API 配置（仅 whisper 模式显示）
         if (isWhisper) ...[
           const SizedBox(height: 12),
           Padding(
@@ -1831,6 +1834,188 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── 本机 Whisper 模型管理 ──────────────────────────────────────────
+
+class _WhisperKitModelManager extends StatefulWidget {
+  @override
+  State<_WhisperKitModelManager> createState() =>
+      _WhisperKitModelManagerState();
+}
+
+class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
+  final OnDeviceSttService _svc = OnDeviceSttService();
+  bool _modelReady = false;
+  bool _downloading = false;
+  String _statusText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+  }
+
+  void _checkStatus() {
+    setState(() {
+      _modelReady = _svc.isModelReady;
+      _downloading = _svc.isModelDownloading;
+      _statusText = _svc.modelStatus;
+    });
+  }
+
+  Future<void> _download() async {
+    final l10n = context.read<LocalizationProvider>();
+    setState(() {
+      _downloading = true;
+      _statusText = '...';
+    });
+
+    try {
+      await _svc.initModel(
+        onProgress: (received, total) {
+          if (mounted) {
+            setState(() {
+              _statusText =
+                  '${(received / total * 100).toStringAsFixed(0)}%';
+            });
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _modelReady = true;
+          _downloading = false;
+          _statusText = l10n.get('whisper_kit_model_downloaded');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _statusText = l10n.get('whisper_kit_download_failed');
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context
+                      .read<LocalizationProvider>()
+                      .get('whisper_kit_download_failed'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _delete() async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('whisper_kit_delete_confirm_title')),
+        content: Text(l10n.get('whisper_kit_delete_confirm_desc')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              context.read<LocalizationProvider>().get('cancel'),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _svc.deleteModel();
+      _checkStatus();
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _modelReady ? Icons.check_circle : Icons.download_outlined,
+              color: _modelReady ? Colors.green : theme.colorScheme.secondary,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.get('whisper_kit_model_status'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _modelReady
+                        ? l10n.get('whisper_kit_model_downloaded')
+                        : _downloading
+                            ? _statusText
+                            : l10n.get('whisper_kit_model_not_downloaded'),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  Text(
+                    l10n.get('whisper_kit_model_size'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_downloading)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (!_modelReady)
+              TextButton(
+                onPressed: _download,
+                child: Text(l10n.get('whisper_kit_download_model')),
+              )
+            else
+              TextButton(
+                onPressed: _delete,
+                child: Text(
+                  l10n.get('whisper_kit_delete_model'),
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2959,16 +3144,21 @@ class _AboutPanelState extends State<_AboutPanel> {
         if (!mounted) return;
         _showInstallGuide(filePath, updateInfo.version);
       } else {
-        // 根据下载失败原因显示不同提示
+        // 根据下载失败原因显示不同提示，附带尝试过的源详情
+        final attempts = updateService.lastAttempts;
         final String errorMessage;
         switch (downloadResult) {
           case DownloadResult.networkError:
-            errorMessage = l10n.get(
+            errorMessage = _buildDownloadErrorMsg(
+              l10n,
               'download_fail_network_error_please_check_network_and_retry',
+              attempts,
             );
           case DownloadResult.verificationFailed:
-            errorMessage = l10n.get(
+            errorMessage = _buildDownloadErrorMsg(
+              l10n,
               'download_fail_or_school_verify_not_open_pass_please_retry',
+              attempts,
             );
           case DownloadResult.cancelled:
             return;
@@ -2979,20 +3169,25 @@ class _AboutPanelState extends State<_AboutPanel> {
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: AppColors.danger,
+            duration: const Duration(seconds: 6),
           ),
         );
       }
     } catch (e) {
       debugPrint('Download error: $e');
       if (mounted) {
+        final attempts = updateService.lastAttempts;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              l10n.get(
+              _buildDownloadErrorMsg(
+                l10n,
                 'download_fail_network_error_please_check_network_and_retry',
+                attempts,
               ),
             ),
             backgroundColor: AppColors.danger,
+            duration: const Duration(seconds: 6),
           ),
         );
       }
@@ -3090,6 +3285,22 @@ class _AboutPanelState extends State<_AboutPanel> {
     );
   }
 
+  /// 构建下载失败时的详细错误信息，包含每个源的尝试结果
+  String _buildDownloadErrorMsg(
+    LocalizationProvider l10n,
+    String baseKey,
+    List<DownloadAttempt> attempts,
+  ) {
+    final base = l10n.get(baseKey);
+    if (attempts.isEmpty) return base;
+
+    final parts = <String>[base];
+    for (final a in attempts) {
+      parts.add('  · ${a.sourceLabel}: ${a.failureReason}');
+    }
+    return parts.join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -3183,7 +3394,7 @@ class _AboutPanelState extends State<_AboutPanel> {
                   controller: controller,
                   decoration: InputDecoration(
                     labelText: l10n.get('custom_mirror_prefix'),
-                    hintText: 'https://ghproxy.com',
+                    hintText: 'https://ghfast.top',
                     isDense: true,
                     border: const OutlineInputBorder(),
                     suffixIcon: hasCustom

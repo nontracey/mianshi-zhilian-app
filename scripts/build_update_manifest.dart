@@ -77,8 +77,8 @@ void main(List<String> args) {
         'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
     final assetPath = '/releases/latest/download/$name';
     final mirrors = <String>[];
-    // 备用镜像：ghproxy.com 加速
-    mirrors.add('https://ghproxy.com/$githubUrl');
+    // 备用镜像：ghfast.top 加速
+    mirrors.add('https://ghfast.top/$githubUrl');
     // 自定义镜像站前缀（CI 环境变量 GH_MIRROR_PREFIX 可覆盖默认镜像）
     if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
       mirrors.add('$ghMirrorPrefix/$githubUrl');

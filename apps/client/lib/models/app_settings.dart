@@ -111,7 +111,7 @@ class AppSettings {
   final String cardDensity;
 
   // 语音识别配置
-  final String sttMode; // 'system' | 'whisper'
+  final String sttMode; // 'whisper_kit' | 'whisper'
   final String? whisperBaseUrl;
   final String? whisperApiKey;
   final String whisperModel;
@@ -144,7 +144,7 @@ class AppSettings {
     this.mockInterviewPreference = 'mixed',
     this.fontScale = 1.0,
     this.cardDensity = 'comfortable',
-    this.sttMode = 'system',
+    this.sttMode = 'whisper_kit',
     this.whisperBaseUrl,
     this.whisperApiKey,
     this.whisperModel = 'whisper-1',
@@ -316,7 +316,7 @@ class AppSettings {
         json['mockInterviewPreference'] as String? ?? 'mixed',
     fontScale: (json['fontScale'] as num?)?.toDouble() ?? 1.0,
     cardDensity: json['cardDensity'] as String? ?? 'comfortable',
-    sttMode: json['sttMode'] as String? ?? 'system',
+    sttMode: json['sttMode'] as String? ?? 'whisper_kit',
     whisperBaseUrl: json['whisperBaseUrl'] as String?,
     whisperApiKey: json['whisperApiKey'] as String?,
     whisperModel: json['whisperModel'] as String? ?? 'whisper-1',

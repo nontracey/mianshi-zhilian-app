@@ -115,6 +115,34 @@ enum DownloadResult {
   cancelled,
 }
 
+/// 单次下载源尝试记录
+class DownloadAttempt {
+  final String url;
+  final String sourceLabel;
+  final bool reached;
+  final int? statusCode;
+  final String? errorSummary;
+
+  const DownloadAttempt({
+    required this.url,
+    required this.sourceLabel,
+    required this.reached,
+    this.statusCode,
+    this.errorSummary,
+  });
+
+  /// 用户可读的失败原因
+  String get failureReason {
+    if (reached) {
+      if (statusCode != null && statusCode != 200) {
+        return 'HTTP $statusCode';
+      }
+      return '校验不通过';
+    }
+    return errorSummary ?? '无法连接';
+  }
+}
+
 /// 下载进度回调
 /// [received] 已下载字节数, [total] 总字节数, [sourceLabel] 当前下载源描述
 typedef DownloadProgressCallback =
@@ -157,6 +185,10 @@ class UpdateService {
   /// 下载源模式，控制各来源的尝试顺序
   final DownloadSourceMode downloadSourceMode;
 
+  /// 最近一次下载的源尝试记录（供 UI 展示失败详情）
+  List<DownloadAttempt> _lastAttempts = [];
+  List<DownloadAttempt> get lastAttempts => List.unmodifiable(_lastAttempts);
+
   UpdateService({
     this.updateManifestUrl = '',
     this.customMirrorPrefix,
@@ -169,7 +201,7 @@ class UpdateService {
            );
 
   /// 默认备用镜像站
-  static const defaultMirrorPrefix = 'https://ghproxy.com';
+  static const defaultMirrorPrefix = 'https://ghfast.top';
 
   /// 检查是否有新版本
   Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
@@ -239,6 +271,7 @@ class UpdateService {
   /// 根据 URL 生成用户可读的下载源描述
   String _sourceLabelFromUrl(String url) {
     if (url.contains('github.com')) return 'GitHub';
+    if (url.contains('ghfast.top')) return 'ghfast.top';
     if (url.contains('ghproxy.com')) return 'ghproxy.com';
     if (customMirrorPrefix != null && url.startsWith(customMirrorPrefix!)) {
       // 从自定义镜像 URL 中提取域名
@@ -270,7 +303,7 @@ class UpdateService {
         (customMirrorPrefix ?? '').replaceAll(RegExp(r'/+$'), '');
     final customMirrorUrl =
         mirrorPrefix.isNotEmpty ? '$mirrorPrefix/$githubUrl' : '';
-    final ghproxyUrl = githubUrl.isNotEmpty ? '$defaultMirrorPrefix/$githubUrl' : '';
+    final defaultMirrorUrl = githubUrl.isNotEmpty ? '$defaultMirrorPrefix/$githubUrl' : '';
     final manifestMirrors =
         platformUpdate.mirrors.where((m) => m.trim().isNotEmpty).toList();
 
@@ -284,8 +317,8 @@ class UpdateService {
         if (githubUrl.isNotEmpty) urls.add(githubUrl);
         if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
       }
-      if (ghproxyUrl.isNotEmpty && !urls.contains(ghproxyUrl)) {
-        urls.add(ghproxyUrl);
+      if (defaultMirrorUrl.isNotEmpty && !urls.contains(defaultMirrorUrl)) {
+        urls.add(defaultMirrorUrl);
       }
       for (final mirror in manifestMirrors) {
         if (!urls.contains(mirror)) urls.add(mirror);
@@ -304,7 +337,8 @@ class UpdateService {
   }
 
   /// 下载更新文件
-  /// 返回 (文件路径, 下载结果)，失败时路径为 null
+  /// 返回 (文件路径, 下载结果)，失败时路径为 null。
+  /// 可通过 [lastAttempts] 获取每个源的尝试详情。
   Future<(String?, DownloadResult)> downloadUpdate({
     required PlatformUpdate platformUpdate,
     required String version,
@@ -314,6 +348,7 @@ class UpdateService {
     final urls = _buildDownloadUrls(platformUpdate);
 
     if (urls.isEmpty) {
+      _lastAttempts = [];
       return (null, DownloadResult.networkError);
     }
 
@@ -322,13 +357,21 @@ class UpdateService {
     final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
     final filePath = '${tempDir.path}/$fileName';
 
+    final attempts = <DownloadAttempt>[];
     bool lastVerificationFailed = false;
 
     for (final url in urls) {
       if (cancelToken?.isCancelled ?? false) {
+        _lastAttempts = attempts;
         return (null, DownloadResult.cancelled);
       }
       final sourceLabel = _sourceLabelFromUrl(url);
+
+      // HEAD 预检：快速判断源是否可达，避免等待完整超时
+      if (!await _headCheck(url, sourceLabel, attempts, cancelToken)) {
+        continue;
+      }
+
       final result = await _downloadFromUrl(
         url: url,
         filePath: filePath,
@@ -339,24 +382,95 @@ class UpdateService {
       );
       switch (result) {
         case _DownloadStatus.success:
+          // 只记录成功的，前面的失败已在 HEAD 预检中记录
+          _lastAttempts = attempts;
           return (filePath, DownloadResult.success);
         case _DownloadStatus.cancelled:
+          _lastAttempts = attempts;
           return (null, DownloadResult.cancelled);
         case _DownloadStatus.verificationFailed:
-          // 前一个候选 URL 内容可能不是真正的安装包（如 Pages CDN 返回 SPA），
-          // 继续尝试后续镜像（GitHub 直链 / ghproxy）
+          attempts.add(DownloadAttempt(
+            url: url,
+            sourceLabel: sourceLabel,
+            reached: true,
+            errorSummary: 'SHA256 校验不通过',
+          ));
           lastVerificationFailed = true;
           continue;
         case _DownloadStatus.networkError:
+          attempts.add(DownloadAttempt(
+            url: url,
+            sourceLabel: sourceLabel,
+            reached: false,
+            errorSummary: '下载中断',
+          ));
           continue;
       }
     }
 
+    _lastAttempts = attempts;
     // 所有源都失败
     if (lastVerificationFailed) {
       return (null, DownloadResult.verificationFailed);
     }
     return (null, DownloadResult.networkError);
+  }
+
+  /// HEAD 预检：快速判断下载源是否可达
+  ///
+  /// 返回 true 表示可以继续尝试下载，false 表示应跳过该源
+  Future<bool> _headCheck(
+    String url,
+    String sourceLabel,
+    List<DownloadAttempt> attempts,
+    DownloadCancelToken? cancelToken,
+  ) async {
+    final client = http.Client();
+    cancelToken?._bind(client);
+    try {
+      final headRequest = http.Request('HEAD', Uri.parse(url));
+      final headResponse = await client
+          .send(headRequest)
+          .timeout(const Duration(seconds: 12));
+      cancelToken?._unbind(client);
+      client.close();
+
+      if (headResponse.statusCode == 200) {
+        return true; // 源可达，继续下载
+      }
+
+      // 返回非 200，记录并跳过
+      attempts.add(DownloadAttempt(
+        url: url,
+        sourceLabel: sourceLabel,
+        reached: true,
+        statusCode: headResponse.statusCode,
+      ));
+      debugPrint('HEAD $sourceLabel → ${headResponse.statusCode}，跳过');
+      return false;
+    } on TimeoutException {
+      cancelToken?._unbind(client);
+      client.close();
+      attempts.add(DownloadAttempt(
+        url: url,
+        sourceLabel: sourceLabel,
+        reached: false,
+        errorSummary: '连接超时',
+      ));
+      debugPrint('HEAD $sourceLabel → 超时，跳过');
+      return false;
+    } catch (e) {
+      cancelToken?._unbind(client);
+      client.close();
+      attempts.add(DownloadAttempt(
+        url: url,
+        sourceLabel: sourceLabel,
+        reached: false,
+        errorSummary: '$e'.length > 60 ? '${'$e'.substring(0, 60)}...' : '$e',
+      ));
+      debugPrint('HEAD $sourceLabel → $e，跳过');
+      return false;
+    }
   }
 
   Future<_DownloadStatus> _downloadFromUrl({
@@ -376,11 +490,11 @@ class UpdateService {
         await file.delete();
       }
 
-      // 下载文件
+      // 下载文件（HEAD 预检已确认源可达，缩短连接超时）
       final request = http.Request('GET', Uri.parse(url));
       final response = await client
           .send(request)
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         debugPrint('Download failed from $url: ${response.statusCode}');

@@ -6,7 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
-import 'package:mianshi_zhilian/services/whisper_stt_service.dart';
+import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
+import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
@@ -15,7 +16,7 @@ class VoiceInputButton extends StatefulWidget {
     super.key,
     required this.onResult,
     this.onListeningChanged,
-    this.sttMode = 'system',
+    this.sttMode = 'whisper_kit',
     this.whisperBaseUrl,
     this.whisperApiKey,
     this.whisperModel = 'whisper-1',
@@ -39,7 +40,11 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   // Whisper STT
   final AudioRecorder _recorder = AudioRecorder();
-  final WhisperSttService _whisperService = WhisperSttService();
+
+  // WhisperKit (本机 whisper.cpp)
+  OnDeviceSttService? _whisperKit;
+  bool _whisperKitReady = false;
+  String _accumulatedText = '';
 
   bool _isListening = false;
   late LocalizationProvider l10n;
@@ -79,16 +84,20 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   Future<void> _startListening() async {
-    if (widget.sttMode == 'whisper') {
-      await _startWhisperRecording();
+    if (widget.sttMode == 'whisper_kit') {
+      await _startWhisperKitStreaming();
+    } else if (widget.sttMode == 'whisper') {
+      await _startWhisperStreaming();
     } else {
       await _startSystemListening();
     }
   }
 
   Future<void> _stopListening() async {
-    if (widget.sttMode == 'whisper') {
-      await _stopWhisperRecording();
+    if (widget.sttMode == 'whisper_kit') {
+      await _stopWhisperKitStreaming();
+    } else if (widget.sttMode == 'whisper') {
+      await _stopWhisperStreaming();
     } else {
       await _stopSystemListening();
     }
@@ -148,9 +157,41 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     widget.onListeningChanged?.call(false);
   }
 
-  // ── Whisper STT ──
+  // ── Whisper STT (API 流式模式) ──
 
-  Future<void> _startWhisperRecording() async {
+  /// 录制一个音频分块（3 秒），返回临时 WAV 文件路径。
+  /// whisper_kit 和 Whisper API 流式模式共用此方法。
+  Future<String?> _recordChunk() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final chunkPath =
+          '${tempDir.path}/whisper_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: chunkPath,
+      );
+
+      await Future.delayed(const Duration(seconds: 3));
+
+      if (!_isListening) {
+        await _recorder.stop();
+        return null;
+      }
+
+      final path = await _recorder.stop();
+      return (path != null && path.isNotEmpty) ? path : null;
+    } catch (e) {
+      debugPrint('Record chunk failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _startWhisperStreaming() async {
     if (kIsWeb) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -172,121 +213,317 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       return;
     }
 
+    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    if (!mounted) return;
+
+    _accumulatedText = '';
+    setState(() => _isListening = true);
+    widget.onListeningChanged?.call(true);
+
+    final baseUrl = widget.whisperBaseUrl!;
+    final apiKey = widget.whisperApiKey!;
+    final model = widget.whisperModel;
+
+    // 分块录音 + 流式转写循环
+    _runWhisperStreamLoop(baseUrl, apiKey, model);
+  }
+
+  Future<void> _runWhisperStreamLoop(
+    String baseUrl,
+    String apiKey,
+    String model,
+  ) async {
+    final streamSvc = WhisperStreamSttService();
     try {
-      if (!await AppPermissionService.ensureMicrophone(context)) return;
-      if (!mounted) return;
+      while (_isListening) {
+        final chunkPath = await _recordChunk();
+        if (chunkPath == null || !_isListening) break;
 
-      setState(() => _isListening = true);
-      widget.onListeningChanged?.call(true);
+        final audioBytes = await readBytesFromPath(chunkPath);
+        try {
+          await deleteFileAtPath(chunkPath);
+        } catch (_) {}
 
-      final tempDir = await getTemporaryDirectory();
-      final tempPath =
-          '${tempDir.path}/mianshi_stt_${DateTime.now().millisecondsSinceEpoch}.wav';
+        if (!_isListening) break;
 
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.wav,
-          sampleRate: 16000,
-          numChannels: 1,
-        ),
-        path: tempPath,
-      );
+        try {
+          await for (final text in streamSvc.transcribeStream(
+            audioBytes: audioBytes,
+            baseUrl: baseUrl,
+            apiKey: apiKey,
+            model: model,
+            language: 'zh',
+          )) {
+            if (!_isListening) break;
+            _accumulatedText += text;
+            if (mounted) setState(() {});
+          }
+        } catch (e) {
+          debugPrint('Whisper stream chunk error: $e');
+        }
+      }
     } catch (e) {
-      setState(() => _isListening = false);
-      widget.onListeningChanged?.call(false);
+      debugPrint('Whisper streaming error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isListening = false);
+        widget.onListeningChanged?.call(false);
+        if (_accumulatedText.isNotEmpty) {
+          widget.onResult(_accumulatedText);
+          _accumulatedText = '';
+        }
+      }
+    }
+  }
+
+  Future<void> _stopWhisperStreaming() async {
+    _isListening = false;
+    try {
+      await _recorder.stop();
+    } catch (_) {}
+  }
+
+  // ── WhisperKit (本机 whisper.cpp 边说边转) ──
+
+  Future<void> _ensureWhisperKit() async {
+    if (_whisperKitReady) return;
+
+    _whisperKit ??= OnDeviceSttService();
+    if (_whisperKit!.isModelReady) {
+      _whisperKitReady = true;
+      return;
+    }
+
+    if (_whisperKit!.isModelDownloading) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.getp('record_voice_fail', {'error': '$e'})),
+            content: Text(l10n.get('whisper_kit_model_downloading')),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 模型未下载，弹出引导弹窗
+    if (!mounted) return;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('whisper_kit_download_prompt_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.get('whisper_kit_download_prompt_desc')),
+            const SizedBox(height: 8),
+            Text(
+              l10n.get('whisper_kit_model_size'),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: Text(l10n.get('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'settings'),
+            child: Text(l10n.get('whisper_kit_go_settings')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'download'),
+            child: Text(l10n.get('whisper_kit_download_now')),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (choice == 'settings') {
+      // 导航到个人中心设置页
+      Navigator.of(context).pushNamed('/profile');
+      return;
+    }
+    if (choice != 'download') return;
+
+    // 开始下载
+    try {
+      await _whisperKit!.initModel(
+        onProgress: (received, total) {
+          if (mounted && total > 0 && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  l10n.getp('whisper_kit_downloading_percent', {
+                    'percent': (received / total * 100).toStringAsFixed(0),
+                  }),
+                ),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
+        },
+      );
+      if (mounted) {
+        setState(() => _whisperKitReady = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.get('whisper_kit_download_complete')),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.get('whisper_kit_download_failed')),
+            backgroundColor: Colors.red,
           ),
         );
       }
     }
   }
 
-  Future<void> _stopWhisperRecording() async {
-    try {
-      final path = await _recorder.stop();
-      setState(() => _isListening = false);
-      widget.onListeningChanged?.call(false);
-
-      if (path == null || path.isEmpty) return;
-
+  Future<void> _startWhisperKitStreaming() async {
+    if (kIsWeb) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: 12),
-                Text(l10n.get('voice_recognizing')),
-              ],
-            ),
-            duration: Duration(seconds: 30),
-          ),
+          SnackBar(content: Text(l10n.get('whisper_kit_web_unsupported'))),
         );
       }
-
-      final audioBytes = await readBytesFromPath(path);
-      await deleteFileAtPath(path);
-
-      final result = await _whisperService.transcribe(
-        audioBytes: audioBytes,
-        baseUrl: widget.whisperBaseUrl!,
-        apiKey: widget.whisperApiKey!,
-        model: widget.whisperModel,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        if (result.isNotEmpty) {
-          widget.onResult(result);
-        }
-      }
-    } catch (e) {
-      setState(() => _isListening = false);
-      widget.onListeningChanged?.call(false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.getp('voice_recognize_failed', {'error': '$e'})),
-          ),
-        );
-      }
+      return;
     }
+
+    await _ensureWhisperKit();
+    if (!_whisperKitReady || !mounted) return;
+
+    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    if (!mounted) return;
+
+    _accumulatedText = '';
+    setState(() => _isListening = true);
+    widget.onListeningChanged?.call(true);
+
+    // 在后台启动边说边转循环
+    unawaited(_whisperKit!.startStreaming(
+      onResult: (text) {
+        if (mounted) {
+          _accumulatedText = text;
+          setState(() {});
+        }
+      },
+      onStatus: (_) {},
+    ));
+  }
+
+  Future<void> _stopWhisperKitStreaming() async {
+    await _whisperKit?.stopStreaming();
+    setState(() => _isListening = false);
+    widget.onListeningChanged?.call(false);
+
+    if (_accumulatedText.isNotEmpty) {
+      widget.onResult(_accumulatedText);
+      _accumulatedText = '';
+    }
+  }
+
+  /// 将服务层 modelStatus 码解析为 UI 可显示文本
+  /// modelStatus 格式: 'ready' | 'not_downloaded' | 'downloading' | 'downloading:45'
+  String _formatModelStatus(LocalizationProvider l10n, String status) {
+    if (status.startsWith('downloading:')) {
+      final pct = status.split(':').last;
+      return l10n.getp('whisper_kit_downloading_percent', {'percent': pct});
+    }
+    // downloading 无进度、ready、not_downloaded 等状态在 showModelProgress
+    // 条件下（只有 isModelDownloading 为 true）不应出现，兜底返回原始码
+    return status;
   }
 
   @override
   void dispose() {
     _speech.stop();
     _recorder.dispose();
+    _whisperKit?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     l10n = context.watch<LocalizationProvider>();
-    return IconButton(
-      onPressed: _toggleListening,
-      icon: Icon(
-        _isListening ? Icons.mic : Icons.mic_none,
-        color: _isListening ? Colors.green : null,
-      ),
-      style: IconButton.styleFrom(
-        backgroundColor: _isListening
-            ? Colors.green.withValues(alpha: 0.12)
-            : null,
-      ),
-      tooltip: _isListening
-          ? l10n.get('voice_stop_recording')
-          : (widget.sttMode == 'whisper'
-                ? l10n.get('voice_whisper_input')
-                : l10n.get('voice_input')),
+    final isWhisperKit = widget.sttMode == 'whisper_kit';
+    final showModelProgress =
+        isWhisperKit && _whisperKit != null && _whisperKit!.isModelDownloading;
+
+    String tooltip;
+    if (_isListening) {
+      tooltip = l10n.get('voice_stop_recording');
+    } else if (isWhisperKit) {
+      tooltip = _whisperKitReady
+          ? l10n.get('whisper_kit_input_tooltip')
+          : l10n.get('whisper_kit_need_download_tooltip');
+    } else if (widget.sttMode == 'whisper') {
+      tooltip = l10n.get('voice_whisper_input');
+    } else {
+      tooltip = l10n.get('voice_input');
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: showModelProgress ? null : _toggleListening,
+          icon: Icon(
+            _isListening ? Icons.mic : Icons.mic_none,
+            color: _isListening ? Colors.green : null,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor: _isListening
+                ? Colors.green.withValues(alpha: 0.12)
+                : null,
+          ),
+          tooltip: tooltip,
+        ),
+        // 模型下载进度指示
+        if (showModelProgress && _whisperKit != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              _formatModelStatus(l10n, _whisperKit!.modelStatus),
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        // 边说边转实时文字预览
+        if (isWhisperKit && _isListening && _accumulatedText.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _accumulatedText,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

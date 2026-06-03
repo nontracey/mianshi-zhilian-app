@@ -16,7 +16,7 @@
 有新版本 → 显示更新内容和文件大小
        ↓
 用户确认 → 依次尝试下载源：
-  GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像
+  GitHub 官方 → 用户自定义镜像 → ghfast.top → manifest 中的其他镜像
        ↓
 校验 sha256 → 引导安装
        ↓
@@ -40,7 +40,7 @@
       "url": "https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk",
       "assetPath": "/releases/latest/download/mianshi-zhilian-v0.1.0-android.apk",
       "mirrors": [
-        "https://ghproxy.com/https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
+        "https://ghfast.top/https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.0/mianshi-zhilian-v0.1.0-android.apk"
       ],
       "sha256": "abc123...",
       "size": 52428800
@@ -83,7 +83,7 @@
 - 各平台并行构建，不等待全部完成
 - 单个平台构建完成后立即上传到 GitHub Release
 - 所有平台完成后生成并上传 `update.json`
-- `update.json` 中的 `mirrors` 默认包含 `ghproxy.com` 加速镜像；可通过 CI 环境变量 `GH_MIRROR_PREFIX` 追加自定义镜像
+- `update.json` 中的 `mirrors` 默认包含 `ghfast.top` 加速镜像；可通过 CI 环境变量 `GH_MIRROR_PREFIX` 追加自定义镜像
 
 ## 下载源与镜像机制
 
@@ -93,7 +93,7 @@
 |--------|--------|------|
 | 1 | GitHub 官方 | `update.json` 中的 `url` 字段，默认首选 |
 | 2 | 用户自定义镜像 | 在"关于与更新"页 ⚙️ 设置中配置的前缀，拼接到 GitHub URL 前面 |
-| 3 | ghproxy.com | 内置备用镜像，自动加速 GitHub Release 下载 |
+| 3 | ghfast.top | 内置备用镜像，自动加速 GitHub Release 下载 |
 | 4 | manifest 中的其他镜像 | `update.json` `mirrors` 字段中的额外地址 |
 
 - 某个源下载失败后自动尝试下一个，用户在进度对话框中能看到当前正在从哪个源下载
@@ -102,7 +102,7 @@
 
 ### 用户自定义镜像站
 
-用户可以在 **个人中心 → 关于与更新 → ⚙️ 下载设置** 中配置自定义 GitHub 镜像站前缀（如 `https://ghproxy.com`）。配置后该镜像会排在 GitHub 官方之后、内置备用镜像之前。留空则仅使用默认的下载源顺序。
+用户可以在 **个人中心 → 关于与更新 → ⚙️ 下载设置** 中配置自定义 GitHub 镜像站前缀（如 `https://ghfast.top`）。配置后该镜像会排在 GitHub 官方之后、内置备用镜像之前。留空则仅使用默认的下载源顺序。
 
 ## 平台更新策略
 
@@ -151,7 +151,7 @@ class UpdateService {
   /// 下载结果枚举，区分失败原因
   // DownloadResult { success, networkError, verificationFailed, cancelled }
 
-  /// 构建下载 URL 列表：GitHub → 自定义镜像 → ghproxy → manifest mirrors
+  /// 构建下载 URL 列表：GitHub → 自定义镜像 → ghfast.top → manifest mirrors
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) { ... }
 
   /// 下载更新，返回 (文件路径, DownloadResult)

@@ -8,10 +8,10 @@ enum RouteMode { auto, primaryFirst, backupFirst, primaryOnly, backupOnly }
 ///
 /// 控制更新包下载时各来源的优先级顺序。
 enum DownloadSourceMode {
-  /// GitHub 官方 → 用户自定义镜像 → ghproxy.com → manifest 中的其他镜像（默认）
+  /// GitHub 官方 → 用户自定义镜像 → ghfast.top → manifest 中的其他镜像（默认）
   githubFirst,
 
-  /// 用户自定义镜像 → GitHub 官方 → ghproxy.com → 其他镜像
+  /// 用户自定义镜像 → GitHub 官方 → ghfast.top → 其他镜像
   mirrorFirst,
 
   /// 仅使用官方 GitHub 下载

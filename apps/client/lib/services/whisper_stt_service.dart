@@ -5,7 +5,12 @@ import 'package:http/http.dart' as http;
 /// Whisper 兼容 STT 服务
 ///
 /// 支持任何 OpenAI Whisper 兼容 API（如 OpenAI、Groq、本地 whisper-server）
+///
+/// [client] 可选的 HTTP 客户端注入，用于测试时替换为 mock
 class WhisperSttService {
+  final http.Client? _client;
+
+  WhisperSttService({http.Client? client}) : _client = client;
   /// 将音频字节发送到 Whisper API 进行转写
   ///
   /// [audioBytes] 音频文件内容（WAV/MP3/WebM/M4A 等）
@@ -37,17 +42,30 @@ class WhisperSttService {
       ),
     );
 
-    final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 30),
-    );
+    final client = _client ?? http.Client();
+    try {
+      final streamedResponse = await client.send(request).timeout(
+        const Duration(seconds: 30),
+      );
 
-    final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode != 200) {
-      throw Exception('Whisper 转写失败: ${response.statusCode} ${response.body}');
+      if (response.statusCode != 200) {
+        final errorBody = response.body.length > 200
+            ? '${response.body.substring(0, 200)}...'
+            : response.body;
+        throw Exception(
+          'Whisper transcription failed: HTTP ${response.statusCode}\n'
+          'URL: $url\n'
+          'Response: $errorBody\n'
+          'Tip: Verify the API supports /audio/transcriptions endpoint',
+        );
+      }
+
+      return response.body.trim();
+    } finally {
+      if (_client == null) client.close();
     }
-
-    return response.body.trim();
   }
 
   /// 测试 Whisper API 连接
