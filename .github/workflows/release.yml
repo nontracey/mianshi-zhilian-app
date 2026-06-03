@@ -354,13 +354,13 @@ jobs:
       - name: Remove macOS platform from whisper_kit
         run: |
           PKG_PATH=$(python3 -c "
-import json
-with open('.dart_tool/package_config.json') as f:
-    data = json.load(f)
-for p in data['packages']:
-    if p['name'] == 'whisper_kit':
-        print(p['rootUri'].replace('file://', ''))
-")
+          import json
+          with open('.dart_tool/package_config.json') as f:
+              data = json.load(f)
+          for p in data['packages']:
+              if p['name'] == 'whisper_kit':
+                  print(p['rootUri'].replace('file://', ''))
+          ")
           ruby -e "
             require 'yaml'
             data = YAML.load_file('$PKG_PATH/pubspec.yaml')
