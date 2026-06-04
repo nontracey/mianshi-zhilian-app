@@ -11,9 +11,11 @@ import '../services/route_resolver.dart';
 import '../services/route_state_store.dart';
 import '../services/storage_service.dart';
 
-/// Access token 有效期为 24h，按一半间隔 12h 主动刷新，确保 token 不过期。
-/// 定时器只在登录后启动，登出/刷新失败时自动取消。
+/// Access token 有效期为 24h，默认在过期前约 12h 主动刷新。
+/// 启动时会优先解析 token 的 exp，避免每次打开 App 都轮换 refresh token。
 const _refreshInterval = Duration(hours: 12);
+const _refreshRetryInterval = Duration(minutes: 5);
+const _refreshExpiryGuard = Duration(minutes: 5);
 
 class AuthProvider extends ChangeNotifier {
   final StorageService _storage;
@@ -49,15 +51,75 @@ class AuthProvider extends ChangeNotifier {
   /// 公开的刷新方法，供外部（如其他 Provider）在收到 401 时调用。
   Future<bool> refreshLogin() => _refreshLogin();
 
-  /// 启动定时刷新周期。每次刷新成功后重置计时器。
+  /// 启动下一次刷新计时。每次刷新成功后根据新 token 重新调度。
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
-      // 后台静默刷新，不阻塞 UI
-      if (_refreshToken != null) {
-        _refreshLogin();
-      }
+    if (_refreshToken == null) return;
+
+    final expiresAt = _tokenExpiresAt(_token);
+    final now = DateTime.now();
+    final refreshAt = expiresAt == null
+        ? now.add(_refreshInterval)
+        : expiresAt.subtract(_refreshInterval);
+    final delay = refreshAt.isAfter(now)
+        ? refreshAt.difference(now)
+        : const Duration(minutes: 1);
+
+    _refreshTimer = Timer(delay, () {
+      if (_refreshToken == null) return;
+      _refreshLogin().then((success) {
+        if (!success && _user != null && _refreshToken != null) {
+          _scheduleRefreshRetry();
+        }
+      });
     });
+  }
+
+  void _scheduleRefreshRetry() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(_refreshRetryInterval, () {
+      if (_refreshToken == null) return;
+      _refreshLogin().then((success) {
+        if (!success && _user != null && _refreshToken != null) {
+          _scheduleRefreshRetry();
+        }
+      });
+    });
+  }
+
+  bool _shouldRefreshNow(String? token) {
+    if (token == null || token.isEmpty) return true;
+    final expiresAt = _tokenExpiresAt(token);
+    if (expiresAt == null) return true;
+    return expiresAt
+        .subtract(_refreshInterval)
+        .isBefore(DateTime.now().add(_refreshExpiryGuard));
+  }
+
+  DateTime? _tokenExpiresAt(String? token) {
+    if (token == null || token.isEmpty) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      final payload = json.decode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (payload is! Map<String, dynamic>) return null;
+      final exp = payload['exp'];
+      if (exp is! num) return null;
+      return DateTime.fromMillisecondsSinceEpoch(
+        exp.toInt() * 1000,
+        isUtc: false,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isTokenStillUsable(String? token) {
+    final expiresAt = _tokenExpiresAt(token);
+    if (expiresAt == null) return token != null && token.isNotEmpty;
+    return expiresAt.isAfter(DateTime.now().add(_refreshExpiryGuard));
   }
 
   void _stopRefreshTimer() {
@@ -81,8 +143,7 @@ class AuthProvider extends ChangeNotifier {
         _token = await _storage.load('auth_token') as String?;
         _refreshToken = await _storage.load('auth_refresh_token') as String?;
 
-        // 先尝试 refresh 再通知 UI，避免闪一下「已登录」又被清空
-        if (_refreshToken != null) {
+        if (_refreshToken != null && _shouldRefreshNow(_token)) {
           final refreshed = await _refreshLogin();
           if (refreshed) {
             _startRefreshTimer();
@@ -91,6 +152,11 @@ class AuthProvider extends ChangeNotifier {
             // 401/403 → _clearSavedUser 已清空状态，无需再 notify
             return;
           }
+          if (!refreshed && _isTokenStillUsable(_token)) {
+            _startRefreshTimer();
+          }
+        } else if (_refreshToken != null) {
+          _startRefreshTimer();
         }
         notifyListeners();
       }

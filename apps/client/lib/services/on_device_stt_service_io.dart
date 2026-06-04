@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:whisper_kit/download_model.dart' show downloadModel;
 import 'package:whisper_kit/whisper_kit.dart';
 
 /// 本机 Whisper 语音转写服务
@@ -95,22 +96,37 @@ class OnDeviceSttService {
     _modelStatus = 'downloading';
 
     try {
+      final dir = Platform.isAndroid
+          ? await getApplicationSupportDirectory()
+          : await getLibraryDirectory();
+      final modelFile = File(WhisperModel.tiny.getPath(dir.path));
+      if (!await modelFile.exists()) {
+        await downloadModel(
+          model: WhisperModel.tiny,
+          destinationPath: dir.path,
+          downloadHost:
+              'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main',
+          onDownloadProgress: onProgress == null
+              ? null
+              : (received, total) {
+                  onProgress(received, total);
+                  if (total > 0) {
+                    final pct = (received / total * 100).toStringAsFixed(0);
+                    _modelStatus = 'downloading:$pct';
+                  }
+                },
+        );
+      }
+
       _whisper = Whisper(
         model: WhisperModel.tiny,
         downloadHost:
             'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main',
-        onDownloadProgress: (received, total) {
-          onProgress?.call(received, total);
-          if (total > 0) {
-            final pct = (received / total * 100).toStringAsFixed(0);
-            _modelStatus = 'downloading:$pct';
-          }
-        },
       );
 
-      // 触发模型初始化（调用 getVersion 会内部触发模型下载/加载）
+      // 触发 native 库初始化。这里的 Whisper 实例不能带进度回调，
+      // whisper_kit 内部会跨 isolate 调用，闭包无法被发送到 isolate。
       await _whisper!.getVersion();
-
       _modelReady = true;
       _modelStatus = 'ready';
     } catch (e) {
