@@ -116,7 +116,9 @@ class OnDeviceSttService {
     } catch (e) {
       _modelReady = false;
       _modelStatus = 'not_downloaded';
-      debugPrint('OnDeviceStt: initModel failed (platform may not support native whisper): $e');
+      debugPrint(
+        'OnDeviceStt: initModel failed (platform may not support native whisper): $e',
+      );
     } finally {
       _modelDownloading = false;
     }
@@ -132,6 +134,8 @@ class OnDeviceSttService {
   Future<void> startStreaming({
     required void Function(String accumulatedText) onResult,
     void Function(String status)? onStatus,
+    void Function()? onEmptyResult,
+    void Function(Object error)? onError,
   }) async {
     if (!_modelReady) {
       throw StateError('Model not ready, call initModel() first');
@@ -154,15 +158,18 @@ class OnDeviceSttService {
         if (text.isNotEmpty) {
           _allResults.add(text);
           onResult(_allResults.join());
+        } else {
+          onEmptyResult?.call();
         }
       } catch (e) {
         debugPrint('OnDeviceStt: chunk transcribe failed: $e');
+        onError?.call(e);
+        rethrow;
+      } finally {
+        try {
+          await File(chunkPath).delete();
+        } catch (_) {}
       }
-
-      // 3. 清理临时文件
-      try {
-        await File(chunkPath).delete();
-      } catch (_) {}
     }
 
     _isRunning = false;
@@ -197,7 +204,9 @@ class OnDeviceSttService {
       await Future.delayed(const Duration(seconds: 3));
 
       if (!_isRunning) {
-        await _recorder.stop();
+        try {
+          await _recorder.stop();
+        } catch (_) {}
         return null;
       }
 
@@ -205,7 +214,7 @@ class OnDeviceSttService {
       return (path != null && path.isNotEmpty) ? path : null;
     } catch (e) {
       debugPrint('OnDeviceStt: record chunk failed: $e');
-      return null;
+      rethrow;
     }
   }
 

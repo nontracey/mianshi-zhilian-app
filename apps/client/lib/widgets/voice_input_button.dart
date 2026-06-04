@@ -53,6 +53,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   String _lastSystemText = '';
   String _lastCumulativeText = '';
   String _previewText = '';
+  String? _statusMessageKey;
+  int _emptyChunkCount = 0;
+  bool _hasEmittedText = false;
 
   bool get _isActive =>
       _state == VoiceInputState.recording ||
@@ -83,6 +86,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _lastSystemText = '';
     _lastCumulativeText = '';
     _previewText = '';
+    _statusMessageKey = null;
+    _emptyChunkCount = 0;
+    _hasEmittedText = false;
 
     switch (provider.kind) {
       case _VoiceProviderKind.ai:
@@ -160,6 +166,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
 
     _setStateKind(VoiceInputState.recording);
+    _setStatusMessage('voice_recording_hint');
     await _speech.listen(
       onResult: (result) {
         final words = result.recognizedWords;
@@ -182,6 +189,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
     if (!await AppPermissionService.ensureMicrophone(context)) return;
     _setStateKind(VoiceInputState.recording);
+    _setStatusMessage('voice_recording_hint');
     unawaited(_runAiChunkLoop(config));
   }
 
@@ -203,6 +211,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         );
         _emitText(text);
         if (_running) _setStateKind(VoiceInputState.recording);
+        if (_running) _setStatusMessage('voice_recording_hint');
       }
     } catch (e) {
       _showError(_messageKeyForError(e));
@@ -230,6 +239,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       }
     }
     _setStateKind(VoiceInputState.recording);
+    _setStatusMessage('voice_recording_hint');
     unawaited(
       _onDevice!
           .startStreaming(
@@ -237,17 +247,31 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
               final delta = _deltaFromCumulative(text, _lastCumulativeText);
               _lastCumulativeText = text;
               _emitText(delta);
+              _emptyChunkCount = 0;
             },
             onStatus: (status) {
               if (status == 'transcribing') {
                 _setStateKind(VoiceInputState.transcribing);
+                _setStatusMessage('voice_transcribing');
               } else if (status == 'recording') {
                 _setStateKind(VoiceInputState.recording);
+                _setStatusMessage('voice_recording_hint');
               }
+            },
+            onEmptyResult: () {
+              _emptyChunkCount += 1;
+              if (_emptyChunkCount >= 2 && !_hasEmittedText) {
+                _setStatusMessage('voice_no_speech_detected');
+              }
+            },
+            onError: (error) {
+              _showErrorDetail('voice_recognize_failed', error);
             },
           )
           .catchError((e) {
-            _showError(_messageKeyForError(e));
+            if (_state != VoiceInputState.error) {
+              _showErrorDetail(_messageKeyForError(e), e);
+            }
           }),
     );
   }
@@ -276,6 +300,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   Future<void> _stopListening() async {
     _running = false;
     _setStateKind(VoiceInputState.stopping);
+    _setStatusMessage('voice_stopping');
     try {
       await _speech.stop();
     } catch (_) {}
@@ -291,6 +316,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   void _emitText(String text) {
     final cleaned = text.trim();
     if (cleaned.isEmpty) return;
+    _hasEmittedText = true;
     widget.onResult(cleaned);
     if (mounted) {
       setState(() {
@@ -322,16 +348,41 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   void _showError(String messageKey) {
+    _showErrorDetail(messageKey, null);
+  }
+
+  void _showErrorDetail(String messageKey, Object? error) {
     _running = false;
     _setStateKind(VoiceInputState.error);
     widget.onError?.call(messageKey);
     if (mounted) {
       final l10n = context.read<LocalizationProvider>();
+      final message = error == null
+          ? l10n.get(messageKey)
+          : l10n.getp('voice_recognize_failed_with_error', {
+              'error': _safeErrorText(error),
+            });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.get(messageKey))));
+      ).showSnackBar(SnackBar(content: Text(message)));
       _setStateKind(VoiceInputState.idle);
     }
+  }
+
+  void _setStatusMessage(String messageKey) {
+    if (!mounted) return;
+    setState(() => _statusMessageKey = messageKey);
+  }
+
+  String _safeErrorText(Object error) {
+    final text = error.toString();
+    final redacted = text.replaceAll(
+      RegExp(r'sk-[A-Za-z0-9_\-]{8,}'),
+      'sk-***',
+    );
+    return redacted.length > 120
+        ? '${redacted.substring(0, 120)}...'
+        : redacted;
   }
 
   @override
@@ -371,13 +422,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           ),
           tooltip: tooltip,
         ),
-        if (_previewText.isNotEmpty && _isActive)
+        if (_isActive && (_previewText.isNotEmpty || _statusMessageKey != null))
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 220),
               child: Text(
-                _previewText,
+                _previewText.isNotEmpty
+                    ? _previewText
+                    : l10n.get(_statusMessageKey!),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12),

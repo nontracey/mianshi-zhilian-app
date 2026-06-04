@@ -12,13 +12,17 @@ class OnDeviceSttService {
 
   Future<void> deleteModel() async {}
 
-  Future<void> initModel({void Function(int received, int total)? onProgress}) async {
+  Future<void> initModel({
+    void Function(int received, int total)? onProgress,
+  }) async {
     throw UnsupportedError('OnDeviceSttService is not available on web');
   }
 
   Future<void> startStreaming({
     required void Function(String accumulatedText) onResult,
     void Function(String status)? onStatus,
+    void Function()? onEmptyResult,
+    void Function(Object error)? onError,
   }) async {
     throw UnsupportedError('OnDeviceSttService is not available on web');
   }

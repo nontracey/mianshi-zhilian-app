@@ -1137,7 +1137,9 @@ class L10n {
     'un_score_category': '未评分',
     'un_start': '未开始',
     'update_switch_avatar': '更新/切换头像',
-    'voice_recognize_failed': '语音识别失败：{error}',
+    'voice_recognize_failed': '语音识别失败',
+    'voice_recognize_failed_with_error': '语音识别失败：{error}',
+    'voice_no_speech_detected': '还没有识别到清晰语音，请靠近麦克风或继续说',
     'weakness_training_pack': '薄弱训练包',
     'wechat_already_bind': '微信已绑定',
     'wechat_bind': '微信绑定',
@@ -2988,7 +2990,10 @@ class L10n {
     // Added to keep supported locale maps in sync.
     'interview_day_year_month_day': 'Interview date: {year}-{month}-{day}',
     'use': 'Use',
-    'voice_recognize_failed': 'Voice recognition failed: {error}',
+    'voice_recognize_failed': 'Voice recognition failed',
+    'voice_recognize_failed_with_error': 'Voice recognition failed: {error}',
+    'voice_no_speech_detected':
+        'No clear speech detected yet. Move closer to the mic or keep speaking.',
     'mastery_skilled': 'Skilled',
     'mastery_learning': 'Needs Practice',
     'operating_system': 'Operating System',
