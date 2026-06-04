@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
-import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/privacy_dialog.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
@@ -181,13 +181,24 @@ class _RecallPageState extends State<RecallPage> {
           hasNext: _currentIndex < widget.topicIds.length - 1,
           isEvaluating: _isEvaluating,
           hasAnswer: _answerController.text.trim().isNotEmpty,
-          hasAi: aiProvider.enabledConfigs.isNotEmpty,
+          hasAi: _selectedEvaluationConfig(aiProvider)?.canEvaluate == true,
           onPrevious: _goPrevious,
           onNext: _goNext,
           onSubmit: _handleEvaluate,
         ),
       ],
     );
+  }
+
+  AiConfig? _selectedEvaluationConfig(AiProvider aiProvider) {
+    final selectedConfigId =
+        _selectedAiConfigId ??
+        aiProvider.defaultConfig?.id ??
+        aiProvider.enabledConfigs.firstOrNull?.id;
+    if (selectedConfigId == null) return null;
+    return aiProvider.enabledConfigs
+        .where((config) => config.id == selectedConfigId)
+        .firstOrNull;
   }
 
   // ── 输入区域（共享） ──
@@ -202,7 +213,8 @@ class _RecallPageState extends State<RecallPage> {
               .firstOrNull
         : null;
     final supportsImage = selectedConfig?.supportsImageInput ?? false;
-    final supportsAudio = selectedConfig?.supportsAudioInput ?? false;
+    final supportsAudio = selectedConfig?.audioMode != AiAudioMode.none;
+    final canEvaluate = selectedConfig?.canEvaluate ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,11 +233,13 @@ class _RecallPageState extends State<RecallPage> {
               _inputMode = 'text';
             }
             if (_inputMode == 'voice' &&
-                !(config?.supportsAudioInput ?? false)) {
+                !(config?.audioMode != AiAudioMode.none)) {
               _inputMode = 'text';
             }
           }),
         ),
+        const SizedBox(height: 10),
+        _AiReadinessNotice(config: selectedConfig),
         const SizedBox(height: 16),
 
         // 输入模式切换（根据模型能力动态启用/禁用）
@@ -312,7 +326,7 @@ class _RecallPageState extends State<RecallPage> {
               label: Text(
                 _isEvaluating
                     ? l10n.get('evaluation_in')
-                    : aiProvider.enabledConfigs.isEmpty
+                    : !canEvaluate
                     ? l10n.get('save_local_practice')
                     : l10n.get('gain_fetch_ai_evaluation'),
               ),
@@ -386,19 +400,7 @@ class _RecallPageState extends State<RecallPage> {
                 onListeningChanged: (listening) {
                   setState(() => _isVoiceListening = listening);
                 },
-                sttMode: context.read<SettingsProvider>().settings.sttMode,
-                whisperBaseUrl: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperBaseUrl,
-                whisperApiKey: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperApiKey,
-                whisperModel: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperModel,
+                aiConfigId: _selectedAiConfigId,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -781,6 +783,7 @@ class _RecallPageState extends State<RecallPage> {
         });
         final progressProvider = context.read<ProgressProvider>();
         final score = result['score'] as int? ?? 0;
+        final aiEvaluated = result['aiUnavailable'] != true;
         await progressProvider.addAttempt(
           PracticeAttempt(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -814,10 +817,12 @@ class _RecallPageState extends State<RecallPage> {
                     as String?,
             nextAction: result['nextAction'] as String?,
             aiConfigId: aiConfigId,
-            aiEvaluated: result['aiUnavailable'] != true,
+            aiEvaluated: aiEvaluated,
+            localOnly: !aiEvaluated,
+            analysisStatus: aiEvaluated ? 'success' : 'unanalysed',
           ),
         );
-        if (result['score'] is int) {
+        if (aiEvaluated && result['score'] is int) {
           await progressProvider.updateTopicProgress(topicId, score: score);
         }
 
@@ -845,6 +850,8 @@ class _RecallPageState extends State<RecallPage> {
       }
     } catch (e) {
       if (mounted) {
+        await _saveFailedAttempt(answer, e);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.getp('evaluation_fail_error_2', {'error': e})),
@@ -856,6 +863,40 @@ class _RecallPageState extends State<RecallPage> {
         setState(() => _isEvaluating = false);
       }
     }
+  }
+
+  Future<void> _saveFailedAttempt(String answer, Object error) async {
+    final aiProvider = context.read<AiProvider>();
+    final contentProvider = context.read<ContentProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+    final topicId = widget.topicIds[_currentIndex];
+    final topic = contentProvider.findTopic(topicId);
+    if (topic == null) return;
+    final enabledConfigs = aiProvider.enabledConfigs;
+    final aiConfigId =
+        _selectedAiConfigId ??
+        aiProvider.defaultConfig?.id ??
+        (enabledConfigs.isNotEmpty ? enabledConfigs.first.id : null);
+    await progressProvider.addAttempt(
+      PracticeAttempt(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        topicId: topicId,
+        promptId: topic.recallPrompts.isNotEmpty
+            ? topic.recallPrompts.first.id
+            : '',
+        mode: _inputMode == 'code' ? 'code' : 'recall',
+        question: topic.recallPrompts.isNotEmpty
+            ? topic.recallPrompts.first.prompt
+            : topic.title,
+        answer: answer,
+        createdAt: DateTime.now(),
+        summary: error.toString(),
+        aiConfigId: aiConfigId,
+        aiEvaluated: false,
+        localOnly: true,
+        analysisStatus: 'failed',
+      ),
+    );
   }
 
   List<String> _inferErrorTags(Map<String, dynamic> result) {
@@ -1091,6 +1132,76 @@ class _RubricPanel extends StatelessWidget {
 
 // ── 模型选择器 ──────────────────────────────────────────────
 
+class _AiReadinessNotice extends StatelessWidget {
+  const _AiReadinessNotice({required this.config});
+
+  final AiConfig? config;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final (icon, color, text) = _status(context, l10n);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  (IconData, Color, String) _status(
+    BuildContext context,
+    LocalizationProvider l10n,
+  ) {
+    if (config == null) {
+      return (
+        Icons.info_outline,
+        AppColors.warning,
+        l10n.get('ai_status_not_configured_local_save'),
+      );
+    }
+    final record = config!.testRecord(AiCapability.text);
+    if (record.state == CapabilityTestState.passed && config!.canEvaluate) {
+      return (
+        Icons.check_circle_outline,
+        AppColors.success,
+        l10n.getp('ai_status_ready_model', {'model': config!.name}),
+      );
+    }
+    if (record.state == CapabilityTestState.failed) {
+      return (
+        Icons.error_outline,
+        AppColors.danger,
+        l10n.getp('ai_status_failed_model', {'model': config!.name}),
+      );
+    }
+    return (
+      Icons.pending_outlined,
+      AppColors.warning,
+      l10n.getp('ai_status_untested_model', {'model': config!.name}),
+    );
+  }
+}
+
 class _ModelSelector extends StatelessWidget {
   const _ModelSelector({required this.selectedId, required this.onChanged});
 
@@ -1183,7 +1294,7 @@ class _CapabilityTags extends StatelessWidget {
     if (config.supportsImageInput == true) {
       tags.add(_tag(l10n.get('image_picture'), AppColors.success));
     }
-    if (config.supportsAudioInput == true) {
+    if (config.audioMode != AiAudioMode.none) {
       tags.add(_tag(l10n.get('speech_voice'), AppColors.warning));
     }
     if (tags.isEmpty) return const SizedBox();

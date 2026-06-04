@@ -1,84 +1,73 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+
+import 'package:mianshi_zhilian/models/ai_config.dart';
+import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
-import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
-import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
-import 'package:mianshi_zhilian/providers/localization_provider.dart';
-import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
+
+enum VoiceInputState { idle, recording, transcribing, stopping, error }
 
 class VoiceInputButton extends StatefulWidget {
   const VoiceInputButton({
     super.key,
     required this.onResult,
     this.onListeningChanged,
-    this.sttMode = 'whisper_kit',
-    this.whisperBaseUrl,
-    this.whisperApiKey,
-    this.whisperModel = 'whisper-1',
+    this.onStateChanged,
+    this.onError,
+    this.aiConfigId,
+    this.sttMode,
   });
 
   final ValueChanged<String> onResult;
   final ValueChanged<bool>? onListeningChanged;
-  final String sttMode;
-  final String? whisperBaseUrl;
-  final String? whisperApiKey;
-  final String whisperModel;
+  final ValueChanged<VoiceInputState>? onStateChanged;
+  final ValueChanged<String>? onError;
+  final String? aiConfigId;
+
+  // Kept for older call sites; the component now resolves settings itself.
+  final String? sttMode;
 
   @override
   State<VoiceInputButton> createState() => _VoiceInputButtonState();
 }
 
 class _VoiceInputButtonState extends State<VoiceInputButton> {
-  // System STT
   final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _isAvailable = false;
-
-  // Whisper STT
   final AudioRecorder _recorder = AudioRecorder();
 
-  // WhisperKit (本机 whisper.cpp)
-  OnDeviceSttService? _whisperKit;
-  bool _whisperKitReady = false;
-  String _accumulatedText = '';
+  OnDeviceSttService? _onDevice;
+  VoiceInputState _state = VoiceInputState.idle;
+  bool _systemAvailable = false;
+  bool _running = false;
+  String _lastSystemText = '';
+  String _lastCumulativeText = '';
+  String _previewText = '';
 
-  bool _isListening = false;
-  late LocalizationProvider l10n;
+  bool get _isActive =>
+      _state == VoiceInputState.recording ||
+      _state == VoiceInputState.transcribing ||
+      _state == VoiceInputState.stopping;
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  Future<void> _initSystemSpeech() async {
-    _isAvailable = await _speech.initialize(
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          if (mounted) {
-            setState(() => _isListening = false);
-            widget.onListeningChanged?.call(false);
-          }
-        }
-      },
-      onError: (error) {
-        if (mounted) {
-          setState(() => _isListening = false);
-          widget.onListeningChanged?.call(false);
-        }
-        debugPrint('Speech error: $error');
-      },
-    );
-    if (mounted) setState(() {});
+  void _setStateKind(VoiceInputState state) {
+    if (!mounted) return;
+    setState(() => _state = state);
+    widget.onListeningChanged?.call(_isActive);
+    widget.onStateChanged?.call(state);
   }
 
   Future<void> _toggleListening() async {
-    if (_isListening) {
+    if (_isActive) {
       await _stopListening();
     } else {
       await _startListening();
@@ -86,121 +75,188 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   Future<void> _startListening() async {
-    if (widget.sttMode == 'whisper_kit') {
-      await _startWhisperKitStreaming();
-    } else if (widget.sttMode == 'whisper') {
-      await _startWhisperStreaming();
-    } else {
-      await _startSystemListening();
+    final aiProvider = context.read<AiProvider>();
+    final settings = context.read<SettingsProvider>().settings;
+    final provider = _resolveProvider(settings, aiProvider);
+
+    _running = true;
+    _lastSystemText = '';
+    _lastCumulativeText = '';
+    _previewText = '';
+
+    switch (provider.kind) {
+      case _VoiceProviderKind.ai:
+        await _startAiStreaming(provider.config!);
+        break;
+      case _VoiceProviderKind.system:
+        await _startSystemListening();
+        break;
+      case _VoiceProviderKind.whisperKit:
+        await _startOnDeviceStreaming();
+        break;
+      case _VoiceProviderKind.none:
+        _showError('voice_provider_unavailable');
+        break;
     }
   }
 
-  Future<void> _stopListening() async {
-    if (widget.sttMode == 'whisper_kit') {
-      await _stopWhisperKitStreaming();
-    } else if (widget.sttMode == 'whisper') {
-      await _stopWhisperStreaming();
-    } else {
-      await _stopSystemListening();
-    }
-  }
+  _ResolvedVoiceProvider _resolveProvider(
+    dynamic settings,
+    AiProvider aiProvider,
+  ) {
+    final mode = widget.sttMode ?? settings.sttMode;
+    final selected = aiProvider.configById(widget.aiConfigId);
+    final fixed = settings.sttAiConfigId == null
+        ? null
+        : aiProvider.configById(settings.sttAiConfigId);
+    final defaultConfig = aiProvider.defaultConfig;
 
-  // ── System STT ──
-
-  /// 本地模式不可用时的降级弹窗
-  Future<void> _showLocalModeUnavailable({
-    required String messageKey,
-    required String currentMode,
-  }) async {
-    if (!mounted) return;
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('voice_not_available')),
-        content: Text(l10n.get(messageKey)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: Text(l10n.get('cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'switch'),
-            child: Text(l10n.get('switch_to_whisper_api')),
-          ),
-        ],
-      ),
-    );
-    if (choice == 'switch' && mounted) {
-      context
-          .read<SettingsProvider>()
-          .updateSettings(
-            context.read<SettingsProvider>().settings.copyWith(sttMode: 'whisper'),
-          );
+    AiConfig? audioConfig;
+    if (mode == 'fixed_ai_config') {
+      audioConfig = fixed?.canTranscribe == true ? fixed : null;
+    } else if (mode == 'follow_current_ai') {
+      audioConfig = selected?.canTranscribe == true ? selected : null;
+    } else if (mode == 'auto') {
+      audioConfig = selected?.canTranscribe == true
+          ? selected
+          : (fixed?.canTranscribe == true
+                ? fixed
+                : (defaultConfig?.canTranscribe == true
+                      ? defaultConfig
+                      : null));
     }
+
+    if (audioConfig != null) {
+      return _ResolvedVoiceProvider.ai(audioConfig);
+    }
+    if (mode == 'system') return const _ResolvedVoiceProvider.system();
+    if (mode == 'whisper_kit') return const _ResolvedVoiceProvider.whisperKit();
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return const _ResolvedVoiceProvider.whisperKit();
+    }
+    return const _ResolvedVoiceProvider.system();
   }
 
   Future<void> _startSystemListening() async {
     if (!await AppPermissionService.ensureSpeechRecognition(context)) return;
-    if (!mounted) return;
-
-    try {
-      if (!_isAvailable) {
-        await _initSystemSpeech();
-        if (!mounted) return;
-      }
-
-      if (!_isAvailable) {
-        if (mounted) {
-          _showLocalModeUnavailable(
-            messageKey: 'system_speech_unsupported',
-            currentMode: 'system',
-          );
-        }
-        return;
-      }
-
-      setState(() => _isListening = true);
-      widget.onListeningChanged?.call(true);
-
-      await _speech.listen(
-        onResult: (result) {
-          widget.onResult(result.recognizedWords);
+    if (!_systemAvailable) {
+      _systemAvailable = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            _running = false;
+            _setStateKind(VoiceInputState.idle);
+          }
         },
-        listenOptions: stt.SpeechListenOptions(
-          listenMode: stt.ListenMode.dictation,
-          cancelOnError: true,
-          localeId: 'zh_CN',
-        ),
+        onError: (error) {
+          _running = false;
+          _showError('system_speech_unsupported');
+        },
       );
-    } catch (e) {
-      debugPrint('System STT error: $e');
-      if (mounted) {
-        setState(() => _isListening = false);
-        widget.onListeningChanged?.call(false);
-        _showLocalModeUnavailable(
-          messageKey: 'system_speech_unsupported',
-          currentMode: 'system',
+    }
+    if (!_systemAvailable) {
+      _showError('system_speech_unsupported');
+      return;
+    }
+
+    _setStateKind(VoiceInputState.recording);
+    await _speech.listen(
+      onResult: (result) {
+        final words = result.recognizedWords;
+        final delta = _deltaFromCumulative(words, _lastSystemText);
+        _lastSystemText = words;
+        _emitText(delta);
+      },
+      listenOptions: stt.SpeechListenOptions(
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: true,
+        localeId: 'zh_CN',
+      ),
+    );
+  }
+
+  Future<void> _startAiStreaming(AiConfig config) async {
+    if (kIsWeb) {
+      _showError('voice_web_unsupported');
+      return;
+    }
+    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    _setStateKind(VoiceInputState.recording);
+    unawaited(_runAiChunkLoop(config));
+  }
+
+  Future<void> _runAiChunkLoop(AiConfig config) async {
+    final aiProvider = context.read<AiProvider>();
+    try {
+      while (_running) {
+        final chunkPath = await _recordChunk(const Duration(seconds: 2));
+        if (chunkPath == null) break;
+        _setStateKind(VoiceInputState.transcribing);
+        final bytes = await readBytesFromPath(chunkPath);
+        try {
+          await deleteFileAtPath(chunkPath);
+        } catch (_) {}
+        if (!_running && bytes.isEmpty) break;
+        final text = await aiProvider.transcribeAudio(
+          config: config,
+          audioBytes: bytes,
         );
+        _emitText(text);
+        if (_running) _setStateKind(VoiceInputState.recording);
+      }
+    } catch (e) {
+      _showError(_messageKeyForError(e));
+    } finally {
+      _running = false;
+      if (mounted && _state != VoiceInputState.error) {
+        _setStateKind(VoiceInputState.idle);
       }
     }
   }
 
-  Future<void> _stopSystemListening() async {
-    await _speech.stop();
-    setState(() => _isListening = false);
-    widget.onListeningChanged?.call(false);
+  Future<void> _startOnDeviceStreaming() async {
+    if (kIsWeb) {
+      _showError('whisper_kit_web_unsupported');
+      return;
+    }
+    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    _onDevice ??= OnDeviceSttService();
+    if (!_onDevice!.isModelReady) {
+      if (await _onDevice!.isModelFilePresent()) {
+        await _onDevice!.initModel();
+      } else {
+        _showError('whisper_kit_model_not_downloaded');
+        return;
+      }
+    }
+    _setStateKind(VoiceInputState.recording);
+    unawaited(
+      _onDevice!
+          .startStreaming(
+            onResult: (text) {
+              final delta = _deltaFromCumulative(text, _lastCumulativeText);
+              _lastCumulativeText = text;
+              _emitText(delta);
+            },
+            onStatus: (status) {
+              if (status == 'transcribing') {
+                _setStateKind(VoiceInputState.transcribing);
+              } else if (status == 'recording') {
+                _setStateKind(VoiceInputState.recording);
+              }
+            },
+          )
+          .catchError((e) {
+            _showError(_messageKeyForError(e));
+          }),
+    );
   }
 
-  // ── Whisper STT (API 流式模式) ──
-
-  /// 录制一个音频分块（3 秒），返回临时 WAV 文件路径。
-  /// whisper_kit 和 Whisper API 流式模式共用此方法。
-  Future<String?> _recordChunk() async {
+  Future<String?> _recordChunk(Duration duration) async {
     try {
       final tempDir = await getTemporaryDirectory();
       final chunkPath =
-          '${tempDir.path}/whisper_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
-
+          '${tempDir.path}/voice_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
@@ -209,341 +265,72 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         ),
         path: chunkPath,
       );
-
-      await Future.delayed(const Duration(seconds: 3));
-
-      if (!_isListening) {
-        await _recorder.stop();
-        return null;
-      }
-
+      await Future.delayed(duration);
       final path = await _recorder.stop();
       return (path != null && path.isNotEmpty) ? path : null;
-    } catch (e) {
-      debugPrint('Record chunk failed: $e');
+    } catch (_) {
       return null;
     }
   }
 
-  Future<void> _startWhisperStreaming() async {
-    if (kIsWeb) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('voice_web_unsupported'))),
-        );
-      }
-      return;
-    }
-
-    if (widget.whisperBaseUrl == null ||
-        widget.whisperApiKey == null ||
-        widget.whisperBaseUrl!.trim().isEmpty ||
-        widget.whisperApiKey!.trim().isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('voice_no_whisper_key'))),
-        );
-      }
-      return;
-    }
-
-    if (!await AppPermissionService.ensureMicrophone(context)) return;
-    if (!mounted) return;
-
-    _accumulatedText = '';
-    setState(() => _isListening = true);
-    widget.onListeningChanged?.call(true);
-
-    final baseUrl = widget.whisperBaseUrl!;
-    final apiKey = widget.whisperApiKey!;
-    final model = widget.whisperModel;
-
-    // 分块录音 + 流式转写循环
-    _runWhisperStreamLoop(baseUrl, apiKey, model);
-  }
-
-  Future<void> _runWhisperStreamLoop(
-    String baseUrl,
-    String apiKey,
-    String model,
-  ) async {
-    final streamSvc = WhisperStreamSttService();
+  Future<void> _stopListening() async {
+    _running = false;
+    _setStateKind(VoiceInputState.stopping);
     try {
-      while (_isListening) {
-        final chunkPath = await _recordChunk();
-        if (chunkPath == null || !_isListening) break;
-
-        final audioBytes = await readBytesFromPath(chunkPath);
-        try {
-          await deleteFileAtPath(chunkPath);
-        } catch (_) {}
-
-        if (!_isListening) break;
-
-        try {
-          await for (final text in streamSvc.transcribeStream(
-            audioBytes: audioBytes,
-            baseUrl: baseUrl,
-            apiKey: apiKey,
-            model: model,
-            language: 'zh',
-          )) {
-            if (!_isListening) break;
-            _accumulatedText += text;
-            if (mounted) setState(() {});
-          }
-        } catch (e) {
-          debugPrint('Whisper stream chunk error: $e');
-          if (mounted) {
-            // 解析错误信息，给用户更具体的建议
-            final errMsg = e.toString();
-            String userMsg;
-            if (errMsg.contains('401') || errMsg.contains('Unauthorized')) {
-              userMsg = l10n.get('whisper_api_auth_error');
-            } else if (errMsg.contains('404') || errMsg.contains('Not Found')) {
-              userMsg = l10n.get('whisper_api_not_found');
-            } else if (errMsg.contains('429') || errMsg.contains('rate limit')) {
-              userMsg = l10n.get('whisper_api_rate_limit');
-            } else if (errMsg.contains('SocketException') ||
-                errMsg.contains('Connection refused')) {
-              userMsg = l10n.get('whisper_api_network_error');
-            } else if (errMsg.contains('TimeoutException') ||
-                errMsg.contains('timed out')) {
-              userMsg = l10n.get('whisper_api_timeout');
-            } else {
-              userMsg = '${l10n.get('whisper_api_transcribe_failed')}: '
-                  '${errMsg.length > 80 ? '${errMsg.substring(0, 80)}...' : errMsg}';
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(userMsg),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
-              ),
-            );
-          }
-          break; // 停止重试
-        }
-      }
-    } catch (e) {
-      debugPrint('Whisper streaming error: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isListening = false);
-        widget.onListeningChanged?.call(false);
-        if (_accumulatedText.isNotEmpty) {
-          widget.onResult(_accumulatedText);
-          _accumulatedText = '';
-        }
-      }
-    }
-  }
-
-  Future<void> _stopWhisperStreaming() async {
-    _isListening = false;
+      await _speech.stop();
+    } catch (_) {}
     try {
       await _recorder.stop();
     } catch (_) {}
-  }
-
-  // ── WhisperKit (本机 whisper.cpp 边说边转) ──
-
-  Future<void> _ensureWhisperKit() async {
-    if (_whisperKitReady) return;
-
-    _whisperKit ??= OnDeviceSttService();
-    if (_whisperKit!.isModelReady) {
-      _whisperKitReady = true;
-      return;
-    }
-
-    // 模型文件可能已存在于磁盘但未加载到内存
-    // 先检查文件系统，如果存在则直接加载（无需弹下载提示）
-    if (await _whisperKit!.isModelFilePresent()) {
-      try {
-        await _whisperKit!.initModel();
-        if (_whisperKit!.isModelReady) {
-          _whisperKitReady = true;
-          return;
-        }
-      } catch (e) {
-        debugPrint('WhisperKit: load existing model failed: $e');
-        // 加载失败，继续走下载流程
-      }
-    }
-
-    if (_whisperKit!.isModelDownloading) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.get('whisper_kit_model_downloading')),
-          ),
-        );
-      }
-      return;
-    }
-
-    // 模型未下载，弹出引导弹窗
-    if (!mounted) return;
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('whisper_kit_download_prompt_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.get('whisper_kit_download_prompt_desc')),
-            const SizedBox(height: 8),
-            Text(
-              l10n.get('whisper_kit_model_size'),
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: Text(l10n.get('cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'settings'),
-            child: Text(l10n.get('whisper_kit_go_settings')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'download'),
-            child: Text(l10n.get('whisper_kit_download_now')),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-    if (choice == 'settings') {
-      // 导航到 AI & 语音设置页
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AiVoiceSettingsPage()),
-      );
-      return;
-    }
-    if (choice != 'download') return;
-
-    // 开始下载
     try {
-      await _whisperKit!.initModel(
-        onProgress: (received, total) {
-          if (mounted && total > 0 && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  l10n.getp('whisper_kit_downloading_percent', {
-                    'percent': (received / total * 100).toStringAsFixed(0),
-                  }),
-                ),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          }
-        },
-      );
-      if (mounted) {
-        setState(() => _whisperKitReady = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.get('whisper_kit_download_complete')),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showLocalModeUnavailable(
-          messageKey: 'whisper_kit_unsupported_platform',
-          currentMode: 'whisper_kit',
-        );
-      }
-    }
+      await _onDevice?.stopStreaming();
+    } catch (_) {}
+    if (mounted) _setStateKind(VoiceInputState.idle);
   }
 
-  Future<void> _startWhisperKitStreaming() async {
-    if (kIsWeb) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('whisper_kit_web_unsupported'))),
-        );
-      }
-      return;
-    }
-
-    await _ensureWhisperKit();
-    if (!_whisperKitReady || !mounted) return;
-
-    if (!await AppPermissionService.ensureMicrophone(context)) return;
-    if (!mounted) return;
-
-    _accumulatedText = '';
-    setState(() => _isListening = true);
-    widget.onListeningChanged?.call(true);
-
-    // 在后台启动边说边转循环（捕获异常并提示用户）
-    unawaited(_whisperKit!.startStreaming(
-      onResult: (text) {
-        if (mounted) {
-          _accumulatedText = text;
-          setState(() {});
+  void _emitText(String text) {
+    final cleaned = text.trim();
+    if (cleaned.isEmpty) return;
+    widget.onResult(cleaned);
+    if (mounted) {
+      setState(() {
+        _previewText = (_previewText + cleaned).trim();
+        if (_previewText.length > 80) {
+          _previewText = _previewText.substring(_previewText.length - 80);
         }
-      },
-      onStatus: (_) {},
-    ).catchError((e) {
-      debugPrint('WhisperKit streaming error: $e');
-      if (mounted) {
-        setState(() {
-          _isListening = false;
-        });
-        widget.onListeningChanged?.call(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${l10n.get('voice_not_available')}: $e',
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }));
-  }
-
-  Future<void> _stopWhisperKitStreaming() async {
-    await _whisperKit?.stopStreaming();
-    setState(() => _isListening = false);
-    widget.onListeningChanged?.call(false);
-
-    if (_accumulatedText.isNotEmpty) {
-      widget.onResult(_accumulatedText);
-      _accumulatedText = '';
+      });
     }
   }
 
-  /// 将服务层 modelStatus 码解析为 UI 可显示文本
-  /// modelStatus 格式: 'ready' | 'not_downloaded' | 'downloading' | 'downloading:45'
-  String _formatModelStatus(LocalizationProvider l10n_, String status) {
-    if (status.startsWith('downloading:')) {
-      final pct = status.split(':').last;
-      return l10n_.getp('whisper_kit_downloading_percent', {'percent': pct});
+  String _deltaFromCumulative(String current, String previous) {
+    if (current.isEmpty) return '';
+    if (previous.isNotEmpty && current.startsWith(previous)) {
+      return current.substring(previous.length);
     }
-    switch (status) {
-      case 'ready':
-        return l10n_.get('whisper_kit_model_downloaded');
-      case 'not_downloaded':
-        return l10n_.get('whisper_kit_model_not_downloaded');
-      case 'downloading':
-        return l10n_.get('whisper_kit_model_downloading');
-      default:
-        return status;
+    return current == previous ? '' : current;
+  }
+
+  String _messageKeyForError(Object error) {
+    final text = error.toString();
+    if (text.contains('401') || text.contains('403')) {
+      return 'ai_test_auth_error';
+    }
+    if (text.contains('404')) return 'ai_test_not_found';
+    if (text.contains('429')) return 'ai_test_rate_limited';
+    if (text.contains('timeout')) return 'ai_test_timeout';
+    return 'voice_recognize_failed';
+  }
+
+  void _showError(String messageKey) {
+    _running = false;
+    _setStateKind(VoiceInputState.error);
+    widget.onError?.call(messageKey);
+    if (mounted) {
+      final l10n = context.read<LocalizationProvider>();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.get(messageKey))));
+      _setStateKind(VoiceInputState.idle);
     }
   }
 
@@ -551,74 +338,46 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   void dispose() {
     _speech.stop();
     _recorder.dispose();
-    _whisperKit?.dispose();
+    _onDevice?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    l10n = context.watch<LocalizationProvider>();
-    final isWhisperKit = widget.sttMode == 'whisper_kit';
-    final showModelProgress =
-        isWhisperKit && _whisperKit != null && _whisperKit!.isModelDownloading;
-
-    String tooltip;
-    if (_isListening) {
-      tooltip = l10n.get('voice_stop_recording');
-    } else if (isWhisperKit) {
-      tooltip = _whisperKitReady
-          ? l10n.get('whisper_kit_input_tooltip')
-          : l10n.get('whisper_kit_need_download_tooltip');
-    } else if (widget.sttMode == 'whisper') {
-      tooltip = l10n.get('voice_whisper_input');
-    } else {
-      tooltip = l10n.get('voice_input');
-    }
+    final l10n = context.watch<LocalizationProvider>();
+    final color = switch (_state) {
+      VoiceInputState.idle => null,
+      VoiceInputState.recording => Colors.green,
+      VoiceInputState.transcribing => Theme.of(context).colorScheme.primary,
+      VoiceInputState.stopping => Colors.orange,
+      VoiceInputState.error => Colors.red,
+    };
+    final tooltip = switch (_state) {
+      VoiceInputState.idle => l10n.get('voice_input'),
+      VoiceInputState.recording => l10n.get('voice_stop_recording'),
+      VoiceInputState.transcribing => l10n.get('voice_transcribing'),
+      VoiceInputState.stopping => l10n.get('voice_stopping'),
+      VoiceInputState.error => l10n.get('voice_recognize_failed'),
+    };
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          onPressed: showModelProgress ? null : _toggleListening,
-          icon: Icon(
-            _isListening ? Icons.mic : Icons.mic_none,
-            color: _isListening ? Colors.green : null,
-          ),
+          onPressed: _toggleListening,
+          icon: Icon(_isActive ? Icons.mic : Icons.mic_none, color: color),
           style: IconButton.styleFrom(
-            backgroundColor: _isListening
-                ? Colors.green.withValues(alpha: 0.12)
-                : null,
+            backgroundColor: color?.withValues(alpha: 0.12),
           ),
           tooltip: tooltip,
         ),
-        // 模型下载进度指示
-        if (showModelProgress && _whisperKit != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              _formatModelStatus(l10n, _whisperKit!.modelStatus),
-              style: TextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        // 边说边转实时文字预览
-        if (isWhisperKit && _isListening && _accumulatedText.isNotEmpty)
+        if (_previewText.isNotEmpty && _isActive)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest
-                    .withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(8),
-              ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
               child: Text(
-                _accumulatedText,
+                _previewText,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12),
@@ -628,4 +387,19 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       ],
     );
   }
+}
+
+enum _VoiceProviderKind { ai, system, whisperKit, none }
+
+class _ResolvedVoiceProvider {
+  const _ResolvedVoiceProvider._(this.kind, this.config);
+  const _ResolvedVoiceProvider.ai(AiConfig config)
+    : this._(_VoiceProviderKind.ai, config);
+  const _ResolvedVoiceProvider.system()
+    : this._(_VoiceProviderKind.system, null);
+  const _ResolvedVoiceProvider.whisperKit()
+    : this._(_VoiceProviderKind.whisperKit, null);
+
+  final _VoiceProviderKind kind;
+  final AiConfig? config;
 }

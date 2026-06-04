@@ -112,6 +112,7 @@ class PracticeAttempt {
   final String? aiConfigId;
   final bool aiEvaluated;
   final bool localOnly;
+  final String analysisStatus; // unanalysed, success, failed, pending
 
   const PracticeAttempt({
     required this.id,
@@ -132,6 +133,7 @@ class PracticeAttempt {
     this.aiConfigId,
     this.aiEvaluated = false,
     this.localOnly = true,
+    this.analysisStatus = 'unanalysed',
   });
 
   factory PracticeAttempt.fromJson(Map<String, dynamic> json) =>
@@ -166,6 +168,11 @@ class PracticeAttempt {
         aiConfigId: json['aiConfigId'] as String?,
         aiEvaluated: json['aiEvaluated'] as bool? ?? false,
         localOnly: json['localOnly'] as bool? ?? true,
+        analysisStatus:
+            json['analysisStatus'] as String? ??
+            ((json['aiEvaluated'] as bool? ?? false)
+                ? 'success'
+                : 'unanalysed'),
       );
 
   Map<String, dynamic> toJson() => {
@@ -187,6 +194,7 @@ class PracticeAttempt {
     'aiConfigId': aiConfigId,
     'aiEvaluated': aiEvaluated,
     'localOnly': localOnly,
+    'analysisStatus': analysisStatus,
   };
 }
 
@@ -368,7 +376,8 @@ class LocalProfile {
 }
 
 class SyncSettings {
-  final String method; // local, file, webdav, github, gitee (cloud 已废弃，fromJson 自动转为 local)
+  final String
+  method; // local, file, webdav, github, gitee (cloud 已废弃，fromJson 自动转为 local)
   final String webDavUrl;
   final String webDavUsername;
   final String webDavPassword;

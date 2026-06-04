@@ -254,21 +254,25 @@ git push origin vx.x.x
 - Web 端因 CORS 限制可走 Worker 代理
 - API Key 默认仅保存在本地，不上传云端
 - 支持流式输出（打字机模式）
+- 支持按能力测试文本分析和语音转写；AI 分析必须使用已通过文本连通测试的配置
+- 语音能力统一挂在 AI 配置上，可选择转写端点或 Chat 音频输入
 
 ### 语音识别（STT）
 
-三种模式，按平台自动选择默认值：
+语音输入支持自动模式、跟随当前 AI、固定语音 AI、系统语音和 Android 本机 WhisperKit。默认使用自动模式：
 
 | 模式 | 说明 | 默认平台 |
 |------|------|---------|
-| `system` | 系统内置语音引擎（macOS NSSpeechRecognizer / Android GMS） | macOS |
-| `whisper_kit` | 本地 whisper.cpp 离线模型 | Android |
-| `whisper` | 用户自配 Whisper API（云端） | Web |
+| `auto` | 优先使用当前可转写 AI，其次固定语音 AI、默认 AI、本机兜底 | 全平台 |
+| `follow_current_ai` | 跟随当前练习选择的 AI 配置，要求语音能力测试通过 | 按用户选择 |
+| `fixed_ai_config` | 固定使用某个支持语音的 AI 配置 | 按用户选择 |
+| `system` | 系统内置语音引擎（macOS NSSpeechRecognizer / Android GMS） | 兜底 |
+| `whisper_kit` | 本地 whisper.cpp 离线模型 | Android 兜底 |
 
 **平台约束与降级：**
 - iOS 尚未启用，`whisper_kit` 声明了 `macos: ffiPlugin: true` 但缺少 macOS podspec → 见下方 macOS 构建说明
-- macOS 系统语音引擎可靠，但无 GMS 的 Android 设备系统语音不可用，会自动跳 Whisper API
-- 首次使用（无已保存设置）时 `SettingsProvider._applyPlatformDefaults` 按平台选择合理默认值
+- macOS 系统语音引擎可靠；无 GMS 的 Android 设备系统语音不可用时会回退到本机 WhisperKit 或可用语音 AI
+- 语音按钮点一下开始实时转写，再点一下停止；系统语音、WhisperKit 和 AI 分块转写都会把文本增量写回业务输入区域
 
 **条件导入模式：**
 `on_device_stt_service.dart` 使用 `export if (dart.library.io)` 在 native 平台导出真实实现（`on_device_stt_service_io.dart`），Web 导出空桩（`on_device_stt_service_stub.dart`）。这是 `whisper_kit` 的 `package:whisper_kit` import 放在 IO 实现文件而非入口文件的原因——Web 编译时不会尝试解析该包。

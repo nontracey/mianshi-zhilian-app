@@ -5,7 +5,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
-import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
@@ -3525,21 +3524,27 @@ class _AnswerPanel extends StatelessWidget {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(
-                      color: isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                      color: isVoiceListening
+                          ? Colors.green
+                          : const Color(0xFFB0BEC5),
                       width: isVoiceListening ? 2 : 1,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(
-                      color: isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                      color: isVoiceListening
+                          ? Colors.green
+                          : const Color(0xFFB0BEC5),
                       width: isVoiceListening ? 2 : 1,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(
-                      color: isVoiceListening ? Colors.green : Theme.of(context).colorScheme.primary,
+                      color: isVoiceListening
+                          ? Colors.green
+                          : Theme.of(context).colorScheme.primary,
                       width: isVoiceListening ? 2 : 2,
                     ),
                   ),
@@ -3557,19 +3562,6 @@ class _AnswerPanel extends StatelessWidget {
                       );
                     },
                     onListeningChanged: onVoiceListeningChanged,
-                    sttMode: context.read<SettingsProvider>().settings.sttMode,
-                    whisperBaseUrl: context
-                        .read<SettingsProvider>()
-                        .settings
-                        .whisperBaseUrl,
-                    whisperApiKey: context
-                        .read<SettingsProvider>()
-                        .settings
-                        .whisperApiKey,
-                    whisperModel: context
-                        .read<SettingsProvider>()
-                        .settings
-                        .whisperModel,
                   ),
                 ),
               ),

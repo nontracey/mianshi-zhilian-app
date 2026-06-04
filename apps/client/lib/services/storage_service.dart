@@ -207,13 +207,6 @@ class StorageService {
               'webDavPassword': '[redacted]',
             };
           }
-          if (key == 'settings' &&
-              exportData['data'][key] is Map<String, dynamic>) {
-            exportData['data'][key] = {
-              ...(exportData['data'][key] as Map<String, dynamic>),
-              'whisperApiKey': '[redacted]',
-            };
-          }
           if (key == 'auth_token') {
             exportData['data'][key] = '[redacted]';
           }
@@ -419,10 +412,14 @@ class StorageService {
     const allowed = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
     if (!allowed.contains(feature)) return;
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    final buffer = await loadJsonObject('_analyticsBuffer') ?? {'days': <String, dynamic>{}};
+    final buffer =
+        await loadJsonObject('_analyticsBuffer') ??
+        {'days': <String, dynamic>{}};
     final days = Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
     final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
-    final features = Map<String, dynamic>.from(day['feature_counts'] as Map? ?? {});
+    final features = Map<String, dynamic>.from(
+      day['feature_counts'] as Map? ?? {},
+    );
     features[feature] = ((features[feature] as num?)?.toInt() ?? 0) + 1;
     day['feature_counts'] = features;
     days[today] = day;
@@ -453,9 +450,6 @@ class StorageService {
     dynamic value,
     SyncSettings syncSettings,
   ) {
-    if (key == 'settings' && value is Map<String, dynamic>) {
-      return {...value, 'whisperApiKey': null};
-    }
     if (key == 'sync_settings') return null;
     if (key == 'ai_configs') {
       if (!syncSettings.syncAiConfigMetadata || value is! List) return null;
@@ -499,8 +493,7 @@ class StorageService {
 
   Future<dynamic> _mergeSettingsForImport(dynamic incoming) async {
     if (incoming is! Map<String, dynamic>) return incoming;
-    final current = await loadSettings();
-    return {...incoming, 'whisperApiKey': current.whisperApiKey};
+    return incoming;
   }
 
   Future<dynamic> _mergeAiConfigsForImport(dynamic incoming) async {

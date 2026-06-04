@@ -9,7 +9,6 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../providers/localization_provider.dart';
 import '../providers/settings_provider.dart';
-import '../services/whisper_stream_stt_service.dart';
 
 enum _DiagStatus { checking, pass, fail }
 
@@ -23,11 +22,8 @@ class VoiceDiagnosticSheet extends StatefulWidget {
 class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   _DiagStatus _micStatus = _DiagStatus.checking;
   _DiagStatus _speechStatus = _DiagStatus.checking;
-  _DiagStatus _whisperConfigStatus = _DiagStatus.checking;
-  _DiagStatus _whisperConnStatus = _DiagStatus.checking;
   _DiagStatus _whisperKitModelStatus = _DiagStatus.checking;
   String _speechDetail = '';
-  String _whisperConnDetail = '';
   String _whisperKitDetail = '';
   bool _running = false;
 
@@ -61,23 +57,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       _speechDetail = '';
     }
     if (mounted) setState(() {});
-
-    // ── Whisper API 配置检测（仅 whisper 模式）──
-    if (currentMode == 'whisper') {
-      final baseUrlOk =
-          settings.whisperBaseUrl != null && settings.whisperBaseUrl!.trim().isNotEmpty;
-      final apiKeyOk =
-          settings.whisperApiKey != null && settings.whisperApiKey!.trim().isNotEmpty;
-      if (baseUrlOk && apiKeyOk) {
-        _whisperConfigStatus = _DiagStatus.pass;
-        // 启动后台静默测试实际 API 连通性
-        _testWhisperConnection(settings);
-      } else {
-        _whisperConfigStatus = _DiagStatus.fail;
-      }
-    } else {
-      _whisperConfigStatus = _DiagStatus.checking;
-    }
 
     // ── WhisperKit 本机模型检测（仅 whisper_kit 模式）──
     if (currentMode == 'whisper_kit') {
@@ -114,34 +93,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
   }
 
-  /// 测试 Whisper API 连通性（与实际使用同一服务）
-  Future<void> _testWhisperConnection(dynamic settings) async {
-    final l10n = context.read<LocalizationProvider>();
-    try {
-      final svc = WhisperStreamSttService();
-      final result = await svc.testConnection(
-        baseUrl: settings.whisperBaseUrl!,
-        apiKey: settings.whisperApiKey!,
-        model: settings.whisperModel,
-      );
-      if (mounted) {
-        setState(() {
-          _whisperConnStatus = result.reachable ? _DiagStatus.pass : _DiagStatus.fail;
-          _whisperConnDetail = result.detail ?? (result.reachable
-              ? ''
-              : l10n.get('whisper_kit_endpoint_unreachable'));
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _whisperConnStatus = _DiagStatus.fail;
-          _whisperConnDetail = '$e';
-        });
-      }
-    }
-  }
-
   /// 检测本机 Whisper 模型下载状态（只读，不会触发模型下载）
   Future<void> _checkWhisperKitModel() async {
     final l10n = context.read<LocalizationProvider>();
@@ -154,8 +105,9 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       if (mounted) {
         setState(() {
           _whisperKitModelStatus = exists ? _DiagStatus.pass : _DiagStatus.fail;
-          _whisperKitDetail =
-              exists ? l10n.get('whisper_kit_model_downloaded') : '';
+          _whisperKitDetail = exists
+              ? l10n.get('whisper_kit_model_downloaded')
+              : '';
         });
       }
     } catch (e) {
@@ -194,7 +146,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final settings = context.watch<SettingsProvider>().settings;
-    final isWhisper = settings.sttMode == 'whisper';
     final isWhisperKit = settings.sttMode == 'whisper_kit';
     final isSystem = settings.sttMode == 'system';
 
@@ -225,19 +176,13 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
 
             // 当前模式
             _DiagRow(
-              icon: isWhisperKit
-                  ? Icons.memory
-                  : isWhisper
-                      ? Icons.cloud_outlined
-                      : Icons.phone_android,
+              icon: isWhisperKit ? Icons.memory : Icons.phone_android,
               color: Theme.of(context).colorScheme.secondary,
               label: l10n.get('mode_type_name'),
               trailing: Text(
                 isWhisperKit
                     ? l10n.get('whisper_kit_mode_label')
-                    : isWhisper
-                        ? 'Whisper API'
-                        : l10n.get('system_speech_voice'),
+                    : l10n.get('system_speech_voice'),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.secondary,
                   fontWeight: FontWeight.w500,
@@ -255,8 +200,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 _micStatus == _DiagStatus.checking
                     ? l10n.get('stt_testing')
                     : (_micStatus == _DiagStatus.pass
-                        ? l10n.get('stt_available')
-                        : l10n.get('stt_unavailable')),
+                          ? l10n.get('stt_available')
+                          : l10n.get('stt_unavailable')),
                 style: TextStyle(
                   color: _colorFor(_micStatus),
                   fontWeight: FontWeight.w500,
@@ -274,8 +219,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                   _speechStatus == _DiagStatus.checking
                       ? l10n.get('stt_testing')
                       : (_speechStatus == _DiagStatus.pass
-                          ? l10n.get('stt_available')
-                          : l10n.get('stt_unavailable')),
+                            ? l10n.get('stt_available')
+                            : l10n.get('stt_unavailable')),
                   style: TextStyle(
                     color: _colorFor(_speechStatus),
                     fontWeight: FontWeight.w500,
@@ -283,45 +228,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 ),
                 detail: _speechDetail.isNotEmpty ? _speechDetail : null,
               ),
-
-            // Whisper API 配置检测 + 连通性（仅 whisper 模式）
-            if (isWhisper) ...[
-              _DiagRow(
-                icon: _iconFor(_whisperConfigStatus),
-                color: _colorFor(_whisperConfigStatus),
-                label: l10n.get('whisper_config_label'),
-                trailing: Text(
-                  _whisperConfigStatus == _DiagStatus.pass
-                      ? l10n.get('stt_configured')
-                      : l10n.get('stt_not_configured'),
-                  style: TextStyle(
-                    color: _colorFor(_whisperConfigStatus),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              // 配置正确后才检测连通性
-              if (_whisperConfigStatus == _DiagStatus.pass)
-                _DiagRow(
-                  icon: _iconFor(_whisperConnStatus),
-                  color: _colorFor(_whisperConnStatus),
-                  label: l10n.get('whisper_api_connectivity'),
-                  trailing: Text(
-                    _whisperConnStatus == _DiagStatus.checking
-                        ? l10n.get('stt_testing')
-                        : (_whisperConnStatus == _DiagStatus.pass
-                            ? l10n.get('stt_reachable')
-                            : l10n.get('stt_unreachable')),
-                    style: TextStyle(
-                      color: _colorFor(_whisperConnStatus),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  detail: _whisperConnDetail.isNotEmpty
-                      ? _whisperConnDetail
-                      : null,
-                ),
-            ],
 
             // WhisperKit 模型状态（仅 whisper_kit 模式）
             if (isWhisperKit)
@@ -333,8 +239,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                   _whisperKitModelStatus == _DiagStatus.checking
                       ? l10n.get('stt_testing')
                       : (_whisperKitModelStatus == _DiagStatus.pass
-                          ? l10n.get('whisper_kit_model_downloaded')
-                          : l10n.get('whisper_kit_model_not_downloaded')),
+                            ? l10n.get('whisper_kit_model_downloaded')
+                            : l10n.get('whisper_kit_model_not_downloaded')),
                   style: TextStyle(
                     color: _colorFor(_whisperKitModelStatus),
                     fontWeight: FontWeight.w500,
@@ -371,18 +277,6 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 ),
               ),
 
-            if (_whisperConfigStatus == _DiagStatus.fail && isWhisper)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  l10n.get('stt_not_configured'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-
             // 重新检测
             SizedBox(
               width: double.infinity,
@@ -393,11 +287,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                         setState(() {
                           _micStatus = _DiagStatus.checking;
                           _speechStatus = _DiagStatus.checking;
-                          _whisperConfigStatus = _DiagStatus.checking;
-                          _whisperConnStatus = _DiagStatus.checking;
                           _whisperKitModelStatus = _DiagStatus.checking;
                           _speechDetail = '';
-                          _whisperConnDetail = '';
                           _whisperKitDetail = '';
                         });
                         _runAll();
@@ -410,7 +301,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                       )
                     : const Icon(Icons.refresh),
                 label: Text(
-                    _running ? l10n.get('stt_testing') : l10n.get('refresh')),
+                  _running ? l10n.get('stt_testing') : l10n.get('refresh'),
+                ),
               ),
             ),
           ],
@@ -447,10 +339,7 @@ class _DiagRow extends StatelessWidget {
               Icon(icon, size: 20, color: color),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontSize: 14),
-                ),
+                child: Text(label, style: const TextStyle(fontSize: 14)),
               ),
               trailing,
             ],

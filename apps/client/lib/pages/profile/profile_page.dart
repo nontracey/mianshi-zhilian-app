@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
+import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/models/user.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
@@ -22,7 +23,6 @@ import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
-import 'package:mianshi_zhilian/services/whisper_stream_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -283,11 +283,26 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
         border: const OutlineInputBorder(),
       ),
       items: [
-        DropdownMenuItem(value: RouteMode.auto, child: Text(l10n.get('route_auto'))),
-        DropdownMenuItem(value: RouteMode.backupFirst, child: Text(l10n.get('route_backup_first'))),
-        DropdownMenuItem(value: RouteMode.primaryFirst, child: Text(l10n.get('route_primary_first'))),
-        DropdownMenuItem(value: RouteMode.backupOnly, child: Text(l10n.get('route_backup_only'))),
-        DropdownMenuItem(value: RouteMode.primaryOnly, child: Text(l10n.get('route_primary_only'))),
+        DropdownMenuItem(
+          value: RouteMode.auto,
+          child: Text(l10n.get('route_auto')),
+        ),
+        DropdownMenuItem(
+          value: RouteMode.backupFirst,
+          child: Text(l10n.get('route_backup_first')),
+        ),
+        DropdownMenuItem(
+          value: RouteMode.primaryFirst,
+          child: Text(l10n.get('route_primary_first')),
+        ),
+        DropdownMenuItem(
+          value: RouteMode.backupOnly,
+          child: Text(l10n.get('route_backup_only')),
+        ),
+        DropdownMenuItem(
+          value: RouteMode.primaryOnly,
+          child: Text(l10n.get('route_primary_only')),
+        ),
       ],
       onChanged: (mode) {
         if (mode != null) onChanged(mode);
@@ -1664,7 +1679,7 @@ class _AiConfigPanel extends StatelessWidget {
 
 // ── 语音识别配置面板 ──────────────────────────────────────────────
 
-class _SttConfigPanel extends StatefulWidget {
+class _SttConfigPanel extends StatelessWidget {
   const _SttConfigPanel({
     required this.settings,
     required this.onSettingsChanged,
@@ -1674,203 +1689,125 @@ class _SttConfigPanel extends StatefulWidget {
   final ValueChanged<AppSettings> onSettingsChanged;
 
   @override
-  State<_SttConfigPanel> createState() => _SttConfigPanelState();
-}
-
-class _SttConfigPanelState extends State<_SttConfigPanel> {
-  late TextEditingController _baseUrlCtrl;
-  late TextEditingController _apiKeyCtrl;
-  late TextEditingController _modelCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _initControllers();
-  }
-
-  void _initControllers() {
-    _baseUrlCtrl =
-        TextEditingController(text: widget.settings.whisperBaseUrl ?? '');
-    _apiKeyCtrl =
-        TextEditingController(text: widget.settings.whisperApiKey ?? '');
-    _modelCtrl = TextEditingController(text: widget.settings.whisperModel);
-  }
-
-  @override
-  void didUpdateWidget(_SttConfigPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 外部 settings 变化时同步 controller，避免覆盖用户正在编辑的内容
-    if (oldWidget.settings.whisperBaseUrl != widget.settings.whisperBaseUrl &&
-        _baseUrlCtrl.text != (widget.settings.whisperBaseUrl ?? '')) {
-      _baseUrlCtrl.text = widget.settings.whisperBaseUrl ?? '';
-    }
-    if (oldWidget.settings.whisperApiKey != widget.settings.whisperApiKey &&
-        _apiKeyCtrl.text != (widget.settings.whisperApiKey ?? '')) {
-      _apiKeyCtrl.text = widget.settings.whisperApiKey ?? '';
-    }
-    if (oldWidget.settings.whisperModel != widget.settings.whisperModel &&
-        _modelCtrl.text != widget.settings.whisperModel) {
-      _modelCtrl.text = widget.settings.whisperModel;
-    }
-  }
-
-  @override
-  void dispose() {
-    _baseUrlCtrl.dispose();
-    _apiKeyCtrl.dispose();
-    _modelCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final mode = widget.settings.sttMode;
+    final aiProvider = context.watch<AiProvider>();
+    final mode = settings.sttMode;
+    final audioConfigs = aiProvider.enabledConfigs
+        .where((config) => config.audioMode != AiAudioMode.none)
+        .toList(growable: false);
     final isSystem = mode == 'system';
-    final isWhisper = mode == 'whisper';
     final isWhisperKit = mode == 'whisper_kit';
-
-    // 按平台决定本地语音模式的卡片内容和可用性
-    // Android → 本机 Whisper（whisper_kit），系统语音无 GMS 不可用
-    // macOS   → 系统语音（NSSpeechRecognizer），whisper_kit 无 podspec 不可用
-    // Web     → 系统语音（浏览器 Web Speech API）
-    // Windows/Linux → 系统语音（有内置引擎则可用）
-    final bool showLocalCard;
-    final Widget localCard;
-    if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb) {
-      showLocalCard = true;
-      localCard = _SttModeCard(
-        label: l10n.get('whisper_kit_mode_label'),
-        icon: Icons.memory,
-        description: l10n.get('whisper_kit_mode_desc'),
-        selected: isWhisperKit,
-        onTap: () => widget.onSettingsChanged(
-            widget.settings.copyWith(sttMode: 'whisper_kit')),
-      );
-    } else {
-      // macOS / Web / Windows / Linux → 系统语音
-      showLocalCard = true;
-      localCard = _SttModeCard(
-        label: l10n.get('system_speech_voice'),
-        icon: Icons.phone_android,
-        description: l10n.get('system_speech_voice_desc'),
-        selected: isSystem,
-        onTap: () => widget.onSettingsChanged(
-            widget.settings.copyWith(sttMode: 'system')),
-      );
-    }
 
     return WorkPanel(
       title: l10n.get('speech_voice_identify_distinct'),
       icon: Icons.mic_outlined,
       children: [
-        // STT 模式切换
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (showLocalCard) localCard,
               _SttModeCard(
-                label: 'Whisper API',
-                icon: Icons.cloud_outlined,
-                description: l10n.get('whisper_api_description'),
-                selected: isWhisper,
-                onTap: () => widget.onSettingsChanged(
-                    widget.settings.copyWith(sttMode: 'whisper')),
+                label: l10n.get('stt_mode_auto'),
+                icon: Icons.auto_awesome,
+                description: l10n.get('stt_mode_auto_desc'),
+                selected: mode == 'auto',
+                onTap: () =>
+                    onSettingsChanged(settings.copyWith(sttMode: 'auto')),
               ),
+              _SttModeCard(
+                label: l10n.get('stt_mode_follow_current_ai'),
+                icon: Icons.smart_toy_outlined,
+                description: l10n.get('stt_mode_follow_current_ai_desc'),
+                selected: mode == 'follow_current_ai',
+                onTap: () => onSettingsChanged(
+                  settings.copyWith(sttMode: 'follow_current_ai'),
+                ),
+              ),
+              _SttModeCard(
+                label: l10n.get('stt_mode_fixed_ai'),
+                icon: Icons.record_voice_over_outlined,
+                description: l10n.get('stt_mode_fixed_ai_desc'),
+                selected: mode == 'fixed_ai_config',
+                onTap: () => onSettingsChanged(
+                  settings.copyWith(sttMode: 'fixed_ai_config'),
+                ),
+              ),
+              _SttModeCard(
+                label: l10n.get('system_speech_voice'),
+                icon: Icons.phone_android,
+                description: l10n.get('system_speech_voice_desc'),
+                selected: isSystem,
+                onTap: () =>
+                    onSettingsChanged(settings.copyWith(sttMode: 'system')),
+              ),
+              if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb)
+                _SttModeCard(
+                  label: l10n.get('whisper_kit_mode_label'),
+                  icon: Icons.memory,
+                  description: l10n.get('whisper_kit_mode_desc'),
+                  selected: isWhisperKit,
+                  onTap: () => onSettingsChanged(
+                    settings.copyWith(sttMode: 'whisper_kit'),
+                  ),
+                ),
             ],
           ),
         ),
-        // 本机 Whisper 模型管理
+        if (mode == 'fixed_ai_config') ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: DropdownButtonFormField<String>(
+              initialValue:
+                  audioConfigs.any((c) => c.id == settings.sttAiConfigId)
+                  ? settings.sttAiConfigId
+                  : null,
+              decoration: InputDecoration(
+                labelText: l10n.get('fixed_voice_ai_config'),
+                isDense: true,
+              ),
+              items: audioConfigs
+                  .map(
+                    (config) => DropdownMenuItem(
+                      value: config.id,
+                      child: Text(config.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (id) =>
+                  onSettingsChanged(settings.copyWith(sttAiConfigId: id)),
+            ),
+          ),
+          if (audioConfigs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                l10n.get('no_voice_ai_config'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+        ],
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            l10n.get('stt_settings_desc'),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
         if (isWhisperKit) ...[
           const SizedBox(height: 12),
           _WhisperKitModelManager(),
         ],
-        // 系统语音提示（仅 macOS / 桌面端显示）
-        if (isSystem) ...[
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              l10n.get('system_speech_voice_desc'),
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-        // Whisper API 配置（仅 whisper 模式显示）
-        if (isWhisper) ...[
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _baseUrlCtrl,
-                  decoration: InputDecoration(
-                    labelText: l10n.get('api_address'),
-                    hintText: 'https://api.openai.com/v1',
-                    isDense: true,
-                  ),
-                  onChanged: (v) => widget.onSettingsChanged(
-                      widget.settings.copyWith(whisperBaseUrl: v)),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _apiKeyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'API Key',
-                    hintText: 'sk-...',
-                    isDense: true,
-                  ),
-                  obscureText: true,
-                  onChanged: (v) => widget.onSettingsChanged(
-                      widget.settings.copyWith(whisperApiKey: v)),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _modelCtrl,
-                  decoration: InputDecoration(
-                    labelText: l10n.get('mode_type_name'),
-                    hintText: l10n.get('please_enter_model_name'),
-                    isDense: true,
-                  ),
-                  onChanged: (v) => widget.onSettingsChanged(
-                      widget.settings.copyWith(whisperModel: v)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // API 连通性测试按钮
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _WhisperApiTestButton(
-              baseUrl: widget.settings.whisperBaseUrl ?? '',
-              apiKey: widget.settings.whisperApiKey ?? '',
-              model: widget.settings.whisperModel,
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Text(
-            isWhisper
-                ? l10n.get('whisper_api_description')
-                : l10n.get(
-                    'use_design_alternate_internal_set_speech_voice_identify_distinct_offline_53',
-                  ),
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).textTheme.bodySmall?.color,
-            ),
-          ),
-        ),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -1937,8 +1874,7 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
         onProgress: (received, total) {
           if (mounted) {
             setState(() {
-              _statusText =
-                  '${(received / total * 100).toStringAsFixed(0)}%';
+              _statusText = '${(received / total * 100).toStringAsFixed(0)}%';
             });
           }
         },
@@ -1964,31 +1900,22 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
     }
   }
 
-  Future<void> _showWhisperKitUnavailableDialog(LocalizationProvider l10n) async {
-    final choice = await showDialog<String>(
+  Future<void> _showWhisperKitUnavailableDialog(
+    LocalizationProvider l10n,
+  ) async {
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.get('voice_not_available')),
         content: Text(l10n.get('whisper_kit_unsupported_platform')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: Text(l10n.get('cancel')),
-          ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'switch'),
-            child: Text(l10n.get('switch_to_whisper_api')),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.get('confirm')),
           ),
         ],
       ),
     );
-    if (choice == 'switch' && mounted) {
-      context
-          .read<SettingsProvider>()
-          .updateSettings(
-            context.read<SettingsProvider>().settings.copyWith(sttMode: 'whisper'),
-          );
-    }
   }
 
   Future<void> _delete() async {
@@ -2059,8 +1986,8 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
                     isAvailable
                         ? l10n.get('whisper_kit_model_downloaded')
                         : _downloading
-                            ? _statusText
-                            : l10n.get('whisper_kit_model_not_downloaded'),
+                        ? _statusText
+                        : l10n.get('whisper_kit_model_not_downloaded'),
                     style: const TextStyle(fontSize: 14),
                   ),
                   Text(
@@ -2095,133 +2022,6 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Whisper API 连通性测试按钮 ──────────────────────────────────────
-
-class _WhisperApiTestButton extends StatefulWidget {
-  const _WhisperApiTestButton({
-    required this.baseUrl,
-    required this.apiKey,
-    required this.model,
-  });
-
-  final String baseUrl;
-  final String apiKey;
-  final String model;
-
-  @override
-  State<_WhisperApiTestButton> createState() => _WhisperApiTestButtonState();
-}
-
-class _WhisperApiTestButtonState extends State<_WhisperApiTestButton> {
-  bool _testing = false;
-  bool? _result; // null=未测试, true=连通, false=不可达
-  String _detail = ''; // 测试结果详情
-
-  Future<void> _test() async {
-    if (widget.baseUrl.isEmpty || widget.apiKey.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('whisper_api_fill_required'))),
-      );
-      return;
-    }
-
-    setState(() {
-      _testing = true;
-      _result = null;
-      _detail = '';
-    });
-
-    try {
-      final svc = WhisperStreamSttService();
-      final result = await svc.testConnection(
-        baseUrl: widget.baseUrl,
-        apiKey: widget.apiKey,
-        model: widget.model,
-      );
-      if (mounted) {
-        setState(() {
-          _result = result.reachable;
-          _detail = result.detail ?? '';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _result = false;
-          _detail = e.toString();
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _testing = false);
-    }
-  }
-
-  LocalizationProvider get l10n => context.read<LocalizationProvider>();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n_ = l10n;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        OutlinedButton.icon(
-          onPressed: _testing ? null : _test,
-          icon: _testing
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  _result == null
-                      ? Icons.wifi_find
-                      : _result!
-                          ? Icons.check_circle
-                          : Icons.error,
-                  size: 18,
-                  color: _result == null
-                      ? null
-                      : _result!
-                          ? Colors.green
-                          : Colors.red,
-                ),
-          label: Text(
-            _testing
-                ? l10n_.get('stt_testing')
-                : _result == null
-                    ? l10n_.get('whisper_api_test_connection')
-                    : _result!
-                        ? l10n_.get('whisper_api_standard_ok')
-                        : l10n_.get('whisper_kit_endpoint_unreachable'),
-          ),
-        ),
-        if (_detail.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: (_result == true)
-                  ? Colors.green.withValues(alpha: 0.08)
-                  : Colors.red.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              _detail,
-              style: TextStyle(
-                fontSize: 11,
-                fontFamily: 'monospace',
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }
@@ -3100,9 +2900,7 @@ class _AboutPanelState extends State<_AboutPanel> {
           }),
         ),
         content: notes.isNotEmpty
-            ? SingleChildScrollView(
-                child: Text(notes),
-              )
+            ? SingleChildScrollView(child: Text(notes))
             : Text(l10n.get('no_release_notes')),
         actions: [
           TextButton(

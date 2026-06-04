@@ -1,7 +1,7 @@
 name: mianshi_zhilian
 description: "面试智练 - AI 主动回忆学习工作台"
 publish_to: 'none'
-version: 0.1.4+111
+version: 0.1.4+112
 
 environment:
   sdk: ^3.11.5

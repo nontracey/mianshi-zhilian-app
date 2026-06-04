@@ -1,11 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
+
 import '../models/ai_config.dart';
 
+class AiTestResult {
+  final bool success;
+  final String messageKey;
+  final String detail;
+  final int? statusCode;
+
+  const AiTestResult({
+    required this.success,
+    required this.messageKey,
+    this.detail = '',
+    this.statusCode,
+  });
+}
+
 class AiService {
-  /// 调用 OpenAI 兼容 API 评估用户回答（非流式）
   Future<Map<String, dynamic>> evaluateAnswer({
     required AiConfig config,
     required String topicTitle,
@@ -16,7 +31,6 @@ class AiService {
     Uint8List? imageBytes,
   }) async {
     final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
-
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
     final response = await http.post(
@@ -46,10 +60,9 @@ class AiService {
       return _parseEvaluationResult(content);
     }
 
-    throw Exception('evaluation_failed:${response.statusCode}');
+    throw AiServiceException.fromResponse(response.statusCode, response.body);
   }
 
-  /// 流式调用 OpenAI 兼容 API 评估用户回答
   Stream<String> evaluateAnswerStream({
     required AiConfig config,
     required String topicTitle,
@@ -60,7 +73,6 @@ class AiService {
     Uint8List? imageBytes,
   }) async* {
     final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
-
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
 
@@ -84,50 +96,284 @@ class AiService {
       });
 
       final response = await client.send(request);
-      
       if (response.statusCode != 200) {
-        throw Exception('evaluation_failed:${response.statusCode}');
+        final body = await response.stream.bytesToString();
+        throw AiServiceException.fromResponse(response.statusCode, body);
       }
 
-      // 处理 SSE 流
-      String buffer = '';
-      await for (final chunk in response.stream.transform(utf8.decoder)) {
-        buffer += chunk;
-        
-        // 处理完整的行
-        while (buffer.contains('\n')) {
-          final index = buffer.indexOf('\n');
-          final line = buffer.substring(0, index).trim();
-          buffer = buffer.substring(index + 1);
-          
-          if (line.startsWith('data: ')) {
-            final data = line.substring(6);
-            if (data == '[DONE]') {
-              return;
-            }
-            
-            try {
-              final jsonData = json.decode(data) as Map<String, dynamic>;
-              final choices = jsonData['choices'] as List?;
-              if (choices != null && choices.isNotEmpty) {
-                final delta = choices[0]['delta'] as Map<String, dynamic>?;
-                final content = delta?['content'] as String?;
-                if (content != null) {
-                  yield content;
-                }
-              }
-            } catch (_) {
-              // 忽略解析错误
-            }
-          }
-        }
-      }
+      yield* _decodeSseContent(response.stream);
     } finally {
       client.close();
     }
   }
 
-  /// 构建用户消息内容，支持图片多模态
+  Future<AiTestResult> testTextConnection(AiConfig config) async {
+    try {
+      final url =
+          '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ${config.apiKey}',
+            },
+            body: json.encode({
+              'model': config.model,
+              'messages': [
+                {'role': 'user', 'content': 'Hi'},
+              ],
+              'max_tokens': 5,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode == 200) {
+        return const AiTestResult(
+          success: true,
+          messageKey: 'connection_success',
+        );
+      }
+      final exception = AiServiceException.fromResponse(
+        response.statusCode,
+        response.body,
+      );
+      return AiTestResult(
+        success: false,
+        messageKey: exception.messageKey,
+        detail: exception.safeDetail,
+        statusCode: exception.statusCode,
+      );
+    } on TimeoutException {
+      return const AiTestResult(success: false, messageKey: 'ai_test_timeout');
+    } catch (e) {
+      return AiTestResult(
+        success: false,
+        messageKey: 'ai_test_network_error',
+        detail: _safeErrorDetail(e),
+      );
+    }
+  }
+
+  Future<bool> testConnection(AiConfig config) async =>
+      (await testTextConnection(config)).success;
+
+  Future<AiTestResult> testAudioConnection(AiConfig config) async {
+    if (config.audioMode == AiAudioMode.none) {
+      return const AiTestResult(
+        success: false,
+        messageKey: 'audio_mode_not_enabled',
+      );
+    }
+    try {
+      final text = await transcribeAudio(
+        config: config,
+        audioBytes: _createSilentWav(),
+      );
+      return AiTestResult(
+        success: true,
+        messageKey: 'connection_success',
+        detail: text,
+      );
+    } on AiServiceException catch (e) {
+      return AiTestResult(
+        success: false,
+        messageKey: e.messageKey,
+        detail: e.safeDetail,
+        statusCode: e.statusCode,
+      );
+    } on TimeoutException {
+      return const AiTestResult(success: false, messageKey: 'ai_test_timeout');
+    } catch (e) {
+      return AiTestResult(
+        success: false,
+        messageKey: 'ai_test_network_error',
+        detail: _safeErrorDetail(e),
+      );
+    }
+  }
+
+  Future<String> transcribeAudio({
+    required AiConfig config,
+    required Uint8List audioBytes,
+    String language = 'zh',
+    String fileName = 'audio.wav',
+  }) async {
+    switch (config.audioMode) {
+      case AiAudioMode.transcriptionEndpoint:
+        return _transcribeViaEndpoint(
+          config: config,
+          audioBytes: audioBytes,
+          language: language,
+          fileName: fileName,
+        );
+      case AiAudioMode.chatAudioInput:
+        return _transcribeViaChatAudio(
+          config: config,
+          audioBytes: audioBytes,
+          language: language,
+        );
+      case AiAudioMode.none:
+        throw const AiServiceException(messageKey: 'audio_mode_not_enabled');
+    }
+  }
+
+  Stream<String> sendMessageStream({
+    required AiConfig config,
+    required String userMessage,
+    String? systemPrompt,
+  }) async* {
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    final messages = <Map<String, String>>[];
+    if (systemPrompt != null) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    messages.add({'role': 'user', 'content': userMessage});
+
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse(url));
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer ${config.apiKey}';
+      request.body = json.encode({
+        'model': config.model,
+        'messages': messages,
+        'temperature': 0.5,
+        'max_tokens': 2000,
+        'stream': true,
+      });
+
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        throw AiServiceException.fromResponse(response.statusCode, body);
+      }
+
+      yield* _decodeSseContent(response.stream);
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<String> _transcribeViaEndpoint({
+    required AiConfig config,
+    required Uint8List audioBytes,
+    required String language,
+    required String fileName,
+  }) async {
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/audio/transcriptions';
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers['Authorization'] = 'Bearer ${config.apiKey}';
+    request.fields['model'] = config.model;
+    request.fields['language'] = language;
+    request.fields['response_format'] = 'text';
+    request.files.add(
+      http.MultipartFile.fromBytes('file', audioBytes, filename: fileName),
+    );
+
+    final client = http.Client();
+    try {
+      final streamed = await client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200) {
+        throw AiServiceException.fromResponse(
+          response.statusCode,
+          response.body,
+        );
+      }
+      return response.body.trim();
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<String> _transcribeViaChatAudio({
+    required AiConfig config,
+    required Uint8List audioBytes,
+    required String language,
+  }) async {
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.apiKey}',
+          },
+          body: json.encode({
+            'model': config.model,
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'type': 'text',
+                    'text': '请把这段音频转写成$language文本。只返回转写文本，不要解释。',
+                  },
+                  {
+                    'type': 'input_audio',
+                    'input_audio': {
+                      'data': base64Encode(audioBytes),
+                      'format': 'wav',
+                    },
+                  },
+                ],
+              },
+            ],
+            'temperature': 0,
+            'max_tokens': 200,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw AiServiceException.fromResponse(response.statusCode, response.body);
+    }
+    final body = json.decode(response.body) as Map<String, dynamic>;
+    final message = body['choices']?[0]?['message'] as Map<String, dynamic>?;
+    final content = message?['content'];
+    if (content is String) return content.trim();
+    if (content is List) {
+      return content
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              return item['text']?.toString() ?? '';
+            }
+            return item.toString();
+          })
+          .where((text) => text.trim().isNotEmpty)
+          .join('\n')
+          .trim();
+    }
+    return '';
+  }
+
+  Stream<String> _decodeSseContent(Stream<List<int>> stream) async* {
+    String buffer = '';
+    await for (final chunk in stream.transform(utf8.decoder)) {
+      buffer += chunk;
+      while (buffer.contains('\n')) {
+        final index = buffer.indexOf('\n');
+        final line = buffer.substring(0, index).trim();
+        buffer = buffer.substring(index + 1);
+        if (!line.startsWith('data: ')) continue;
+        final data = line.substring(6);
+        if (data == '[DONE]') return;
+        try {
+          final jsonData = json.decode(data) as Map<String, dynamic>;
+          final choices = jsonData['choices'] as List?;
+          if (choices == null || choices.isEmpty) continue;
+          final delta = choices[0]['delta'] as Map<String, dynamic>?;
+          final content = delta?['content'] as String?;
+          if (content != null) yield content;
+        } catch (_) {}
+      }
+    }
+  }
+
   dynamic _buildUserContent(
     String topicTitle,
     String userAnswer,
@@ -146,7 +392,11 @@ class AiService {
     ];
   }
 
-  String _buildSystemPrompt(List<String> mustHave, List<String> commonMistakes, String language) {
+  String _buildSystemPrompt(
+    List<String> mustHave,
+    List<String> commonMistakes,
+    String language,
+  ) {
     return '''你是一个技术面试评估专家。请评估用户对知识点的回答。
 
 评估维度：
@@ -173,14 +423,11 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
   }
 
   Map<String, dynamic> _parseEvaluationResult(String content) {
-    // 尝试从回复中提取 JSON
     final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
     if (jsonMatch != null) {
       try {
         return json.decode(jsonMatch.group(0)!) as Map<String, dynamic>;
-      } catch (_) {
-        // JSON 解析失败，返回原始内容
-      }
+      } catch (_) {}
     }
     return {
       'score': 0,
@@ -193,89 +440,113 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
     };
   }
 
-  /// 测试 AI 配置连接
-  Future<bool> testConnection(AiConfig config) async {
-    try {
-      final url =
-          '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.apiKey}',
-        },
-        body: json.encode({
-          'model': config.model,
-          'messages': [
-            {'role': 'user', 'content': 'Hi'},
-          ],
-          'max_tokens': 5,
-        }),
+  Uint8List _createSilentWav() {
+    final data = ByteData(48);
+    data.setUint8(0, 0x52);
+    data.setUint8(1, 0x49);
+    data.setUint8(2, 0x46);
+    data.setUint8(3, 0x46);
+    data.setUint32(4, 40, Endian.little);
+    data.setUint8(8, 0x57);
+    data.setUint8(9, 0x41);
+    data.setUint8(10, 0x56);
+    data.setUint8(11, 0x45);
+    data.setUint8(12, 0x66);
+    data.setUint8(13, 0x6D);
+    data.setUint8(14, 0x74);
+    data.setUint8(15, 0x20);
+    data.setUint32(16, 16, Endian.little);
+    data.setUint16(20, 1, Endian.little);
+    data.setUint16(22, 1, Endian.little);
+    data.setUint32(24, 16000, Endian.little);
+    data.setUint32(28, 32000, Endian.little);
+    data.setUint16(32, 2, Endian.little);
+    data.setUint16(34, 16, Endian.little);
+    data.setUint8(36, 0x64);
+    data.setUint8(37, 0x61);
+    data.setUint8(38, 0x74);
+    data.setUint8(39, 0x61);
+    data.setUint32(40, 4, Endian.little);
+    data.setInt16(44, 0, Endian.little);
+    data.setInt16(46, 0, Endian.little);
+    return data.buffer.asUint8List();
+  }
+
+  static String _safeErrorDetail(Object error) {
+    final text = error.toString();
+    return text.length > 160 ? '${text.substring(0, 160)}...' : text;
+  }
+}
+
+class AiServiceException implements Exception {
+  final String messageKey;
+  final int? statusCode;
+  final String safeDetail;
+
+  const AiServiceException({
+    required this.messageKey,
+    this.statusCode,
+    this.safeDetail = '',
+  });
+
+  factory AiServiceException.fromResponse(int statusCode, String body) {
+    final detail = _extractSafeDetail(body);
+    if (statusCode == 401 || statusCode == 403) {
+      return AiServiceException(
+        messageKey: 'ai_test_auth_error',
+        statusCode: statusCode,
+        safeDetail: detail,
       );
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
     }
+    if (statusCode == 404) {
+      return AiServiceException(
+        messageKey: 'ai_test_not_found',
+        statusCode: statusCode,
+        safeDetail: detail,
+      );
+    }
+    if (statusCode == 429) {
+      return AiServiceException(
+        messageKey: 'ai_test_rate_limited',
+        statusCode: statusCode,
+        safeDetail: detail,
+      );
+    }
+    if (detail.toLowerCase().contains('model')) {
+      return AiServiceException(
+        messageKey: 'ai_test_model_error',
+        statusCode: statusCode,
+        safeDetail: detail,
+      );
+    }
+    return AiServiceException(
+      messageKey: 'ai_test_http_error',
+      statusCode: statusCode,
+      safeDetail: detail,
+    );
   }
 
-  /// 通用流式聊天补全
-  Stream<String> sendMessageStream({
-    required AiConfig config,
-    required String userMessage,
-    String? systemPrompt,
-  }) async* {
-    final url =
-        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-
-    final messages = <Map<String, String>>[];
-    if (systemPrompt != null) {
-      messages.add({'role': 'system', 'content': systemPrompt});
-    }
-    messages.add({'role': 'user', 'content': userMessage});
-
-    final client = http.Client();
+  static String _extractSafeDetail(String body) {
+    if (body.isEmpty) return '';
     try {
-      final request = http.Request('POST', Uri.parse(url));
-      request.headers['Content-Type'] = 'application/json';
-      request.headers['Authorization'] = 'Bearer ${config.apiKey}';
-      request.body = json.encode({
-        'model': config.model,
-        'messages': messages,
-        'temperature': 0.5,
-        'max_tokens': 2000,
-        'stream': true,
-      });
-
-      final response = await client.send(request);
-      if (response.statusCode != 200) {
-        throw Exception('ai_request_failed:${response.statusCode}');
-      }
-
-      String buffer = '';
-      await for (final chunk in response.stream.transform(utf8.decoder)) {
-        buffer += chunk;
-        while (buffer.contains('\n')) {
-          final index = buffer.indexOf('\n');
-          final line = buffer.substring(0, index).trim();
-          buffer = buffer.substring(index + 1);
-
-          if (line.startsWith('data: ')) {
-            final data = line.substring(6);
-            if (data == '[DONE]') return;
-            try {
-              final jsonData = json.decode(data) as Map<String, dynamic>;
-              final choices = jsonData['choices'] as List?;
-              if (choices != null && choices.isNotEmpty) {
-                final delta = choices[0]['delta'] as Map<String, dynamic>?;
-                final content = delta?['content'] as String?;
-                if (content != null) yield content;
-              }
-            } catch (_) {}
-          }
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        final error = decoded['error'];
+        if (error is Map<String, dynamic>) {
+          return _redact(error['message']?.toString() ?? '');
         }
+        return _redact(decoded['message']?.toString() ?? '');
       }
-    } finally {
-      client.close();
-    }
+    } catch (_) {}
+    final trimmed = body.length > 240 ? '${body.substring(0, 240)}...' : body;
+    return _redact(trimmed);
   }
+
+  static String _redact(String text) {
+    return text.replaceAll(RegExp(r'sk-[A-Za-z0-9_\-]{8,}'), 'sk-***');
+  }
+
+  @override
+  String toString() =>
+      statusCode == null ? messageKey : '$messageKey:$statusCode';
 }

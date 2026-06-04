@@ -1114,7 +1114,7 @@ flowchart LR
 | --- | --- |
 | 登录 token、refresh token、平台账号登录态 | 凭证数据，不能进入任何同步目标 |
 | WebDAV/GitHub/Gitee token、密码、应用密码 | 同步目标凭证，只保存在本机 |
-| AI API Key、Whisper API Key | 默认只保存在本机 |
+| AI API Key | 默认只保存在本机 |
 | 内容缓存、manifest 缓存、domain 缓存、版本缓存 | 可重新下载，不需要同步 |
 | `_lastSyncTime`、dirty 标记、失败记录 | 本机运行态，不跨设备同步 |
 | 工单、本机错误日志 | 不属于学习数据同步 |
@@ -1414,23 +1414,25 @@ interview-study-app/
 
 ## 17. 语音识别实现
 
-### 17.1 三种模式
+### 17.1 语音模式
 
 | 模式 | 引擎 | 平台支持 | 免费 | 离线 |
 |------|------|---------|------|------|
+| `auto` | 自动选择可用语音 AI、本机 WhisperKit 或系统语音 | 全平台 | 视所选链路 | 视所选链路 |
+| `follow_current_ai` | 跟随当前练习选择的 AI 配置，要求语音能力测试通过 | 全平台 | ❌ | ❌ |
+| `fixed_ai_config` | 固定使用某个支持语音的 AI 配置，要求语音能力测试通过 | 全平台 | ❌ | ❌ |
 | `system` | 平台内置语音引擎（macOS NSSpeechRecognizer / Android GMS RecognizerIntent） | macOS ✅、Android（需 GMS）⚠️、Windows ❌、Web ❌ | ✅ | ✅ |
 | `whisper_kit` | whisper.cpp 本地模型（`package:whisper_kit`） | Android ✅、iOS ✅、macOS ❌（见下文） | ✅ | ✅ |
-| `whisper` | 用户自配 Whisper API（云端） | 全平台 | ❌ | ❌ |
+
+AI 语音能力不再使用独立语音 API 配置，统一挂在 AI 配置中。每个 AI 配置可选择 `none`、`transcription_endpoint` 或 `chat_audio_input`，并分别保存文本/语音能力连通测试状态。
 
 ### 17.2 平台感知默认值
 
-首次使用时（无已保存设置），`SettingsProvider._applyPlatformDefaults` 按平台选择合理默认模式，避免用户在不支持的模式上遇到失败：
+默认 `sttMode` 为 `auto`。自动模式的选择顺序是：当前练习 AI（可转写且测试通过）→ 固定语音 AI → 默认 AI → 平台本机兜底。
 
-- **macOS** → `system`（NSSpeechRecognizer 稳定可靠）
-- **Android** → `whisper_kit`（无 GMS 设备会降级，见 17.4）
-- **Web** → `whisper`（Web 端没有本地引擎）
-
-判断依据：检查 `s.sttMode` 是否等于 `AppSettings` 中的硬编码默认值 `'whisper_kit'`，是则覆盖为平台默认，否则保留用户已选择的模式。
+- **macOS** → 优先系统语音兜底
+- **Android** → 优先本机 WhisperKit 兜底
+- **Web** → 需要可转写 AI 配置；没有本地语音兜底
 
 ### 17.3 条件导入架构
 
@@ -1446,17 +1448,18 @@ on_device_stt_service.dart
 
 ### 17.4 降级与错误处理
 
-两种本地模式（`system` 和 `whisper_kit`）初始化失败时：
+语音输入失败时不阻塞练习流程，用户可以继续文字输入。具体策略：
 
-1. 弹出 `AlertDialog`，文案提示"当前平台不支持，建议切换到 Whisper API"
-2. 提供两个按钮：`取消` 和 `切换到 Whisper API`
-3. 点击"切换到 Whisper API"时，直接更新 `SettingsProvider` 的 `sttMode` 为 `'whisper'`
-4. 用户再次打开语音输入时将自动使用 Whisper API 配置
+1. `auto` 模式会自动寻找可用语音链路。
+2. AI 语音必须通过连通测试；测试失败、未测试或未启用语音能力时不会被自动选中。
+3. 系统语音和本机 WhisperKit 初始化失败时展示本地化错误，提示切换语音模式或配置支持语音的 AI。
+4. 识别结果按增量写入业务输入区域，停止按钮只负责结束录音/转写。
 
 触发降级的场景：
 - 系统语音初始化返回 `!isAvailable`（如 Windows、无 GMS 的 Android）
 - 系统语音 `listen()` 抛出异常（如 Web 端的 `SpeechToText` 初始化失败）
 - `whisper_kit` 模型下载/初始化失败（如 macOS 虽已声明支持，但实际 whisper.cpp 模型不可用）
+- AI 语音配置未通过测试、接口超时、鉴权失败、模型不支持音频输入
 
 ### 17.5 macOS 构建约束
 
@@ -1473,4 +1476,8 @@ STT 相关文案遵循项目 l10n 规范，新增 keys：
 | `whisper_kit_unsupported_platform` | 本机 Whisper 不支持当前平台 |
 | `system_speech_voice_desc` | 系统语音模式描述文案 |
 | `system_speech_unsupported` | 系统语音不支持当前平台 |
-| `switch_to_whisper_api` | 降级弹窗中"切换到 Whisper API"按钮文案 |
+| `stt_mode_auto` | 自动语音模式 |
+| `stt_mode_follow_current_ai` | 跟随当前 AI 的语音模式 |
+| `stt_mode_fixed_ai` | 固定语音 AI 模式 |
+| `audio_mode_transcription_endpoint` | AI 转写端点语音模式 |
+| `audio_mode_chat_audio_input` | Chat 音频输入语音模式 |

@@ -18,7 +18,7 @@ class AiProvider extends ChangeNotifier {
   AiConfig? _defaultConfig;
   bool _isTesting = false;
   String? _testResult;
-  
+
   // 流式评估的订阅，用于取消
   StreamSubscription<String>? _currentStreamSubscription;
 
@@ -29,6 +29,7 @@ class AiProvider extends ChangeNotifier {
   bool get isTesting => _isTesting;
   String? get testResult => _testResult;
   bool get hasAnyConfig => _configs.any((c) => c.enabled);
+  bool get hasUsableDefaultConfig => _defaultConfig?.canEvaluate == true;
 
   @override
   void dispose() {
@@ -108,23 +109,58 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _aiService.testConnection(config);
-      _testResult = success
-          ? L10n.get('connection_success', 'zh')
-          : L10n.get('connection_failed', 'zh');
+      final result = await testCapability(id, AiCapability.text);
+      _testResult = L10n.get(result.messageKey, 'zh');
     } catch (e) {
-      _testResult = L10n.getp('connection_failed_with_error', 'zh', {'error': '$e'});
+      _testResult = L10n.getp('connection_failed_with_error', 'zh', {
+        'error': '$e',
+      });
     }
 
     _isTesting = false;
     notifyListeners();
   }
 
+  Future<AiTestResult> testCapability(
+    String id,
+    AiCapability capability,
+  ) async {
+    final config = _configs.where((c) => c.id == id).firstOrNull;
+    if (config == null) {
+      return const AiTestResult(
+        success: false,
+        messageKey: 'ai_config_not_found',
+      );
+    }
+    final result = switch (capability) {
+      AiCapability.text => await _aiService.testTextConnection(config),
+      AiCapability.audio => await _aiService.testAudioConnection(config),
+      AiCapability.image => const AiTestResult(
+        success: false,
+        messageKey: 'image_test_not_ready',
+      ),
+    };
+    final updatedTests = Map<String, CapabilityTestRecord>.from(
+      config.capabilityTests,
+    );
+    updatedTests[capability.key] = CapabilityTestRecord(
+      state: result.success
+          ? CapabilityTestState.passed
+          : CapabilityTestState.failed,
+      testedAt: DateTime.now(),
+      message: result.detail.isNotEmpty ? result.detail : result.messageKey,
+    );
+    await updateConfig(config.copyWith(capabilityTests: updatedTests));
+    return result;
+  }
+
   /// Test connection with explicit baseUrl/apiKey/model
-  Future<bool> testConnectionWithParams({
+  Future<AiTestResult> testConnectionWithParams({
     required String baseUrl,
     required String apiKey,
     required String model,
+    AiAudioMode audioMode = AiAudioMode.none,
+    AiCapability capability = AiCapability.text,
   }) async {
     final tempConfig = AiConfig(
       id: '_test',
@@ -132,8 +168,15 @@ class AiProvider extends ChangeNotifier {
       baseUrl: baseUrl,
       apiKey: apiKey,
       model: model,
+      audioMode: audioMode,
     );
-    return _aiService.testConnection(tempConfig);
+    return switch (capability) {
+      AiCapability.text => _aiService.testTextConnection(tempConfig),
+      AiCapability.audio => _aiService.testAudioConnection(tempConfig),
+      AiCapability.image => Future.value(
+        const AiTestResult(success: false, messageKey: 'image_test_not_ready'),
+      ),
+    };
   }
 
   AiConfig? configById(String? id) {
@@ -151,7 +194,7 @@ class AiProvider extends ChangeNotifier {
     Uint8List? imageBytes,
   }) async {
     final config = configById(aiConfigId);
-    if (config == null || !config.enabled) {
+    if (config == null || !config.canEvaluate) {
       return {
         'score': null,
         'level': 'local',
@@ -177,7 +220,8 @@ class AiProvider extends ChangeNotifier {
 
   /// Evaluate a user's answer with streaming support
   /// Returns a stream of content chunks, and a future with the final parsed result
-  ({Stream<String> stream, Future<Map<String, dynamic>> result}) evaluateAnswerStream({
+  ({Stream<String> stream, Future<Map<String, dynamic>> result})
+  evaluateAnswerStream({
     String? aiConfigId,
     required String topicId,
     required String question,
@@ -186,7 +230,7 @@ class AiProvider extends ChangeNotifier {
     Uint8List? imageBytes,
   }) {
     final config = configById(aiConfigId);
-    if (config == null || !config.enabled) {
+    if (config == null || !config.canEvaluate) {
       final result = Future.value({
         'score': null,
         'level': 'local',
@@ -203,40 +247,42 @@ class AiProvider extends ChangeNotifier {
 
     // 取消之前的流
     _currentStreamSubscription?.cancel();
-    
+
     final streamController = StreamController<String>();
     final completer = Completer<Map<String, dynamic>>();
-    
+
     String fullContent = '';
-    
-    _currentStreamSubscription = _aiService.evaluateAnswerStream(
-      config: config,
-      topicTitle: question,
-      mustHave: rubric?.mustHave ?? [],
-      commonMistakes: rubric?.commonMistakes ?? [],
-      userAnswer: userAnswer,
-      language: 'zh',
-      imageBytes: imageBytes,
-    ).listen(
-      (chunk) {
-        fullContent += chunk;
-        streamController.add(chunk);
-      },
-      onDone: () {
-        streamController.close();
-        _currentStreamSubscription = null;
-        // 解析完整内容
-        final result = _parseStreamResult(fullContent);
-        completer.complete(result);
-      },
-      onError: (error) {
-        streamController.close();
-        _currentStreamSubscription = null;
-        completer.completeError(error);
-      },
-      cancelOnError: true,
-    );
-    
+
+    _currentStreamSubscription = _aiService
+        .evaluateAnswerStream(
+          config: config,
+          topicTitle: question,
+          mustHave: rubric?.mustHave ?? [],
+          commonMistakes: rubric?.commonMistakes ?? [],
+          userAnswer: userAnswer,
+          language: 'zh',
+          imageBytes: imageBytes,
+        )
+        .listen(
+          (chunk) {
+            fullContent += chunk;
+            streamController.add(chunk);
+          },
+          onDone: () {
+            streamController.close();
+            _currentStreamSubscription = null;
+            // 解析完整内容
+            final result = _parseStreamResult(fullContent);
+            completer.complete(result);
+          },
+          onError: (error) {
+            streamController.close();
+            _currentStreamSubscription = null;
+            completer.completeError(error);
+          },
+          cancelOnError: true,
+        );
+
     return (stream: streamController.stream, result: completer.future);
   }
 
@@ -244,6 +290,18 @@ class AiProvider extends ChangeNotifier {
   void cancelStreamEvaluation() {
     _currentStreamSubscription?.cancel();
     _currentStreamSubscription = null;
+  }
+
+  Future<String> transcribeAudio({
+    required AiConfig config,
+    required Uint8List audioBytes,
+    String language = 'zh',
+  }) {
+    return _aiService.transcribeAudio(
+      config: config,
+      audioBytes: audioBytes,
+      language: language,
+    );
   }
 
   Map<String, dynamic> _parseStreamResult(String content) {
@@ -268,14 +326,14 @@ class AiProvider extends ChangeNotifier {
   }
 
   /// 通用流式聊天，用于 AI 改进等场景
-  Stream<String> sendMessageStream(
-    String userMessage, {
-    String? systemPrompt,
-  }) {
-    final config = _defaultConfig ?? _configs.firstWhere(
-      (c) => c.enabled,
-      orElse: () => throw Exception(L10n.get('no_ai_config_available', 'zh')),
-    );
+  Stream<String> sendMessageStream(String userMessage, {String? systemPrompt}) {
+    final config =
+        _defaultConfig ??
+        _configs.firstWhere(
+          (c) => c.enabled,
+          orElse: () =>
+              throw Exception(L10n.get('no_ai_config_available', 'zh')),
+        );
     return _aiService.sendMessageStream(
       config: config,
       userMessage: userMessage,

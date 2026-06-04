@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
-import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
@@ -804,21 +803,27 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: _isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                  color: _isVoiceListening
+                      ? Colors.green
+                      : const Color(0xFFB0BEC5),
                   width: _isVoiceListening ? 2 : 1,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: _isVoiceListening ? Colors.green : const Color(0xFFB0BEC5),
+                  color: _isVoiceListening
+                      ? Colors.green
+                      : const Color(0xFFB0BEC5),
                   width: _isVoiceListening ? 2 : 1,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: _isVoiceListening ? Colors.green : Theme.of(context).colorScheme.primary,
+                  color: _isVoiceListening
+                      ? Colors.green
+                      : Theme.of(context).colorScheme.primary,
                   width: _isVoiceListening ? 2 : 2,
                 ),
               ),
@@ -838,19 +843,6 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 onListeningChanged: (listening) {
                   setState(() => _isVoiceListening = listening);
                 },
-                sttMode: context.read<SettingsProvider>().settings.sttMode,
-                whisperBaseUrl: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperBaseUrl,
-                whisperApiKey: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperApiKey,
-                whisperModel: context
-                    .read<SettingsProvider>()
-                    .settings
-                    .whisperModel,
               ),
             ),
             onChanged: (_) => setState(() {}),

@@ -83,13 +83,15 @@ class _AiConfigPageState extends State<AiConfigPage> {
     bool enabled = config?.enabled ?? true;
     bool supportsTextInput = config?.supportsTextInput ?? true;
     bool supportsImageInput = config?.supportsImageInput ?? false;
-    bool supportsAudioInput = config?.supportsAudioInput ?? false;
+    var audioMode = config?.audioMode ?? AiAudioMode.none;
+    bool supportsAudioInput = audioMode != AiAudioMode.none;
     bool supportsMultimodal = config?.supportsMultimodal ?? false;
     bool supportsStreaming = config?.supportsStreaming ?? false;
     final usageTags = <String>{
       ...config?.usageTags ?? const ['recall'],
     };
     String? testResult;
+    bool? testPassed;
     bool isTesting = false;
 
     showDialog(
@@ -143,27 +145,20 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ? null
                         : () async {
                             setDialogState(() => isTesting = true);
-                            try {
-                              final aiProvider = context.read<AiProvider>();
-                              final success = await aiProvider
-                                  .testConnectionWithParams(
-                                    baseUrl: baseUrlController.text.trim(),
-                                    apiKey: apiKeyController.text.trim(),
-                                    model: modelController.text.trim(),
-                                  );
-                              setDialogState(() {
-                                testResult = success
-                                    ? l10n.get('connection_success')
-                                    : l10n.get('connection_failed');
-                                isTesting = false;
-                              });
-                            } catch (e) {
-                              setDialogState(() {
-                                testResult =
-                                    '${l10n.get('connection_failed')}：$e';
-                                isTesting = false;
-                              });
-                            }
+                            final aiProvider = context.read<AiProvider>();
+                            final result = await aiProvider
+                                .testConnectionWithParams(
+                                  baseUrl: baseUrlController.text.trim(),
+                                  apiKey: apiKeyController.text.trim(),
+                                  model: modelController.text.trim(),
+                                );
+                            setDialogState(() {
+                              testPassed = result.success;
+                              testResult = result.detail.isEmpty
+                                  ? l10n.get(result.messageKey)
+                                  : '${l10n.get(result.messageKey)}: ${result.detail}';
+                              isTesting = false;
+                            });
                           },
                     icon: isTesting
                         ? const SizedBox(
@@ -183,7 +178,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     Text(
                       testResult!,
                       style: TextStyle(
-                        color: testResult == l10n.get('connection_success')
+                        color: testPassed == true
                             ? AppColors.success
                             : AppColors.danger,
                       ),
@@ -227,14 +222,26 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           supportsImageInput || supportsAudioInput;
                     }),
                   ),
-                  SwitchListTile(
-                    value: supportsAudioInput,
-                    title: Text(l10n.get('support_raw_audio')),
-                    subtitle: Text(l10n.get('transcribe_before_scoring')),
+                  DropdownButtonFormField<AiAudioMode>(
+                    initialValue: audioMode,
+                    decoration: InputDecoration(
+                      labelText: l10n.get('audio_mode'),
+                      isDense: true,
+                    ),
+                    items: AiAudioMode.values
+                        .map(
+                          (mode) => DropdownMenuItem(
+                            value: mode,
+                            child: Text(l10n.get(mode.labelKey)),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) => setDialogState(() {
-                      supportsAudioInput = value;
+                      audioMode = value ?? AiAudioMode.none;
+                      supportsAudioInput = audioMode != AiAudioMode.none;
                       supportsMultimodal =
                           supportsImageInput || supportsAudioInput;
+                      if (supportsAudioInput) usageTags.add('stt');
                     }),
                   ),
                   SwitchListTile(
@@ -320,6 +327,16 @@ class _AiConfigPageState extends State<AiConfigPage> {
                 }
 
                 final aiProvider = context.read<AiProvider>();
+                final capabilityTests = <String, CapabilityTestRecord>{};
+                if (testPassed != null) {
+                  capabilityTests[AiCapability.text.key] = CapabilityTestRecord(
+                    state: testPassed!
+                        ? CapabilityTestState.passed
+                        : CapabilityTestState.failed,
+                    testedAt: DateTime.now(),
+                    message: testResult ?? '',
+                  );
+                }
                 if (isEditing) {
                   final updated = config.copyWith(
                     name: name,
@@ -333,7 +350,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     supportsAudioInput: supportsAudioInput,
                     supportsMultimodal: supportsMultimodal,
                     supportsStreaming: supportsStreaming,
+                    audioMode: audioMode,
                     usageTags: usageTags.toList(),
+                    capabilityTests: {
+                      ...config.capabilityTests,
+                      ...capabilityTests,
+                    },
                   );
                   aiProvider.updateConfig(updated);
                 } else {
@@ -351,7 +373,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     supportsAudioInput: supportsAudioInput,
                     supportsMultimodal: supportsMultimodal,
                     supportsStreaming: supportsStreaming,
+                    audioMode: audioMode,
                     usageTags: usageTags.toList(),
+                    capabilityTests: capabilityTests,
                   );
                   aiProvider.addConfig(newConfig);
                 }
@@ -413,6 +437,7 @@ class _ConfigCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
+    final aiProvider = context.read<AiProvider>();
     return WorkPanel(
       title: config.name,
       trailing: Row(
@@ -478,10 +503,44 @@ class _ConfigCard extends StatelessWidget {
                 : l10n.get('already_disable'),
           }),
         ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _CapabilityStatusChip(
+              label: l10n.get('support_text'),
+              record: config.testRecord(AiCapability.text),
+            ),
+            if (config.audioMode != AiAudioMode.none)
+              _CapabilityStatusChip(
+                label: l10n.get('speech_voice'),
+                record: config.testRecord(AiCapability.audio),
+              ),
+            if (config.supportsImageInput)
+              _CapabilityStatusChip(
+                label: l10n.get('support_image'),
+                record: config.testRecord(AiCapability.image),
+              ),
+          ],
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           children: [
+            OutlinedButton.icon(
+              onPressed: () =>
+                  aiProvider.testCapability(config.id, AiCapability.text),
+              icon: const Icon(Icons.wifi_find, size: 18),
+              label: Text(l10n.get('test_text_ai')),
+            ),
+            if (config.audioMode != AiAudioMode.none)
+              OutlinedButton.icon(
+                onPressed: () =>
+                    aiProvider.testCapability(config.id, AiCapability.audio),
+                icon: const Icon(Icons.mic_outlined, size: 18),
+                label: Text(l10n.get('test_voice_ai')),
+              ),
             FilledButton.tonalIcon(
               onPressed: onEdit,
               icon: const Icon(Icons.edit_outlined, size: 18),
@@ -527,6 +586,42 @@ class _UsageChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onSelected,
+    );
+  }
+}
+
+class _CapabilityStatusChip extends StatelessWidget {
+  const _CapabilityStatusChip({required this.label, required this.record});
+
+  final String label;
+  final CapabilityTestRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final color = switch (record.state) {
+      CapabilityTestState.passed => AppColors.success,
+      CapabilityTestState.failed => AppColors.danger,
+      CapabilityTestState.untested => Colors.grey,
+    };
+    final testedAt = record.testedAt;
+    final timeLabel = testedAt == null
+        ? ''
+        : ' · ${testedAt.month}/${testedAt.day} ${testedAt.hour.toString().padLeft(2, '0')}:${testedAt.minute.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$label: ${l10n.get(record.state.labelKey)}$timeLabel',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
