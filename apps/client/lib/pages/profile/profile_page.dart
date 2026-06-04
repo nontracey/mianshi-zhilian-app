@@ -28,6 +28,7 @@ import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
+import 'package:mianshi_zhilian/pages/profile/on_device_model_management_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/voice_diagnostic_sheet.dart';
 
@@ -111,6 +112,16 @@ class ProfilePage extends StatelessWidget {
               subtitle: l10n.get(settings.contentEnv.labelKey),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const _ContentSourcePage()),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.model_training_outlined,
+              title: l10n.get('on_device_model_management'),
+              subtitle: '查看已下载的模型和运行时',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const OnDeviceModelManagementPage(),
+                ),
               ),
             ),
             _ProfileSectionItem(

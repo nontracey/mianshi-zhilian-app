@@ -168,16 +168,20 @@ jobs:
           echo "ANDROID_RELEASE_STORE_PASSWORD=${ANDROID_RELEASE_STORE_PASSWORD}" >> "$GITHUB_ENV"
           echo "ANDROID_RELEASE_KEY_ALIAS=${ANDROID_RELEASE_KEY_ALIAS}" >> "$GITHUB_ENV"
           echo "ANDROID_RELEASE_KEY_PASSWORD=${ANDROID_RELEASE_KEY_PASSWORD}" >> "$GITHUB_ENV"
-      - run: flutter build apk --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
-      - run: cp build/app/outputs/flutter-apk/app-release.apk "mianshi-zhilian-${GITHUB_REF_NAME}-android.apk"
+      - run: flutter build apk --release --split-per-abi --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: |
+          for f in build/app/outputs/flutter-apk/app-*-release.apk; do
+            abi=$(echo "$f" | sed 's/.*app-\(.*\)-release.apk/\1/')
+            cp "$f" "mianshi-zhilian-${GITHUB_REF_NAME}-android-${abi}.apk"
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: apps/client/mianshi-zhilian-${{ github.ref_name }}-android.apk
-      - name: Upload Android APK to release
+          name: android-apks
+          path: apps/client/mianshi-zhilian-${{ github.ref_name }}-android-*.apk
+      - name: Upload Android APKs to release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/client/mianshi-zhilian-${{ github.ref_name }}-android.apk
+          files: apps/client/mianshi-zhilian-${{ github.ref_name }}-android-*.apk
 
   web:
     runs-on: ubuntu-latest

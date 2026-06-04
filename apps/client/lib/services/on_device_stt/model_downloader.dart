@@ -338,6 +338,8 @@ class ModelDownloader {
       if (file.sizeBytes != null && await f.length() != file.sizeBytes) {
         return false;
       }
+      // 即使没有已知 sizeBytes，0 字节文件必为损坏
+      if (await f.length() == 0) return false;
     }
     return true;
   }
@@ -697,7 +699,8 @@ class ModelDownloader {
           final sink = tempFile.openWrite(mode: FileMode.append);
           try {
             int received = existingBytes;
-            await for (final chunk in response.stream) {
+            await for (final chunk
+                in response.stream.timeout(const Duration(seconds: 30))) {
               _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;
@@ -733,7 +736,8 @@ class ModelDownloader {
           final sink = tempFile.openWrite();
           try {
             int received = 0;
-            await for (final chunk in response.stream) {
+            await for (final chunk
+                in response.stream.timeout(const Duration(seconds: 30))) {
               _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;

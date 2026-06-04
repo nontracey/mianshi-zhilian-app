@@ -1505,6 +1505,9 @@ class L10n {
     'model_delete': '删除模型',
     'model_not_ready': '模型未下载',
     'model_download': '下载模型',
+    'model_redownload': '重新下载',
+    'model_download_success': '模型下载并解压完成',
+    'download_failed': '下载失败',
     'confirm_delete_model_title': '确认删除模型',
     'confirm_delete_model_desc': '确定要删除已下载的本机 STT 模型吗？删除后需要重新下载才能使用。',
     'on_device_runtime': 'ONNX Runtime',
@@ -1519,6 +1522,20 @@ class L10n {
     'download_paused': '下载已暂停，可再次点击下载继续',
     'confirm_delete_runtime_title': '确认删除 ONNX Runtime',
     'confirm_delete_runtime_desc': '确定要删除已下载的 ONNX Runtime 吗？删除后本机 STT 模型将无法使用，直到重新下载运行时。',
+    'on_device_model_management': '模型管理',
+    'model_management_all_models': '所有模型',
+    'model_management_others_runtime': '运行时',
+    'model_storage_path': '存储路径',
+    'model_ready_summary': '已就绪',
+    'total_storage_usage': '总占用',
+    'no_models_downloaded': '暂无已下载的模型',
+    'confirm_delete_model_item_desc': '确定要删除 {name} 吗？',
+    'model_deleted_success': '模型已删除',
+    'runtime_deleted_success': '运行时已删除',
+    'delete_failed_message': '删除失败',
+    'clean_orphan_dirs': '清理孤立目录',
+    'clean_orphan_dirs_desc': '清理下载失败或已删除模型的残留目录',
+    'orphan_dirs_cleaned': '已清理 {count} 个孤立目录',
   };
 
   static const _en = {
@@ -3197,6 +3214,9 @@ class L10n {
     'model_delete': 'Delete model',
     'model_not_ready': 'Model not downloaded',
     'model_download': 'Download model',
+    'model_redownload': 'Re-download',
+    'model_download_success': 'Model downloaded and extracted successfully',
+    'download_failed': 'Download failed',
     'confirm_delete_model_title': 'Confirm delete model',
     'confirm_delete_model_desc':
         'Are you sure you want to delete the downloaded on-device STT model? You will need to re-download it to use it again.',
@@ -3214,6 +3234,20 @@ class L10n {
     'confirm_delete_runtime_title': 'Confirm delete ONNX Runtime',
     'confirm_delete_runtime_desc':
         'Are you sure you want to delete the downloaded ONNX Runtime? On-device STT models cannot be used until the runtime is downloaded again.',
+    'on_device_model_management': 'Model Management',
+    'model_management_all_models': 'All Models',
+    'model_management_others_runtime': 'Runtime',
+    'model_storage_path': 'Storage Path',
+    'model_ready_summary': 'Ready',
+    'total_storage_usage': 'Total Storage',
+    'no_models_downloaded': 'No models downloaded',
+    'confirm_delete_model_item_desc': 'Are you sure you want to delete {name}?',
+    'model_deleted_success': 'Model deleted',
+    'runtime_deleted_success': 'Runtime deleted',
+    'delete_failed_message': 'Delete failed',
+    'clean_orphan_dirs': 'Clean Orphaned Directories',
+    'clean_orphan_dirs_desc': 'Clean up residual directories from failed downloads or deleted models',
+    'orphan_dirs_cleaned': 'Cleaned {count} orphaned directories',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {

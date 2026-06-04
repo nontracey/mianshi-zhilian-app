@@ -316,7 +316,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     try {
       await service.initialize();
     } catch (e) {
-      _showError('on_device_stt_init_failed');
+      _showErrorDetail('on_device_stt_init_failed', e);
       await service.dispose();
       _resetStartFailure();
       return;
