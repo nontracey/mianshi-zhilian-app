@@ -4,6 +4,29 @@ import '../services/route_resolver.dart';
 
 const Object _unset = Object();
 
+/// 本机 STT 引擎类型
+enum OnDeviceEngine {
+  senseVoice,
+  whisper,
+  paraformer;
+
+  String get key {
+    switch (this) {
+      case OnDeviceEngine.senseVoice:
+        return 'sense_voice';
+      case OnDeviceEngine.whisper:
+        return 'whisper';
+      case OnDeviceEngine.paraformer:
+        return 'paraformer';
+    }
+  }
+
+  static OnDeviceEngine fromKey(String key) => OnDeviceEngine.values.firstWhere(
+    (e) => e.key == key,
+    orElse: () => OnDeviceEngine.senseVoice,
+  );
+}
+
 /// 知识源环境
 enum ContentEnv {
   test,
@@ -111,10 +134,11 @@ class AppSettings {
   final String cardDensity;
 
   // 语音识别配置
-  final String
-  sttMode; // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'whisper_kit'
+  final String sttMode; // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'sherpa_onnx'
   final String? sttAiConfigId;
-  final String whisperModel; // 'tiny' | 'base' | 'small' | 'medium'
+  // 本机语音识别（sherpa_onnx）配置
+  final String onDeviceEngine; // 'sense_voice' | 'whisper' | 'paraformer'
+  final String whisperModel; // 'tiny' | 'base' | 'small' | 'medium'（仅引擎为 whisper 时生效）
 
   // 知识源配置
   final ContentEnv contentEnv;
@@ -146,6 +170,7 @@ class AppSettings {
     this.cardDensity = 'comfortable',
     this.sttMode = 'auto',
     this.sttAiConfigId,
+    this.onDeviceEngine = 'sense_voice',
     this.whisperModel = 'base',
     this.contentEnv = ContentEnv.production,
     this.customTestContentUrl,
@@ -208,7 +233,8 @@ class AppSettings {
     String? cardDensity,
     String? sttMode,
     Object? sttAiConfigId = _unset,
-    Object? whisperModel = _unset,
+    String? onDeviceEngine,
+    String? whisperModel,
     ContentEnv? contentEnv,
     Object? customTestContentUrl = _unset,
     Object? customProdContentUrl = _unset,
@@ -239,9 +265,8 @@ class AppSettings {
     sttAiConfigId: sttAiConfigId == _unset
         ? this.sttAiConfigId
         : sttAiConfigId as String?,
-    whisperModel: whisperModel == _unset
-        ? this.whisperModel
-        : whisperModel as String,
+    onDeviceEngine: onDeviceEngine ?? this.onDeviceEngine,
+    whisperModel: whisperModel ?? this.whisperModel,
     contentEnv: contentEnv ?? this.contentEnv,
     customTestContentUrl: customTestContentUrl == _unset
         ? this.customTestContentUrl
@@ -315,6 +340,7 @@ class AppSettings {
     cardDensity: json['cardDensity'] as String? ?? 'comfortable',
     sttMode: json['sttMode'] as String? ?? 'auto',
     sttAiConfigId: json['sttAiConfigId'] as String?,
+    onDeviceEngine: json['onDeviceEngine'] as String? ?? 'sense_voice',
     whisperModel: json['whisperModel'] as String? ?? 'base',
     contentEnv: ContentEnv.fromKey(
       json['contentEnv'] as String? ?? 'production',
@@ -346,6 +372,7 @@ class AppSettings {
     'cardDensity': cardDensity,
     'sttMode': sttMode,
     'sttAiConfigId': sttAiConfigId,
+    'onDeviceEngine': onDeviceEngine,
     'whisperModel': whisperModel,
     'contentEnv': contentEnv.key,
     'customTestContentUrl': customTestContentUrl,

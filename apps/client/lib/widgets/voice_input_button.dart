@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -13,9 +13,10 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
-import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
+import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
+import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_factory.dart';
+import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
-import 'package:whisper_kit/whisper_kit.dart' show WhisperModel;
 
 enum VoiceInputState { idle, recording, transcribing, stopping, error }
 
@@ -47,20 +48,16 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final AudioRecorder _recorder = AudioRecorder();
 
-  OnDeviceSttService? _onDevice;
   VoiceInputState _state = VoiceInputState.idle;
   bool _systemAvailable = false;
   bool _running = false;
   String _lastSystemText = '';
-  String _lastCumulativeText = '';
   String _previewText = '';
   String? _statusMessageKey;
+  OnDeviceSttService? _sherpaOnnxService;
 
   /// 当前活跃的 AI 配置名（用于转写时显示模型信息）
   String? _activeConfigLabel;
-  int _emptyChunkCount = 0;
-  bool _hasEmittedText = false;
-
   bool get _isActive =>
       _state == VoiceInputState.recording ||
       _state == VoiceInputState.transcribing ||
@@ -88,12 +85,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
     _running = true;
     _lastSystemText = '';
-    _lastCumulativeText = '';
     _previewText = '';
     _statusMessageKey = null;
     _activeConfigLabel = null;
-    _emptyChunkCount = 0;
-    _hasEmittedText = false;
 
     switch (provider.kind) {
       case _VoiceProviderKind.ai:
@@ -102,8 +96,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       case _VoiceProviderKind.system:
         await _startSystemListening();
         break;
-      case _VoiceProviderKind.whisperKit:
-        await _startOnDeviceStreaming();
+      case _VoiceProviderKind.sherpaOnnx:
+        final engine = provider.engine;
+        final whisperModel = provider.whisperModel;
+        if (engine == null || whisperModel == null) break;
+        await _startSherpaOnnxListening(
+          engine: engine,
+          whisperModel: whisperModel,
+        );
         break;
       case _VoiceProviderKind.none:
         _showError('voice_provider_unavailable');
@@ -121,6 +121,13 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         ? null
         : aiProvider.configById(settings.sttAiConfigId);
     final defaultConfig = aiProvider.defaultConfig;
+
+    if (mode == 'sherpa_onnx') {
+      return _ResolvedVoiceProvider.sherpaOnnx(
+        engine: settings.onDeviceEngine,
+        whisperModel: settings.whisperModel,
+      );
+    }
 
     AiConfig? audioConfig;
     if (mode == 'fixed_ai_config') {
@@ -140,13 +147,23 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     if (audioConfig != null) {
       return _ResolvedVoiceProvider.ai(audioConfig);
     }
-    if (mode == 'system') return const _ResolvedVoiceProvider.system();
-    if (mode == 'whisper_kit') return const _ResolvedVoiceProvider.whisperKit();
 
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return const _ResolvedVoiceProvider.whisperKit();
+    // 无可用 AI 语音配置时，auto 模式尝试本机 sherpa-onnx 兜底
+    if (mode == 'auto') {
+      final onDeviceEngine = settings.onDeviceEngine;
+      if (onDeviceEngine != null && onDeviceEngine.isNotEmpty) {
+        return _ResolvedVoiceProvider.sherpaOnnx(
+          engine: onDeviceEngine,
+          whisperModel: settings.whisperModel,
+        );
+      }
     }
-    return const _ResolvedVoiceProvider.system();
+
+    if (mode == 'system' || mode == 'auto') {
+      return const _ResolvedVoiceProvider.system();
+    }
+
+    return const _ResolvedVoiceProvider.none();
   }
 
   Future<void> _startSystemListening() async {
@@ -240,68 +257,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
-  Future<void> _startOnDeviceStreaming() async {
-    if (kIsWeb) {
-      _resetStartFailure();
-      _showError('whisper_kit_web_unsupported');
-      return;
-    }
-    // 在 async 调用前读取 settings，避免 use_build_context_synchronously
-    final modelStr = context.read<SettingsProvider>().settings.whisperModel;
-    if (!await AppPermissionService.ensureMicrophone(context)) {
-      _resetStartFailure();
-      return;
-    }
-    _onDevice ??= OnDeviceSttService(
-      model: _parseWhisperModel(modelStr),
-    );
-    if (!_onDevice!.isModelReady) {
-      if (await _onDevice!.isModelFilePresent()) {
-        await _onDevice!.initModel();
-      } else {
-        _resetStartFailure();
-        _showError('whisper_kit_model_not_downloaded');
-        return;
-      }
-    }
-    _setStateKind(VoiceInputState.recording);
-    _setStatusMessage('voice_recording_hint');
-    unawaited(
-      _onDevice!
-          .startStreaming(
-            onResult: (text) {
-              final delta = _deltaFromCumulative(text, _lastCumulativeText);
-              _lastCumulativeText = text;
-              _emitText(delta);
-              _emptyChunkCount = 0;
-            },
-            onStatus: (status) {
-              if (status == 'transcribing') {
-                _setStateKind(VoiceInputState.transcribing);
-                _setStatusMessage('voice_transcribing');
-              } else if (status == 'recording') {
-                _setStateKind(VoiceInputState.recording);
-                _setStatusMessage('voice_recording_hint');
-              }
-            },
-            onEmptyResult: () {
-              _emptyChunkCount += 1;
-              if (_emptyChunkCount >= 2 && !_hasEmittedText) {
-                _setStatusMessage('voice_no_speech_detected');
-              }
-            },
-            onError: (error) {
-              _showErrorDetail('voice_recognize_failed', error);
-            },
-          )
-          .catchError((e) {
-            if (_state != VoiceInputState.error) {
-              _showErrorDetail(_messageKeyForError(e), e);
-            }
-          }),
-    );
-  }
-
   Future<String?> _recordChunk(Duration duration) async {
     try {
       final tempDir = await getTemporaryDirectory();
@@ -323,6 +278,151 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
+  Future<void> _startSherpaOnnxListening({
+    required String engine,
+    required String whisperModel,
+  }) async {
+    if (kIsWeb) {
+      _resetStartFailure();
+      _showError('voice_web_unsupported');
+      return;
+    }
+    if (!await AppPermissionService.ensureMicrophone(context)) {
+      _resetStartFailure();
+      return;
+    }
+
+    // 确定模型配置并检查是否就绪
+    final modelConfig = _sherpaOnnxModelConfig(engine, whisperModel);
+    if (modelConfig == null) {
+      _showError('on_device_engine_unknown');
+      _resetStartFailure();
+      return;
+    }
+    final ready = await ModelDownloader.isModelReady(modelConfig);
+    if (!ready) {
+      _showError('on_device_model_not_downloaded');
+      _resetStartFailure();
+      return;
+    }
+
+    // 创建并初始化本机 STT 服务
+    final modelDir = await ModelDownloader.getModelDir(modelConfig.id);
+    final service = createOnDeviceSttService(
+      engine: engine,
+      modelDir: modelDir.path,
+      whisperModelSize: whisperModel,
+    );
+    try {
+      await service.initialize();
+    } catch (e) {
+      _showError('on_device_stt_init_failed');
+      await service.dispose();
+      _resetStartFailure();
+      return;
+    }
+    _sherpaOnnxService = service;
+
+    _activeConfigLabel = _sherpaOnnxEngineLabel(engine);
+    _setStateKind(VoiceInputState.recording);
+    _setStatusMessage('voice_recording_hint');
+    unawaited(_runSherpaOnnxChunkLoop());
+  }
+
+  Future<void> _runSherpaOnnxChunkLoop() async {
+    try {
+      while (_running) {
+        final chunkPath = await _recordChunk(const Duration(seconds: 3));
+        if (chunkPath == null) break;
+        _setStateKind(VoiceInputState.transcribing);
+        final bytes = await readBytesFromPath(chunkPath);
+        try {
+          await deleteFileAtPath(chunkPath);
+        } catch (_) {}
+        if (!_running || _sherpaOnnxService == null) break;
+
+        // 将 WAV bytes 转为 Float32List（16-bit PCM → [-1, 1]）
+        final samples = _wavBytesToFloat32List(bytes);
+        if (samples == null || samples.isEmpty) {
+          if (_running) _setStateKind(VoiceInputState.recording);
+          if (_running) _setStatusMessage('voice_recording_hint');
+          continue;
+        }
+
+        try {
+          final result = await _sherpaOnnxService!.transcribe(samples, 16000);
+          if (!_running) break;
+          final text = result.text.trim();
+          if (text.isNotEmpty) {
+            _emitText(text);
+          }
+        } catch (e) {
+          // 单段转录失败不影响连续录音
+          debugPrint('sherpa_onnx chunk transcribe failed: $e');
+        }
+
+        if (_running) _setStateKind(VoiceInputState.recording);
+        if (_running) _setStatusMessage('voice_recording_hint');
+      }
+    } catch (e) {
+      _showError('voice_recognize_failed');
+    } finally {
+      _running = false;
+      await _disposeSherpaOnnxService();
+      if (mounted && _state != VoiceInputState.error) {
+        _setStateKind(VoiceInputState.idle);
+      }
+    }
+  }
+
+  /// 将 16-bit PCM WAV 字节数据转为 Float32List（值域 [-1.0, 1.0]）
+  Float32List? _wavBytesToFloat32List(Uint8List bytes) {
+    // WAV 头部至少 44 字节
+    if (bytes.length < 44) return null;
+    // 跳过 WAV 头部，从第 44 字节开始读取 PCM 数据
+    final dataSize = bytes.length - 44;
+    if (dataSize < 2) return null;
+    final sampleCount = dataSize ~/ 2;
+    final result = Float32List(sampleCount);
+    for (int i = 0; i < sampleCount; i++) {
+      final offset = 44 + i * 2;
+      // 小端 16-bit signed
+      final sample = (bytes[offset] | (bytes[offset + 1] << 8)).toSigned(16);
+      result[i] = sample / 32768.0;
+    }
+    return result;
+  }
+
+  OnDeviceModelConfig? _sherpaOnnxModelConfig(String engine, String whisperModel) {
+    return switch (engine) {
+      'sense_voice' => KnownModels.senseVoice,
+      'whisper' => switch (whisperModel) {
+        'tiny' => KnownModels.whisperTiny,
+        'small' => KnownModels.whisperSmall,
+        'medium' => KnownModels.whisperMedium,
+        _ => KnownModels.whisperBase,
+      },
+      'paraformer' => KnownModels.paraformer,
+      _ => null,
+    };
+  }
+
+  String _sherpaOnnxEngineLabel(String engine) {
+    return switch (engine) {
+      'sense_voice' => 'SenseVoice',
+      'whisper' => 'Whisper',
+      'paraformer' => 'Paraformer',
+      _ => engine,
+    };
+  }
+
+  Future<void> _disposeSherpaOnnxService() async {
+    try {
+      await _sherpaOnnxService?.dispose();
+    } catch (_) {}
+    _sherpaOnnxService = null;
+  }
+
   Future<void> _stopListening() async {
     _running = false;
     _setStateKind(VoiceInputState.stopping);
@@ -333,16 +433,12 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     try {
       await _recorder.stop();
     } catch (_) {}
-    try {
-      await _onDevice?.stopStreaming();
-    } catch (_) {}
     if (mounted) _setStateKind(VoiceInputState.idle);
   }
 
   void _emitText(String text) {
     final cleaned = text.trim();
     if (cleaned.isEmpty) return;
-    _hasEmittedText = true;
     widget.onResult(cleaned);
     if (mounted) {
       setState(() {
@@ -375,20 +471,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   void _showError(String messageKey) {
     _showErrorDetail(messageKey, null);
-  }
-
-  /// 将 whisperModel 字符串（'tiny'/'base'/'small'/'medium'）转为 WhisperModel 枚举
-  static WhisperModel _parseWhisperModel(String model) {
-    switch (model) {
-      case 'tiny':
-        return WhisperModel.tiny;
-      case 'small':
-        return WhisperModel.small;
-      case 'medium':
-        return WhisperModel.medium;
-      default:
-        return WhisperModel.base;
-    }
   }
 
   void _resetStartFailure() {
@@ -436,7 +518,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   void dispose() {
     _speech.stop();
     _recorder.dispose();
-    _onDevice?.dispose();
+    _disposeSherpaOnnxService();
     super.dispose();
   }
 
@@ -507,17 +589,23 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 }
 
-enum _VoiceProviderKind { ai, system, whisperKit, none }
+enum _VoiceProviderKind { ai, system, sherpaOnnx, none }
 
 class _ResolvedVoiceProvider {
-  const _ResolvedVoiceProvider._(this.kind, this.config);
+  const _ResolvedVoiceProvider._(this.kind, this.config, this.engine, this.whisperModel);
   const _ResolvedVoiceProvider.ai(AiConfig config)
-    : this._(_VoiceProviderKind.ai, config);
+    : this._(_VoiceProviderKind.ai, config, null, null);
   const _ResolvedVoiceProvider.system()
-    : this._(_VoiceProviderKind.system, null);
-  const _ResolvedVoiceProvider.whisperKit()
-    : this._(_VoiceProviderKind.whisperKit, null);
+    : this._(_VoiceProviderKind.system, null, null, null);
+  const _ResolvedVoiceProvider.none()
+    : this._(_VoiceProviderKind.none, null, null, null);
+  const _ResolvedVoiceProvider.sherpaOnnx({
+    required String engine,
+    required String whisperModel,
+  }) : this._(_VoiceProviderKind.sherpaOnnx, null, engine, whisperModel);
 
   final _VoiceProviderKind kind;
   final AiConfig? config;
+  final String? engine;
+  final String? whisperModel;
 }

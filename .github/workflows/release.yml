@@ -348,28 +348,6 @@ jobs:
           restore-keys: |
             macos-build-${{ runner.os }}-
       - run: flutter pub get
-      # whisper_kit declares macOS: ffiPlugin: true but ships no macOS podspec.
-      # Remove its macOS platform entry from the pub-cache copy so Flutter's
-      # plugin system doesn't try to register it as a CocoaPods dependency.
-      - name: Remove macOS platform from whisper_kit
-        run: |
-          PKG_PATH=$(python3 -c "
-          import json
-          with open('.dart_tool/package_config.json') as f:
-              data = json.load(f)
-          for p in data['packages']:
-              if p['name'] == 'whisper_kit':
-                  print(p['rootUri'].replace('file://', ''))
-          ")
-          ruby -e "
-            require 'yaml'
-            data = YAML.load_file('$PKG_PATH/pubspec.yaml')
-            data['flutter']['plugin']['platforms'].delete('macos')
-            File.write('$PKG_PATH/pubspec.yaml', YAML.dump(data))
-            puts 'Removed macOS platform from whisper_kit'
-          "
-          # Clear Flutter plugin cache so build re-scans pubspecs
-          rm -f .flutter-plugins .flutter-plugins-dependencies
       - run: bash tool/generate_version.sh
       - name: Embed release notes
         run: |

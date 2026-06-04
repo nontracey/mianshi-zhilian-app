@@ -99,11 +99,6 @@ class SettingsProvider extends ChangeNotifier {
 
   AppSettings _applyPlatformDefaults(AppSettings s) {
     if (s.sttMode == 'whisper') return s.copyWith(sttMode: 'auto');
-    if (s.sttMode == 'whisper_kit' &&
-        (kIsWeb || defaultTargetPlatform == TargetPlatform.macOS)) {
-      return s.copyWith(sttMode: 'auto');
-    }
-    // Android 保持 whisper_kit 默认
     return s;
   }
 

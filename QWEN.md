@@ -259,7 +259,7 @@ git push origin vx.x.x
 
 ### 语音识别（STT）
 
-语音输入支持自动模式、跟随当前 AI、固定语音 AI、系统语音和 Android 本机 WhisperKit。默认使用自动模式：
+语音输入支持自动模式、跟随当前 AI、固定语音 AI、系统语音和本机 sherpa-onnx。默认使用自动模式：
 
 | 模式 | 说明 | 默认平台 |
 |------|------|---------|
@@ -267,18 +267,20 @@ git push origin vx.x.x
 | `follow_current_ai` | 跟随当前练习选择的 AI 配置，要求语音能力测试通过 | 按用户选择 |
 | `fixed_ai_config` | 固定使用某个支持语音的 AI 配置 | 按用户选择 |
 | `system` | 系统内置语音引擎（macOS NSSpeechRecognizer / Android GMS） | 兜底 |
-| `whisper_kit` | 本地 whisper.cpp 离线模型 | Android 兜底 |
+| `sherpa_onnx` | sherpa-onnx 本机离线模型（SenseVoice / Whisper / Paraformer） | Android 兜底 |
+
+本机 sherpa-onnx 模式支持三种离线引擎：SenseVoice（多语言+情感识别，~41MB）、Whisper（高精度多语言，tiny/base/small/medium 四种尺寸）、Paraformer（纯中文流式，~41MB）。用户需先在设置页下载模型再使用。
 
 **平台约束与降级：**
-- iOS 尚未启用，`whisper_kit` 声明了 `macos: ffiPlugin: true` 但缺少 macOS podspec → 见下方 macOS 构建说明
-- macOS 系统语音引擎可靠；无 GMS 的 Android 设备系统语音不可用时会回退到本机 WhisperKit 或可用语音 AI
-- 语音按钮点一下开始实时转写，再点一下停止；系统语音、WhisperKit 和 AI 分块转写都会把文本增量写回业务输入区域
+- macOS 系统语音引擎可靠；无 GMS 的 Android 设备系统语音不可用时会回退到本机 sherpa-onnx 或可用语音 AI
+- Web 端不支持 `dart:ffi`，sherpa-onnx 不可用，也无系统语音兜底，必须依赖可转写 AI 配置
+- 语音按钮点一下开始实时转写，再点一下停止；系统语音、sherpa-onnx 和 AI 分块转写都会把文本增量写回业务输入区域
 
 **条件导入模式：**
-`on_device_stt_service.dart` 使用 `export if (dart.library.io)` 在 native 平台导出真实实现（`on_device_stt_service_io.dart`），Web 导出空桩（`on_device_stt_service_stub.dart`）。这是 `whisper_kit` 的 `package:whisper_kit` import 放在 IO 实现文件而非入口文件的原因——Web 编译时不会尝试解析该包。
+`on_device_stt_factory.dart` 使用 `export if (dart.library.io)` 在 native 平台导出真实实现（`on_device_stt_factory_native.dart`），Web 导出空桩（`on_device_stt_factory_stub.dart`）。`sherpa_onnx` 的 `package:sherpa_onnx`（依赖 `dart:ffi`）仅在 native 文件被引用，Web 编译不解析该包。
 
-**macOS 构建注意事项：**
-`whisper_kit` 在 pubspec.yaml 中声明了 `macos: ffiPlugin: true`，但实际没有提供 `macos/whisper_kit.podspec`，导致 `flutter build macos --release` 时 CocoaPods 报错。修复方式：`macos/Podfile` 在 `flutter_install_all_macos_pods` 执行前检查 `.symlinks/plugins/whisper_kit/macos/whisper_kit.podspec`，不存在时自动创建桩文件。这是第三包包缺陷，非本项目问题。
+**macOS/Windows 构建注意事项：**
+`sherpa_onnx` 提供了各原生平台的正确 podspec/CMakeLists.txt，无需额外桩文件。native 平台可直接 `flutter build macos --release`。
 
 ### 设计理念
 

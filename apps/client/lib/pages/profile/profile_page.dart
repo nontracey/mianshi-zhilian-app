@@ -22,8 +22,7 @@ import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
-import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
-import 'package:whisper_kit/whisper_kit.dart' show WhisperModel;
+import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -1710,7 +1709,7 @@ class _AiConfigPanel extends StatelessWidget {
 
 // ── 语音识别配置面板 ──────────────────────────────────────────────
 
-class _SttConfigPanel extends StatelessWidget {
+class _SttConfigPanel extends StatefulWidget {
   const _SttConfigPanel({
     required this.settings,
     required this.onSettingsChanged,
@@ -1720,15 +1719,83 @@ class _SttConfigPanel extends StatelessWidget {
   final ValueChanged<AppSettings> onSettingsChanged;
 
   @override
+  State<_SttConfigPanel> createState() => _SttConfigPanelState();
+}
+
+class _SttConfigPanelState extends State<_SttConfigPanel> {
+  // ── 本机引擎状态 ──
+  bool _onDeviceChecking = true;
+  bool _onDeviceReady = false;
+  int? _onDeviceModelSizeBytes;
+  bool _onDeviceDownloading = false;
+  double _onDeviceProgress = 0.0;
+  String? _onDeviceError;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnDeviceStatus();
+  }
+
+  AppSettings get _settings => widget.settings;
+
+  Future<void> _checkOnDeviceStatus() async {
+    // 使用动态导入避免 web 端编译失败
+    // 实际上 sherpa_onnx 包在 web 端不可用，但 kIsWeb 检查在 service 层
+    if (kIsWeb) {
+      if (mounted) {
+        setState(() {
+          _onDeviceChecking = false;
+          _onDeviceReady = false;
+        });
+      }
+      return;
+    }
+
+    final engine = _settings.onDeviceEngine;
+    final onDeviceModelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
+
+    if (onDeviceModelConfig == null) {
+      if (mounted) {
+        setState(() {
+          _onDeviceChecking = false;
+          _onDeviceReady = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final ready = await ModelDownloader.isModelReady(onDeviceModelConfig);
+      final size = await ModelDownloader.getModelSize(onDeviceModelConfig.id);
+      if (mounted) {
+        setState(() {
+          _onDeviceChecking = false;
+          _onDeviceReady = ready;
+          _onDeviceModelSizeBytes = size;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _onDeviceChecking = false;
+          _onDeviceReady = false;
+          _onDeviceError = '$e';
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final aiProvider = context.watch<AiProvider>();
-    final mode = settings.sttMode;
+    final mode = _settings.sttMode;
     final audioConfigs = aiProvider.enabledConfigs
         .where((config) => config.audioMode != AiAudioMode.none)
         .toList(growable: false);
     final isSystem = mode == 'system';
-    final isWhisperKit = mode == 'whisper_kit';
+    final isOnDevice = mode == 'sherpa_onnx';
 
     return WorkPanel(
       title: l10n.get('speech_voice_identify_distinct'),
@@ -1746,15 +1813,15 @@ class _SttConfigPanel extends StatelessWidget {
                 description: l10n.get('stt_mode_auto_desc'),
                 selected: mode == 'auto',
                 onTap: () =>
-                    onSettingsChanged(settings.copyWith(sttMode: 'auto')),
+                    widget.onSettingsChanged(_settings.copyWith(sttMode: 'auto')),
               ),
               _SttModeCard(
                 label: l10n.get('stt_mode_follow_current_ai'),
                 icon: Icons.smart_toy_outlined,
                 description: l10n.get('stt_mode_follow_current_ai_desc'),
                 selected: mode == 'follow_current_ai',
-                onTap: () => onSettingsChanged(
-                  settings.copyWith(sttMode: 'follow_current_ai'),
+                onTap: () => widget.onSettingsChanged(
+                  _settings.copyWith(sttMode: 'follow_current_ai'),
                 ),
               ),
               _SttModeCard(
@@ -1762,8 +1829,8 @@ class _SttConfigPanel extends StatelessWidget {
                 icon: Icons.record_voice_over_outlined,
                 description: l10n.get('stt_mode_fixed_ai_desc'),
                 selected: mode == 'fixed_ai_config',
-                onTap: () => onSettingsChanged(
-                  settings.copyWith(sttMode: 'fixed_ai_config'),
+                onTap: () => widget.onSettingsChanged(
+                  _settings.copyWith(sttMode: 'fixed_ai_config'),
                 ),
               ),
               _SttModeCard(
@@ -1772,57 +1839,27 @@ class _SttConfigPanel extends StatelessWidget {
                 description: l10n.get('system_speech_voice_desc'),
                 selected: isSystem,
                 onTap: () =>
-                    onSettingsChanged(settings.copyWith(sttMode: 'system')),
+                    widget.onSettingsChanged(_settings.copyWith(sttMode: 'system')),
               ),
-              if (defaultTargetPlatform == TargetPlatform.android && !kIsWeb)
-                _SttModeCard(
-                  label: l10n.get('whisper_kit_mode_label'),
-                  icon: Icons.memory,
-                  description: l10n.get('whisper_kit_mode_desc'),
-                  selected: isWhisperKit,
-                  onTap: () => onSettingsChanged(
-                    settings.copyWith(sttMode: 'whisper_kit'),
-                  ),
+              _SttModeCard(
+                label: l10n.get('on_device_stt_title'),
+                icon: Icons.memory_outlined,
+                description: l10n.get('on_device_stt_desc'),
+                selected: isOnDevice,
+                onTap: () => widget.onSettingsChanged(
+                  _settings.copyWith(sttMode: 'sherpa_onnx'),
                 ),
+              ),
             ],
           ),
         ),
         if (mode == 'fixed_ai_config') ...[
           const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DropdownButtonFormField<String>(
-              initialValue:
-                  audioConfigs.any((c) => c.id == settings.sttAiConfigId)
-                  ? settings.sttAiConfigId
-                  : null,
-              decoration: InputDecoration(
-                labelText: l10n.get('fixed_voice_ai_config'),
-                isDense: true,
-              ),
-              items: audioConfigs
-                  .map(
-                    (config) => DropdownMenuItem(
-                      value: config.id,
-                      child: Text(config.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (id) =>
-                  onSettingsChanged(settings.copyWith(sttAiConfigId: id)),
-            ),
-          ),
-          if (audioConfigs.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                l10n.get('no_voice_ai_config'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
-            ),
+          _buildFixedAiSelector(l10n, audioConfigs),
+        ],
+        if (isOnDevice) ...[
+          const SizedBox(height: 12),
+          _buildOnDeviceSettings(l10n),
         ],
         const SizedBox(height: 12),
         Padding(
@@ -1835,10 +1872,6 @@ class _SttConfigPanel extends StatelessWidget {
             ),
           ),
         ),
-        if (isWhisperKit) ...[
-          const SizedBox(height: 12),
-          _WhisperKitModelManager(),
-        ],
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -1853,325 +1886,380 @@ class _SttConfigPanel extends StatelessWidget {
       ],
     );
   }
-}
 
-// ── 本机 Whisper 模型管理 ──────────────────────────────────────────
-
-class _WhisperKitModelManager extends StatefulWidget {
-  @override
-  State<_WhisperKitModelManager> createState() =>
-      _WhisperKitModelManagerState();
-}
-
-class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
-  late OnDeviceSttService _svc;
-  bool _modelReady = false;
-  bool _modelOnDisk = false;
-  bool _downloading = false;
-  String _statusText = '';
-  late String _selectedModel;
-
-  static const List<String> _modelOptions = ['tiny', 'base', 'small', 'medium'];
-
-  /// 通过 l10n 获取模型显示标签
-  String _modelLabel(LocalizationProvider l10n, String model) {
-    switch (model) {
-      case 'tiny':
-        return l10n.get('whisper_kit_model_tiny_label');
-      case 'small':
-        return l10n.get('whisper_kit_model_small_label');
-      case 'medium':
-        return l10n.get('whisper_kit_model_medium_label');
-      default:
-        return l10n.get('whisper_kit_model_base_label');
-    }
-  }
-
-  /// 通过 l10n 获取模型介绍文本
-  String _modelHint(LocalizationProvider l10n, String model) {
-    switch (model) {
-      case 'tiny':
-        return l10n.get('whisper_kit_model_tiny_hint');
-      case 'small':
-        return l10n.get('whisper_kit_model_small_hint');
-      case 'medium':
-        return l10n.get('whisper_kit_model_medium_hint');
-      default:
-        return l10n.get('whisper_kit_model_base_hint');
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _initFromSettings();
-    _checkStatus();
-  }
-
-  void _initFromSettings() {
-    _selectedModel =
-        context.read<SettingsProvider>().settings.whisperModel;
-    if (!_modelOptions.contains(_selectedModel)) {
-      _selectedModel = 'base';
-    }
-    _svc = OnDeviceSttService(model: _parseWhisperModel(_selectedModel));
-  }
-
-  Future<void> _onModelChanged(String model) async {
-    if (model == _selectedModel) return;
-    await context.read<SettingsProvider>().updateSettings(
-      context.read<SettingsProvider>().settings.copyWith(whisperModel: model),
-    );
-    setState(() {
-      _selectedModel = model;
-      _svc = OnDeviceSttService(model: _parseWhisperModel(model));
-      _modelReady = false;
-      _modelOnDisk = false;
-      _downloading = false;
-      _statusText = '';
-    });
-    await _checkStatus();
-  }
-
-  Future<void> _checkStatus() async {
-    // 先检查文件系统，再检查内存状态
-    final onDisk = await _svc.isModelFilePresent();
-    if (mounted) {
-      setState(() {
-        _modelOnDisk = onDisk;
-        _modelReady = _svc.isModelReady;
-        _downloading = _svc.isModelDownloading;
-        _statusText = _svc.modelStatus;
-        // 如果文件存在但内存未加载，显示为"已下载（未加载）"
-        if (onDisk && !_modelReady && !_downloading) {
-          _statusText = 'ready'; // 文件已存在，标记为 ready
-        }
-      });
-    }
-  }
-
-  /// 将 whisperModel 字符串转为 WhisperModel 枚举
-  static WhisperModel _parseWhisperModel(String model) {
-    switch (model) {
-      case 'tiny':
-        return WhisperModel.tiny;
-      case 'small':
-        return WhisperModel.small;
-      case 'medium':
-        return WhisperModel.medium;
-      default:
-        return WhisperModel.base;
-    }
-  }
-
-  Future<void> _download() async {
-    final l10n = context.read<LocalizationProvider>();
-    setState(() {
-      _downloading = true;
-      _statusText = '...';
-    });
-
-    try {
-      await _svc.initModel(
-        onProgress: (received, total) {
-          if (mounted) {
-            setState(() {
-              _statusText = '${(received / total * 100).toStringAsFixed(0)}%';
-            });
-          }
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _modelReady = true;
-          _downloading = false;
-          _statusText = l10n.get('whisper_kit_model_downloaded');
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _downloading = false;
-          _statusText = l10n.get('whisper_kit_download_failed');
-        });
-        // 非 Android 平台大概率是平台不支持，给出降级引导
-        if (defaultTargetPlatform != TargetPlatform.android) {
-          _showWhisperKitUnavailableDialog(l10n);
-        }
-      }
-    }
-  }
-
-  Future<void> _showWhisperKitUnavailableDialog(
+  Widget _buildFixedAiSelector(
     LocalizationProvider l10n,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('voice_not_available')),
-        content: Text(l10n.get('whisper_kit_unsupported_platform')),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('confirm')),
+    List<AiConfig> audioConfigs,
+  ) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: DropdownButtonFormField<String>(
+            initialValue:
+                audioConfigs.any((c) => c.id == _settings.sttAiConfigId)
+                ? _settings.sttAiConfigId
+                : null,
+            decoration: InputDecoration(
+              labelText: l10n.get('fixed_voice_ai_config'),
+              isDense: true,
+            ),
+            items: audioConfigs
+                .map(
+                  (config) => DropdownMenuItem(
+                    value: config.id,
+                    child: Text(config.name),
+                  ),
+                )
+                .toList(),
+            onChanged: (id) =>
+                widget.onSettingsChanged(_settings.copyWith(sttAiConfigId: id)),
           ),
-        ],
-      ),
+        ),
+        if (audioConfigs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              l10n.get('no_voice_ai_config'),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
-  Future<void> _delete() async {
-    final l10n = context.read<LocalizationProvider>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.get('whisper_kit_delete_confirm_title')),
-        content: Text(l10n.get('whisper_kit_delete_confirm_desc')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.get('cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.get('delete')),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      await _svc.deleteModel();
-      _checkStatus();
-    } catch (_) {}
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
+  Widget _buildOnDeviceSettings(LocalizationProvider l10n) {
     final theme = Theme.of(context);
-    final isAvailable = _modelReady || _modelOnDisk;
+
+    if (kIsWeb) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          l10n.get('on_device_stt_web_unsupported'),
+          style: TextStyle(fontSize: 12, color: theme.colorScheme.error),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 引擎选择
+          DropdownButtonFormField<String>(
+            initialValue: _settings.onDeviceEngine,
+            decoration: InputDecoration(
+              labelText: l10n.get('on_device_engine_select'),
+              isDense: true,
+            ),
+            items: ['sense_voice', 'whisper', 'paraformer'].map((engine) {
+              return DropdownMenuItem(
+                value: engine,
+                child: Text(_engineLabel(context, engine)),
+              );
+            }).toList(),
+            onChanged: (engine) {
+              if (engine != null) {
+                widget.onSettingsChanged(
+                  _settings.copyWith(onDeviceEngine: engine),
+                );
+                setState(() {
+                  _onDeviceChecking = true;
+                  _onDeviceReady = false;
+                });
+                _checkOnDeviceStatus();
+              }
+            },
           ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 模型选择器
-            Row(
-              children: [
-                Text(
-                  l10n.get('whisper_kit_model_select'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _selectedModel,
-                  isDense: true,
-                  underline: const SizedBox(),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                  items: _modelOptions.map((model) {
-                    return DropdownMenuItem(
-                      value: model,
-                      child: Text(_modelLabel(l10n, model)),
-                    );
-                  }).toList(),
-                  onChanged: (model) {
-                    if (model != null) _onModelChanged(model);
-                  },
-                ),
-              ],
+          const SizedBox(height: 8),
+
+          // Whisper 模型大小选择（仅引擎为 whisper 时显示）
+          if (_settings.onDeviceEngine == 'whisper') ...[
+            DropdownButtonFormField<String>(
+              initialValue: _settings.whisperModel,
+              decoration: InputDecoration(
+                labelText: l10n.get('on_device_whisper_model_select'),
+                isDense: true,
+              ),
+              items: ['tiny', 'base', 'small', 'medium'].map((size) {
+                return DropdownMenuItem(
+                  value: size,
+                  child: Text(_whisperModelLabel(l10n, size)),
+                );
+              }).toList(),
+              onChanged: (size) {
+                if (size != null) {
+                  widget.onSettingsChanged(
+                    _settings.copyWith(whisperModel: size),
+                  );
+                  setState(() {
+                    _onDeviceChecking = true;
+                    _onDeviceReady = false;
+                  });
+                  _checkOnDeviceStatus();
+                }
+              },
             ),
             const SizedBox(height: 4),
-            // 模型介绍文字
             Text(
-              _modelHint(l10n, _selectedModel),
+              _whisperModelHint(l10n, _settings.whisperModel),
               style: TextStyle(
                 fontSize: 11,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
-            // 模型状态行
-            Row(
-              children: [
-                Icon(
-                  isAvailable
-                      ? Icons.check_circle
-                      : Icons.download_outlined,
-                  color: isAvailable
-                      ? Colors.green
-                      : theme.colorScheme.secondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.get('whisper_kit_model_status'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isAvailable
-                            ? l10n.get('whisper_kit_model_downloaded')
-                            : _downloading
-                            ? _statusText
-                            : l10n.get('whisper_kit_model_not_downloaded'),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_downloading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else if (!isAvailable)
-                  TextButton(
-                    onPressed: _download,
-                    child: Text(l10n.get('whisper_kit_download_now')),
-                  )
-                else
-                  TextButton(
-                    onPressed: _delete,
-                    child: Text(
-                      l10n.get('whisper_kit_delete_model'),
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-              ],
-            ),
           ],
-        ),
+
+          // 引擎提示说明
+          Text(
+            _engineHint(context, _settings.onDeviceEngine),
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 状态和下载管理
+          _buildModelStatus(l10n, theme),
+        ],
       ),
     );
   }
+
+  Widget _buildModelStatus(LocalizationProvider l10n, ThemeData theme) {
+    if (_onDeviceChecking) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            l10n.get('stt_testing'),
+            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      );
+    }
+
+    if (_onDeviceReady) {
+      final sizeMb = _onDeviceModelSizeBytes != null
+          ? ' (${(_onDeviceModelSizeBytes! / 1048576).toStringAsFixed(1)} MB)'
+          : '';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, size: 18, color: Colors.green),
+              const SizedBox(width: 6),
+              Text(
+                '${l10n.get('model_ready')}$sizeMb',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: () => _deleteModel(l10n),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(l10n.get('model_delete')),
+            style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+          ),
+        ],
+      );
+    }
+
+    // 未就绪
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error),
+            const SizedBox(width: 6),
+            Text(
+              l10n.get('model_not_ready'),
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ],
+        ),
+        if (_onDeviceError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _onDeviceError!,
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        if (_onDeviceDownloading)
+          Column(
+            children: [
+              LinearProgressIndicator(value: _onDeviceProgress),
+              const SizedBox(height: 4),
+              Text(
+                '${(_onDeviceProgress * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          )
+        else
+          _buildDownloadButton(l10n, theme),
+      ],
+    );
+  }
+
+  Widget _buildDownloadButton(LocalizationProvider l10n, ThemeData theme) {
+    final engine = _settings.onDeviceEngine;
+    final modelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
+    if (modelConfig == null) return const SizedBox.shrink();
+
+    final sizeInfo = modelConfig.estimatedSizeMb != null
+        ? ' (~${modelConfig.estimatedSizeMb} MB)'
+        : '';
+
+    return FilledButton.tonalIcon(
+      onPressed: () => _downloadModel(modelConfig, l10n),
+      icon: const Icon(Icons.download, size: 16),
+      label: Text('${l10n.get('model_download')}$sizeInfo'),
+    );
+  }
+
+  Future<void> _downloadModel(OnDeviceModelConfig config, LocalizationProvider l10n) async {
+    if (!mounted) return;
+    setState(() {
+      _onDeviceDownloading = true;
+      _onDeviceProgress = 0.0;
+      _onDeviceError = null;
+    });
+
+    try {
+      await ModelDownloader.downloadModel(
+        config: config,
+        onProgress: (received, total) {
+          if (mounted && total > 0) {
+            setState(() => _onDeviceProgress = received / total);
+          }
+        },
+      );
+      await _checkOnDeviceStatus();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _onDeviceError = '$e';
+          _onDeviceDownloading = false;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _onDeviceDownloading = false);
+      }
+    }
+  }
+
+  Future<void> _deleteModel(LocalizationProvider l10n) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('confirm_delete_model_title')),
+        content: Text(l10n.get('confirm_delete_model_desc')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final engine = _settings.onDeviceEngine;
+    final modelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
+    if (modelConfig != null) {
+      await ModelDownloader.deleteModel(modelConfig.id);
+    }
+    await _checkOnDeviceStatus();
+  }
+
+  String _engineLabel(BuildContext context, String engine) {
+    final l10n = context.read<LocalizationProvider>();
+    return switch (engine) {
+      'sense_voice' => l10n.get('on_device_engine_sense_voice'),
+      'whisper' => l10n.get('on_device_engine_whisper'),
+      'paraformer' => l10n.get('on_device_engine_paraformer'),
+      _ => engine,
+    };
+  }
+
+  String _engineHint(BuildContext context, String engine) {
+    final l10n = context.read<LocalizationProvider>();
+    return switch (engine) {
+      'sense_voice' => l10n.get('on_device_engine_sense_voice_hint'),
+      'whisper' => l10n.get('on_device_engine_whisper_hint'),
+      'paraformer' => l10n.get('on_device_engine_paraformer_hint'),
+      _ => '',
+    };
+  }
+
+  String _whisperModelLabel(LocalizationProvider l10n, String size) {
+    return switch (size) {
+      'tiny' => l10n.get('whisper_model_tiny'),
+      'base' => l10n.get('whisper_model_base'),
+      'small' => l10n.get('whisper_model_small'),
+      'medium' => l10n.get('whisper_model_medium'),
+      _ => size,
+    };
+  }
+
+  String _whisperModelHint(LocalizationProvider l10n, String size) {
+    return switch (size) {
+      'tiny' => l10n.get('whisper_model_tiny_hint'),
+      'base' => l10n.get('whisper_model_base_hint'),
+      'small' => l10n.get('whisper_model_small_hint'),
+      'medium' => l10n.get('whisper_model_medium_hint'),
+      _ => '',
+    };
+  }
+
+  OnDeviceModelConfig? _modelConfigForEngine(String engine, String whisperSize) {
+    return switch (engine) {
+      'sense_voice' => KnownModels.senseVoice,
+      'whisper' => switch (whisperSize) {
+        'tiny' => KnownModels.whisperTiny,
+        'small' => KnownModels.whisperSmall,
+        'medium' => KnownModels.whisperMedium,
+        _ => KnownModels.whisperBase,
+      },
+      'paraformer' => KnownModels.paraformer,
+      _ => null,
+    };
+  }
 }
+
 
 class _SttModeCard extends StatelessWidget {
   const _SttModeCard({

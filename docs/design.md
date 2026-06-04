@@ -1418,33 +1418,38 @@ interview-study-app/
 
 | 模式 | 引擎 | 平台支持 | 免费 | 离线 |
 |------|------|---------|------|------|
-| `auto` | 自动选择可用语音 AI、本机 WhisperKit 或系统语音 | 全平台 | 视所选链路 | 视所选链路 |
+| `auto` | 自动选择可用语音 AI、本机 sherpa-onnx 或系统语音 | 全平台 | 视所选链路 | 视所选链路 |
 | `follow_current_ai` | 跟随当前练习选择的 AI 配置，要求语音能力测试通过 | 全平台 | ❌ | ❌ |
 | `fixed_ai_config` | 固定使用某个支持语音的 AI 配置，要求语音能力测试通过 | 全平台 | ❌ | ❌ |
 | `system` | 平台内置语音引擎（macOS NSSpeechRecognizer / Android GMS RecognizerIntent） | macOS ✅、Android（需 GMS）⚠️、Windows ❌、Web ❌ | ✅ | ✅ |
-| `whisper_kit` | whisper.cpp 本地模型（`package:whisper_kit`） | Android ✅、iOS ✅、macOS ❌（见下文） | ✅ | ✅ |
+| `sherpa_onnx` | sherpa-onnx 本机模型（SenseVoice / Whisper / Paraformer，离线免网络） | macOS ✅、Android ✅、Windows ✅、iOS ✅、Web ❌ | ✅ | ✅ |
 
 AI 语音能力不再使用独立语音 API 配置，统一挂在 AI 配置中。每个 AI 配置可选择 `none`、`transcription_endpoint` 或 `chat_audio_input`，并分别保存文本/语音能力连通测试状态。
+
+sherpa-onnx 模式下用户可选择三种引擎：SenseVoice（多语言 + 情感识别）、Whisper（高精度多语言，tiny/base/small/medium 四种尺寸）、Paraformer（纯中文流式转写）。用户需先下载模型再使用。
 
 ### 17.2 平台感知默认值
 
 默认 `sttMode` 为 `auto`。自动模式的选择顺序是：当前练习 AI（可转写且测试通过）→ 固定语音 AI → 默认 AI → 平台本机兜底。
 
 - **macOS** → 优先系统语音兜底
-- **Android** → 优先本机 WhisperKit 兜底
+- **Android** → 优先本机 sherpa-onnx 兜底
 - **Web** → 需要可转写 AI 配置；没有本地语音兜底
 
 ### 17.3 条件导入架构
 
+on_device_stt 模块拆为三层：
+
 ```
-on_device_stt_service.dart
-  ├── export if (dart.library.io) → on_device_stt_service_io.dart (真实实现)
-  └── export else                 → on_device_stt_service_stub.dart (空桩，仅 Web 编译)
+on_device_stt_service.dart              # 共享类型：OnDeviceSttResult、OnDeviceSttService 抽象类、OnDeviceSttStub
+on_device_stt_factory.dart              # 条件导出工厂函数
+  ├── export if (dart.library.io) → on_device_stt_factory_native.dart (真实实现)
+  └── export else                 → on_device_stt_factory_stub.dart (空桩，仅 Web 编译)
 ```
 
-- `on_device_stt_service_io.dart` 中 `import 'package:whisper_kit/whisper_kit.dart'` 仅在 native 平台编译
-- Web 编译时不解析 `whisper_kit` 包，因此 Web 的 `flutter build` 不会因该包的平台限制失败
-- 空桩方法全部抛出 `UnsupportedError`
+- `on_device_stt_factory_native.dart` 中 `import 'package:sherpa_onnx/sherpa_onnx.dart'` 仅在 native 平台编译
+- Web 编译时不解析 `sherpa_onnx` 包，因此 Web 的 `flutter build` 不会因 `dart:ffi` 限制失败
+- 空桩工厂返回 `OnDeviceSttStub`，其方法全部抛出 `UnsupportedError`
 
 ### 17.4 降级与错误处理
 
@@ -1452,20 +1457,20 @@ on_device_stt_service.dart
 
 1. `auto` 模式会自动寻找可用语音链路。
 2. AI 语音必须通过连通测试；测试失败、未测试或未启用语音能力时不会被自动选中。
-3. 系统语音和本机 WhisperKit 初始化失败时展示本地化错误，提示切换语音模式或配置支持语音的 AI。
+3. 系统语音和本机 sherpa-onnx 初始化失败时展示本地化错误，提示切换语音模式或配置支持语音的 AI。
 4. 识别结果按增量写入业务输入区域，停止按钮只负责结束录音/转写。
 
 触发降级的场景：
 - 系统语音初始化返回 `!isAvailable`（如 Windows、无 GMS 的 Android）
 - 系统语音 `listen()` 抛出异常（如 Web 端的 `SpeechToText` 初始化失败）
-- `whisper_kit` 模型下载/初始化失败（如 macOS 虽已声明支持，但实际 whisper.cpp 模型不可用）
+- sherpa-onnx 模型未下载或初始化失败
 - AI 语音配置未通过测试、接口超时、鉴权失败、模型不支持音频输入
 
-### 17.5 macOS 构建约束
+### 17.5 构建约束
 
-`whisper_kit` 在 `pubspec.yaml` 中声明了 `macos: ffiPlugin: true`，但实际没有提供 `macos/whisper_kit.podspec`。Flutter macOS 构建流程中 `flutter_install_all_macos_pods` 会遍历所有声明 macOS 支持的插件并查找其 podspec，找不到时 CocoaPods 报错退出。
+sherpa-onnx 通过 `sherpa_onnx` Dart 包接入，底层依赖 `dart:ffi`，因此 **Web 平台无法编译 sherpa-onnx**。通过 §17.3 的条件导入模式，Web 构建时不解析 `sherpa_onnx` 包，编译不会失败。
 
-修复位置：`macos/Podfile` 在 `flutter_install_all_macos_pods` 执行前检查 `.symlinks/plugins/whisper_kit/macos/whisper_kit.podspec`，不存在时写入桩文件（仅含 `FlutterMacOS` 依赖和必要元信息）。这是第三包包缺陷，桩文件使构建通过，桩 pod 不会在运行时链接任何实际代码。
+`sherpa_onnx` 提供了各原生平台的正确 podspec 和 CMakeLists.txt，无需额外桩文件。
 
 ### 17.6 l10n Key 约定
 
@@ -1473,11 +1478,27 @@ STT 相关文案遵循项目 l10n 规范，新增 keys：
 
 | Key | 用途 |
 |-----|------|
-| `whisper_kit_unsupported_platform` | 本机 Whisper 不支持当前平台 |
+| `on_device_stt_title` | 本机模型标题 |
+| `on_device_stt_desc` | 本机模型模式描述 |
+| `on_device_stt_web_unsupported` | Web 端不支持本机 STT |
+| `on_device_engine_select` | 本机引擎选择器标签 |
+| `on_device_engine_sense_voice` | SenseVoice 引擎名 |
+| `on_device_engine_whisper` | Whisper 引擎名 |
+| `on_device_engine_paraformer` | Paraformer 引擎名 |
+| `on_device_engine_sense_voice_hint` | SenseVoice 引擎介绍 |
+| `on_device_engine_whisper_hint` | Whisper 引擎介绍 |
+| `on_device_engine_paraformer_hint` | Paraformer 引擎介绍 |
+| `on_device_engine_unknown` | 未知引擎提示 |
+| `on_device_whisper_model_select` | Whisper 模型大小选择器 |
+| `on_device_model_not_downloaded` | 模型未下载提示 |
+| `on_device_stt_init_failed` | 模型初始化失败 |
+| `whisper_model_tiny` / `_base` / `_small` / `_medium` | Whisper 模型尺寸标签 |
+| `whisper_model_tiny_hint` / `_base_hint` / `_small_hint` / `_medium_hint` | Whisper 模型详细介绍 |
+| `model_ready` / `model_not_ready` / `model_download` / `model_delete` | 模型管理状态 |
 | `system_speech_voice_desc` | 系统语音模式描述文案 |
 | `system_speech_unsupported` | 系统语音不支持当前平台 |
-| `stt_mode_auto` | 自动语音模式 |
-| `stt_mode_follow_current_ai` | 跟随当前 AI 的语音模式 |
-| `stt_mode_fixed_ai` | 固定语音 AI 模式 |
+| `stt_mode_auto` + `_desc` | 自动语音模式 |
+| `stt_mode_follow_current_ai` + `_desc` | 跟随当前 AI 的语音模式 |
+| `stt_mode_fixed_ai` + `_desc` | 固定语音 AI 模式 |
 | `audio_mode_transcription_endpoint` | AI 转写端点语音模式 |
 | `audio_mode_chat_audio_input` | Chat 音频输入语音模式 |
