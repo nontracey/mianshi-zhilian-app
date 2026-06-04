@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:sherpa_onnx/sherpa_onnx.dart';
@@ -27,14 +28,30 @@ class ParaformerEngine implements OnDeviceSttService {
   @override
   Future<void> initialize() async {
     initBindings(await ModelDownloader.requireRuntimeLibraryDir());
+
+    // 优先使用离线模式（sherpa-onnx-paraformer-zh-small 仅支持离线，
+    // 存档不含 encoder.int8.onnx/decoder.int8.onnx）。
+    // 若检测到流式模型文件，再尝试升级为在线模式。
+    _offlineRecognizer = OfflineRecognizer(_paraformerOfflineConfig(modelDir));
+    _useOnline = false;
+
+    // 尝试热升级为在线模式（需要 encoder/decoder 文件）
     try {
-      _onlineRecognizer = OnlineRecognizer(_paraformerOnlineConfig(modelDir));
-      _onlineStream = _onlineRecognizer!.createStream();
-      _useOnline = true;
+      final encoderFile = File('$modelDir/encoder.int8.onnx');
+      final decoderFile = File('$modelDir/decoder.int8.onnx');
+      if (await encoderFile.exists() && await decoderFile.exists()) {
+        _onlineRecognizer = OnlineRecognizer(_paraformerOnlineConfig(modelDir));
+        _onlineStream = _onlineRecognizer!.createStream();
+
+        // 在线模式就绪，释放离线资源
+        _offlineRecognizer?.free();
+        _offlineRecognizer = null;
+        _useOnline = true;
+      }
     } catch (_) {
-      _offlineRecognizer = OfflineRecognizer(_paraformerOfflineConfig(modelDir));
-      _useOnline = false;
+      // 升级失败不阻塞——保留离线模式可用
     }
+
     isInitialized = true;
   }
 

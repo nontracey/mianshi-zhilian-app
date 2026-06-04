@@ -329,7 +329,9 @@ class ModelDownloader {
 
   /// 检查模型是否已下载完整
   static Future<bool> isModelReady(OnDeviceModelConfig config) async {
-    final dir = await getModelDir(config.id);
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/${config.id}');
+    if (!await dir.exists()) return false;
     for (final file in config.files) {
       final f = File('${dir.path}/${file.relativePath}');
       if (!await f.exists()) return false;
@@ -341,7 +343,9 @@ class ModelDownloader {
   }
 
   static Future<bool> isRuntimeReady(OnDeviceRuntimeConfig config) async {
-    final dir = await getRuntimeDir(config.id);
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/runtimes/${config.id}');
+    if (!await dir.exists()) return false;
     for (final file in config.files) {
       final found = await _findFile(dir, file.fileName);
       if (found == null) return false;
@@ -384,7 +388,8 @@ class ModelDownloader {
 
   /// 删除整个模型
   static Future<void> deleteModel(String modelId) async {
-    final dir = await getModelDir(modelId);
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/$modelId');
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
@@ -392,7 +397,8 @@ class ModelDownloader {
   }
 
   static Future<void> deleteRuntime(String runtimeId) async {
-    final dir = await getRuntimeDir(runtimeId);
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/runtimes/$runtimeId');
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
@@ -446,6 +452,10 @@ class ModelDownloader {
     }
     await modelDir.create(recursive: true);
 
+    // 跟踪下载阶段的最终进度值（提取阶段复用，避免进度条回退）
+    int downloadTotal = config.archiveSizeBytes ?? 0;
+    String downloadSource = '';
+
     // 1. 下载 .tar.bz2 存档到临时文件
     final tempFile = await _downloadArchiveToTemp(
       archiveUrl: config.archiveUrl,
@@ -455,21 +465,24 @@ class ModelDownloader {
       archiveSizeBytes: config.archiveSizeBytes,
       controller: controller,
       onProgress: (progress) {
+        downloadTotal = progress.total;
+        downloadSource = progress.sourceLabel;
         onProgress?.call(progress.received, progress.total);
         onDetailedProgress?.call(progress);
       },
     );
 
     try {
-      // 2. 读取临时文件到内存用于 BZip2 解压
-      onProgress?.call(0, config.archiveSizeBytes ?? 1);
+      // 2. 切换到提取阶段，保持最近一次下载进度值（进度条不归零）
+      onProgress?.call(downloadTotal, downloadTotal);
       onDetailedProgress?.call(DownloadProgress(
-        received: 0,
-        total: config.archiveSizeBytes ?? 1,
-        sourceLabel: '',
+        received: downloadTotal,
+        total: downloadTotal,
+        sourceLabel: downloadSource,
         bytesPerSecond: 0,
         extracting: true,
       ));
+
       final archiveBytes = await tempFile.readAsBytes();
 
       // 3. BZip2 解压
@@ -534,6 +547,15 @@ class ModelDownloader {
         if (extractedCount == 0) {
           throw HttpException('No files extracted from archive');
         }
+
+        // 提取完成 → 报告 100%
+        onProgress?.call(downloadTotal, downloadTotal);
+        onDetailedProgress?.call(DownloadProgress(
+          received: downloadTotal,
+          total: downloadTotal,
+          sourceLabel: downloadSource,
+          bytesPerSecond: 0,
+        ));
       } catch (e) {
         // 清理可能部分解压的文件
         if (await modelDir.exists()) {
@@ -563,6 +585,10 @@ class ModelDownloader {
     }
     await runtimeDir.create(recursive: true);
 
+    // 跟踪下载阶段最终进度（提取阶段复用）
+    int downloadTotal = config.archiveSizeBytes ?? 0;
+    String downloadSource = '';
+
     final tempFile = await _downloadArchiveToTemp(
       archiveUrl: config.archiveUrl,
       identifier: config.id,
@@ -570,14 +596,18 @@ class ModelDownloader {
       downloadSourceMode: downloadSourceMode,
       archiveSizeBytes: config.archiveSizeBytes,
       controller: controller,
-      onProgress: onProgress,
+      onProgress: (progress) {
+        downloadTotal = progress.total;
+        downloadSource = progress.sourceLabel;
+        onProgress?.call(progress);
+      },
     );
 
     try {
       onProgress?.call(DownloadProgress(
-        received: 0,
-        total: config.archiveSizeBytes ?? 1,
-        sourceLabel: '',
+        received: downloadTotal,
+        total: downloadTotal,
+        sourceLabel: downloadSource,
         bytesPerSecond: 0,
         extracting: true,
       ));
@@ -588,6 +618,13 @@ class ModelDownloader {
           throw HttpException('Runtime file missing: ${file.fileName}');
         }
       }
+      // 提取完成 → 报告 100%
+      onProgress?.call(DownloadProgress(
+        received: downloadTotal,
+        total: downloadTotal,
+        sourceLabel: downloadSource,
+        bytesPerSecond: 0,
+      ));
     } catch (e) {
       if (await runtimeDir.exists()) {
         await runtimeDir.delete(recursive: true);
