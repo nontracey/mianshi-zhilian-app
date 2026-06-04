@@ -389,9 +389,9 @@ class _HeaderBarState extends State<HeaderBar> {
     final authProvider = context.watch<AuthProvider>();
 
     // 获取当前使用的AI模型名称
-    final currentModelName = aiProvider.configs.isNotEmpty
-        ? aiProvider.configs.first.name
-        : l10n.get('ai_not_configured');
+    final currentModelName = aiProvider.defaultConfig?.name ??
+        aiProvider.enabledConfigs.firstOrNull?.name ??
+        l10n.get('ai_not_configured');
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= 600;

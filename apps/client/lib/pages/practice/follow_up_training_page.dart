@@ -144,8 +144,8 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     }
 
     final aiProvider = context.read<AiProvider>();
-    if (aiProvider.defaultConfig == null) {
-      // 无AI配置，保存为本地练习
+    if (!aiProvider.hasAnyConfig) {
+      // 没有启用任何 AI 配置，保存为本地练习
       _saveLocalAnswer(answer);
       return;
     }

@@ -418,6 +418,7 @@ class L10n {
     'whisper_kit_model_downloading': '下载中',
     'whisper_kit_model_not_downloaded': '未下载',
     'whisper_kit_model_size': '约 75MB',
+    'whisper_default_name': 'Whisper 语音',
     'whisper_kit_model_status': '模型状态',
     'whisper_kit_need_download_tooltip': '下载语音模型后可用',
     'whisper_kit_web_unsupported': 'Web 端不支持本机语音识别',
@@ -425,6 +426,7 @@ class L10n {
     'ai_tech_stack_description': 'LLM、RAG、Agent、MCP、Function Calling、AI 工程化',
     'evaluation_instruction':
         '请评估后判断：如果回答已经充分，请返回总体评估；如果还需要进一步澄清，请在 JSON 中额外返回 "followUp" 字段包含追问问题。最多追问2轮。',
+    'evaluation_parse_failed': 'AI 返回格式异常，请重试或检查 AI 配置',
     'third_party_sync_coming_soon': '该第三方同步方式待开通，可先使用文件导出或 WebDAV。',
     'ticket_submitted': '工单已提交，我们会尽快处理',
     'password_reset_ticket_submitted':
@@ -1473,6 +1475,11 @@ class L10n {
     'voice_transcribing': '正在转写',
     'voice_stopping': '正在停止并处理最后一段',
     'voice_provider_unavailable': '没有可用的语音识别方式',
+    'voice_setting_mode': '设置模式',
+    'voice_actual_route': '实际路线',
+    'voice_route_ai': '云端 AI 语音',
+    'analysis_failed_saved_local': '分析失败，已保存本地记录',
+    'analysis_pending': '等待 AI 分析',
     'stt_mode_auto': '自动选择',
     'stt_mode_auto_desc': '优先使用当前 AI 语音能力，不可用时回退本地/系统语音',
     'stt_mode_follow_current_ai': '跟随当前 AI',
@@ -1886,6 +1893,7 @@ class L10n {
     'whisper_kit_model_downloading': 'Downloading',
     'whisper_kit_model_not_downloaded': 'Not downloaded',
     'whisper_kit_model_size': '~75MB',
+    'whisper_default_name': 'Whisper Speech',
     'whisper_kit_model_status': 'Model Status',
     'whisper_kit_need_download_tooltip': 'Download model to use',
     'whisper_kit_web_unsupported':
@@ -1898,6 +1906,8 @@ class L10n {
         'LLM, RAG, Agent, MCP, Function Calling, AI Engineering',
     'evaluation_instruction':
         'After evaluation: if the answer is already sufficient, return an overall assessment; if further clarification is needed, include a "followUp" field in the JSON with follow-up questions. Maximum 2 rounds of follow-up.',
+    'evaluation_parse_failed':
+        'AI returned an unexpected format. Please retry or check your AI configuration.',
     'third_party_sync_coming_soon':
         'This third-party sync method is coming soon. Use file export or WebDAV for now.',
     'ticket_submitted':
@@ -3121,6 +3131,11 @@ class L10n {
     'voice_transcribing': 'Transcribing',
     'voice_stopping': 'Stopping and processing the last segment',
     'voice_provider_unavailable': 'No available speech recognition provider',
+    'voice_setting_mode': 'Setting mode',
+    'voice_actual_route': 'Actual route',
+    'voice_route_ai': 'Cloud AI voice',
+    'analysis_failed_saved_local': 'Analysis failed, saved locally',
+    'analysis_pending': 'Waiting for AI analysis',
     'stt_mode_auto': 'Auto',
     'stt_mode_auto_desc':
         'Use current AI voice capability first, then fall back to local/system speech.',

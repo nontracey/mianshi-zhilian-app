@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../l10n/l10n.dart';
 import '../models/ai_config.dart';
 
 class AiTestResult {
@@ -426,18 +427,66 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
     final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
     if (jsonMatch != null) {
       try {
-        return json.decode(jsonMatch.group(0)!) as Map<String, dynamic>;
+        return _normalizeEvaluationResult(
+          json.decode(jsonMatch.group(0)!) as Map<String, dynamic>,
+        );
       } catch (_) {}
     }
     return {
-      'score': 0,
-      'level': 'unfamiliar',
-      'summary': content,
+      'score': null,
+      'level': 'local',
+      'summary': content.isNotEmpty
+          ? content
+          : L10n.get('evaluation_parse_failed', 'zh'),
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
-      'nextAction': 'retry',
+      'nextAction': L10n.get('retry', 'zh'),
+      'aiUnavailable': true,
     };
+  }
+
+  Map<String, dynamic> _normalizeEvaluationResult(Map<String, dynamic> raw) {
+    final result = Map<String, dynamic>.from(raw);
+    final score = _parseScore(result['score']);
+    result['score'] = score;
+    result['level'] = (result['level'] as String?) ?? _levelForScore(score);
+    result['summary'] = result['summary']?.toString() ?? '';
+    result['missedPoints'] = _stringList(result['missedPoints']);
+    result['wrongPoints'] = _stringList(
+      result['wrongPoints'] ?? result['errorPoints'],
+    );
+    result['improvedAnswer'] =
+        (result['improvedAnswer'] ?? result['optimizedAnswer'])?.toString() ??
+        '';
+    result['nextAction'] = result['nextAction']?.toString() ?? '';
+    if (score == null) result['aiUnavailable'] = true;
+    return result;
+  }
+
+  int? _parseScore(Object? value) {
+    final number = switch (value) {
+      int v => v,
+      double v => v.round(),
+      String v => int.tryParse(v.trim()),
+      _ => null,
+    };
+    if (number == null) return null;
+    return number.clamp(0, 100);
+  }
+
+  String _levelForScore(int? score) {
+    if (score == null) return 'local';
+    if (score >= 85) return 'skilled';
+    if (score >= 60) return 'familiar';
+    return 'unfamiliar';
+  }
+
+  List<String> _stringList(Object? value) {
+    if (value is List) return value.map((e) => e.toString()).toList();
+    if (value == null) return <String>[];
+    final text = value.toString().trim();
+    return text.isEmpty ? <String>[] : <String>[text];
   }
 
   Uint8List _createSilentWav() {

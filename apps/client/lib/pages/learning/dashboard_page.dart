@@ -435,17 +435,32 @@ class _AIFeedbackItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final score = attempt.score ?? 0;
-    final feedbackType = score >= 85
+    final hasAiScore = attempt.aiEvaluated && attempt.score != null;
+    final feedbackType = !hasAiScore
+        ? switch (attempt.analysisStatus) {
+            'failed' => l10n.get('analysis_failed_saved_local'),
+            'pending' => l10n.get('analysis_pending'),
+            _ => l10n.get('local_practice_already_save'),
+          }
+        : score >= 85
         ? l10n.get('surface_current_excellent')
         : score >= 60
         ? l10n.get('understand_question_count_thinking_road_pending_optimize')
         : l10n.get('knowledge_point_mastery_not_enough');
-    final feedbackColor = score >= 85
+    final feedbackColor = !hasAiScore
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : score >= 85
         ? AppColors.success
         : score >= 60
         ? AppColors.warning
         : AppColors.danger;
-    final feedbackIcon = score >= 85
+    final feedbackIcon = !hasAiScore
+        ? switch (attempt.analysisStatus) {
+            'failed' => Icons.error_outline,
+            'pending' => Icons.schedule_outlined,
+            _ => Icons.save_outlined,
+          }
+        : score >= 85
         ? Icons.check_circle_outline
         : score >= 60
         ? Icons.lightbulb_outline
@@ -492,7 +507,9 @@ class _AIFeedbackItem extends StatelessWidget {
             ),
           ),
           Text(
-            _timeAgo(attempt.createdAt, l10n),
+            hasAiScore
+                ? '$score · ${_timeAgo(attempt.createdAt, l10n)}'
+                : _timeAgo(attempt.createdAt, l10n),
             style: TextStyle(
               fontSize: 10,
               color: Theme.of(context).colorScheme.onSurfaceVariant,

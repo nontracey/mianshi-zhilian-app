@@ -146,11 +146,19 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         : () async {
                             setDialogState(() => isTesting = true);
                             final aiProvider = context.read<AiProvider>();
+
+                            // 根据表单状态决定测试哪种能力
+                            final testCapability = supportsTextInput
+                                ? AiCapability.text
+                                : AiCapability.audio;
+
                             final result = await aiProvider
                                 .testConnectionWithParams(
                                   baseUrl: baseUrlController.text.trim(),
                                   apiKey: apiKeyController.text.trim(),
                                   model: modelController.text.trim(),
+                                  audioMode: audioMode,
+                                  capability: testCapability,
                                 );
                             setDialogState(() {
                               testPassed = result.success;
@@ -329,7 +337,10 @@ class _AiConfigPageState extends State<AiConfigPage> {
                 final aiProvider = context.read<AiProvider>();
                 final capabilityTests = <String, CapabilityTestRecord>{};
                 if (testPassed != null) {
-                  capabilityTests[AiCapability.text.key] = CapabilityTestRecord(
+                  final testedKey = supportsTextInput
+                      ? AiCapability.text.key
+                      : AiCapability.audio.key;
+                  capabilityTests[testedKey] = CapabilityTestRecord(
                     state: testPassed!
                         ? CapabilityTestState.passed
                         : CapabilityTestState.failed,
@@ -608,20 +619,48 @@ class _CapabilityStatusChip extends StatelessWidget {
     final timeLabel = testedAt == null
         ? ''
         : ' · ${testedAt.month}/${testedAt.day} ${testedAt.hour.toString().padLeft(2, '0')}:${testedAt.minute.toString().padLeft(2, '0')}';
-    return Container(
+    final stateLabel = '${l10n.get(record.state.labelKey)}$timeLabel';
+    // 失败时显示具体的错误原因
+    final detail = record.state == CapabilityTestState.failed &&
+            record.message.isNotEmpty
+        ? record.message
+        : null;
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        '$label: ${l10n.get(record.state.labelKey)}$timeLabel',
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: $stateLabel',
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (detail != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                detail,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
       ),
     );
+    return detail != null
+        ? Tooltip(message: detail, child: chip)
+        : chip;
   }
 }

@@ -54,6 +54,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   String _lastCumulativeText = '';
   String _previewText = '';
   String? _statusMessageKey;
+
+  /// 当前活跃的 AI 配置名（用于转写时显示模型信息）
+  String? _activeConfigLabel;
   int _emptyChunkCount = 0;
   bool _hasEmittedText = false;
 
@@ -87,6 +90,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _lastCumulativeText = '';
     _previewText = '';
     _statusMessageKey = null;
+    _activeConfigLabel = null;
     _emptyChunkCount = 0;
     _hasEmittedText = false;
 
@@ -145,7 +149,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   Future<void> _startSystemListening() async {
-    if (!await AppPermissionService.ensureSpeechRecognition(context)) return;
+    if (!await AppPermissionService.ensureSpeechRecognition(context)) {
+      _resetStartFailure();
+      return;
+    }
     if (!_systemAvailable) {
       _systemAvailable = await _speech.initialize(
         onStatus: (status) {
@@ -161,6 +168,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       );
     }
     if (!_systemAvailable) {
+      _resetStartFailure();
       _showError('system_speech_unsupported');
       return;
     }
@@ -184,10 +192,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   Future<void> _startAiStreaming(AiConfig config) async {
     if (kIsWeb) {
+      _resetStartFailure();
       _showError('voice_web_unsupported');
       return;
     }
-    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    if (!await AppPermissionService.ensureMicrophone(context)) {
+      _resetStartFailure();
+      return;
+    }
+    _activeConfigLabel = '${config.name} · ${config.model}';
     _setStateKind(VoiceInputState.recording);
     _setStatusMessage('voice_recording_hint');
     unawaited(_runAiChunkLoop(config));
@@ -204,11 +217,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         try {
           await deleteFileAtPath(chunkPath);
         } catch (_) {}
-        if (!_running && bytes.isEmpty) break;
+        // 如果在录音/加载过程中用户停止了，丢弃此段结果
+        if (!_running) break;
         final text = await aiProvider.transcribeAudio(
           config: config,
           audioBytes: bytes,
         );
+        // 转写完成后再检查一次：如果已停止，丢弃结果避免竞态写入
+        if (!_running) break;
         _emitText(text);
         if (_running) _setStateKind(VoiceInputState.recording);
         if (_running) _setStatusMessage('voice_recording_hint');
@@ -225,15 +241,20 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   Future<void> _startOnDeviceStreaming() async {
     if (kIsWeb) {
+      _resetStartFailure();
       _showError('whisper_kit_web_unsupported');
       return;
     }
-    if (!await AppPermissionService.ensureMicrophone(context)) return;
+    if (!await AppPermissionService.ensureMicrophone(context)) {
+      _resetStartFailure();
+      return;
+    }
     _onDevice ??= OnDeviceSttService();
     if (!_onDevice!.isModelReady) {
       if (await _onDevice!.isModelFilePresent()) {
         await _onDevice!.initModel();
       } else {
+        _resetStartFailure();
         _showError('whisper_kit_model_not_downloaded');
         return;
       }
@@ -351,6 +372,13 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _showErrorDetail(messageKey, null);
   }
 
+  void _resetStartFailure() {
+    _running = false;
+    if (mounted && _state != VoiceInputState.idle) {
+      _setStateKind(VoiceInputState.idle);
+    }
+  }
+
   void _showErrorDetail(String messageKey, Object? error) {
     _running = false;
     _setStateKind(VoiceInputState.error);
@@ -427,13 +455,31 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
             padding: const EdgeInsets.only(top: 4),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 220),
-              child: Text(
-                _previewText.isNotEmpty
-                    ? _previewText
-                    : l10n.get(_statusMessageKey!),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _previewText.isNotEmpty
+                        ? _previewText
+                        : l10n.get(_statusMessageKey!),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  if (_activeConfigLabel != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        _activeConfigLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

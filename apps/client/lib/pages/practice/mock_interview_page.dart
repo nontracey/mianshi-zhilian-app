@@ -94,7 +94,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     if (value == _scenario) return;
     final hasProgress = _results.isNotEmpty || _evaluationResult != null;
     if (hasProgress) {
-      final l10n = context.watch<LocalizationProvider>();
+      final l10n = context.read<LocalizationProvider>();
       showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -160,10 +160,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   }
 
   Future<void> _evaluate() async {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
-      final l10n = context.watch<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.get('please_first_input_your_answer'))),
       );
@@ -172,17 +171,6 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
     final topic = _getCurrentTopic();
     if (topic == null) return;
-
-    final aiProvider = context.read<AiProvider>();
-    if (aiProvider.defaultConfig == null) {
-      final l10n = context.watch<LocalizationProvider>();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.get('please_first_at_personal_center_config_ai')),
-        ),
-      );
-      return;
-    }
 
     setState(() => _isEvaluating = true);
 
@@ -209,6 +197,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     }
 
     try {
+      final aiProvider = context.read<AiProvider>();
       final result = await aiProvider.evaluateAnswer(
         topicId: topic.id,
         question: topic.recallPrompts.isNotEmpty
@@ -246,10 +235,13 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           setState(() {
             _evaluationResult = result;
             _stage = _InterviewStage.summary;
+            final scoreForDisplay = result['score'] is int
+                ? result['score'] as int
+                : 0;
             _results.add({
               'topicId': topic.id,
               'topicTitle': topic.title,
-              'score': result['score'] ?? 0,
+              'score': scoreForDisplay,
               'answer': answer,
               'question': topic.recallPrompts.isNotEmpty
                   ? topic.recallPrompts.first.prompt
@@ -267,7 +259,6 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           });
 
           final progressProvider = context.read<ProgressProvider>();
-          final score = result['score'] as int? ?? 0;
           await progressProvider.addAttempt(
             PracticeAttempt(
               id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -300,10 +291,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                       as String?,
               nextAction: result['nextAction'] as String?,
               aiEvaluated: result['aiUnavailable'] != true,
+              localOnly: result['aiUnavailable'] == true,
+              analysisStatus: result['aiUnavailable'] == true
+                  ? 'unanalysed'
+                  : result['score'] == null
+                      ? 'unanalysed'
+                      : 'success',
             ),
           );
-          if (result['score'] is int) {
-            await progressProvider.updateTopicProgress(topic.id, score: score);
+          if (result['aiUnavailable'] != true && result['score'] is int) {
+            await progressProvider.updateTopicProgress(
+              topic.id,
+              score: result['score'] as int,
+            );
           }
         }
       }
@@ -1066,6 +1066,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             as String? ??
         '';
     final nextAction = _evaluationResult!['nextAction'] as String? ?? '';
+    final aiUnavailable = _evaluationResult!['aiUnavailable'] == true;
 
     final topic = _getCurrentTopic();
     final weights = topic?.rubric?.scoreWeights;
@@ -1087,15 +1088,17 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               const Icon(Icons.assessment_outlined, size: 18),
               const SizedBox(width: 8),
               Text(
-                l10n.get('evaluation_result'),
+                aiUnavailable
+                    ? l10n.get('local_practice_already_save')
+                    : l10n.get('evaluation_result'),
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              ScoreBadge(score: score),
+              if (!aiUnavailable) ScoreBadge(score: score),
             ],
           ),
           const SizedBox(height: 16),
-          if (weights != null && weights.isNotEmpty) ...[
+          if (!aiUnavailable && weights != null && weights.isNotEmpty) ...[
             _buildDimensionScores(score, weights),
             const SizedBox(height: 16),
           ],
@@ -1601,8 +1604,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     if (_savedSession) return;
     _savedSession = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final l10n = context.watch<LocalizationProvider>();
       if (!mounted) return;
+      final l10n = context.read<LocalizationProvider>();
       final attempts = _results.map((result) {
         final rawMissed = result['missedPoints'] as List<dynamic>? ?? [];
         final rawWrong = result['wrongPoints'] as List<dynamic>? ?? [];
@@ -1619,6 +1622,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           wrongPoints: rawWrong.map((e) => e.toString()).toList(),
           improvedAnswer: result['improvedAnswer'] as String?,
           aiEvaluated: result['aiUnavailable'] != true,
+          localOnly: result['aiUnavailable'] == true,
+          analysisStatus: result['aiUnavailable'] == true
+              ? 'unanalysed'
+              : result['score'] == null
+                  ? 'unanalysed'
+                  : 'success',
         );
       }).toList();
       context.read<ProgressProvider>().addMockSession(

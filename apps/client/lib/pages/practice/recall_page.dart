@@ -817,9 +817,14 @@ class _RecallPageState extends State<RecallPage> {
                     as String?,
             nextAction: result['nextAction'] as String?,
             aiConfigId: aiConfigId,
-            aiEvaluated: aiEvaluated,
-            localOnly: !aiEvaluated,
-            analysisStatus: aiEvaluated ? 'success' : 'unanalysed',
+            aiEvaluated: result['aiUnavailable'] != true,
+            localOnly: result['aiUnavailable'] == true,
+            analysisStatus:
+                result['aiUnavailable'] == true
+                    ? 'unanalysed'
+                    : result['score'] == null
+                        ? 'unanalysed'
+                        : 'success',
           ),
         );
         if (aiEvaluated && result['score'] is int) {

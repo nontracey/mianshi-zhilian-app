@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
@@ -309,14 +310,6 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     }
 
     final aiProvider = context.read<AiProvider>();
-    if (aiProvider.defaultConfig == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.get('please_first_at_personal_center_config_ai')),
-        ),
-      );
-      return;
-    }
 
     setState(() => _isEvaluating = true);
 
@@ -334,8 +327,57 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       if (mounted) {
         setState(() => _evaluationResult = result);
         final progressProvider = context.read<ProgressProvider>();
-        final score = result['score'] as int? ?? 0;
-        await progressProvider.updateTopicProgress(topic.id, score: score);
+        final enabledConfigs = aiProvider.enabledConfigs;
+        final aiConfigId =
+            aiProvider.defaultConfig?.id ??
+            (enabledConfigs.isNotEmpty ? enabledConfigs.first.id : null);
+        await progressProvider.addAttempt(
+          PracticeAttempt(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            topicId: topic.id,
+            promptId: topic.recallPrompts.isNotEmpty
+                ? topic.recallPrompts.first.id
+                : '',
+            mode: 'topicDetailRecall',
+            question: topic.recallPrompts.isNotEmpty
+                ? topic.recallPrompts.first.prompt
+                : topic.title,
+            answer: answer,
+            createdAt: DateTime.now(),
+            score: result['score'] as int?,
+            level: result['level'] as String?,
+            summary: result['summary'] as String?,
+            missedPoints:
+                (result['missedPoints'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [],
+            wrongPoints:
+                ((result['wrongPoints'] ?? result['errorPoints'])
+                        as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [],
+            improvedAnswer:
+                (result['improvedAnswer'] ?? result['optimizedAnswer'])
+                    as String?,
+            nextAction: result['nextAction'] as String?,
+            aiConfigId: aiConfigId,
+            aiEvaluated: result['aiUnavailable'] != true,
+            localOnly: result['aiUnavailable'] == true,
+            analysisStatus: result['aiUnavailable'] == true
+                ? 'unanalysed'
+                : result['score'] == null
+                    ? 'unanalysed'
+                    : 'success',
+          ),
+        );
+        if (result['aiUnavailable'] != true && result['score'] is int) {
+          await progressProvider.updateTopicProgress(
+            topic.id,
+            score: result['score'] as int,
+          );
+        }
         await StorageService().recordAnalyticsFeature('ai_eval');
       }
     } catch (e) {
@@ -3611,9 +3653,15 @@ class _EvaluationResultPanel extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final score = result['score'] as int? ?? 0;
     final missed = result['missedPoints'] as List<dynamic>? ?? [];
-    final errors = result['errorPoints'] as List<dynamic>? ?? [];
-    final optimized = result['optimizedAnswer'] as String? ?? '';
+    final errors =
+        (result['errorPoints'] ?? result['wrongPoints']) as List<dynamic>? ??
+        [];
+    final optimized =
+        (result['optimizedAnswer'] ?? result['improvedAnswer']) as String? ??
+        '';
     final feedbackTags = result['feedbackTags'] as List<dynamic>? ?? [];
+    final summary = result['summary'] as String? ?? '';
+    final aiUnavailable = result['aiUnavailable'] == true;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -3629,10 +3677,15 @@ class _EvaluationResultPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.assessment_outlined, color: AppColors.accent),
+              Icon(
+                aiUnavailable ? Icons.save_outlined : Icons.assessment_outlined,
+                color: aiUnavailable ? Colors.grey : AppColors.accent,
+              ),
               const SizedBox(width: 8),
               Text(
-                l10n.get('ai_evaluation_result'),
+                aiUnavailable
+                    ? l10n.get('local_practice_already_save')
+                    : l10n.get('ai_evaluation_result'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -3640,52 +3693,64 @@ class _EvaluationResultPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          if (summary.isNotEmpty) ...[
+            Text(summary, style: const TextStyle(height: 1.5)),
+            const SizedBox(height: 14),
+          ],
           // 环形分数 + 标签
-          Row(
-            children: [
-              _ScoreRing(score: score, size: 80),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ScoreBadge(score: score),
-                    if (feedbackTags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: feedbackTags
-                            .map(
-                              (tag) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.1,
+          if (!aiUnavailable)
+            Row(
+              children: [
+                _ScoreRing(score: score, size: 80),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ScoreBadge(score: score),
+                      if (feedbackTags.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: feedbackTags
+                              .map(
+                                (tag) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  tag.toString(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.accent,
-                                    fontWeight: FontWeight.w600,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    tag.toString(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                      ),
+                              )
+                              .toList(),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
+              ],
+            ),
+          if (aiUnavailable)
+            Text(
+              l10n.get('ai_not_configured_summary'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
+            ),
           // 遗漏点
           if (missed.isNotEmpty) ...[
             const SizedBox(height: 14),

@@ -19,8 +19,10 @@ class AiProvider extends ChangeNotifier {
   bool _isTesting = false;
   String? _testResult;
 
-  // 流式评估的订阅，用于取消
+  // 流式评估的订阅及相关资源，用于取消和清理
   StreamSubscription<String>? _currentStreamSubscription;
+  StreamController<String>? _currentStreamController;
+  Completer<Map<String, dynamic>>? _currentCompleter;
 
   List<AiConfig> get configs => _configs;
   AiConfig? get defaultConfig => _defaultConfig;
@@ -33,14 +35,63 @@ class AiProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _currentStreamSubscription?.cancel();
+    _cancelCurrentStream();
     super.dispose();
   }
 
   Future<void> loadConfigs() async {
+    await _migrateOldWhisperConfigIfNeeded();
     _configs = await _storage.loadAiConfigs();
     _defaultConfig = _configs.where((c) => c.isDefault).firstOrNull;
     notifyListeners();
+  }
+
+  Future<void> _migrateOldWhisperConfigIfNeeded() async {
+    try {
+      final rawData = await _storage.load('settings');
+      if (rawData is! Map<String, dynamic>) return;
+      final oldBaseUrl = rawData['whisperBaseUrl'] as String?;
+      final oldApiKey = rawData['whisperApiKey'] as String?;
+      final oldModel = rawData['whisperModel'] as String?;
+      if (oldBaseUrl == null || oldBaseUrl.trim().isEmpty) return;
+
+      final existingConfigs = await _storage.loadAiConfigs();
+      final alreadyMigrated = existingConfigs.any(
+        (c) =>
+            c.baseUrl == oldBaseUrl &&
+            c.audioMode == AiAudioMode.transcriptionEndpoint,
+      );
+      if (alreadyMigrated) return;
+
+      final migratedConfig = AiConfig(
+        id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
+        name: oldModel != null && oldModel.isNotEmpty
+            ? 'Whisper ($oldModel)'
+            : L10n.get('whisper_default_name', 'zh'),
+        baseUrl: oldBaseUrl,
+        apiKey: oldApiKey ?? '',
+        model: oldModel ?? 'whisper-1',
+        isDefault: existingConfigs.isEmpty,
+        enabled: true,
+        supportsTextInput: false,
+        supportsImageInput: false,
+        supportsAudioInput: true,
+        supportsMultimodal: false,
+        supportsStreaming: false,
+        audioMode: AiAudioMode.transcriptionEndpoint,
+        usageTags: const ['stt'],
+        capabilityTests: {
+          AiCapability.audio.key: CapabilityTestRecord(
+            state: CapabilityTestState.untested,
+            testedAt: DateTime.now(),
+            message: 'migrated_from_old_settings',
+          ),
+        },
+      );
+      await _storage.saveAiConfigs([...existingConfigs, migratedConfig]);
+    } catch (e) {
+      debugPrint('AiProvider: whisper migration failed: $e');
+    }
   }
 
   Future<void> addConfig(AiConfig config) async {
@@ -193,7 +244,9 @@ class AiProvider extends ChangeNotifier {
     Rubric? rubric,
     Uint8List? imageBytes,
   }) async {
-    final config = configById(aiConfigId);
+    final config =
+        configById(aiConfigId) ??
+        enabledConfigs.cast<AiConfig?>().firstOrNull;
     if (config == null || !config.canEvaluate) {
       return {
         'score': null,
@@ -229,7 +282,9 @@ class AiProvider extends ChangeNotifier {
     Rubric? rubric,
     Uint8List? imageBytes,
   }) {
-    final config = configById(aiConfigId);
+    final config =
+        configById(aiConfigId) ??
+        enabledConfigs.cast<AiConfig?>().firstOrNull;
     if (config == null || !config.canEvaluate) {
       final result = Future.value({
         'score': null,
@@ -245,11 +300,13 @@ class AiProvider extends ChangeNotifier {
       return (stream: const Stream.empty(), result: result);
     }
 
-    // 取消之前的流
-    _currentStreamSubscription?.cancel();
+    // 取消之前的流并清理旧 StreamController/Completer
+    _cancelCurrentStream();
 
     final streamController = StreamController<String>();
     final completer = Completer<Map<String, dynamic>>();
+    _currentStreamController = streamController;
+    _currentCompleter = completer;
 
     String fullContent = '';
 
@@ -269,16 +326,24 @@ class AiProvider extends ChangeNotifier {
             streamController.add(chunk);
           },
           onDone: () {
-            streamController.close();
-            _currentStreamSubscription = null;
+            if (!streamController.isClosed) streamController.close();
+            if (_currentStreamController == streamController) {
+              _currentStreamSubscription = null;
+              _currentStreamController = null;
+              _currentCompleter = null;
+            }
             // 解析完整内容
             final result = _parseStreamResult(fullContent);
-            completer.complete(result);
+            if (!completer.isCompleted) completer.complete(result);
           },
           onError: (error) {
-            streamController.close();
-            _currentStreamSubscription = null;
-            completer.completeError(error);
+            if (!streamController.isClosed) streamController.close();
+            if (_currentStreamController == streamController) {
+              _currentStreamSubscription = null;
+              _currentStreamController = null;
+              _currentCompleter = null;
+            }
+            if (!completer.isCompleted) completer.completeError(error);
           },
           cancelOnError: true,
         );
@@ -288,8 +353,32 @@ class AiProvider extends ChangeNotifier {
 
   /// 取消当前流式评估
   void cancelStreamEvaluation() {
+    _cancelCurrentStream();
+  }
+
+  /// 取消当前流式评估并清理资源（StreamController/Completer）
+  void _cancelCurrentStream() {
     _currentStreamSubscription?.cancel();
     _currentStreamSubscription = null;
+    // 关闭旧 StreamController 使其监听者收到 done 事件
+    if (_currentStreamController != null && !_currentStreamController!.isClosed) {
+      _currentStreamController!.close();
+    }
+    _currentStreamController = null;
+    // 完成旧 Completer 避免永久挂起
+    if (_currentCompleter != null && !_currentCompleter!.isCompleted) {
+      _currentCompleter!.complete({
+        'score': null,
+        'level': 'local',
+        'summary': 'cancelled',
+        'missedPoints': <String>[],
+        'wrongPoints': <String>[],
+        'improvedAnswer': '',
+        'nextAction': '',
+        'aiUnavailable': true,
+      });
+    }
+    _currentCompleter = null;
   }
 
   Future<String> transcribeAudio({
@@ -309,20 +398,68 @@ class AiProvider extends ChangeNotifier {
     final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
     if (jsonMatch != null) {
       try {
-        return json.decode(jsonMatch.group(0)!) as Map<String, dynamic>;
+        return _normalizeEvaluationResult(
+          json.decode(jsonMatch.group(0)!) as Map<String, dynamic>,
+        );
       } catch (_) {
-        // JSON 解析失败，返回原始内容
+        // JSON 解析失败
       }
     }
+    // JSON 解析失败或没有可解析内容时，返回 aiUnavailable 标记
+    // 上层据此跳过掌握度更新，避免因格式异常而清零用户掌握度
     return {
-      'score': 0,
-      'level': 'unfamiliar',
-      'summary': content,
+      'score': null,
+      'level': 'local',
+      'summary': content.isNotEmpty ? content : L10n.get('evaluation_parse_failed', 'zh'),
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
       'nextAction': L10n.get('retry', 'zh'),
+      'aiUnavailable': true,
     };
+  }
+
+  Map<String, dynamic> _normalizeEvaluationResult(Map<String, dynamic> raw) {
+    final result = Map<String, dynamic>.from(raw);
+    final score = _parseScore(result['score']);
+    result['score'] = score;
+    result['level'] = (result['level'] as String?) ?? _levelForScore(score);
+    result['summary'] = result['summary']?.toString() ?? '';
+    result['missedPoints'] = _stringList(result['missedPoints']);
+    result['wrongPoints'] = _stringList(
+      result['wrongPoints'] ?? result['errorPoints'],
+    );
+    result['improvedAnswer'] =
+        (result['improvedAnswer'] ?? result['optimizedAnswer'])?.toString() ??
+        '';
+    result['nextAction'] = result['nextAction']?.toString() ?? '';
+    if (score == null) result['aiUnavailable'] = true;
+    return result;
+  }
+
+  int? _parseScore(Object? value) {
+    final number = switch (value) {
+      int v => v,
+      double v => v.round(),
+      String v => int.tryParse(v.trim()),
+      _ => null,
+    };
+    if (number == null) return null;
+    return number.clamp(0, 100);
+  }
+
+  String _levelForScore(int? score) {
+    if (score == null) return 'local';
+    if (score >= 85) return 'skilled';
+    if (score >= 60) return 'familiar';
+    return 'unfamiliar';
+  }
+
+  List<String> _stringList(Object? value) {
+    if (value is List) return value.map((e) => e.toString()).toList();
+    if (value == null) return <String>[];
+    final text = value.toString().trim();
+    return text.isEmpty ? <String>[] : <String>[text];
   }
 
   /// 通用流式聊天，用于 AI 改进等场景

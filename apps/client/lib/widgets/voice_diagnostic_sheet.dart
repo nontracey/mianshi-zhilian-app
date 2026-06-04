@@ -1,12 +1,15 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../models/ai_config.dart';
+import '../providers/ai_provider.dart';
 import '../providers/localization_provider.dart';
 import '../providers/settings_provider.dart';
 
@@ -40,6 +43,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     // 在 async 间隙前捕获 settings，避免 use_build_context_synchronously
     final settings = context.read<SettingsProvider>().settings;
     final currentMode = settings.sttMode;
+    final aiProvider = context.read<AiProvider>();
+    final route = _resolveRoute(settings, aiProvider);
 
     // ── 麦克风权限（所有模式都检查）──
     _micStatus = await _checkMicPermission()
@@ -47,8 +52,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
         : _DiagStatus.fail;
     if (mounted) setState(() {});
 
-    // ── 系统语音引擎（仅 system 模式需要检查；其他模式下跳过）──
-    if (currentMode == 'system') {
+    // ── 系统语音引擎（实际会走 system 时检查）──
+    if (route.kind == _DiagRouteKind.system || currentMode == 'system') {
       final (ok, detail) = await _checkSpeechEngine();
       _speechStatus = ok ? _DiagStatus.pass : _DiagStatus.fail;
       _speechDetail = detail;
@@ -58,8 +63,9 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
     if (mounted) setState(() {});
 
-    // ── WhisperKit 本机模型检测（仅 whisper_kit 模式）──
-    if (currentMode == 'whisper_kit') {
+    // ── WhisperKit 本机模型检测（实际会走 whisper_kit 时检查）──
+    if (route.kind == _DiagRouteKind.whisperKit ||
+        currentMode == 'whisper_kit') {
       await _checkWhisperKitModel();
     } else {
       _whisperKitModelStatus = _DiagStatus.checking;
@@ -146,8 +152,10 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final settings = context.watch<SettingsProvider>().settings;
+    final aiProvider = context.watch<AiProvider>();
     final isWhisperKit = settings.sttMode == 'whisper_kit';
     final isSystem = settings.sttMode == 'system';
+    final route = _resolveRoute(settings, aiProvider);
 
     return SafeArea(
       child: Padding(
@@ -178,16 +186,27 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
             _DiagRow(
               icon: isWhisperKit ? Icons.memory : Icons.phone_android,
               color: Theme.of(context).colorScheme.secondary,
-              label: l10n.get('mode_type_name'),
+              label: l10n.get('voice_setting_mode'),
               trailing: Text(
-                isWhisperKit
-                    ? l10n.get('whisper_kit_mode_label')
-                    : l10n.get('system_speech_voice'),
+                _modeLabel(l10n, settings.sttMode),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.secondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
+            ),
+            _DiagRow(
+              icon: _routeIcon(route.kind),
+              color: _routeColor(context, route.kind),
+              label: l10n.get('voice_actual_route'),
+              trailing: Text(
+                _routeLabel(l10n, route),
+                style: TextStyle(
+                  color: _routeColor(context, route.kind),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              detail: route.detail,
             ),
             const Divider(height: 12),
 
@@ -210,7 +229,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
             ),
 
             // 系统语音引擎诊断（仅 system 模式）
-            if (isSystem)
+            if (isSystem || route.kind == _DiagRouteKind.system)
               _DiagRow(
                 icon: _iconFor(_speechStatus),
                 color: _colorFor(_speechStatus),
@@ -230,7 +249,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
               ),
 
             // WhisperKit 模型状态（仅 whisper_kit 模式）
-            if (isWhisperKit)
+            if (isWhisperKit || route.kind == _DiagRouteKind.whisperKit)
               _DiagRow(
                 icon: _iconFor(_whisperKitModelStatus),
                 color: _colorFor(_whisperKitModelStatus),
@@ -310,6 +329,84 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       ),
     );
   }
+
+  _DiagRoute _resolveRoute(dynamic settings, AiProvider aiProvider) {
+    final mode = settings.sttMode as String;
+    final fixed = settings.sttAiConfigId == null
+        ? null
+        : aiProvider.configById(settings.sttAiConfigId as String?);
+    final defaultConfig = aiProvider.defaultConfig;
+
+    AiConfig? audioConfig;
+    if (mode == 'fixed_ai_config') {
+      audioConfig = fixed?.canTranscribe == true ? fixed : null;
+    } else if (mode == 'follow_current_ai') {
+      audioConfig = defaultConfig?.canTranscribe == true ? defaultConfig : null;
+    } else if (mode == 'auto') {
+      audioConfig = fixed?.canTranscribe == true
+          ? fixed
+          : (defaultConfig?.canTranscribe == true ? defaultConfig : null);
+    }
+
+    if (audioConfig != null) {
+      return _DiagRoute(
+        _DiagRouteKind.ai,
+        '${audioConfig.name} · ${audioConfig.model}',
+      );
+    }
+    if (mode == 'system') return const _DiagRoute(_DiagRouteKind.system);
+    if (mode == 'whisper_kit') {
+      return const _DiagRoute(_DiagRouteKind.whisperKit);
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return const _DiagRoute(_DiagRouteKind.whisperKit);
+    }
+    return const _DiagRoute(_DiagRouteKind.system);
+  }
+
+  String _modeLabel(LocalizationProvider l10n, String mode) {
+    return switch (mode) {
+      'auto' => l10n.get('stt_mode_auto'),
+      'follow_current_ai' => l10n.get('stt_mode_follow_current_ai'),
+      'fixed_ai_config' => l10n.get('stt_mode_fixed_ai'),
+      'whisper_kit' => l10n.get('whisper_kit_mode_label'),
+      'system' => l10n.get('system_speech_voice'),
+      _ => mode,
+    };
+  }
+
+  String _routeLabel(LocalizationProvider l10n, _DiagRoute route) {
+    return switch (route.kind) {
+      _DiagRouteKind.ai => l10n.get('voice_route_ai'),
+      _DiagRouteKind.whisperKit => l10n.get('whisper_kit_mode_label'),
+      _DiagRouteKind.system => l10n.get('system_speech_voice'),
+    };
+  }
+
+  IconData _routeIcon(_DiagRouteKind kind) {
+    return switch (kind) {
+      _DiagRouteKind.ai => Icons.cloud_outlined,
+      _DiagRouteKind.whisperKit => Icons.memory,
+      _DiagRouteKind.system => Icons.phone_android,
+    };
+  }
+
+  Color _routeColor(BuildContext context, _DiagRouteKind kind) {
+    return switch (kind) {
+      _DiagRouteKind.ai => Theme.of(context).colorScheme.primary,
+      _DiagRouteKind.whisperKit => Colors.deepPurple,
+      _DiagRouteKind.system => Theme.of(context).colorScheme.secondary,
+    };
+  }
+}
+
+enum _DiagRouteKind { ai, whisperKit, system }
+
+class _DiagRoute {
+  const _DiagRoute(this.kind, [this.detail]);
+
+  final _DiagRouteKind kind;
+  final String? detail;
 }
 
 class _DiagRow extends StatelessWidget {

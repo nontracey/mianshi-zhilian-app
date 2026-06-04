@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../l10n/l10n.dart';
+import '../models/ai_config.dart';
 import '../models/app_settings.dart';
 import '../models/user_progress.dart';
 import '../services/data_sync_service.dart';
@@ -30,8 +31,70 @@ class SettingsProvider extends ChangeNotifier {
 
     _settings = await _storage.loadSettings();
     _settings = _applyPlatformDefaults(_settings);
+
+    // 迁移旧版 Whisper API 配置 → AiConfig
+    await _migrateOldWhisperConfig();
+
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// 检测并迁移旧版 AppSettings 中的 whisperBaseUrl/whisperApiKey/whisperModel
+  /// 到新的 AiConfig 体系，避免旧用户升级后配置静默丢失
+  Future<void> _migrateOldWhisperConfig() async {
+    try {
+      final rawData = await _storage.load('settings');
+      if (rawData == null) return;
+      final rawJson = rawData as Map<String, dynamic>;
+      final oldBaseUrl = rawJson['whisperBaseUrl'] as String?;
+      final oldApiKey = rawJson['whisperApiKey'] as String?;
+      final oldModel = rawJson['whisperModel'] as String?;
+      if (oldBaseUrl == null || oldBaseUrl.isEmpty) return;
+
+      // 检查是否已迁移过（通过标记或已有同名配置）
+      final existingConfigs = await _storage.loadAiConfigs();
+      final alreadyMigrated = existingConfigs.any(
+        (c) =>
+            c.baseUrl == oldBaseUrl &&
+            c.name.contains(L10n.get('whisper_default_name', 'zh')),
+      );
+      if (alreadyMigrated) return;
+
+      // 创建一个新 AiConfig
+      final migratedConfig = AiConfig(
+        id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
+        name: oldModel != null && oldModel.isNotEmpty
+            ? 'Whisper ($oldModel)'
+            : L10n.get('whisper_default_name', 'zh'),
+        baseUrl: oldBaseUrl,
+        apiKey: oldApiKey ?? '',
+        model: oldModel ?? 'whisper-1',
+        isDefault: existingConfigs.isEmpty,
+        enabled: true,
+        supportsTextInput: false,
+        supportsImageInput: false,
+        supportsAudioInput: true,
+        supportsMultimodal: false,
+        supportsStreaming: true,
+        audioMode: AiAudioMode.transcriptionEndpoint,
+        usageTags: ['stt'],
+        capabilityTests: {
+          AiCapability.audio.key: CapabilityTestRecord(
+            state: CapabilityTestState.untested,
+            testedAt: DateTime.now(),
+            message: 'migrated_from_old_settings',
+          ),
+        },
+      );
+      final updatedConfigs = [...existingConfigs, migratedConfig];
+      await _storage.saveAiConfigs(updatedConfigs);
+
+      // 清除旧 whisper 字段（可选 — 不破坏其他设置）
+      // 但不对 settings 本身做写回，因为 fromJson 已忽略这些字段
+      debugPrint('SettingsProvider: migrated old whisper config to AiConfig');
+    } catch (e) {
+      debugPrint('SettingsProvider: whisper migration failed: $e');
+    }
   }
 
   AppSettings _applyPlatformDefaults(AppSettings s) {
