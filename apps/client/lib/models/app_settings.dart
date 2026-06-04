@@ -114,6 +114,7 @@ class AppSettings {
   final String
   sttMode; // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'whisper_kit'
   final String? sttAiConfigId;
+  final String whisperModel; // 'tiny' | 'base' | 'small' | 'medium'
 
   // 知识源配置
   final ContentEnv contentEnv;
@@ -145,6 +146,7 @@ class AppSettings {
     this.cardDensity = 'comfortable',
     this.sttMode = 'auto',
     this.sttAiConfigId,
+    this.whisperModel = 'base',
     this.contentEnv = ContentEnv.production,
     this.customTestContentUrl,
     this.customProdContentUrl,
@@ -206,6 +208,7 @@ class AppSettings {
     String? cardDensity,
     String? sttMode,
     Object? sttAiConfigId = _unset,
+    Object? whisperModel = _unset,
     ContentEnv? contentEnv,
     Object? customTestContentUrl = _unset,
     Object? customProdContentUrl = _unset,
@@ -236,6 +239,9 @@ class AppSettings {
     sttAiConfigId: sttAiConfigId == _unset
         ? this.sttAiConfigId
         : sttAiConfigId as String?,
+    whisperModel: whisperModel == _unset
+        ? this.whisperModel
+        : whisperModel as String,
     contentEnv: contentEnv ?? this.contentEnv,
     customTestContentUrl: customTestContentUrl == _unset
         ? this.customTestContentUrl
@@ -309,6 +315,7 @@ class AppSettings {
     cardDensity: json['cardDensity'] as String? ?? 'comfortable',
     sttMode: json['sttMode'] as String? ?? 'auto',
     sttAiConfigId: json['sttAiConfigId'] as String?,
+    whisperModel: json['whisperModel'] as String? ?? 'base',
     contentEnv: ContentEnv.fromKey(
       json['contentEnv'] as String? ?? 'production',
     ),
@@ -339,6 +346,7 @@ class AppSettings {
     'cardDensity': cardDensity,
     'sttMode': sttMode,
     'sttAiConfigId': sttAiConfigId,
+    'whisperModel': whisperModel,
     'contentEnv': contentEnv.key,
     'customTestContentUrl': customTestContentUrl,
     'customProdContentUrl': customProdContentUrl,

@@ -15,6 +15,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
+import 'package:whisper_kit/whisper_kit.dart' show WhisperModel;
 
 enum VoiceInputState { idle, recording, transcribing, stopping, error }
 
@@ -245,11 +246,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       _showError('whisper_kit_web_unsupported');
       return;
     }
+    // 在 async 调用前读取 settings，避免 use_build_context_synchronously
+    final modelStr = context.read<SettingsProvider>().settings.whisperModel;
     if (!await AppPermissionService.ensureMicrophone(context)) {
       _resetStartFailure();
       return;
     }
-    _onDevice ??= OnDeviceSttService();
+    _onDevice ??= OnDeviceSttService(
+      model: _parseWhisperModel(modelStr),
+    );
     if (!_onDevice!.isModelReady) {
       if (await _onDevice!.isModelFilePresent()) {
         await _onDevice!.initModel();
@@ -370,6 +375,20 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   void _showError(String messageKey) {
     _showErrorDetail(messageKey, null);
+  }
+
+  /// 将 whisperModel 字符串（'tiny'/'base'/'small'/'medium'）转为 WhisperModel 枚举
+  static WhisperModel _parseWhisperModel(String model) {
+    switch (model) {
+      case 'tiny':
+        return WhisperModel.tiny;
+      case 'small':
+        return WhisperModel.small;
+      case 'medium':
+        return WhisperModel.medium;
+      default:
+        return WhisperModel.base;
+    }
   }
 
   void _resetStartFailure() {

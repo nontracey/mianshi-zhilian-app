@@ -23,6 +23,7 @@ import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt_service.dart';
+import 'package:whisper_kit/whisper_kit.dart' show WhisperModel;
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -1863,16 +1864,73 @@ class _WhisperKitModelManager extends StatefulWidget {
 }
 
 class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
-  final OnDeviceSttService _svc = OnDeviceSttService();
+  late OnDeviceSttService _svc;
   bool _modelReady = false;
-  bool _modelOnDisk = false; // 模型文件是否存在于磁盘
+  bool _modelOnDisk = false;
   bool _downloading = false;
   String _statusText = '';
+  late String _selectedModel;
+
+  static const List<String> _modelOptions = ['tiny', 'base', 'small', 'medium'];
+
+  /// 通过 l10n 获取模型显示标签
+  String _modelLabel(LocalizationProvider l10n, String model) {
+    switch (model) {
+      case 'tiny':
+        return l10n.get('whisper_kit_model_tiny_label');
+      case 'small':
+        return l10n.get('whisper_kit_model_small_label');
+      case 'medium':
+        return l10n.get('whisper_kit_model_medium_label');
+      default:
+        return l10n.get('whisper_kit_model_base_label');
+    }
+  }
+
+  /// 通过 l10n 获取模型介绍文本
+  String _modelHint(LocalizationProvider l10n, String model) {
+    switch (model) {
+      case 'tiny':
+        return l10n.get('whisper_kit_model_tiny_hint');
+      case 'small':
+        return l10n.get('whisper_kit_model_small_hint');
+      case 'medium':
+        return l10n.get('whisper_kit_model_medium_hint');
+      default:
+        return l10n.get('whisper_kit_model_base_hint');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _initFromSettings();
     _checkStatus();
+  }
+
+  void _initFromSettings() {
+    _selectedModel =
+        context.read<SettingsProvider>().settings.whisperModel;
+    if (!_modelOptions.contains(_selectedModel)) {
+      _selectedModel = 'base';
+    }
+    _svc = OnDeviceSttService(model: _parseWhisperModel(_selectedModel));
+  }
+
+  Future<void> _onModelChanged(String model) async {
+    if (model == _selectedModel) return;
+    await context.read<SettingsProvider>().updateSettings(
+      context.read<SettingsProvider>().settings.copyWith(whisperModel: model),
+    );
+    setState(() {
+      _selectedModel = model;
+      _svc = OnDeviceSttService(model: _parseWhisperModel(model));
+      _modelReady = false;
+      _modelOnDisk = false;
+      _downloading = false;
+      _statusText = '';
+    });
+    await _checkStatus();
   }
 
   Future<void> _checkStatus() async {
@@ -1889,6 +1947,20 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
           _statusText = 'ready'; // 文件已存在，标记为 ready
         }
       });
+    }
+  }
+
+  /// 将 whisperModel 字符串转为 WhisperModel 枚举
+  static WhisperModel _parseWhisperModel(String model) {
+    switch (model) {
+      case 'tiny':
+        return WhisperModel.tiny;
+      case 'small':
+        return WhisperModel.small;
+      case 'medium':
+        return WhisperModel.medium;
+      default:
+        return WhisperModel.base;
     }
   }
 
@@ -1992,63 +2064,108 @@ class _WhisperKitModelManagerState extends State<_WhisperKitModelManager> {
           ),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isAvailable ? Icons.check_circle : Icons.download_outlined,
-              color: isAvailable ? Colors.green : theme.colorScheme.secondary,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.get('whisper_kit_model_status'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+            // 模型选择器
+            Row(
+              children: [
+                Text(
+                  l10n.get('whisper_kit_model_select'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isAvailable
-                        ? l10n.get('whisper_kit_model_downloaded')
-                        : _downloading
-                        ? _statusText
-                        : l10n.get('whisper_kit_model_not_downloaded'),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  Text(
-                    l10n.get('whisper_kit_model_size'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_downloading)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else if (!isAvailable)
-              TextButton(
-                onPressed: _download,
-                child: Text(l10n.get('whisper_kit_download_model')),
-              )
-            else
-              TextButton(
-                onPressed: _delete,
-                child: Text(
-                  l10n.get('whisper_kit_delete_model'),
-                  style: const TextStyle(color: Colors.red),
                 ),
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: _selectedModel,
+                  isDense: true,
+                  underline: const SizedBox(),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  items: _modelOptions.map((model) {
+                    return DropdownMenuItem(
+                      value: model,
+                      child: Text(_modelLabel(l10n, model)),
+                    );
+                  }).toList(),
+                  onChanged: (model) {
+                    if (model != null) _onModelChanged(model);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // 模型介绍文字
+            Text(
+              _modelHint(l10n, _selectedModel),
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(height: 8),
+            // 模型状态行
+            Row(
+              children: [
+                Icon(
+                  isAvailable
+                      ? Icons.check_circle
+                      : Icons.download_outlined,
+                  color: isAvailable
+                      ? Colors.green
+                      : theme.colorScheme.secondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.get('whisper_kit_model_status'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isAvailable
+                            ? l10n.get('whisper_kit_model_downloaded')
+                            : _downloading
+                            ? _statusText
+                            : l10n.get('whisper_kit_model_not_downloaded'),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_downloading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (!isAvailable)
+                  TextButton(
+                    onPressed: _download,
+                    child: Text(l10n.get('whisper_kit_download_now')),
+                  )
+                else
+                  TextButton(
+                    onPressed: _delete,
+                    child: Text(
+                      l10n.get('whisper_kit_delete_model'),
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

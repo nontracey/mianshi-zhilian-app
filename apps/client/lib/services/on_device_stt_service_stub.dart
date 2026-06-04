@@ -1,8 +1,14 @@
+import 'package:whisper_kit/whisper_kit.dart' show WhisperModel;
+
 /// Web stub for [OnDeviceSttService].
 ///
 /// whisper_kit is not available on web. This stub ensures compilation
 /// succeeds; all calls are no-ops or throw [UnsupportedError].
 class OnDeviceSttService {
+  OnDeviceSttService({WhisperModel model = WhisperModel.base}) : _model = model;
+  // ignore: unused_field — kept for API compatibility with IO implementation
+  final WhisperModel _model;
+
   bool get isModelReady => false;
   bool get isModelDownloading => false;
   String get modelStatus => 'not_downloaded';
