@@ -312,6 +312,36 @@ class ContentProvider extends ChangeNotifier {
     return null;
   }
 
+  /// 解析前置知识：尝试在当前已加载 topics 中查找，
+  /// 若找不到则自动加载对应领域的 topics 并重试。
+  ///
+  /// topicId 格式为 `{domain}.{category}.{name}`（如 `java.jvm.runtime-data-area`），
+  /// 第一段即为 domain ID。
+  Future<Topic?> resolvePrerequisiteTopic(String topicId) async {
+    // 1. 先尝试当前已加载的 topics
+    var topic = findTopic(topicId);
+    if (topic != null) return topic;
+
+    // 2. 从 topicId 提取 domain（第一段）
+    final dotIndex = topicId.indexOf('.');
+    if (dotIndex == -1) return null;
+    final domainId = topicId.substring(0, dotIndex);
+
+    // 3. 确认 domain 是否存在于当前 manifest
+    final domainExists = _domains.any((d) => d.id == domainId);
+    if (!domainExists) return null;
+
+    // 4. 检查该 domain 的 topics 是否已加载
+    final alreadyLoaded = _topics.values.any((t) => t.domainId == domainId);
+    if (alreadyLoaded) return null; // 已加载但仍未找到，说明该 topic 不存在
+
+    // 5. 加载该领域的 topics
+    await loadDomainTopics(domainId);
+
+    // 6. 重试查找
+    return findTopic(topicId);
+  }
+
   /// 切换知识源环境：更新 baseUrl 并重载内容
   Future<void> switchContentEnv(
     String newBaseUrl, {

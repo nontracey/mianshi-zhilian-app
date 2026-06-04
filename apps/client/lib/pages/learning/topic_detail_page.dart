@@ -507,56 +507,10 @@ class _LeftSidebar extends StatelessWidget {
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          ...topic.prerequisites.map((prereq) {
-            // 尝试查找 topic 标题
-            final contentProvider = context.read<ContentProvider>();
-            final prereqTopic = contentProvider.findTopic(prereq);
-            final displayName = prereqTopic?.title ?? prereq;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: InkWell(
-                onTap: prereqTopic != null
-                    ? () {
-                        // 点击跳转到前置知识
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => TopicDetailPage(
-                              topic: prereqTopic,
-                              onBack: () => Navigator.pop(context),
-                            ),
-                          ),
-                        );
-                      }
-                    : null,
-                borderRadius: BorderRadius.circular(4),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.arrow_right,
-                      size: 16,
-                      color: AppColors.warning,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        displayName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: prereqTopic != null
-                              ? AppColors.accent
-                              : AppColors.warning,
-                          decoration: prereqTopic != null
-                              ? TextDecoration.underline
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
+          ...topic.prerequisites.map((prereq) => _PrerequisiteTile(
+            key: ValueKey('prereq_$prereq'),
+            prereqId: prereq,
+          )),
         ],
         // LeetCode 链接
         if (topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty) ...[
@@ -3899,6 +3853,91 @@ class _ScoreRing extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Helper widget to asynchronously resolve and display a prerequisite topic.
+///
+/// Uses [ContentProvider.resolvePrerequisiteTopic] to load the topic from any
+/// domain if not already cached, showing a loading indicator while resolving.
+class _PrerequisiteTile extends StatefulWidget {
+  final String prereqId;
+
+  const _PrerequisiteTile({required this.prereqId, super.key});
+
+  @override
+  State<_PrerequisiteTile> createState() => _PrerequisiteTileState();
+}
+
+class _PrerequisiteTileState extends State<_PrerequisiteTile> {
+  Topic? _topic;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final provider = context.read<ContentProvider>();
+    final topic = await provider.resolvePrerequisiteTopic(widget.prereqId);
+    if (mounted) {
+      setState(() {
+        _topic = topic;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = _topic?.title ?? widget.prereqId;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: _topic != null
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TopicDetailPage(
+                      topic: _topic!,
+                      onBack: () => Navigator.pop(context),
+                    ),
+                  ),
+                );
+              }
+            : null,
+        borderRadius: BorderRadius.circular(4),
+        child: Row(
+          children: [
+            const Icon(Icons.arrow_right, size: 16, color: AppColors.warning),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      displayName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _topic != null
+                            ? AppColors.accent
+                            : AppColors.warning,
+                        decoration: _topic != null
+                            ? TextDecoration.underline
+                            : null,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../models/ai_config.dart';
 import '../providers/ai_provider.dart';
 import '../providers/localization_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/on_device_stt/model_downloader.dart';
 
 enum _DiagStatus { checking, pass, fail }
 
@@ -21,7 +22,9 @@ class VoiceDiagnosticSheet extends StatefulWidget {
 class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   _DiagStatus _micStatus = _DiagStatus.checking;
   _DiagStatus _speechStatus = _DiagStatus.checking;
+  _DiagStatus _modelStatus = _DiagStatus.checking;
   String _speechDetail = '';
+  String _modelDetail = '';
   bool _running = false;
 
   @override
@@ -57,6 +60,17 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
     if (mounted) setState(() {});
 
+    // ── 本机模型检测（sherpa_onnx 模式）──
+    if (route.kind == _DiagRouteKind.sherpaOnnx || currentMode == 'sherpa_onnx') {
+      final (ok, detail) = await _checkModelReady(settings);
+      _modelStatus = ok ? _DiagStatus.pass : _DiagStatus.fail;
+      _modelDetail = detail;
+    } else {
+      _modelStatus = _DiagStatus.checking;
+      _modelDetail = '';
+    }
+    if (mounted) setState(() {});
+
     if (mounted) setState(() => _running = false);
   }
 
@@ -86,6 +100,39 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
   }
 
+  Future<(bool, String)> _checkModelReady(dynamic settings) async {
+    final engine = settings.onDeviceEngine as String? ?? 'sense_voice';
+    final whisperSize = settings.whisperModel as String? ?? 'base';
+    final config = _modelConfigForEngine(engine, whisperSize);
+    if (config == null) {
+      return (false, 'Unknown engine: $engine');
+    }
+    try {
+      final ready = await ModelDownloader.isModelReady(config);
+      if (ready) {
+        return (true, '');
+      } else {
+        return (false, 'Model not downloaded');
+      }
+    } catch (e) {
+      return (false, '$e');
+    }
+  }
+
+  OnDeviceModelConfig? _modelConfigForEngine(String engine, String whisperSize) {
+    return switch (engine) {
+      'sense_voice' => KnownModels.senseVoice,
+      'whisper' => switch (whisperSize) {
+        'tiny' => KnownModels.whisperTiny,
+        'small' => KnownModels.whisperSmall,
+        'medium' => KnownModels.whisperMedium,
+        _ => KnownModels.whisperBase,
+      },
+      'paraformer' => KnownModels.paraformer,
+      _ => null,
+    };
+  }
+
   IconData _iconFor(_DiagStatus status) {
     switch (status) {
       case _DiagStatus.checking:
@@ -113,7 +160,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     final l10n = context.watch<LocalizationProvider>();
     final settings = context.watch<SettingsProvider>().settings;
     final aiProvider = context.watch<AiProvider>();
-    final isSystem = settings.sttMode == 'system';
+    final currentMode = settings.sttMode;
     final route = _resolveRoute(settings, aiProvider);
 
     return SafeArea(
@@ -188,7 +235,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
             ),
 
             // 系统语音引擎诊断（仅 system 模式）
-            if (isSystem || route.kind == _DiagRouteKind.system)
+            if (currentMode == 'system' || route.kind == _DiagRouteKind.system)
               _DiagRow(
                 icon: _iconFor(_speechStatus),
                 color: _colorFor(_speechStatus),
@@ -207,14 +254,45 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 detail: _speechDetail.isNotEmpty ? _speechDetail : null,
               ),
 
+            // 本机模型检测诊断（仅 sherpa_onnx 模式）
+            if (route.kind == _DiagRouteKind.sherpaOnnx || currentMode == 'sherpa_onnx')
+              _DiagRow(
+                icon: _iconFor(_modelStatus),
+                color: _colorFor(_modelStatus),
+                label: l10n.get('on_device_stt_title'),
+                trailing: Text(
+                  _modelStatus == _DiagStatus.checking
+                      ? l10n.get('stt_testing')
+                      : (_modelStatus == _DiagStatus.pass
+                            ? l10n.get('model_ready')
+                            : l10n.get('model_not_ready')),
+                  style: TextStyle(
+                    color: _colorFor(_modelStatus),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                detail: _modelDetail.isNotEmpty ? _modelDetail : null,
+              ),
+
             const SizedBox(height: 20),
 
             // 提示信息
-            if (_speechStatus == _DiagStatus.fail && isSystem)
+            if (_speechStatus == _DiagStatus.fail && currentMode == 'system')
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   '${l10n.get('system_speech_voice')}${l10n.get('stt_unavailable')}。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            if (_modelStatus == _DiagStatus.fail && currentMode == 'sherpa_onnx')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  l10n.get('on_device_model_not_downloaded'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -232,7 +310,9 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                         setState(() {
                           _micStatus = _DiagStatus.checking;
                           _speechStatus = _DiagStatus.checking;
+                          _modelStatus = _DiagStatus.checking;
                           _speechDetail = '';
+                          _modelDetail = '';
                         });
                         _runAll();
                       },
@@ -270,6 +350,14 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       audioConfig = fixed?.canTranscribe == true
           ? fixed
           : (defaultConfig?.canTranscribe == true ? defaultConfig : null);
+    } else if (mode == 'sherpa_onnx') {
+      final engine = (settings.onDeviceEngine as String?) ?? 'sense_voice';
+      final whisperSize = (settings.whisperModel as String?) ?? 'base';
+      final config = _modelConfigForEngine(engine, whisperSize);
+      return _DiagRoute(
+        _DiagRouteKind.sherpaOnnx,
+        config != null ? config.displayName : engine,
+      );
     }
 
     if (audioConfig != null) {
@@ -278,6 +366,22 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
         '${audioConfig.name} · ${audioConfig.model}',
       );
     }
+
+    // auto 模式无可用 AI 配置时，与 VoiceInputButton 一致：
+    // 若有本机引擎配置则兜底到 sherpa_onnx，否则 system
+    if (mode == 'auto') {
+      final engine = (settings.onDeviceEngine as String?) ?? '';
+      if (engine.isNotEmpty) {
+        final whisperSize = (settings.whisperModel as String?) ?? 'base';
+        final config = _modelConfigForEngine(engine, whisperSize);
+        return _DiagRoute(
+          _DiagRouteKind.sherpaOnnx,
+          config != null ? config.displayName : engine,
+        );
+      }
+      return const _DiagRoute(_DiagRouteKind.system);
+    }
+
     return const _DiagRoute(_DiagRouteKind.system);
   }
 
@@ -287,6 +391,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       'follow_current_ai' => l10n.get('stt_mode_follow_current_ai'),
       'fixed_ai_config' => l10n.get('stt_mode_fixed_ai'),
       'system' => l10n.get('system_speech_voice'),
+      'sherpa_onnx' => l10n.get('on_device_stt_title'),
       _ => mode,
     };
   }
@@ -295,6 +400,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     return switch (route.kind) {
       _DiagRouteKind.ai => l10n.get('voice_route_ai'),
       _DiagRouteKind.system => l10n.get('system_speech_voice'),
+      _DiagRouteKind.sherpaOnnx => l10n.get('on_device_stt_title'),
     };
   }
 
@@ -302,6 +408,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     return switch (kind) {
       _DiagRouteKind.ai => Icons.cloud_outlined,
       _DiagRouteKind.system => Icons.phone_android,
+      _DiagRouteKind.sherpaOnnx => Icons.memory,
     };
   }
 
@@ -309,11 +416,12 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     return switch (kind) {
       _DiagRouteKind.ai => Theme.of(context).colorScheme.primary,
       _DiagRouteKind.system => Theme.of(context).colorScheme.secondary,
+      _DiagRouteKind.sherpaOnnx => Theme.of(context).colorScheme.tertiary,
     };
   }
 }
 
-enum _DiagRouteKind { ai, system }
+enum _DiagRouteKind { ai, system, sherpaOnnx }
 
 class _DiagRoute {
   const _DiagRoute(this.kind, [this.detail]);

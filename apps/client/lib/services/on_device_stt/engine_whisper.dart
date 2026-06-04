@@ -24,7 +24,7 @@ class WhisperOnnxEngine implements OnDeviceSttService {
   @override
   Future<void> initialize() async {
     initBindings();
-    _recognizer = OfflineRecognizer(_whisperOnnxConfig(modelDir, modelSize));
+    _recognizer = OfflineRecognizer(_whisperOnnxConfig(modelDir));
     isInitialized = true;
   }
 
@@ -58,18 +58,17 @@ class WhisperOnnxEngine implements OnDeviceSttService {
   }
 }
 
-OfflineRecognizerConfig _whisperOnnxConfig(String modelDir, String modelSize) {
-  final subdir = _whisperSubdir(modelSize);
+OfflineRecognizerConfig _whisperOnnxConfig(String modelDir) {
   return OfflineRecognizerConfig(
     feat: const FeatureConfig(sampleRate: 16000, featureDim: 80),
     model: OfflineModelConfig(
       whisper: OfflineWhisperModelConfig(
-        encoder: '$modelDir/$subdir/encoder.int8.onnx',
-        decoder: '$modelDir/$subdir/decoder.int8.onnx',
+        encoder: '$modelDir/encoder.int8.onnx',
+        decoder: '$modelDir/decoder.int8.onnx',
         language: 'zh',
         task: 'transcribe',
       ),
-      tokens: '$modelDir/$subdir/tokens.txt',
+      tokens: '$modelDir/tokens.txt',
       modelType: 'whisper',
       numThreads: 1,
       provider: 'cpu',
@@ -77,13 +76,4 @@ OfflineRecognizerConfig _whisperOnnxConfig(String modelDir, String modelSize) {
     decodingMethod: 'greedy_search',
     maxActivePaths: 4,
   );
-}
-
-String _whisperSubdir(String modelSize) {
-  return switch (modelSize) {
-    'tiny' => 'sherpa-onnx-whisper-tiny',
-    'small' => 'sherpa-onnx-whisper-small',
-    'medium' => 'sherpa-onnx-whisper-medium',
-    _ => 'sherpa-onnx-whisper-base',
-  };
 }
