@@ -235,18 +235,33 @@ class AiProvider extends ChangeNotifier {
     return _configs.where((c) => c.id == id).firstOrNull;
   }
 
+  AiConfig? _selectConfig(String? id, String usageTag) {
+    if (id != null && id.isNotEmpty) return configById(id);
+
+    final matchingDefault =
+        _defaultConfig != null && _defaultConfig!.usageTags.contains(usageTag)
+        ? _defaultConfig
+        : null;
+    return matchingDefault ??
+        enabledConfigs
+            .where((config) => config.usageTags.contains(usageTag))
+            .cast<AiConfig?>()
+            .firstOrNull ??
+        _defaultConfig ??
+        enabledConfigs.cast<AiConfig?>().firstOrNull;
+  }
+
   /// Evaluate a user's answer using a user-provided AI config.
   Future<Map<String, dynamic>> evaluateAnswer({
     String? aiConfigId,
+    String usageTag = 'recall',
     required String topicId,
     required String question,
     required String userAnswer,
     Rubric? rubric,
     Uint8List? imageBytes,
   }) async {
-    final config =
-        configById(aiConfigId) ??
-        enabledConfigs.cast<AiConfig?>().firstOrNull;
+    final config = _selectConfig(aiConfigId, usageTag);
     if (config == null || !config.canEvaluate) {
       return {
         'score': null,
@@ -276,15 +291,14 @@ class AiProvider extends ChangeNotifier {
   ({Stream<String> stream, Future<Map<String, dynamic>> result})
   evaluateAnswerStream({
     String? aiConfigId,
+    String usageTag = 'recall',
     required String topicId,
     required String question,
     required String userAnswer,
     Rubric? rubric,
     Uint8List? imageBytes,
   }) {
-    final config =
-        configById(aiConfigId) ??
-        enabledConfigs.cast<AiConfig?>().firstOrNull;
+    final config = _selectConfig(aiConfigId, usageTag);
     if (config == null || !config.canEvaluate) {
       final result = Future.value({
         'score': null,
@@ -361,7 +375,8 @@ class AiProvider extends ChangeNotifier {
     _currentStreamSubscription?.cancel();
     _currentStreamSubscription = null;
     // 关闭旧 StreamController 使其监听者收到 done 事件
-    if (_currentStreamController != null && !_currentStreamController!.isClosed) {
+    if (_currentStreamController != null &&
+        !_currentStreamController!.isClosed) {
       _currentStreamController!.close();
     }
     _currentStreamController = null;
@@ -410,7 +425,9 @@ class AiProvider extends ChangeNotifier {
     return {
       'score': null,
       'level': 'local',
-      'summary': content.isNotEmpty ? content : L10n.get('evaluation_parse_failed', 'zh'),
+      'summary': content.isNotEmpty
+          ? content
+          : L10n.get('evaluation_parse_failed', 'zh'),
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',

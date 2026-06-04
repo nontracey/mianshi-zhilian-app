@@ -216,24 +216,41 @@ class DashboardPage extends StatelessWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: _CenterPanel(
-                      currentDomain: currentDomain,
-                      allDomains: domains,
-                      currentDomainId: currentDomainId,
-                      recommendedTopics: recommendedTopics,
-                      masteryPercent: masteryPercent,
-                      topicCount: topicCount,
-                      readiness: readiness,
-                      streakDays: progressProvider.streakDays,
-                      onDomainChanged: onDomainChanged,
-                      onTopicTap: onTopicTap,
-                      onViewDomainCatalog: onViewDomainCatalog,
-                      onPractice: onPractice,
-                      onReview: onReview,
-                      onMockInterview: onMockInterview,
-                      contentProvider: contentProvider,
-                      progressProvider: progressProvider,
-                      settingsProvider: settingsProvider,
+                    child: Column(
+                      children: [
+                        _CenterPanel(
+                          currentDomain: currentDomain,
+                          allDomains: domains,
+                          currentDomainId: currentDomainId,
+                          recommendedTopics: recommendedTopics,
+                          masteryPercent: masteryPercent,
+                          topicCount: topicCount,
+                          readiness: readiness,
+                          streakDays: progressProvider.streakDays,
+                          onDomainChanged: onDomainChanged,
+                          onTopicTap: onTopicTap,
+                          onViewDomainCatalog: onViewDomainCatalog,
+                          onPractice: onPractice,
+                          onReview: onReview,
+                          onMockInterview: onMockInterview,
+                          contentProvider: contentProvider,
+                          progressProvider: progressProvider,
+                          settingsProvider: settingsProvider,
+                        ),
+                        const SizedBox(height: 16),
+                        _RightPanel(
+                          currentDomainId: currentDomainId,
+                          domains: domains,
+                          masteryPercent: masteryPercent,
+                          readiness: readiness,
+                          weakTopics: weakTopics,
+                          recentAttempts: recentAttempts,
+                          onTopicTap: onTopicTap,
+                          onDomainChanged: onDomainChanged,
+                          progressProvider: progressProvider,
+                          contentProvider: contentProvider,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -2751,11 +2768,14 @@ class _RightPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // 最近AI反馈
+        // 练习记录
         _PanelCard(
-          title: l10n.get('recent_ai_feedback'),
+          title: l10n.get('practice_record'),
           icon: Icons.auto_awesome_outlined,
-          trailing: l10n.get('check_view_all'),
+          trailing: recentAttempts.isEmpty ? null : l10n.get('check_view_all'),
+          onTrailingTap: recentAttempts.isEmpty
+              ? null
+              : () => _showPracticeRecords(context),
           child: Column(
             children: [
               if (recentAttempts.isEmpty)
@@ -2769,6 +2789,327 @@ class _RightPanel extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  void _showPracticeRecords(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ProgressProvider>.value(
+            value: progressProvider,
+          ),
+          ChangeNotifierProvider<ContentProvider>.value(value: contentProvider),
+        ],
+        child: const _PracticeRecordsSheet(),
+      ),
+    );
+  }
+}
+
+class _PracticeRecordsSheet extends StatefulWidget {
+  const _PracticeRecordsSheet();
+
+  @override
+  State<_PracticeRecordsSheet> createState() => _PracticeRecordsSheetState();
+}
+
+class _PracticeRecordsSheetState extends State<_PracticeRecordsSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final progressProvider = context.watch<ProgressProvider>();
+    final contentProvider = context.watch<ContentProvider>();
+    final attempts = _filterAttempts(
+      progressProvider.recentAttempts,
+      contentProvider,
+    );
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.78,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.get('practice_record'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() {
+                  _query = value.trim().toLowerCase();
+                }),
+                decoration: InputDecoration(
+                  hintText: l10n.get('search_practice_record'),
+                  prefixIcon: const Icon(Icons.search_outlined),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: l10n.get('clear'),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: attempts.isEmpty
+                  ? Center(
+                      child: _EmptyState(
+                        message: l10n.get('temporary_no_feedback_record'),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      itemCount: attempts.length,
+                      separatorBuilder: (_, _) => const Divider(height: 16),
+                      itemBuilder: (_, index) => _PracticeRecordItem(
+                        attempt: attempts[index],
+                        topic: contentProvider.findTopic(
+                          attempts[index].topicId,
+                        ),
+                        onDelete: () => _confirmDelete(attempts[index]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<PracticeAttempt> _filterAttempts(
+    List<PracticeAttempt> attempts,
+    ContentProvider contentProvider,
+  ) {
+    if (_query.isEmpty) return attempts;
+
+    return attempts.where((attempt) {
+      final topic = contentProvider.findTopic(attempt.topicId);
+      final text = [
+        topic?.title,
+        attempt.topicId,
+        attempt.mode,
+        attempt.question,
+        attempt.answer,
+        attempt.summary,
+        attempt.nextAction,
+        attempt.missedPoints.join(' '),
+        attempt.wrongPoints.join(' '),
+      ].whereType<String>().join(' ').toLowerCase();
+      return text.contains(_query);
+    }).toList();
+  }
+
+  Future<void> _confirmDelete(PracticeAttempt attempt) async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.get('confirm_delete')),
+        content: Text(l10n.get('confirm_delete_practice_record')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await context.read<ProgressProvider>().deleteAttempt(attempt.id);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.get('practice_record_deleted'))),
+    );
+  }
+}
+
+class _PracticeRecordItem extends StatelessWidget {
+  const _PracticeRecordItem({
+    required this.attempt,
+    required this.topic,
+    required this.onDelete,
+  });
+
+  final PracticeAttempt attempt;
+  final Topic? topic;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final score = attempt.score ?? 0;
+    final hasAiScore = attempt.aiEvaluated && attempt.score != null;
+    final statusText = !hasAiScore
+        ? switch (attempt.analysisStatus) {
+            'failed' => l10n.get('analysis_failed_saved_local'),
+            'pending' => l10n.get('analysis_pending'),
+            _ => l10n.get('local_practice_already_save'),
+          }
+        : score >= 85
+        ? l10n.get('surface_current_excellent')
+        : score >= 60
+        ? l10n.get('understand_question_count_thinking_road_pending_optimize')
+        : l10n.get('knowledge_point_mastery_not_enough');
+    final statusColor = !hasAiScore
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : score >= 85
+        ? AppColors.success
+        : score >= 60
+        ? AppColors.warning
+        : AppColors.danger;
+    final statusIcon = switch (attempt.analysisStatus) {
+      'failed' => Icons.error_outline,
+      'pending' => Icons.schedule_outlined,
+      _ => Icons.save_outlined,
+    };
+    final title =
+        topic?.title ??
+        (attempt.question.isNotEmpty ? attempt.question : attempt.topicId);
+    final detail = attempt.summary?.isNotEmpty == true
+        ? attempt.summary!
+        : (attempt.answer.isNotEmpty ? attempt.answer : attempt.question);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: hasAiScore
+                ? Text(
+                    '$score',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  )
+                : Icon(statusIcon, size: 18, color: statusColor),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _timeAgo(attempt.createdAt, l10n),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                statusText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+              if (detail.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: l10n.get('delete'),
+          onPressed: onDelete,
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
+    );
+  }
+
+  String _timeAgo(DateTime dateTime, LocalizationProvider l10n) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return l10n.get('just');
+    if (diff.inMinutes < 60) {
+      return l10n.getp('minutes_min_ago_2', {'minutes': diff.inMinutes});
+    }
+    if (diff.inHours < 24) {
+      return l10n.getp('hours_hour_ago_2', {'hours': diff.inHours});
+    }
+    if (diff.inDays < 7) {
+      return l10n.getp('days_day_ago_2', {'days': diff.inDays});
+    }
+    return '${dateTime.month}/${dateTime.day}';
   }
 }
 

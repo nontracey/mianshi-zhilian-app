@@ -53,6 +53,7 @@ class _CatalogPageState extends State<CatalogPage> {
   bool _hasCodeOnly = false;
   bool _hasLeetcodeOnly = false;
   final Set<String> _statusFilters = {};
+  final Set<String> _collapsedRoadmapSections = {};
   String _sortBy = 'order';
   bool _showFilters = false;
 
@@ -239,43 +240,62 @@ class _CatalogPageState extends State<CatalogPage> {
           Row(
             children: [
               // 领域下拉选择
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: widget.currentDomainId,
-                    isDense: true,
-                    items: domains
-                        .map(
-                          (d) => DropdownMenuItem(
-                            value: d.id,
-                            child: Text(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: widget.currentDomainId,
+                      isDense: true,
+                      isExpanded: true,
+                      selectedItemBuilder: (_) => domains
+                          .map(
+                            (d) => Text(
                               d.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        widget.onDomainChanged(value);
-                        if (contentProvider.getLoadedTopicCount(value) == 0) {
-                          contentProvider.loadDomainTopics(value);
+                          )
+                          .toList(),
+                      items: domains
+                          .map(
+                            (d) => DropdownMenuItem(
+                              value: d.id,
+                              child: Text(
+                                d.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          widget.onDomainChanged(value);
+                          if (contentProvider.getLoadedTopicCount(value) == 0) {
+                            contentProvider.loadDomainTopics(value);
+                          }
                         }
-                      }
-                    },
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -1078,6 +1098,8 @@ class _CatalogPageState extends State<CatalogPage> {
     ];
     final color = colors[index % colors.length];
     final topics = section.topics;
+    final sectionKey = '${section.title}#$index';
+    final isCollapsed = _collapsedRoadmapSections.contains(sectionKey);
 
     // 计算阶段进度
     int mastered = 0;
@@ -1154,18 +1176,27 @@ class _CatalogPageState extends State<CatalogPage> {
                   familiar,
                   progressPercent,
                   isDark,
+                  isCollapsed,
+                  () => setState(() {
+                    if (isCollapsed) {
+                      _collapsedRoadmapSections.remove(sectionKey);
+                    } else {
+                      _collapsedRoadmapSections.add(sectionKey);
+                    }
+                  }),
                 ),
-                const SizedBox(height: 6),
+                if (!isCollapsed) const SizedBox(height: 6),
                 // 紧凑知识点列表
-                ...topics.map(
-                  (topic) => _buildRoadmapTopicRow(
-                    context,
-                    topic,
-                    progressProvider,
-                    isDark,
-                    color,
+                if (!isCollapsed)
+                  ...topics.map(
+                    (topic) => _buildRoadmapTopicRow(
+                      context,
+                      topic,
+                      progressProvider,
+                      isDark,
+                      color,
+                    ),
                   ),
-                ),
                 if (!isLast) const SizedBox(height: 16),
               ],
             ),
@@ -1184,6 +1215,8 @@ class _CatalogPageState extends State<CatalogPage> {
     int familiar,
     int progressPercent,
     bool isDark,
+    bool isCollapsed,
+    VoidCallback onToggle,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1231,6 +1264,23 @@ class _CatalogPageState extends State<CatalogPage> {
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white54 : Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: isCollapsed
+                    ? l10n.get('expand')
+                    : l10n.get('collapse'),
+                onPressed: onToggle,
+                icon: Icon(
+                  isCollapsed
+                      ? Icons.keyboard_arrow_down
+                      : Icons.keyboard_arrow_up,
+                  size: 18,
+                  color: color,
                 ),
               ),
             ],

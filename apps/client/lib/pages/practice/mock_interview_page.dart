@@ -199,6 +199,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     try {
       final aiProvider = context.read<AiProvider>();
       final result = await aiProvider.evaluateAnswer(
+        usageTag: 'mockInterview',
         topicId: topic.id,
         question: topic.recallPrompts.isNotEmpty
             ? topic.recallPrompts.first.prompt
@@ -295,8 +296,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               analysisStatus: result['aiUnavailable'] == true
                   ? 'unanalysed'
                   : result['score'] == null
-                      ? 'unanalysed'
-                      : 'success',
+                  ? 'unanalysed'
+                  : 'success',
             ),
           );
           if (result['aiUnavailable'] != true && result['score'] is int) {
@@ -1626,8 +1627,8 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
           analysisStatus: result['aiUnavailable'] == true
               ? 'unanalysed'
               : result['score'] == null
-                  ? 'unanalysed'
-                  : 'success',
+              ? 'unanalysed'
+              : 'success',
         );
       }).toList();
       context.read<ProgressProvider>().addMockSession(

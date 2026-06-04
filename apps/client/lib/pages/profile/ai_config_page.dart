@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/services/ai_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -79,6 +80,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
     );
     final apiKeyController = TextEditingController(text: config?.apiKey ?? '');
     final modelController = TextEditingController(text: config?.model ?? '');
+    final bulkController = TextEditingController();
     bool isDefault = config?.isDefault ?? false;
     bool enabled = config?.enabled ?? true;
     bool supportsTextInput = config?.supportsTextInput ?? true;
@@ -93,6 +95,17 @@ class _AiConfigPageState extends State<AiConfigPage> {
     String? testResult;
     bool? testPassed;
     bool isTesting = false;
+    bool showBulkPaste = false;
+
+    void applyBulkText(String text) {
+      final parsed = parseAiConfigPaste(text);
+      if (parsed.baseUrl != null) baseUrlController.text = parsed.baseUrl!;
+      if (parsed.apiKey != null) apiKeyController.text = parsed.apiKey!;
+      if (parsed.model != null) modelController.text = parsed.model!;
+      if (nameController.text.trim().isEmpty && parsed.model != null) {
+        nameController.text = parsed.model!;
+      }
+    }
 
     showDialog(
       context: context,
@@ -107,6 +120,47 @@ class _AiConfigPageState extends State<AiConfigPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          setDialogState(() => showBulkPaste = !showBulkPaste),
+                      icon: Icon(
+                        showBulkPaste
+                            ? Icons.view_list_outlined
+                            : Icons.content_paste_go_outlined,
+                      ),
+                      label: Text(
+                        showBulkPaste
+                            ? l10n.get('single_line_input')
+                            : l10n.get('bulk_paste_config'),
+                      ),
+                    ),
+                  ),
+                  if (showBulkPaste) ...[
+                    TextField(
+                      controller: bulkController,
+                      minLines: 4,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        labelText: l10n.get('bulk_paste_config'),
+                        hintText:
+                            'https://api.example.com/v1\nsk-...\nmodel-name',
+                        alignLabelWithHint: true,
+                      ),
+                      onChanged: (value) =>
+                          setDialogState(() => applyBulkText(value)),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        l10n.get('bulk_paste_config_desc'),
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: nameController,
                     decoration: InputDecoration(
@@ -432,6 +486,69 @@ class _AiConfigPageState extends State<AiConfigPage> {
   }
 }
 
+class ParsedAiConfigPaste {
+  const ParsedAiConfigPaste({this.baseUrl, this.apiKey, this.model});
+
+  final String? baseUrl;
+  final String? apiKey;
+  final String? model;
+}
+
+ParsedAiConfigPaste parseAiConfigPaste(String input) {
+  String? baseUrl;
+  String? apiKey;
+  String? model;
+  final lines = input
+      .split(RegExp(r'[\r\n]+'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+
+  for (final line in lines) {
+    final keyValue = RegExp(
+      r'^(base[_\s-]?url|url|endpoint|api[_\s-]?key|key|token|model|model[_\s-]?name)\s*[:=]\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(line);
+    final value = keyValue?.group(2)?.trim();
+    final key = keyValue?.group(1)?.toLowerCase();
+    if (value != null && value.isNotEmpty && key != null) {
+      if (key.contains('url') || key == 'endpoint') {
+        baseUrl ??= value;
+        continue;
+      }
+      if (key.contains('key') || key == 'token') {
+        apiKey ??= value;
+        continue;
+      }
+      if (key.contains('model')) {
+        model ??= value;
+        continue;
+      }
+    }
+
+    final urlMatch = RegExp(r'https?://[^\s,，]+').firstMatch(line);
+    if (urlMatch != null) {
+      baseUrl ??= urlMatch.group(0);
+      continue;
+    }
+
+    if (apiKey == null &&
+        RegExp(r'^(sk-|tp-|ak-|pk-|AIza|ya29\.|gsk_)[^\s]+').hasMatch(line)) {
+      apiKey = line;
+      continue;
+    }
+
+    if (model == null &&
+        !line.contains(' ') &&
+        !line.contains('://') &&
+        line.length <= 80) {
+      model = line;
+    }
+  }
+
+  return ParsedAiConfigPaste(baseUrl: baseUrl, apiKey: apiKey, model: model);
+}
+
 class _ConfigCard extends StatelessWidget {
   const _ConfigCard({
     required this.config,
@@ -538,17 +655,40 @@ class _ConfigCard extends StatelessWidget {
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
+          runSpacing: 8,
           children: [
             OutlinedButton.icon(
-              onPressed: () =>
-                  aiProvider.testCapability(config.id, AiCapability.text),
+              onPressed: () async {
+                final result = await aiProvider.testCapability(
+                  config.id,
+                  AiCapability.text,
+                );
+                if (!context.mounted) return;
+                _showCapabilityResult(
+                  context,
+                  l10n,
+                  l10n.get('test_text_ai'),
+                  result,
+                );
+              },
               icon: const Icon(Icons.wifi_find, size: 18),
               label: Text(l10n.get('test_text_ai')),
             ),
             if (config.audioMode != AiAudioMode.none)
               OutlinedButton.icon(
-                onPressed: () =>
-                    aiProvider.testCapability(config.id, AiCapability.audio),
+                onPressed: () async {
+                  final result = await aiProvider.testCapability(
+                    config.id,
+                    AiCapability.audio,
+                  );
+                  if (!context.mounted) return;
+                  _showCapabilityResult(
+                    context,
+                    l10n,
+                    l10n.get('test_voice_ai'),
+                    result,
+                  );
+                },
                 icon: const Icon(Icons.mic_outlined, size: 18),
                 label: Text(l10n.get('test_voice_ai')),
               ),
@@ -574,6 +714,21 @@ class _ConfigCard extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  void _showCapabilityResult(
+    BuildContext context,
+    LocalizationProvider l10n,
+    String label,
+    AiTestResult result,
+  ) {
+    final message = _formatTestResult(l10n, result.messageKey, result.detail);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label：$message'),
+        backgroundColor: result.success ? AppColors.success : AppColors.danger,
+      ),
     );
   }
 }
@@ -621,9 +776,9 @@ class _CapabilityStatusChip extends StatelessWidget {
         : ' · ${testedAt.month}/${testedAt.day} ${testedAt.hour.toString().padLeft(2, '0')}:${testedAt.minute.toString().padLeft(2, '0')}';
     final stateLabel = '${l10n.get(record.state.labelKey)}$timeLabel';
     // 失败时显示具体的错误原因
-    final detail = record.state == CapabilityTestState.failed &&
-            record.message.isNotEmpty
-        ? record.message
+    final detail =
+        record.state == CapabilityTestState.failed && record.message.isNotEmpty
+        ? _humanizeCapabilityMessage(l10n, record.message)
         : null;
     final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -648,10 +803,7 @@ class _CapabilityStatusChip extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 detail,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                ),
+                style: TextStyle(color: color, fontSize: 10),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -659,8 +811,31 @@ class _CapabilityStatusChip extends StatelessWidget {
         ],
       ),
     );
-    return detail != null
-        ? Tooltip(message: detail, child: chip)
-        : chip;
+    return detail != null ? Tooltip(message: detail, child: chip) : chip;
   }
+}
+
+String _humanizeCapabilityMessage(
+  LocalizationProvider l10n,
+  String rawMessage,
+) {
+  final separatorIndex = rawMessage.indexOf(': ');
+  if (separatorIndex > 0) {
+    final first = rawMessage.substring(0, separatorIndex);
+    final rest = rawMessage.substring(separatorIndex + 2);
+    final translated = l10n.get(first);
+    return translated == first ? rawMessage : '$translated：$rest';
+  }
+  final translated = l10n.get(rawMessage);
+  return translated == rawMessage ? rawMessage : translated;
+}
+
+String _formatTestResult(
+  LocalizationProvider l10n,
+  String messageKey,
+  String detail,
+) {
+  final message = l10n.get(messageKey);
+  if (detail.isEmpty) return message;
+  return '$message：$detail';
 }

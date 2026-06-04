@@ -76,6 +76,21 @@ class ProgressProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAttempt(String attemptId) async {
+    _attempts.removeWhere((attempt) => attempt.id == attemptId);
+    await _storage.savePracticeAttempts(_attempts);
+    notifyListeners();
+  }
+
+  Future<void> clearPracticeData() async {
+    _progressMap = {};
+    _sessions = [];
+    _attempts = [];
+    _mockSessions = [];
+    await _storage.clearPracticeData();
+    notifyListeners();
+  }
+
   Future<void> addMockSession(MockInterviewSession session) async {
     _mockSessions.insert(0, session);
     await _storage.saveMockInterviewSessions(_mockSessions);
@@ -131,10 +146,7 @@ class ProgressProvider extends ChangeNotifier {
     final coverage = count / domainTopics.length;
     final masteryPercent = (avgScore * coverage).round();
 
-    return (
-      masteryPercent: masteryPercent,
-      topicCount: domainTopics.length,
-    );
+    return (masteryPercent: masteryPercent, topicCount: domainTopics.length);
   }
 
   /// 获取指定领域的练习总次数
@@ -349,6 +361,11 @@ class ProgressProvider extends ChangeNotifier {
 
   int readinessScore(List<Topic> topics) {
     if (topics.isEmpty) return 0;
+    final hasScoredProgress = topics.any(
+      (topic) => (_progressMap[topic.id]?.score ?? 0) > 0,
+    );
+    if (!hasScoredProgress && _mockSessions.isEmpty) return 0;
+
     final domainAverage =
         topics
             .map((t) => _progressMap[t.id]?.score ?? 0)
@@ -379,10 +396,9 @@ class ProgressProvider extends ChangeNotifier {
         .where((t) => (_progressMap[t.id]?.score ?? 0) > 0)
         .toList();
     scored.sort(
-      (a, b) =>
-          (_progressMap[a.id]?.score ?? 0).compareTo(
-            _progressMap[b.id]?.score ?? 0,
-          ),
+      (a, b) => (_progressMap[a.id]?.score ?? 0).compareTo(
+        _progressMap[b.id]?.score ?? 0,
+      ),
     );
     return scored.take(limit).toList();
   }
@@ -408,7 +424,9 @@ class ProgressProvider extends ChangeNotifier {
   double get todayHoursGrowth {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
-    final todayAttempts = _attempts.where((a) => a.createdAt.isAfter(todayStart)).length;
+    final todayAttempts = _attempts
+        .where((a) => a.createdAt.isAfter(todayStart))
+        .length;
     return todayAttempts * 10 / 60;
   }
 
@@ -422,14 +440,19 @@ class ProgressProvider extends ChangeNotifier {
       final dayStart = DateTime(date.year, date.month, date.day);
       final dayEnd = dayStart.add(const Duration(days: 1));
 
-      final dayAttempts = _attempts.where((a) =>
-        a.createdAt.isAfter(dayStart) &&
-        a.createdAt.isBefore(dayEnd) &&
-        a.score != null
-      ).toList();
+      final dayAttempts = _attempts
+          .where(
+            (a) =>
+                a.createdAt.isAfter(dayStart) &&
+                a.createdAt.isBefore(dayEnd) &&
+                a.score != null,
+          )
+          .toList();
 
       if (dayAttempts.isNotEmpty) {
-        final avgScore = dayAttempts.fold<double>(0, (sum, a) => sum + (a.score ?? 0)) / dayAttempts.length;
+        final avgScore =
+            dayAttempts.fold<double>(0, (sum, a) => sum + (a.score ?? 0)) /
+            dayAttempts.length;
         trend.add(avgScore);
       } else {
         // 如果当天没有数据，返回 null
@@ -457,8 +480,7 @@ class ProgressProvider extends ChangeNotifier {
         _progressMap[topicId] = TopicProgress.fromJson(cloudData);
       } else {
         final cloudScore = cloudData['score'] as int? ?? 0;
-        final cloudPracticeCount =
-            cloudData['practiceCount'] as int? ?? 0;
+        final cloudPracticeCount = cloudData['practiceCount'] as int? ?? 0;
 
         if (cloudScore > localProgress.score ||
             (cloudScore == localProgress.score &&

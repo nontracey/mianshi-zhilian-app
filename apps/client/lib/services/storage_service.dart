@@ -231,6 +231,20 @@ class StorageService {
     await prefs.clear();
   }
 
+  /// 仅清除学习/练习产生的数据，保留 AI 配置、同步配置、内容缓存和个人资料。
+  Future<void> clearPracticeData() async {
+    final prefs = await _instance;
+    for (final key in [
+      'progress_map',
+      'sessions',
+      'practice_attempts',
+      'mock_interview_sessions',
+    ]) {
+      await prefs.remove(key);
+    }
+    await markSyncDirty();
+  }
+
   /// 保存 JSON 列表
   Future<void> saveJsonList(String key, List<Map<String, dynamic>> data) async {
     await save(key, data);

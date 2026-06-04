@@ -565,9 +565,39 @@ class _SyncBackupPage extends StatelessWidget {
           onRestore: () => _restoreRemote(context),
           onExport: settingsProvider.exportData,
           onImport: () => _importFile(context),
+          onClearPracticeData: () => _clearPracticeData(context),
         ),
       ],
     );
+  }
+
+  Future<void> _clearPracticeData(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('clear_practice_data')),
+        content: Text(l10n.get('confirm_clear_practice_data')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(l10n.get('clear')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await context.read<ProgressProvider>().clearPracticeData();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.get('practice_data_cleared'))));
   }
 
   Future<void> _syncNow(BuildContext context) async {
@@ -2469,6 +2499,7 @@ class _DataManagementPanel extends StatelessWidget {
     required this.onSync,
     required this.onExport,
     required this.onImport,
+    required this.onClearPracticeData,
     this.onTestConnection,
     this.onRestore,
   });
@@ -2479,6 +2510,7 @@ class _DataManagementPanel extends StatelessWidget {
   final VoidCallback onSync;
   final VoidCallback onExport;
   final VoidCallback onImport;
+  final VoidCallback onClearPracticeData;
   final VoidCallback? onTestConnection;
   final VoidCallback? onRestore;
 
@@ -2820,6 +2852,21 @@ class _DataManagementPanel extends StatelessWidget {
               label: Text(l10n.get('data_import')),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.restart_alt_outlined,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(l10n.get('clear_practice_data')),
+          subtitle: Text(l10n.get('clear_practice_data_desc')),
+          trailing: TextButton(
+            onPressed: onClearPracticeData,
+            child: Text(l10n.get('clear')),
+          ),
         ),
       ],
     );

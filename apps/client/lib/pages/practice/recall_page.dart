@@ -55,8 +55,11 @@ class _RecallPageState extends State<RecallPage> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     if (widget.topicIds.isEmpty) {
-      return Center(
-        child: Text(l10n.get('not_has_optional_practice_knowledge_point')),
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: Center(
+          child: Text(l10n.get('not_has_optional_practice_knowledge_point')),
+        ),
       );
     }
 
@@ -65,16 +68,22 @@ class _RecallPageState extends State<RecallPage> {
     final topic = contentProvider.findTopic(widget.topicIds[_currentIndex]);
 
     if (topic == null) {
-      return Center(child: Text(l10n.get('knowledge_point_un_find_to')));
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: Center(child: Text(l10n.get('knowledge_point_un_find_to'))),
+      );
     }
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isDesktop = screenWidth >= 900;
+    final content = isDesktop
+        ? _buildDesktopLayout(context, topic, aiProvider)
+        : _buildMobileLayout(context, topic, aiProvider);
 
-    if (isDesktop) {
-      return _buildDesktopLayout(context, topic, aiProvider);
-    }
-    return _buildMobileLayout(context, topic, aiProvider);
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: content,
+    );
   }
 
   // ── 桌面端分栏布局 ──
@@ -819,12 +828,11 @@ class _RecallPageState extends State<RecallPage> {
             aiConfigId: aiConfigId,
             aiEvaluated: result['aiUnavailable'] != true,
             localOnly: result['aiUnavailable'] == true,
-            analysisStatus:
-                result['aiUnavailable'] == true
-                    ? 'unanalysed'
-                    : result['score'] == null
-                        ? 'unanalysed'
-                        : 'success',
+            analysisStatus: result['aiUnavailable'] == true
+                ? 'unanalysed'
+                : result['score'] == null
+                ? 'unanalysed'
+                : 'success',
           ),
         );
         if (aiEvaluated && result['score'] is int) {
