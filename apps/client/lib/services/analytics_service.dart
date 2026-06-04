@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:uuid/uuid.dart';
 
 import 'api_headers.dart';
 import 'device_info_helper.dart';
@@ -12,7 +12,7 @@ import 'route_resolver.dart';
 import 'route_state_store.dart';
 import 'storage_service.dart';
 
-class AnalyticsService {
+class AnalyticsService with WidgetsBindingObserver {
   AnalyticsService(this._storage, {EndpointFallbackClient? routeClient})
     : _routeClient =
           routeClient ??
@@ -22,10 +22,10 @@ class AnalyticsService {
   final EndpointFallbackClient _routeClient;
   Timer? _timer;
   DateTime? _activeStartedAt;
-  String? _currentBatchId;
   bool _flushing = false;
+  bool _isActive = false;
+  bool _observingLifecycle = false;
 
-  static const _bufferKey = '_analyticsBuffer';
   static const _lastFlushKey = '_analyticsLastFlushAt';
   static const _flushInterval = Duration(minutes: 30);
   static const _sections = {
@@ -39,7 +39,12 @@ class AnalyticsService {
   static const _features = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
 
   void start() {
+    _isActive = true;
     _activeStartedAt ??= DateTime.now();
+    if (!_observingLifecycle) {
+      WidgetsBinding.instance.addObserver(this);
+      _observingLifecycle = true;
+    }
     recordOpen();
     _timer?.cancel();
     _timer = Timer.periodic(_flushInterval, (_) => flush());
@@ -48,9 +53,32 @@ class AnalyticsService {
   void stop() {
     _timer?.cancel();
     _timer = null;
+    _isActive = false;
+    if (_observingLifecycle) {
+      WidgetsBinding.instance.removeObserver(this);
+      _observingLifecycle = false;
+    }
     // 同步部分：先取消定时器；异步 flush 交给事件循环收尾
     // 如果进程立即退出，本批数据下次启动时会随 buffer 重试
-    flush();
+    flush(restartActiveTimer: false);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isActive = true;
+        _activeStartedAt ??= DateTime.now();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        if (!_isActive) return;
+        _isActive = false;
+        flush(restartActiveTimer: false);
+        break;
+    }
   }
 
   Future<void> recordOpen() async {
@@ -67,22 +95,20 @@ class AnalyticsService {
     await _storage.recordAnalyticsFeature(feature);
   }
 
-  Future<void> flush({String? token}) async {
+  Future<void> flush({String? token, bool restartActiveTimer = true}) async {
     if (_flushing) return;
     _flushing = true;
     try {
       await _captureActiveSeconds();
-      final buffer = await _loadBuffer();
-      final days = buffer['days'];
-      if (days is! Map || days.isEmpty) return;
-      // 快照要发送的日期集合，成功时只移除这批日期
-      final snapshotDates = days.keys.toSet();
-      _currentBatchId = const Uuid().v4();
+      final snapshot = await _storage.snapshotAnalyticsBufferForFlush();
+      if (snapshot == null) return;
+      final batchId = snapshot['batch_id'] as String;
+      final days = snapshot['days'] as Map<String, dynamic>;
       final deviceId = await _storage.getOrCreateDeviceId();
       final packageInfo = await PackageInfo.fromPlatform();
       final deviceInfo = await DeviceInfoHelper.instance;
       final payload = {
-        'batch_id': _currentBatchId,
+        'batch_id': batchId,
         'device_id': deviceId,
         'platform': defaultTargetPlatform.name,
         'app_version': packageInfo.version,
@@ -103,25 +129,17 @@ class AnalyticsService {
         timeout: const Duration(seconds: 10),
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        // 重新加载 buffer，仅移除已成功发送的日期，
-        // 保留 flush 期间并发写入的新数据
-        final currentBuffer = await _loadBuffer();
-        final currentDays = Map<String, dynamic>.from(
-          currentBuffer['days'] as Map? ?? {},
-        );
-        for (final date in snapshotDates) {
-          currentDays.remove(date);
-        }
-        await _storage.saveJsonObject(_bufferKey, {'days': currentDays});
+        await _storage.markAnalyticsFlushSuccess(batchId, days);
         await _storage.save(_lastFlushKey, DateTime.now().toIso8601String());
-        _currentBatchId = null;
       }
-      // 失败时保留 _currentBatchId 和 buffer，下次 flush 重试
+      // 失败时保留 buffer 和 batch_id，下次 flush 以同一批次重试
     } catch (e) {
       debugPrint('Analytics flush failed: $e');
     } finally {
       _flushing = false;
-      _activeStartedAt = DateTime.now();
+      _activeStartedAt = (restartActiveTimer || _isActive)
+          ? DateTime.now()
+          : null;
     }
   }
 
@@ -141,45 +159,12 @@ class AnalyticsService {
     }
   }
 
-  Future<Map<String, dynamic>> _loadBuffer() async {
-    final buffer = await _storage.loadJsonObject(_bufferKey);
-    if (buffer == null) return {'days': <String, dynamic>{}};
-    return buffer;
-  }
-
-  String _today() => DateTime.now().toIso8601String().substring(0, 10);
-
   Future<void> _increment(String key, {int by = 1}) async {
-    final buffer = await _loadBuffer();
-    final days = Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
-    final today = _today();
-    final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
-    day[key] = ((day[key] as num?)?.toInt() ?? 0) + by;
-    days[today] = day;
-    await _storage.saveJsonObject(_bufferKey, {'days': _trimDays(days)});
+    await _storage.incrementAnalyticsCounter(key, by: by);
   }
 
   Future<void> _incrementNested(String key, String name) async {
-    final buffer = await _loadBuffer();
-    final days = Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
-    final today = _today();
-    final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
-    final nested = Map<String, dynamic>.from(day[key] as Map? ?? {});
-    nested[name] = ((nested[name] as num?)?.toInt() ?? 0) + 1;
-    day[key] = nested;
-    days[today] = day;
-    await _storage.saveJsonObject(_bufferKey, {'days': _trimDays(days)});
-  }
-
-  Map<String, dynamic> _trimDays(Map<String, dynamic> days) {
-    final cutoff = DateTime.now().subtract(const Duration(days: 7));
-    final result = <String, dynamic>{};
-    for (final entry in days.entries) {
-      final date = DateTime.tryParse(entry.key);
-      if (date == null || date.isBefore(cutoff)) continue;
-      result[entry.key] = entry.value;
-    }
-    return result;
+    await _storage.incrementAnalyticsNestedCounter(key, name);
   }
 
   Future<void> _captureActiveSeconds() async {

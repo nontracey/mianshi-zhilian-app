@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,10 +11,12 @@ import '../models/app_settings.dart';
 class StorageService {
   SharedPreferences? _prefs;
   bool _suppressSyncDirty = false;
+  Future<void> _analyticsWriteQueue = Future.value();
 
   static const _syncDirtyKey = '_syncDirty';
   static const _syncDirtyAtKey = '_syncDirtyAt';
   static const _deviceIdKey = '_syncDeviceId';
+  static const _analyticsBufferKey = '_analyticsBuffer';
 
   static const Set<String> _syncKeys = {
     'progress_map',
@@ -481,25 +484,187 @@ class StorageService {
   Future<void> recordAnalyticsFeature(String feature) async {
     const allowed = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
     if (!allowed.contains(feature)) return;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    final buffer =
-        await loadJsonObject('_analyticsBuffer') ??
-        {'days': <String, dynamic>{}};
-    final days = Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
-    final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
-    final features = Map<String, dynamic>.from(
-      day['feature_counts'] as Map? ?? {},
-    );
-    features[feature] = ((features[feature] as num?)?.toInt() ?? 0) + 1;
-    day['feature_counts'] = features;
-    days[today] = day;
-    // 与 AnalyticsService 保持一致：仅保留最近 7 天
-    final cutoff = DateTime.now().subtract(const Duration(days: 7));
-    days.removeWhere((key, _) {
-      final date = DateTime.tryParse(key);
-      return date == null || date.isBefore(cutoff);
+    await incrementAnalyticsNestedCounter('feature_counts', feature);
+  }
+
+  Future<void> incrementAnalyticsCounter(String key, {int by = 1}) async {
+    if (by <= 0) return;
+    await _mutateAnalyticsBuffer((buffer) {
+      final days = _analyticsDays(buffer);
+      final today = _todayKey();
+      final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
+      day[key] = ((day[key] as num?)?.toInt() ?? 0) + by;
+      days[today] = day;
+      buffer['days'] = _trimAnalyticsDays(days);
     });
-    await saveJsonObject('_analyticsBuffer', {'days': days});
+  }
+
+  Future<void> incrementAnalyticsNestedCounter(String key, String name) async {
+    await _mutateAnalyticsBuffer((buffer) {
+      final days = _analyticsDays(buffer);
+      final today = _todayKey();
+      final day = Map<String, dynamic>.from(days[today] as Map? ?? {});
+      final nested = Map<String, dynamic>.from(day[key] as Map? ?? {});
+      nested[name] = ((nested[name] as num?)?.toInt() ?? 0) + 1;
+      day[key] = nested;
+      days[today] = day;
+      buffer['days'] = _trimAnalyticsDays(days);
+    });
+  }
+
+  Future<Map<String, dynamic>?> snapshotAnalyticsBufferForFlush() async {
+    return _mutateAnalyticsBuffer((buffer) {
+      final days = _analyticsDays(buffer);
+      if (days.isEmpty) return null;
+      final batchId = _analyticsBatchId(buffer) ?? const Uuid().v4();
+      buffer['batch_id'] = batchId;
+      return {'batch_id': batchId, 'days': _deepCopyMap(days)};
+    });
+  }
+
+  Future<void> markAnalyticsFlushSuccess(
+    String batchId,
+    Map<String, dynamic> sentDays,
+  ) async {
+    await _mutateAnalyticsBuffer((buffer) {
+      final currentBatchId = _analyticsBatchId(buffer);
+      if (currentBatchId != null && currentBatchId != batchId) {
+        return;
+      }
+      final currentDays = _analyticsDays(buffer);
+      final remainingDays = _subtractAnalyticsDays(currentDays, sentDays);
+      buffer['days'] = remainingDays;
+      if (remainingDays.isEmpty) {
+        buffer.remove('batch_id');
+      } else {
+        buffer['batch_id'] = const Uuid().v4();
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>> loadAnalyticsBuffer() async {
+    final buffer = await loadJsonObject(_analyticsBufferKey);
+    if (buffer == null) return {'days': <String, dynamic>{}};
+    return _normalizeAnalyticsBuffer(buffer);
+  }
+
+  Future<T> _mutateAnalyticsBuffer<T>(
+    FutureOr<T> Function(Map<String, dynamic> buffer) mutate,
+  ) async {
+    final previous = _analyticsWriteQueue;
+    final completer = Completer<void>();
+    _analyticsWriteQueue = previous.then((_) => completer.future);
+    await previous;
+    try {
+      final buffer = await loadAnalyticsBuffer();
+      final result = await mutate(buffer);
+      final normalized = _normalizeAnalyticsBuffer(buffer);
+      await saveJsonObject(_analyticsBufferKey, normalized);
+      return result;
+    } finally {
+      completer.complete();
+    }
+  }
+
+  String _todayKey() => DateTime.now().toIso8601String().substring(0, 10);
+
+  String? _analyticsBatchId(Map<String, dynamic> buffer) {
+    final value = buffer['batch_id'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  Map<String, dynamic> _analyticsDays(Map<String, dynamic> buffer) {
+    return Map<String, dynamic>.from(buffer['days'] as Map? ?? {});
+  }
+
+  Map<String, dynamic> _normalizeAnalyticsBuffer(Map<String, dynamic> buffer) {
+    final days = _trimAnalyticsDays(_analyticsDays(buffer));
+    final normalized = <String, dynamic>{'days': days};
+    final batchId = _analyticsBatchId(buffer);
+    if (days.isNotEmpty && batchId != null) {
+      normalized['batch_id'] = batchId;
+    }
+    return normalized;
+  }
+
+  Map<String, dynamic> _trimAnalyticsDays(Map<String, dynamic> days) {
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    final result = <String, dynamic>{};
+    for (final entry in days.entries) {
+      final date = DateTime.tryParse(entry.key);
+      if (date == null || date.isBefore(cutoff)) continue;
+      result[entry.key] = entry.value;
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _subtractAnalyticsDays(
+    Map<String, dynamic> currentDays,
+    Map<String, dynamic> sentDays,
+  ) {
+    final remaining = _deepCopyMap(currentDays);
+    for (final sentEntry in sentDays.entries) {
+      final currentDay = remaining[sentEntry.key];
+      final sentDay = sentEntry.value;
+      if (currentDay is! Map || sentDay is! Map) continue;
+      final day = Map<String, dynamic>.from(currentDay);
+      _subtractNumberField(day, sentDay, 'open_count');
+      _subtractNumberField(day, sentDay, 'active_seconds');
+      _subtractNestedCounts(day, sentDay, 'section_counts');
+      _subtractNestedCounts(day, sentDay, 'feature_counts');
+      if (day.isEmpty) {
+        remaining.remove(sentEntry.key);
+      } else {
+        remaining[sentEntry.key] = day;
+      }
+    }
+    return remaining;
+  }
+
+  void _subtractNumberField(
+    Map<String, dynamic> target,
+    Map<dynamic, dynamic> sent,
+    String key,
+  ) {
+    final currentValue = (target[key] as num?)?.toInt() ?? 0;
+    final sentValue = (sent[key] as num?)?.toInt() ?? 0;
+    final remaining = currentValue - sentValue;
+    if (remaining > 0) {
+      target[key] = remaining;
+    } else {
+      target.remove(key);
+    }
+  }
+
+  void _subtractNestedCounts(
+    Map<String, dynamic> target,
+    Map<dynamic, dynamic> sent,
+    String key,
+  ) {
+    final currentNested = target[key];
+    final sentNested = sent[key];
+    if (currentNested is! Map || sentNested is! Map) return;
+    final remaining = Map<String, dynamic>.from(currentNested);
+    for (final entry in sentNested.entries) {
+      final name = entry.key.toString();
+      final currentValue = (remaining[name] as num?)?.toInt() ?? 0;
+      final sentValue = (entry.value as num?)?.toInt() ?? 0;
+      final count = currentValue - sentValue;
+      if (count > 0) {
+        remaining[name] = count;
+      } else {
+        remaining.remove(name);
+      }
+    }
+    if (remaining.isEmpty) {
+      target.remove(key);
+    } else {
+      target[key] = remaining;
+    }
+  }
+
+  Map<String, dynamic> _deepCopyMap(Map<String, dynamic> value) {
+    return json.decode(json.encode(value)) as Map<String, dynamic>;
   }
 
   bool _isSyncRelevantKey(String key) {
