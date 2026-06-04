@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
+import 'model_downloader.dart';
 import 'on_device_stt_service.dart';
 
 /// SenseVoice 引擎实现（基于 sherpa_onnx OfflineRecognizer）
@@ -20,7 +21,7 @@ class SenseVoiceEngine implements OnDeviceSttService {
 
   @override
   Future<void> initialize() async {
-    initBindings();
+    initBindings(await ModelDownloader.requireRuntimeLibraryDir());
     _recognizer = OfflineRecognizer(_senseVoiceConfig(modelDir, language));
     isInitialized = true;
   }

@@ -61,7 +61,7 @@ class RouteStateStore {
     final raw = data?['mode'] as String?;
     return DownloadSourceMode.values.firstWhere(
       (mode) => mode.name == raw,
-      orElse: () => DownloadSourceMode.githubFirst,
+      orElse: () => DownloadSourceMode.auto,
     );
   }
 

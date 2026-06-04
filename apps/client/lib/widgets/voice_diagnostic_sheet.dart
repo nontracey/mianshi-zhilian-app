@@ -108,11 +108,11 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       return (false, 'Unknown engine: $engine');
     }
     try {
-      final ready = await ModelDownloader.isModelReady(config);
+      final ready = await ModelDownloader.isOnDeviceReady(config);
       if (ready) {
         return (true, '');
       } else {
-        return (false, 'Model not downloaded');
+        return (false, 'Runtime or model not downloaded');
       }
     } catch (e) {
       return (false, '$e');

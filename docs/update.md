@@ -15,8 +15,9 @@
        ↓
 有新版本 → 显示更新内容和文件大小
        ↓
-用户确认 → 依次尝试下载源：
-  GitHub 官方 → 用户自定义镜像 → ghfast.top → manifest 中的其他镜像
+用户确认 → 自动探测下载源：
+  GitHub 官方 / 用户自定义镜像 / ghfast.top / manifest 中的其他镜像
+  按响应最快的可达线路优先下载
        ↓
 校验 sha256 → 引导安装
        ↓
@@ -87,14 +88,14 @@
 
 ## 下载源与镜像机制
 
-客户端下载更新时按以下顺序依次尝试：
+客户端下载更新默认使用“自动选择最快线路”。下载前会对候选源做轻量 `HEAD` 探测，优先使用响应最快的可达线路；不可达来源会排到后面继续兜底。用户也可以在设置中改为固定顺序。
 
-| 优先级 | 下载源 | 说明 |
-|--------|--------|------|
-| 1 | GitHub 官方 | `update.json` 中的 `url` 字段，默认首选 |
-| 2 | 用户自定义镜像 | 在"关于与更新"页 ⚙️ 设置中配置的前缀，拼接到 GitHub URL 前面 |
-| 3 | ghfast.top | 内置备用镜像，自动加速 GitHub Release 下载 |
-| 4 | manifest 中的其他镜像 | `update.json` `mirrors` 字段中的额外地址 |
+| 模式 | 行为 |
+|--------|------|
+| 自动选择最快线路（默认） | 并发探测 GitHub 官方、用户自定义镜像、ghfast.top 和 manifest mirrors，按响应耗时排序 |
+| GitHub 官方优先 | GitHub 官方 → 用户自定义镜像 → ghfast.top → manifest mirrors |
+| 镜像源优先 | 用户自定义镜像 → GitHub 官方 → ghfast.top → manifest mirrors |
+| 仅 GitHub 官方 | 只使用 `update.json` 中的 `url` 字段 |
 
 - 某个源下载失败后自动尝试下一个，用户在进度对话框中能看到当前正在从哪个源下载
 - 校验失败（sha256 不匹配）不会重试其他源，直接报错
@@ -102,7 +103,7 @@
 
 ### 用户自定义镜像站
 
-用户可以在 **个人中心 → 关于与更新 → ⚙️ 下载设置** 中配置自定义 GitHub 镜像站前缀（如 `https://ghfast.top`）。配置后该镜像会排在 GitHub 官方之后、内置备用镜像之前。留空则仅使用默认的下载源顺序。
+用户可以在 **个人中心 → 关于与更新 → ⚙️ 下载设置** 中配置自定义 GitHub 镜像站前缀（如 `https://ghfast.top`），也可以在 **个人中心 → 线路诊断** 中选择“自动选择最快线路 / GitHub 官方优先 / 镜像源优先 / 仅 GitHub 官方”。该偏好同时作用于应用更新包、本机语音模型和 ONNX Runtime 下载。
 
 ## 平台更新策略
 
@@ -131,7 +132,7 @@ https://mianshizhilian-api.nontracey.de5.net/update.json
 
 生产构建不再支持通过 `UPDATE_MANIFEST_URL` 固定官方更新域名；官方主备域名由客户端路由表统一维护。
 
-`scripts/build_update_manifest.dart` 会为每个平台写入 `assetPath`，格式为 `/releases/latest/download/<asset>`。Worker 只代理体积很小的 `update.json`，并对旧 manifest 做兜底规范化；各平台安装包不会经过 Worker 转发。客户端会优先使用 `assetPath` 生成官方 Web 主备下载候选，再依次尝试 GitHub Release、用户自定义镜像和默认镜像源。
+`scripts/build_update_manifest.dart` 会为每个平台写入 `assetPath`，格式为 `/releases/latest/download/<asset>`。Worker 只代理体积很小的 `update.json`，并对旧 manifest 做兜底规范化；各平台安装包不会经过 Worker 转发。客户端会用 `assetPath` 和 manifest 构造下载候选，再按用户选择的下载源模式排序；默认自动模式会先探测候选源，优先使用最快可达线路。
 
 ## 隐私说明
 
@@ -151,7 +152,7 @@ class UpdateService {
   /// 下载结果枚举，区分失败原因
   // DownloadResult { success, networkError, verificationFailed, cancelled }
 
-  /// 构建下载 URL 列表：GitHub → 自定义镜像 → ghfast.top → manifest mirrors
+  /// 构建下载 URL 列表，自动模式会探测并按最快可达源排序
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) { ... }
 
   /// 下载更新，返回 (文件路径, DownloadResult)

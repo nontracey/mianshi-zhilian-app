@@ -173,7 +173,7 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
   late final RouteStateStore _store;
   RouteMode _appApiMode = RouteMode.auto;
   RouteMode _contentMode = RouteMode.auto;
-  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.githubFirst;
+  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.auto;
   bool _loading = true;
 
   @override
@@ -248,6 +248,10 @@ class _RoutePreferencePanelState extends State<_RoutePreferencePanel> {
         border: const OutlineInputBorder(),
       ),
       items: [
+        DropdownMenuItem(
+          value: DownloadSourceMode.auto,
+          child: Text(l10n.get('download_auto_fastest')),
+        ),
         DropdownMenuItem(
           value: DownloadSourceMode.githubFirst,
           child: Text(l10n.get('download_github_first')),
@@ -1726,10 +1730,21 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
   // ── 本机引擎状态 ──
   bool _onDeviceChecking = true;
   bool _onDeviceReady = false;
+  bool _onDeviceModelReady = false;
+  bool _onDeviceRuntimeReady = false;
   int? _onDeviceModelSizeBytes;
+  int? _onDeviceRuntimeSizeBytes;
   bool _onDeviceDownloading = false;
+  bool _onDeviceRuntimeDownloading = false;
   double _onDeviceProgress = 0.0;
+  double _onDeviceRuntimeProgress = 0.0;
+  String _onDeviceSource = '';
+  String _onDeviceRuntimeSource = '';
+  double _onDeviceSpeed = 0;
+  double _onDeviceRuntimeSpeed = 0;
   String? _onDeviceError;
+  ResourceDownloadController? _modelDownloadController;
+  ResourceDownloadController? _runtimeDownloadController;
 
   @override
   void initState() {
@@ -1754,25 +1769,33 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
 
     final engine = _settings.onDeviceEngine;
     final onDeviceModelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
+    final runtimeConfig = KnownRuntimes.current();
 
-    if (onDeviceModelConfig == null) {
+    if (onDeviceModelConfig == null || runtimeConfig == null) {
       if (mounted) {
         setState(() {
           _onDeviceChecking = false;
           _onDeviceReady = false;
+          _onDeviceModelReady = false;
+          _onDeviceRuntimeReady = false;
         });
       }
       return;
     }
 
     try {
-      final ready = await ModelDownloader.isModelReady(onDeviceModelConfig);
+      final modelReady = await ModelDownloader.isModelReady(onDeviceModelConfig);
+      final runtimeReady = await ModelDownloader.isRuntimeReady(runtimeConfig);
       final size = await ModelDownloader.getModelSize(onDeviceModelConfig.id);
+      final runtimeSize = await ModelDownloader.getRuntimeSize(runtimeConfig.id);
       if (mounted) {
         setState(() {
           _onDeviceChecking = false;
-          _onDeviceReady = ready;
+          _onDeviceReady = modelReady && runtimeReady;
+          _onDeviceModelReady = modelReady;
+          _onDeviceRuntimeReady = runtimeReady;
           _onDeviceModelSizeBytes = size;
+          _onDeviceRuntimeSizeBytes = runtimeSize;
         });
       }
     } catch (e) {
@@ -2050,58 +2073,48 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       );
     }
 
-    if (_onDeviceReady) {
-      final sizeMb = _onDeviceModelSizeBytes != null
-          ? ' (${(_onDeviceModelSizeBytes! / 1048576).toStringAsFixed(1)} MB)'
-          : '';
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle, size: 18, color: Colors.green),
-              const SizedBox(width: 6),
-              Text(
-                '${l10n.get('model_ready')}$sizeMb',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.green,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          TextButton.icon(
-            onPressed: () => _deleteModel(l10n),
-            icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text(l10n.get('model_delete')),
-            style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
-          ),
-        ],
-      );
-    }
-
-    // 未就绪
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error),
+            Icon(
+              _onDeviceReady ? Icons.check_circle : Icons.info_outline,
+              size: 18,
+              color: _onDeviceReady ? Colors.green : theme.colorScheme.primary,
+            ),
             const SizedBox(width: 6),
-            Text(
-              l10n.get('model_not_ready'),
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colorScheme.error,
+            Expanded(
+              child: Text(
+                _onDeviceReady
+                    ? l10n.get('on_device_stt_ready')
+                    : l10n.get('on_device_stt_requires_runtime_and_model'),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _onDeviceReady ? Colors.green : theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
         ),
+        if (!_onDeviceReady) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: (_onDeviceDownloading || _onDeviceRuntimeDownloading)
+                ? null
+                : () => _downloadMissingOnDeviceResources(l10n),
+            icon: const Icon(Icons.download, size: 16),
+            label: Text(l10n.get('download_required_resources')),
+          ),
+        ],
+        const SizedBox(height: 8),
+        _buildRuntimeResourceStatus(l10n, theme),
+        const SizedBox(height: 10),
+        _buildModelResourceStatus(l10n, theme),
         if (_onDeviceError != null)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 8),
             child: Text(
               _onDeviceError!,
               style: TextStyle(
@@ -2110,58 +2123,102 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
               ),
             ),
           ),
-        const SizedBox(height: 8),
-        if (_onDeviceDownloading)
-          Column(
-            children: [
-              LinearProgressIndicator(value: _onDeviceProgress),
-              const SizedBox(height: 4),
-              Text(
-                '${(_onDeviceProgress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          )
-        else
-          _buildDownloadButton(l10n, theme),
       ],
     );
   }
 
-  Widget _buildDownloadButton(LocalizationProvider l10n, ThemeData theme) {
+  Widget _buildRuntimeResourceStatus(LocalizationProvider l10n, ThemeData theme) {
+    final config = KnownRuntimes.current();
+    if (config == null) return const SizedBox.shrink();
+    final sizeText = _onDeviceRuntimeSizeBytes != null
+        ? ' (${UpdateService.formatSize(_onDeviceRuntimeSizeBytes!)})'
+        : '';
+    return _ResourceStatusBlock(
+      icon: Icons.memory_outlined,
+      title: l10n.get('on_device_runtime'),
+      ready: _onDeviceRuntimeReady,
+      readyText: '${l10n.get('runtime_ready')}$sizeText',
+      missingText: l10n.get('runtime_not_ready'),
+      downloading: _onDeviceRuntimeDownloading,
+      progress: _onDeviceRuntimeProgress,
+      source: _onDeviceRuntimeSource,
+      speed: _onDeviceRuntimeSpeed,
+      onDownload: () => _downloadRuntime(config, l10n),
+      onPause: () => _runtimeDownloadController?.pause(),
+      onCancel: () => _runtimeDownloadController?.cancel(),
+      onDelete: _onDeviceRuntimeReady ? () => _deleteRuntime(l10n) : null,
+    );
+  }
+
+  Widget _buildModelResourceStatus(LocalizationProvider l10n, ThemeData theme) {
     final engine = _settings.onDeviceEngine;
     final modelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
     if (modelConfig == null) return const SizedBox.shrink();
-
     final sizeInfo = modelConfig.estimatedSizeMb != null
         ? ' (~${modelConfig.estimatedSizeMb} MB)'
         : '';
-
-    return FilledButton.tonalIcon(
-      onPressed: () => _downloadModel(modelConfig, l10n),
-      icon: const Icon(Icons.download, size: 16),
-      label: Text('${l10n.get('model_download')}$sizeInfo'),
+    final sizeText = _onDeviceModelSizeBytes != null
+        ? ' (${UpdateService.formatSize(_onDeviceModelSizeBytes!)})'
+        : '';
+    return _ResourceStatusBlock(
+      icon: Icons.folder_special_outlined,
+      title: l10n.get('on_device_model'),
+      ready: _onDeviceModelReady,
+      readyText: '${l10n.get('model_ready')}$sizeText',
+      missingText: l10n.get('model_not_ready'),
+      downloading: _onDeviceDownloading,
+      progress: _onDeviceProgress,
+      source: _onDeviceSource,
+      speed: _onDeviceSpeed,
+      onDownload: () => _downloadModel(modelConfig, l10n),
+      onPause: () => _modelDownloadController?.pause(),
+      onCancel: () => _modelDownloadController?.cancel(),
+      onDelete: _onDeviceModelReady ? () => _deleteModel(l10n) : null,
+      downloadLabelSuffix: sizeInfo,
     );
   }
 
   Future<void> _downloadModel(OnDeviceModelConfig config, LocalizationProvider l10n) async {
     if (!mounted) return;
+    final settings = context.read<SettingsProvider>().settings;
+    final downloadSourceMode = await RouteStateStore(
+      StorageService(),
+    ).loadDownloadSourceMode();
+    final controller = ResourceDownloadController();
+    _modelDownloadController = controller;
     setState(() {
       _onDeviceDownloading = true;
       _onDeviceProgress = 0.0;
+      _onDeviceSource = '';
+      _onDeviceSpeed = 0;
       _onDeviceError = null;
     });
 
     try {
       await ModelDownloader.downloadModel(
         config: config,
-        onProgress: (received, total) {
-          if (mounted && total > 0) {
-            setState(() => _onDeviceProgress = received / total);
+        mirrorBaseUrl: settings.customGithubMirror,
+        downloadSourceMode: downloadSourceMode,
+        controller: controller,
+        onDetailedProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _onDeviceProgress = progress.fraction ?? _onDeviceProgress;
+              _onDeviceSource = progress.sourceLabel;
+              _onDeviceSpeed = progress.bytesPerSecond;
+            });
           }
         },
       );
       await _checkOnDeviceStatus();
+    } on ResourceDownloadStopped catch (e) {
+      if (mounted) {
+        setState(() {
+          _onDeviceError = e.reason == DownloadStopReason.paused
+              ? l10n.get('download_paused')
+              : null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -2172,6 +2229,87 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     } finally {
       if (mounted) {
         setState(() => _onDeviceDownloading = false);
+      }
+      if (_modelDownloadController == controller) {
+        _modelDownloadController = null;
+      }
+    }
+  }
+
+  Future<void> _downloadMissingOnDeviceResources(LocalizationProvider l10n) async {
+    final runtimeConfig = KnownRuntimes.current();
+    final modelConfig = _modelConfigForEngine(
+      _settings.onDeviceEngine,
+      _settings.whisperModel,
+    );
+    if (runtimeConfig == null || modelConfig == null) return;
+    if (!_onDeviceRuntimeReady) {
+      await _downloadRuntime(runtimeConfig, l10n);
+      if (!mounted || !_onDeviceRuntimeReady) return;
+    }
+    if (!_onDeviceModelReady) {
+      await _downloadModel(modelConfig, l10n);
+    }
+  }
+
+  Future<void> _downloadRuntime(
+    OnDeviceRuntimeConfig config,
+    LocalizationProvider l10n,
+  ) async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>().settings;
+    final downloadSourceMode = await RouteStateStore(
+      StorageService(),
+    ).loadDownloadSourceMode();
+    final controller = ResourceDownloadController();
+    _runtimeDownloadController = controller;
+    setState(() {
+      _onDeviceRuntimeDownloading = true;
+      _onDeviceRuntimeProgress = 0.0;
+      _onDeviceRuntimeSource = '';
+      _onDeviceRuntimeSpeed = 0;
+      _onDeviceError = null;
+    });
+
+    try {
+      await ModelDownloader.downloadRuntime(
+        config: config,
+        mirrorBaseUrl: settings.customGithubMirror,
+        downloadSourceMode: downloadSourceMode,
+        controller: controller,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _onDeviceRuntimeProgress =
+                  progress.fraction ?? _onDeviceRuntimeProgress;
+              _onDeviceRuntimeSource = progress.sourceLabel;
+              _onDeviceRuntimeSpeed = progress.bytesPerSecond;
+            });
+          }
+        },
+      );
+      await _checkOnDeviceStatus();
+    } on ResourceDownloadStopped catch (e) {
+      if (mounted) {
+        setState(() {
+          _onDeviceError = e.reason == DownloadStopReason.paused
+              ? l10n.get('download_paused')
+              : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _onDeviceError = '$e';
+          _onDeviceRuntimeDownloading = false;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _onDeviceRuntimeDownloading = false);
+      }
+      if (_runtimeDownloadController == controller) {
+        _runtimeDownloadController = null;
       }
     }
   }
@@ -2201,6 +2339,34 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     final modelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
     if (modelConfig != null) {
       await ModelDownloader.deleteModel(modelConfig.id);
+    }
+    await _checkOnDeviceStatus();
+  }
+
+  Future<void> _deleteRuntime(LocalizationProvider l10n) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('confirm_delete_runtime_title')),
+        content: Text(l10n.get('confirm_delete_runtime_desc')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final runtimeConfig = KnownRuntimes.current();
+    if (runtimeConfig != null) {
+      await ModelDownloader.deleteRuntime(runtimeConfig.id);
     }
     await _checkOnDeviceStatus();
   }
@@ -2257,6 +2423,149 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       'paraformer' => KnownModels.paraformer,
       _ => null,
     };
+  }
+}
+
+class _ResourceStatusBlock extends StatelessWidget {
+  const _ResourceStatusBlock({
+    required this.icon,
+    required this.title,
+    required this.ready,
+    required this.readyText,
+    required this.missingText,
+    required this.downloading,
+    required this.progress,
+    required this.source,
+    required this.speed,
+    required this.onDownload,
+    required this.onPause,
+    required this.onCancel,
+    this.onDelete,
+    this.downloadLabelSuffix = '',
+  });
+
+  final IconData icon;
+  final String title;
+  final bool ready;
+  final String readyText;
+  final String missingText;
+  final bool downloading;
+  final double progress;
+  final String source;
+  final double speed;
+  final VoidCallback onDownload;
+  final VoidCallback onPause;
+  final VoidCallback onCancel;
+  final VoidCallback? onDelete;
+  final String downloadLabelSuffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final theme = Theme.of(context);
+    final statusColor = ready ? Colors.green : theme.colorScheme.error;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 17, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  ready ? Icons.check_circle : Icons.error_outline,
+                  size: 17,
+                  color: statusColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  ready ? readyText : missingText,
+                  style: TextStyle(fontSize: 12, color: statusColor),
+                ),
+              ],
+            ),
+            if (downloading) ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: progress > 0 ? progress : null),
+              const SizedBox(height: 6),
+              Text(
+                _downloadDetailText(l10n),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onPause,
+                    icon: const Icon(Icons.pause, size: 16),
+                    label: Text(l10n.get('pause_download')),
+                  ),
+                  TextButton.icon(
+                    onPressed: onCancel,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: Text(l10n.get('cancel')),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (!ready)
+                    FilledButton.tonalIcon(
+                      onPressed: onDownload,
+                      icon: const Icon(Icons.download, size: 16),
+                      label: Text('${l10n.get('model_download')}$downloadLabelSuffix'),
+                    ),
+                  if (onDelete != null)
+                    TextButton.icon(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: Text(l10n.get('delete')),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _downloadDetailText(LocalizationProvider l10n) {
+    final percent = '${(progress * 100).clamp(0, 100).toStringAsFixed(0)}%';
+    final speedText = speed > 0 ? '${UpdateService.formatSize(speed.round())}/s' : '--';
+    final sourceText = source.isNotEmpty ? source : '--';
+    return l10n.getp('download_progress_source_speed', {
+      'percent': percent,
+      'source': sourceText,
+      'speed': speedText,
+    });
   }
 }
 
@@ -3105,7 +3414,7 @@ class _AboutPanelState extends State<_AboutPanel> {
   String? _updateMessage;
   StateSetter? _currentSetDialogState;
   AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
-  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.githubFirst;
+  DownloadSourceMode _downloadSourceMode = DownloadSourceMode.auto;
 
   /// 统一获取 UpdateService 实例（避免重复创建导致设置不一致）
   UpdateService get _updateService {

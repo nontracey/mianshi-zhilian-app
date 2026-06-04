@@ -12,7 +12,10 @@ void main() {
       sha256: 'abc',
       size: 42,
     );
-    final service = UpdateService(customMirrorPrefix: 'https://mirror.local');
+    final service = UpdateService(
+      customMirrorPrefix: 'https://mirror.local',
+      downloadSourceMode: DownloadSourceMode.githubFirst,
+    );
 
     final urls = service.buildDownloadUrlsForTest(update);
 
@@ -39,5 +42,23 @@ void main() {
 
     // url 字段直接原样加入列表（不再做 Pages CDN 解析）
     expect(urls.first, update.url);
+  });
+
+  test('auto mode is the default and includes every candidate before probing', () {
+    const update = PlatformUpdate(
+      url:
+          'https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.3/mianshi-zhilian-v0.1.3-android.apk',
+      mirrors: ['https://mirror.example.test/android.apk'],
+      sha256: 'abc',
+      size: 42,
+    );
+    final service = UpdateService(customMirrorPrefix: 'https://mirror.local');
+
+    final urls = service.buildDownloadUrlsForTest(update);
+
+    expect(urls.first, update.url);
+    expect(urls, contains('https://mirror.local/${update.url}'));
+    expect(urls, contains('https://ghfast.top/${update.url}'));
+    expect(urls, contains('https://mirror.example.test/android.apk'));
   });
 }

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
+import 'model_downloader.dart';
 import 'on_device_stt_service.dart';
 
 /// Paraformer 流式引擎实现（基于 sherpa_onnx OnlineRecognizer）
@@ -25,7 +26,7 @@ class ParaformerEngine implements OnDeviceSttService {
 
   @override
   Future<void> initialize() async {
-    initBindings();
+    initBindings(await ModelDownloader.requireRuntimeLibraryDir());
     try {
       _onlineRecognizer = OnlineRecognizer(_paraformerOnlineConfig(modelDir));
       _onlineStream = _onlineRecognizer!.createStream();

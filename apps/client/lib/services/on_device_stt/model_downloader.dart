@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+
+import '../route_resolver.dart';
 
 /// 模型文件定义（仅用于 isModelReady 检查）
 class ModelFile {
@@ -134,6 +138,162 @@ class KnownModels {
 /// 模型下载状态回调
 typedef OnDownloadProgress = void Function(int received, int total);
 
+typedef OnResourceDownloadProgress = void Function(DownloadProgress progress);
+
+enum DownloadStopReason { paused, cancelled }
+
+class ResourceDownloadStopped implements Exception {
+  const ResourceDownloadStopped(this.reason);
+
+  final DownloadStopReason reason;
+
+  @override
+  String toString() => 'Resource download ${reason.name}';
+}
+
+class DownloadProgress {
+  const DownloadProgress({
+    required this.received,
+    required this.total,
+    required this.sourceLabel,
+    required this.bytesPerSecond,
+    this.extracting = false,
+  });
+
+  final int received;
+  final int total;
+  final String sourceLabel;
+  final double bytesPerSecond;
+  final bool extracting;
+
+  double? get fraction => total > 0 ? (received / total).clamp(0.0, 1.0) : null;
+}
+
+class ResourceDownloadController {
+  bool _paused = false;
+  bool _cancelled = false;
+  http.Client? _client;
+
+  bool get isPaused => _paused;
+  bool get isCancelled => _cancelled;
+
+  void pause() {
+    _paused = true;
+    _client?.close();
+  }
+
+  void cancel() {
+    _cancelled = true;
+    _client?.close();
+  }
+
+  void _bind(http.Client client) {
+    if (_paused || _cancelled) {
+      client.close();
+      return;
+    }
+    _client = client;
+  }
+
+  void _unbind(http.Client client) {
+    if (_client == client) {
+      _client = null;
+    }
+  }
+}
+
+class RuntimeFile {
+  const RuntimeFile(this.fileName);
+
+  final String fileName;
+}
+
+class OnDeviceRuntimeConfig {
+  const OnDeviceRuntimeConfig({
+    required this.id,
+    required this.displayName,
+    required this.archiveUrl,
+    required this.files,
+    this.archiveSizeBytes,
+    this.estimatedSizeMb,
+  });
+
+  final String id;
+  final String displayName;
+  final String archiveUrl;
+  final List<RuntimeFile> files;
+  final int? archiveSizeBytes;
+  final int? estimatedSizeMb;
+}
+
+class KnownRuntimes {
+  KnownRuntimes._();
+
+  static const version = 'v1.13.2';
+  static const _baseUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/$version';
+
+  static OnDeviceRuntimeConfig? current() {
+    if (Platform.isMacOS) {
+      final arch = Abi.current() == Abi.macosArm64 ? 'aarch64' : 'x64';
+      return OnDeviceRuntimeConfig(
+        id: 'sherpa-onnx-$version-osx-$arch',
+        displayName: 'Sherpa ONNX Runtime $version macOS $arch',
+        archiveUrl: '$_baseUrl/sherpa-onnx-native-lib-osx-$arch-$version.jar',
+        estimatedSizeMb: arch == 'aarch64' ? 11 : 10,
+        files: const [
+          RuntimeFile('libsherpa-onnx-c-api.dylib'),
+          RuntimeFile('libsherpa-onnx-cxx-api.dylib'),
+          RuntimeFile('libonnxruntime.1.24.4.dylib'),
+        ],
+      );
+    }
+    if (Platform.isWindows) {
+      return const OnDeviceRuntimeConfig(
+        id: 'sherpa-onnx-v1.13.2-win-x64',
+        displayName: 'Sherpa ONNX Runtime v1.13.2 Windows x64',
+        archiveUrl:
+            'https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-native-lib-win-x64-v1.13.2.jar',
+        estimatedSizeMb: 8,
+        files: [
+          RuntimeFile('sherpa-onnx-c-api.dll'),
+          RuntimeFile('sherpa-onnx-cxx-api.dll'),
+          RuntimeFile('onnxruntime.dll'),
+          RuntimeFile('onnxruntime_providers_shared.dll'),
+        ],
+      );
+    }
+    if (Platform.isLinux) {
+      final arch = Abi.current() == Abi.linuxArm64 ? 'aarch64' : 'x64';
+      return OnDeviceRuntimeConfig(
+        id: 'sherpa-onnx-$version-linux-$arch',
+        displayName: 'Sherpa ONNX Runtime $version Linux $arch',
+        archiveUrl: '$_baseUrl/sherpa-onnx-native-lib-linux-$arch-$version.jar',
+        estimatedSizeMb: arch == 'aarch64' ? 12 : 10,
+        files: const [
+          RuntimeFile('libsherpa-onnx-c-api.so'),
+          RuntimeFile('libsherpa-onnx-cxx-api.so'),
+          RuntimeFile('libonnxruntime.so'),
+        ],
+      );
+    }
+    if (Platform.isAndroid) {
+      return const OnDeviceRuntimeConfig(
+        id: 'sherpa-onnx-v1.13.2-android',
+        displayName: 'Sherpa ONNX Runtime v1.13.2 Android',
+        archiveUrl:
+            'https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-v1.13.2-android.tar.bz2',
+        estimatedSizeMb: 54,
+        files: [
+          RuntimeFile('libsherpa-onnx-c-api.so'),
+          RuntimeFile('libsherpa-onnx-cxx-api.so'),
+          RuntimeFile('libonnxruntime.so'),
+        ],
+      );
+    }
+    return null;
+  }
+}
+
 /// 通用模型下载器
 class ModelDownloader {
   ModelDownloader._();
@@ -158,6 +318,15 @@ class ModelDownloader {
     return dir;
   }
 
+  static Future<Directory> getRuntimeDir(String runtimeId) async {
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/runtimes/$runtimeId');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
   /// 检查模型是否已下载完整
   static Future<bool> isModelReady(OnDeviceModelConfig config) async {
     final dir = await getModelDir(config.id);
@@ -171,11 +340,40 @@ class ModelDownloader {
     return true;
   }
 
+  static Future<bool> isRuntimeReady(OnDeviceRuntimeConfig config) async {
+    final dir = await getRuntimeDir(config.id);
+    for (final file in config.files) {
+      final found = await _findFile(dir, file.fileName);
+      if (found == null) return false;
+    }
+    return true;
+  }
+
+  static Future<bool> isOnDeviceReady(OnDeviceModelConfig modelConfig) async {
+    final runtimeConfig = KnownRuntimes.current();
+    if (runtimeConfig == null) return false;
+    return await isRuntimeReady(runtimeConfig) && await isModelReady(modelConfig);
+  }
+
+  static Future<String?> getRuntimeLibraryDir(OnDeviceRuntimeConfig config) async {
+    final dir = await getRuntimeDir(config.id);
+    final first = config.files.isEmpty ? null : await _findFile(dir, config.files.first.fileName);
+    return first?.parent.path;
+  }
+
+  static Future<int?> getRuntimeSize(String runtimeId) => getResourceSize('runtimes/$runtimeId');
+
   /// 获取已下载模型的文件大小（字节），null 表示未下载
   static Future<int?> getModelSize(String modelId) async {
-    final dir = await getModelDir(modelId);
+    return getResourceSize(modelId);
+  }
+
+  static Future<int?> getResourceSize(String resourcePath) async {
+    final root = await getStorageDir();
+    final dir = Directory('${root.path}/$resourcePath');
     // 递归统计所有文件大小
     int total = 0;
+    if (!await dir.exists()) return null;
     await for (final entity in dir.list(recursive: true)) {
       if (entity is File) {
         total += await entity.length();
@@ -190,6 +388,27 @@ class ModelDownloader {
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
+    await _deleteTempFile(modelId);
+  }
+
+  static Future<void> deleteRuntime(String runtimeId) async {
+    final dir = await getRuntimeDir(runtimeId);
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
+    }
+    await _deleteTempFile(runtimeId);
+  }
+
+  static Future<String> requireRuntimeLibraryDir() async {
+    final runtimeConfig = KnownRuntimes.current();
+    if (runtimeConfig == null || !await isRuntimeReady(runtimeConfig)) {
+      throw StateError('On-device runtime is not downloaded');
+    }
+    final runtimeDir = await getRuntimeLibraryDir(runtimeConfig);
+    if (runtimeDir == null) {
+      throw StateError('On-device runtime library directory is missing');
+    }
+    return runtimeDir;
   }
 
   /// GitHub 代理镜像 URL 列表（按优先级排序）
@@ -215,6 +434,9 @@ class ModelDownloader {
     required OnDeviceModelConfig config,
     OnDownloadProgress? onProgress,
     String? mirrorBaseUrl,
+    DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
+    ResourceDownloadController? controller,
+    OnResourceDownloadProgress? onDetailedProgress,
   }) async {
     final modelDir = await getModelDir(config.id);
 
@@ -229,13 +451,25 @@ class ModelDownloader {
       archiveUrl: config.archiveUrl,
       identifier: config.id,
       mirrorBaseUrl: mirrorBaseUrl,
+      downloadSourceMode: downloadSourceMode,
       archiveSizeBytes: config.archiveSizeBytes,
-      onProgress: onProgress,
+      controller: controller,
+      onProgress: (progress) {
+        onProgress?.call(progress.received, progress.total);
+        onDetailedProgress?.call(progress);
+      },
     );
 
     try {
       // 2. 读取临时文件到内存用于 BZip2 解压
       onProgress?.call(0, config.archiveSizeBytes ?? 1);
+      onDetailedProgress?.call(DownloadProgress(
+        received: 0,
+        total: config.archiveSizeBytes ?? 1,
+        sourceLabel: '',
+        bytesPerSecond: 0,
+        extracting: true,
+      ));
       final archiveBytes = await tempFile.readAsBytes();
 
       // 3. BZip2 解压
@@ -316,6 +550,56 @@ class ModelDownloader {
     }
   }
 
+  static Future<void> downloadRuntime({
+    required OnDeviceRuntimeConfig config,
+    String? mirrorBaseUrl,
+    DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
+    ResourceDownloadController? controller,
+    OnResourceDownloadProgress? onProgress,
+  }) async {
+    final runtimeDir = await getRuntimeDir(config.id);
+    if (await runtimeDir.exists()) {
+      await runtimeDir.delete(recursive: true);
+    }
+    await runtimeDir.create(recursive: true);
+
+    final tempFile = await _downloadArchiveToTemp(
+      archiveUrl: config.archiveUrl,
+      identifier: config.id,
+      mirrorBaseUrl: mirrorBaseUrl,
+      downloadSourceMode: downloadSourceMode,
+      archiveSizeBytes: config.archiveSizeBytes,
+      controller: controller,
+      onProgress: onProgress,
+    );
+
+    try {
+      onProgress?.call(DownloadProgress(
+        received: 0,
+        total: config.archiveSizeBytes ?? 1,
+        sourceLabel: '',
+        bytesPerSecond: 0,
+        extracting: true,
+      ));
+      await _extractArchive(tempFile, runtimeDir);
+      for (final file in config.files) {
+        final found = await _findFile(runtimeDir, file.fileName);
+        if (found == null) {
+          throw HttpException('Runtime file missing: ${file.fileName}');
+        }
+      }
+    } catch (e) {
+      if (await runtimeDir.exists()) {
+        await runtimeDir.delete(recursive: true);
+      }
+      rethrow;
+    } finally {
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    }
+  }
+
   /// 下载存档文件到系统临时目录（流式写入磁盘，避免 OOM）
   ///
   /// 支持断点续传：临时文件以 `model_{identifier}_download.part` 命名，
@@ -325,8 +609,10 @@ class ModelDownloader {
     required String archiveUrl,
     required String identifier,
     String? mirrorBaseUrl,
+    DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
     int? archiveSizeBytes,
-    OnDownloadProgress? onProgress,
+    ResourceDownloadController? controller,
+    OnResourceDownloadProgress? onProgress,
   }) async {
     final tempDir = await getTemporaryDirectory();
     final tempFile = File('${tempDir.path}/model_${identifier}_download.part');
@@ -337,33 +623,37 @@ class ModelDownloader {
       existingBytes = await tempFile.length();
     }
 
-    final candidates = <String>[];
-    // 1. 自定义镜像
-    final mirrorUrl = _resolveUrl(archiveUrl, mirrorBaseUrl);
-    if (mirrorUrl != archiveUrl && !candidates.contains(mirrorUrl)) {
-      candidates.add(mirrorUrl);
-    }
-    // 2. 原始 URL
-    if (!candidates.contains(archiveUrl)) {
-      candidates.add(archiveUrl);
-    }
-    // 3. 已知镜像（国内用户可用）
-    for (final prefix in _mirrorPrefixes) {
-      final ghfastUrl = '$prefix/$archiveUrl';
-      if (!candidates.contains(ghfastUrl)) {
-        candidates.add(ghfastUrl);
-      }
+    var candidates = _buildDownloadCandidates(
+      archiveUrl,
+      mirrorBaseUrl,
+      downloadSourceMode,
+    );
+    if (downloadSourceMode == DownloadSourceMode.auto) {
+      candidates = await _orderCandidatesByProbeLatency(candidates);
     }
 
     HttpException? lastError;
     for (final url in candidates) {
+      if (controller?.isPaused ?? false) {
+        throw const ResourceDownloadStopped(DownloadStopReason.paused);
+      }
+      if (controller?.isCancelled ?? false) {
+        await _deleteTempFile(identifier);
+        throw const ResourceDownloadStopped(DownloadStopReason.cancelled);
+      }
+      final sourceLabel = _sourceLabelFromUrl(url, mirrorBaseUrl);
+      final stopwatch = Stopwatch()..start();
+      int speedBaseBytes = existingBytes;
+      var speedBaseElapsed = Duration.zero;
       try {
         final request = http.Request('GET', Uri.parse(url));
         if (existingBytes > 0) {
           request.headers['Range'] = 'bytes=$existingBytes-';
         }
 
-        final response = await http.Client().send(request);
+        final client = http.Client();
+        controller?._bind(client);
+        final response = await client.send(request);
 
         if (response.statusCode == 206) {
           // 服务器支持 Range，追加写入
@@ -371,12 +661,30 @@ class ModelDownloader {
           try {
             int received = existingBytes;
             await for (final chunk in response.stream) {
+              _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;
-              onProgress?.call(received, archiveSizeBytes ?? received);
+              final speed = _speedBytesPerSecond(
+                stopwatch,
+                received,
+                speedBaseBytes,
+                speedBaseElapsed,
+              );
+              if (stopwatch.elapsed - speedBaseElapsed > const Duration(seconds: 1)) {
+                speedBaseBytes = received;
+                speedBaseElapsed = stopwatch.elapsed;
+              }
+              onProgress?.call(DownloadProgress(
+                received: received,
+                total: archiveSizeBytes ?? response.contentLength ?? received,
+                sourceLabel: sourceLabel,
+                bytesPerSecond: speed,
+              ));
             }
           } finally {
             await sink.close();
+            controller?._unbind(client);
+            client.close();
           }
           return tempFile;
         } else if (response.statusCode == 200) {
@@ -389,20 +697,42 @@ class ModelDownloader {
           try {
             int received = 0;
             await for (final chunk in response.stream) {
+              _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;
-              onProgress?.call(received, archiveSizeBytes ?? received);
+              final speed = _speedBytesPerSecond(
+                stopwatch,
+                received,
+                speedBaseBytes,
+                speedBaseElapsed,
+              );
+              if (stopwatch.elapsed - speedBaseElapsed > const Duration(seconds: 1)) {
+                speedBaseBytes = received;
+                speedBaseElapsed = stopwatch.elapsed;
+              }
+              onProgress?.call(DownloadProgress(
+                received: received,
+                total: archiveSizeBytes ?? response.contentLength ?? received,
+                sourceLabel: sourceLabel,
+                bytesPerSecond: speed,
+              ));
             }
           } finally {
             await sink.close();
+            controller?._unbind(client);
+            client.close();
           }
           return tempFile;
         } else {
           lastError = HttpException(
             'HTTP ${response.statusCode} from $url',
           );
+          controller?._unbind(client);
+          client.close();
           continue;
         }
+      } on ResourceDownloadStopped {
+        rethrow;
       } catch (e) {
         lastError = e is HttpException
             ? e
@@ -420,6 +750,78 @@ class ModelDownloader {
         HttpException('All download attempts failed');
   }
 
+  static List<String> _buildDownloadCandidates(
+    String archiveUrl,
+    String? mirrorBaseUrl,
+    DownloadSourceMode mode,
+  ) {
+    final mirrorUrl = _resolveUrl(archiveUrl, mirrorBaseUrl);
+    final customMirror = mirrorUrl != archiveUrl ? mirrorUrl : null;
+    final defaultMirror = '$defaultMirrorPrefix/$archiveUrl';
+    final urls = <String>[];
+    void add(String? url) {
+      if (url != null && url.isNotEmpty && !urls.contains(url)) urls.add(url);
+    }
+
+    if (mode == DownloadSourceMode.githubOnly) {
+      add(archiveUrl);
+    } else if (mode == DownloadSourceMode.mirrorFirst) {
+      add(customMirror);
+      add(archiveUrl);
+      add(defaultMirror);
+    } else {
+      add(archiveUrl);
+      add(customMirror);
+      add(defaultMirror);
+    }
+    for (final prefix in _mirrorPrefixes) {
+      add('$prefix/$archiveUrl');
+    }
+    return urls;
+  }
+
+  static Future<List<String>> _orderCandidatesByProbeLatency(List<String> urls) async {
+    if (urls.length <= 1) return urls;
+    final probes = await Future.wait(urls.map(_probeDownloadCandidate));
+    final byUrl = {for (final probe in probes) probe.url: probe};
+    final ordered = [...urls]..sort((a, b) {
+      final pa = byUrl[a]!;
+      final pb = byUrl[b]!;
+      if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
+      if (!pa.reachable && !pb.reachable) {
+        return urls.indexOf(a).compareTo(urls.indexOf(b));
+      }
+      return pa.elapsed.compareTo(pb.elapsed);
+    });
+    return ordered;
+  }
+
+  static Future<_DownloadCandidateProbe> _probeDownloadCandidate(String url) async {
+    final client = http.Client();
+    final stopwatch = Stopwatch()..start();
+    try {
+      final request = http.Request('HEAD', Uri.parse(url));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 6));
+      stopwatch.stop();
+      return _DownloadCandidateProbe(
+        url: url,
+        reachable: response.statusCode >= 200 && response.statusCode < 400,
+        elapsed: stopwatch.elapsed,
+      );
+    } catch (_) {
+      stopwatch.stop();
+      return _DownloadCandidateProbe(
+        url: url,
+        reachable: false,
+        elapsed: const Duration(days: 1),
+      );
+    } finally {
+      client.close();
+    }
+  }
+
   static String _resolveUrl(String originalUrl, String? mirrorBaseUrl) {
     if (mirrorBaseUrl == null || mirrorBaseUrl.isEmpty) return originalUrl;
 
@@ -429,6 +831,105 @@ class ModelDownloader {
       final relativePath = originalUrl.substring(releasePrefix.length);
       return '${mirrorBaseUrl.replaceAll(RegExp(r'/$'), '')}/$relativePath';
     }
-    return originalUrl;
+    return '${mirrorBaseUrl.replaceAll(RegExp(r'/+$'), '')}/$originalUrl';
   }
+
+  static const defaultMirrorPrefix = 'https://ghfast.top';
+
+  static String _sourceLabelFromUrl(String url, String? mirrorBaseUrl) {
+    if (mirrorBaseUrl != null && mirrorBaseUrl.isNotEmpty) {
+      final prefix = mirrorBaseUrl.replaceAll(RegExp(r'/+$'), '');
+      if (url.startsWith(prefix)) {
+        return Uri.tryParse(prefix)?.host ?? prefix;
+      }
+    }
+    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
+    if (url.contains('github.com')) return 'GitHub';
+    return Uri.tryParse(url)?.host ?? url;
+  }
+
+  static double _speedBytesPerSecond(
+    Stopwatch stopwatch,
+    int received,
+    int baseBytes,
+    Duration baseElapsed,
+  ) {
+    final elapsed = stopwatch.elapsed - baseElapsed;
+    if (elapsed.inMilliseconds <= 0) return 0;
+    return (received - baseBytes) * 1000 / elapsed.inMilliseconds;
+  }
+
+  static void _throwIfStopped(
+    ResourceDownloadController? controller,
+    String identifier,
+  ) {
+    if (controller?.isPaused ?? false) {
+      throw const ResourceDownloadStopped(DownloadStopReason.paused);
+    }
+    if (controller?.isCancelled ?? false) {
+      unawaited(_deleteTempFile(identifier));
+      throw const ResourceDownloadStopped(DownloadStopReason.cancelled);
+    }
+  }
+
+  static Future<void> _deleteTempFile(String identifier) async {
+    final tempDir = await getTemporaryDirectory();
+    final tempFile = File('${tempDir.path}/model_${identifier}_download.part');
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+  }
+
+  static Future<File?> _findFile(Directory dir, String fileName) async {
+    if (!await dir.exists()) return null;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is File && entity.uri.pathSegments.last == fileName) {
+        return entity;
+      }
+    }
+    return null;
+  }
+
+  static Future<void> _extractArchive(File archiveFile, Directory targetDir) async {
+    final bytes = await archiveFile.readAsBytes();
+    List<int> archiveBytes = bytes;
+    if (archiveFile.path.endsWith('.bz2') || _looksLikeBzip2(bytes)) {
+      archiveBytes = BZip2Decoder().decodeBytes(bytes);
+    }
+    final archive = archiveFile.path.endsWith('.jar') || _looksLikeZip(bytes)
+        ? ZipDecoder().decodeBytes(bytes)
+        : TarDecoder().decodeBytes(archiveBytes);
+    for (final entry in archive.where((e) => e.isFile)) {
+      final name = entry.name.replaceAll('\\', '/');
+      if (name.contains('..')) continue;
+      final destPath = '${targetDir.path}/$name';
+      final destDir = Directory(destPath.substring(0, destPath.lastIndexOf('/')));
+      if (!await destDir.exists()) {
+        await destDir.create(recursive: true);
+      }
+      await File(destPath).writeAsBytes(
+        entry.content is Uint8List
+            ? entry.content as Uint8List
+            : Uint8List.fromList(entry.content),
+      );
+    }
+  }
+
+  static bool _looksLikeBzip2(List<int> bytes) =>
+      bytes.length > 2 && bytes[0] == 0x42 && bytes[1] == 0x5a;
+
+  static bool _looksLikeZip(List<int> bytes) =>
+      bytes.length > 4 && bytes[0] == 0x50 && bytes[1] == 0x4b;
+}
+
+class _DownloadCandidateProbe {
+  const _DownloadCandidateProbe({
+    required this.url,
+    required this.reachable,
+    required this.elapsed,
+  });
+
+  final String url;
+  final bool reachable;
+  final Duration elapsed;
 }

@@ -8,7 +8,7 @@
 - **状态管理**: Provider
 - **本地存储**: SharedPreferences
 - **网络**: http 包 + 自定义 AI/STT 服务
-- **语音识别**: record 录音 + Whisper STT
+- **语音识别**: record 录音 + 云端 AI 语音 / 系统语音 / sherpa-onnx 本机 STT
 - **系统权限**: permission_handler + 平台权限声明
 - **数据同步**: WebDAV + Worker API
 
@@ -41,7 +41,7 @@ lib/
 │   ├── storage_service.dart     # 本地数据存储和导出
 │   ├── data_sync_service.dart   # 多后端备份/恢复
 │   ├── app_permission_service.dart # 相机、相册、麦克风、安装包权限引导
-│   ├── whisper_stt_service.dart # Whisper 语音转文字
+│   ├── on_device_stt/           # sherpa-onnx 本机语音识别与资源下载
 │   └── update_service.dart      # 手动检查更新和安装包校验
 ├── widgets/                     # 通用组件
 │   ├── voice_input_button.dart  # 语音输入按钮
@@ -88,7 +88,8 @@ flutter run -d android
 ## 平台兼容说明
 
 - **Web**: 不支持 `dart:io`，使用 `platform_file_reader.dart` 条件导出处理
-- **Web 语音**: Whisper STT 暂不支持 Web 端，会降级为文本输入
+- **Web 语音**: 本机 STT 暂不支持 Web 端；Web 端需要配置可用的云端 AI 语音能力，否则降级为文本输入。
+- **本机语音**: sherpa-onnx 本机识别需要同时下载 ONNX Runtime 和所选模型；资源下载支持自动选择最快线路、暂停、取消、断点续传、速度显示和独立删除。
 - **临时文件**: 使用 `path_provider` 获取平台临时目录，不硬编码路径
 - **系统权限**: 语音、拍照、相册、Android 安装包会在用户触发功能时请求权限；拒绝或永久拒绝后提示用户前往系统设置授权。
 - **Android 权限声明**: `AndroidManifest.xml` 声明网络、安装 APK、麦克风、相机和图片读取权限。

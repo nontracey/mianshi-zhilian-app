@@ -192,7 +192,7 @@ class UpdateService {
   UpdateService({
     this.updateManifestUrl = '',
     this.customMirrorPrefix,
-    this.downloadSourceMode = DownloadSourceMode.githubFirst,
+    this.downloadSourceMode = DownloadSourceMode.auto,
     EndpointFallbackClient? routeClient,
   }) : _routeClient =
            routeClient ??
@@ -338,6 +338,7 @@ class UpdateService {
     switch (downloadSourceMode) {
       case DownloadSourceMode.githubOnly:
         return githubUrl.isNotEmpty ? [githubUrl] : [];
+      case DownloadSourceMode.auto:
       case DownloadSourceMode.githubFirst:
         return buildList(false);
       case DownloadSourceMode.mirrorFirst:
@@ -354,7 +355,10 @@ class UpdateService {
     DownloadProgressCallback? onProgress,
     DownloadCancelToken? cancelToken,
   }) async {
-    final urls = _buildDownloadUrls(platformUpdate);
+    var urls = _buildDownloadUrls(platformUpdate);
+    if (downloadSourceMode == DownloadSourceMode.auto) {
+      urls = await _orderUrlsByProbeLatency(urls);
+    }
 
     if (urls.isEmpty) {
       _lastAttempts = [];
@@ -479,6 +483,48 @@ class UpdateService {
       ));
       debugPrint('HEAD $sourceLabel → $e，跳过');
       return false;
+    }
+  }
+
+  Future<List<String>> _orderUrlsByProbeLatency(List<String> urls) async {
+    if (urls.length <= 1) return urls;
+    final probes = await Future.wait(
+      urls.map((url) => _probeDownloadUrl(url)),
+    );
+    final byUrl = {for (final probe in probes) probe.url: probe};
+    final ordered = [...urls]..sort((a, b) {
+      final pa = byUrl[a]!;
+      final pb = byUrl[b]!;
+      if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
+      if (!pa.reachable && !pb.reachable) return urls.indexOf(a).compareTo(urls.indexOf(b));
+      return pa.elapsed.compareTo(pb.elapsed);
+    });
+    return ordered;
+  }
+
+  Future<_DownloadSourceProbe> _probeDownloadUrl(String url) async {
+    final client = http.Client();
+    final stopwatch = Stopwatch()..start();
+    try {
+      final request = http.Request('HEAD', Uri.parse(url));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 6));
+      stopwatch.stop();
+      return _DownloadSourceProbe(
+        url: url,
+        reachable: response.statusCode >= 200 && response.statusCode < 400,
+        elapsed: stopwatch.elapsed,
+      );
+    } catch (_) {
+      stopwatch.stop();
+      return _DownloadSourceProbe(
+        url: url,
+        reachable: false,
+        elapsed: const Duration(days: 1),
+      );
+    } finally {
+      client.close();
     }
   }
 
@@ -663,3 +709,15 @@ class UpdateService {
 
 /// 下载状态内部枚举
 enum _DownloadStatus { success, networkError, verificationFailed, cancelled }
+
+class _DownloadSourceProbe {
+  const _DownloadSourceProbe({
+    required this.url,
+    required this.reachable,
+    required this.elapsed,
+  });
+
+  final String url;
+  final bool reachable;
+  final Duration elapsed;
+}

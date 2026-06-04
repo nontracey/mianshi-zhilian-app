@@ -299,7 +299,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       _resetStartFailure();
       return;
     }
-    final ready = await ModelDownloader.isModelReady(modelConfig);
+    final ready = await ModelDownloader.isOnDeviceReady(modelConfig);
     if (!ready) {
       _showError('on_device_model_not_downloaded');
       _resetStartFailure();
