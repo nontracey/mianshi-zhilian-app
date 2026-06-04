@@ -66,6 +66,7 @@ class _OnDeviceModelManagementPageState
       if (mounted) {
         setState(() {
           _loading = false;
+          _orphanDirs.clear();
           _error = '$e';
         });
       }
@@ -92,15 +93,7 @@ class _OnDeviceModelManagementPageState
     }
 
     // All known models
-    final allConfigs = [
-      KnownModels.senseVoice,
-      KnownModels.whisperTiny,
-      KnownModels.whisperBase,
-      KnownModels.whisperSmall,
-      KnownModels.whisperMedium,
-      KnownModels.paraformer,
-    ];
-    for (final config in allConfigs) {
+    for (final config in KnownModels.all) {
       final ready = await ModelDownloader.isModelReady(config);
       final size = await ModelDownloader.getModelSize(config.id);
       final dir = await ModelDownloader.getModelDir(config.id);
@@ -121,15 +114,7 @@ class _OnDeviceModelManagementPageState
     final root = await ModelDownloader.getStorageDir();
     if (!await root.exists()) return [];
 
-    final knownIds = <String>{
-      // known model IDs
-      'sense-voice',
-      'whisper-tiny',
-      'whisper-base',
-      'whisper-small',
-      'whisper-medium',
-      'paraformer',
-    };
+    final knownIds = KnownModels.all.map((c) => c.id).toSet();
     final runtimeConfig = KnownRuntimes.current();
     if (runtimeConfig != null) {
       knownIds.add(runtimeConfig.id);
@@ -243,8 +228,19 @@ class _OnDeviceModelManagementPageState
 
   Future<void> _cleanOrphanDirs() async {
     final l10n = context.read<LocalizationProvider>();
+
+    // 二次确认：构建当前所有有效模型/runtime ID 集合，跳过误拦截
+    final validIds = <String>{
+      ...KnownModels.all.map((c) => c.id),
+    };
+    final runtimeConfig = KnownRuntimes.current();
+    if (runtimeConfig != null) {
+      validIds.add(runtimeConfig.id);
+    }
+
     int cleaned = 0;
     for (final orphan in _orphanDirs) {
+      if (validIds.contains(orphan.name)) continue;
       try {
         await Directory(orphan.path).delete(recursive: true);
         cleaned++;

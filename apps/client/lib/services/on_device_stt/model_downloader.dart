@@ -133,6 +133,33 @@ class KnownModels {
       ModelFile('tokens.txt'),
     ],
   );
+
+  /// 所有已知模型配置列表（用于管理页、孤立目录检测等）
+  static final all = <OnDeviceModelConfig>[
+    senseVoice,
+    whisperTiny,
+    whisperBase,
+    whisperSmall,
+    whisperMedium,
+    paraformer,
+  ];
+
+  /// 根据引擎名和 Whisper 模型大小返回对应的模型配置
+  ///
+  /// 这是整个项目中唯一的引擎→模型映射入口，所有消费方必须通过此方法获取配置。
+  static OnDeviceModelConfig? forEngine(String engine, {String whisperSize = 'base'}) {
+    return switch (engine) {
+      'sense_voice' => senseVoice,
+      'whisper' => switch (whisperSize) {
+        'tiny' => whisperTiny,
+        'small' => whisperSmall,
+        'medium' => whisperMedium,
+        _ => whisperBase,
+      },
+      'paraformer' => paraformer,
+      _ => null,
+    };
+  }
 }
 
 /// 模型下载状态回调
@@ -409,12 +436,17 @@ class ModelDownloader {
 
   static Future<String> requireRuntimeLibraryDir() async {
     final runtimeConfig = KnownRuntimes.current();
-    if (runtimeConfig == null || !await isRuntimeReady(runtimeConfig)) {
-      throw StateError('On-device runtime is not downloaded');
+    if (runtimeConfig == null) {
+      throw StateError('No runtime config available for current platform');
+    }
+    if (!await isRuntimeReady(runtimeConfig)) {
+      final dir = await getRuntimeDir(runtimeConfig.id);
+      throw StateError('Runtime not ready: ${runtimeConfig.id} at ${dir.path}');
     }
     final runtimeDir = await getRuntimeLibraryDir(runtimeConfig);
     if (runtimeDir == null) {
-      throw StateError('On-device runtime library directory is missing');
+      final dir = await getRuntimeDir(runtimeConfig.id);
+      throw StateError('Runtime library not found in ${dir.path}');
     }
     return runtimeDir;
   }

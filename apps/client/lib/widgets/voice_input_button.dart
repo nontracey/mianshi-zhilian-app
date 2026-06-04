@@ -394,17 +394,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   OnDeviceModelConfig? _sherpaOnnxModelConfig(String engine, String whisperModel) {
-    return switch (engine) {
-      'sense_voice' => KnownModels.senseVoice,
-      'whisper' => switch (whisperModel) {
-        'tiny' => KnownModels.whisperTiny,
-        'small' => KnownModels.whisperSmall,
-        'medium' => KnownModels.whisperMedium,
-        _ => KnownModels.whisperBase,
-      },
-      'paraformer' => KnownModels.paraformer,
-      _ => null,
-    };
+    return KnownModels.forEngine(engine, whisperSize: whisperModel);
   }
 
   String _sherpaOnnxEngineLabel(String engine) {

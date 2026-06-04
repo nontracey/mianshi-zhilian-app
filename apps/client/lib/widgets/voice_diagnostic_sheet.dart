@@ -120,17 +120,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
   }
 
   OnDeviceModelConfig? _modelConfigForEngine(String engine, String whisperSize) {
-    return switch (engine) {
-      'sense_voice' => KnownModels.senseVoice,
-      'whisper' => switch (whisperSize) {
-        'tiny' => KnownModels.whisperTiny,
-        'small' => KnownModels.whisperSmall,
-        'medium' => KnownModels.whisperMedium,
-        _ => KnownModels.whisperBase,
-      },
-      'paraformer' => KnownModels.paraformer,
-      _ => null,
-    };
+    return KnownModels.forEngine(engine, whisperSize: whisperSize);
   }
 
   IconData _iconFor(_DiagStatus status) {
