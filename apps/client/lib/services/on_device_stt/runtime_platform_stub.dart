@@ -1,0 +1,1 @@
+String currentSherpaOnnxRuntimeArch() => 'x64';

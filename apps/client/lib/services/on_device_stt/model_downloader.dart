@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -8,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../route_resolver.dart';
+import 'runtime_platform.dart';
 
 /// 模型文件定义（仅用于 isModelReady 检查）
 class ModelFile {
@@ -234,7 +234,7 @@ class KnownRuntimes {
 
   static OnDeviceRuntimeConfig? current() {
     if (Platform.isMacOS) {
-      final arch = Abi.current() == Abi.macosArm64 ? 'aarch64' : 'x64';
+      final arch = currentSherpaOnnxRuntimeArch();
       return OnDeviceRuntimeConfig(
         id: 'sherpa-onnx-$version-osx-$arch',
         displayName: 'Sherpa ONNX Runtime $version macOS $arch',
@@ -263,7 +263,7 @@ class KnownRuntimes {
       );
     }
     if (Platform.isLinux) {
-      final arch = Abi.current() == Abi.linuxArm64 ? 'aarch64' : 'x64';
+      final arch = currentSherpaOnnxRuntimeArch();
       return OnDeviceRuntimeConfig(
         id: 'sherpa-onnx-$version-linux-$arch',
         displayName: 'Sherpa ONNX Runtime $version Linux $arch',

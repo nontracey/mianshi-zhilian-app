@@ -1485,7 +1485,7 @@ on_device_stt_factory.dart              # 条件导出工厂函数
 
 ### 17.5 构建约束
 
-sherpa-onnx 通过 `sherpa_onnx` Dart 包接入，底层依赖 `dart:ffi`，因此 **Web 平台无法编译 sherpa-onnx**。通过 §17.3 的条件导入模式，Web 构建时不解析 `sherpa_onnx` 包，编译不会失败。
+sherpa-onnx 通过 `sherpa_onnx` Dart 包接入，底层依赖 `dart:ffi`，因此 **Web 平台无法编译 sherpa-onnx**。通过 §17.4 的条件导入模式，Web 构建时不解析 `sherpa_onnx` 包，编译不会失败。
 
 `sherpa_onnx` 提供了各原生平台的正确 podspec 和 CMakeLists.txt，无需额外桩文件。
 
