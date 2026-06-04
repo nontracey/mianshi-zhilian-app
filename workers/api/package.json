@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler pages dev src/",
-    "deploy": "wrangler pages deploy --project-name=mianshi-zhilian-api src/"
+    "deploy": "wrangler pages deploy --project-name=mianshi-zhilian-api src/",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260604.1",
+    "typescript": "^5.9.3",
     "wrangler": "^4.49.0"
   }
 }

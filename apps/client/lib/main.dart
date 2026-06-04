@@ -48,7 +48,7 @@ void main() async {
   );
   final aiService = AiService();
   final updateService = UpdateService(routeClient: routeClient);
-  final dataSyncService = DataSyncService(storage)..start();
+  final dataSyncService = DataSyncService(storage);
   final analyticsService = AnalyticsService(storage, routeClient: routeClient)
     ..start();
 
@@ -153,6 +153,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
                   settingsProvider.settings.language,
                 );
               };
+              widget.dataSyncService.start();
               // 同步语言设置到 LocalizationProvider
               context.read<LocalizationProvider>().setLanguage(
                 settings.settings.language,

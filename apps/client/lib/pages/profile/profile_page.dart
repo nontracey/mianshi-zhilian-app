@@ -141,7 +141,6 @@ class ProfilePage extends StatelessWidget {
         'webdav' => 'WebDAV',
         'github' => 'GitHub',
         'gitee' => 'Gitee',
-        'cloud' => l10n.get('account_cloud_sync'),
         _ => l10n.get('local_mode'),
       };
 }
@@ -634,7 +633,7 @@ class _SyncBackupPage extends StatelessWidget {
 
   Future<void> _testConnection(BuildContext context) async {
     final l10n = context.read<LocalizationProvider>();
-    final result = await context.read<SettingsProvider>().testWebDavConnection(
+    final result = await context.read<SettingsProvider>().testSyncConnection(
       context.read<ProgressProvider>().syncSettings,
     );
     if (!context.mounted) return;
@@ -675,7 +674,7 @@ class _SyncBackupPage extends StatelessWidget {
     final aiProvider = context.read<AiProvider>();
     final localizationProvider = context.read<LocalizationProvider>();
     final messenger = ScaffoldMessenger.of(context);
-    final result = await settingsProvider.restoreFromWebDav(
+    final result = await settingsProvider.restoreFromRemote(
       progressProvider.syncSettings,
     );
     await _reloadAfterImport(
@@ -1250,7 +1249,6 @@ class _AccountPanel extends StatelessWidget {
         'webdav' => 'WebDAV',
         'github' => 'GitHub',
         'gitee' => 'Gitee',
-        'cloud' => l10n.get('cloud_sync'),
         'file' => l10n.get('file'),
         _ => l10n.get('local'),
       };
@@ -3065,11 +3063,6 @@ class _DataManagementPanel extends StatelessWidget {
             const DropdownMenuItem(value: 'github', child: Text('GitHub')),
             const DropdownMenuItem(value: 'gitee', child: Text('Gitee')),
             DropdownMenuItem(
-              value: 'cloud',
-              enabled: false,
-              child: Text(l10n.get('account_cloud_sync_unavailable')),
-            ),
-            DropdownMenuItem(
               value: 'baidu',
               child: Text(l10n.get('hundred_degree_web_disk_pending_open')),
             ),
@@ -3161,15 +3154,6 @@ class _DataManagementPanel extends StatelessWidget {
             ),
             onChanged: (value) => onSyncSettingsChanged(
               syncSettings.copyWith(webDavPassword: value),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: onTestConnection,
-              icon: const Icon(Icons.wifi_find, size: 16),
-              label: Text(l10n.get('test_connect')),
             ),
           ),
         ],
@@ -3311,6 +3295,15 @@ class _DataManagementPanel extends StatelessWidget {
         ],
         if (syncSettings.isAutomaticMethod) ...[
           const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onTestConnection,
+              icon: const Icon(Icons.wifi_find, size: 16),
+              label: Text(l10n.get('test_connect')),
+            ),
+          ),
+          const SizedBox(height: 12),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
             value: syncSettings.syncFullPracticeText,
@@ -3392,7 +3385,6 @@ class _DataManagementPanel extends StatelessWidget {
         'webdav' => 'WebDAV',
         'github' => 'GitHub',
         'gitee' => 'Gitee',
-        'cloud' => l10n.get('account_cloud_sync'),
         'baidu' => l10n.get('hundred_degree_web_disk'),
         'quark' => l10n.get('quark_web_disk'),
         'aliyun' => l10n.get('ali_cloud_disk'),

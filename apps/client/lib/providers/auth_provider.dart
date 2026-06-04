@@ -458,60 +458,6 @@ class AuthProvider extends ChangeNotifier {
     return response;
   }
 
-  Future<http.Response> _authorizedGet(String path) async {
-    Future<http.Response> send() async {
-      return _routeClient.request(
-        RouteService.appApi,
-        'GET',
-        path,
-        headers: await ApiHeaders.build(_storage, token: _token, json: false),
-      );
-    }
-
-    var response = await send();
-    if (response.statusCode == 401 && await _refreshLogin()) {
-      response = await send();
-    }
-    return response;
-  }
-
-  /// 上传学习进度到云端
-  Future<bool> syncToCloud(
-    Map<String, dynamic> progressMap,
-    Map<String, dynamic> settings,
-  ) async {
-    if (!isLoggedIn) return false;
-
-    try {
-      final response = await _authorizedPost(
-        '/sync/progress',
-        body: {'progressMap': progressMap, 'settings': settings},
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Sync to cloud failed: $e');
-      return false;
-    }
-  }
-
-  /// 从云端获取学习进度
-  Future<Map<String, dynamic>?> getCloudProgress() async {
-    if (!isLoggedIn) return null;
-
-    try {
-      final response = await _authorizedGet('/sync/progress');
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body) as Map<String, dynamic>;
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Get cloud progress failed: $e');
-      return null;
-    }
-  }
-
   /// 修改密码
   Future<bool> changePassword({
     required String oldPassword,

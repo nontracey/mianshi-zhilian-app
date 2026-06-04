@@ -281,14 +281,14 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  /// 从 WebDAV 恢复数据
-  Future<SyncResult> restoreFromWebDav([SyncSettings? syncSettings]) async {
+  /// 从当前远端同步渠道恢复数据
+  Future<SyncResult> restoreFromRemote([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
     return _dataSync.restoreFromRemote(settings);
   }
 
-  /// 测试 WebDAV 连接
-  Future<SyncResult> testWebDavConnection([SyncSettings? syncSettings]) async {
+  /// 测试当前同步渠道连接
+  Future<SyncResult> testSyncConnection([SyncSettings? syncSettings]) async {
     final settings = syncSettings ?? const SyncSettings();
     return _dataSync.testConnection(settings);
   }

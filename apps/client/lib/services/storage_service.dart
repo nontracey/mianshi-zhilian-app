@@ -321,17 +321,52 @@ class StorageService {
       data['answer_versions'] = answerVersions;
     }
 
-    return {
+    return sanitizeSyncPackage({
       'schemaVersion': 1,
       'app': 'mianshi-zhilian',
       'updatedAt': DateTime.now().toIso8601String(),
       'deviceId': deviceId,
       'data': data,
+    }, syncSettings);
+  }
+
+  /// 对同步快照应用当前隐私策略。远端已有历史数据参与合并后也要再过一遍，
+  /// 避免旧快照中的完整回答被当前设备继续上传。
+  Map<String, dynamic> sanitizeSyncPackage(
+    Map<String, dynamic> package,
+    SyncSettings syncSettings,
+  ) {
+    final data = package['data'];
+    if (data is! Map) return package;
+
+    final sanitizedData = <String, dynamic>{};
+    for (final entry in data.entries) {
+      final key = entry.key.toString();
+      final value = entry.value;
+      if (key == 'answer_versions') {
+        if (syncSettings.syncFullPracticeText && value is Map) {
+          sanitizedData[key] = value.map((k, v) => MapEntry(k.toString(), v));
+        }
+        continue;
+      }
+      final sanitized = _sanitizeSyncValue(key, value, syncSettings);
+      if (sanitized != null) {
+        sanitizedData[key] = sanitized;
+      }
+    }
+
+    return {
+      ...package,
+      'data': sanitizedData..removeWhere((_, value) => value == null),
     };
   }
 
   /// 导入白名单同步快照。只写入允许同步的业务数据。
-  Future<void> importSyncPackage(Map<String, dynamic> package) async {
+  Future<void> importSyncPackage(
+    Map<String, dynamic> package, {
+    SyncSettings? syncSettings,
+    bool preserveLocalSensitiveData = true,
+  }) async {
     final data = package['data'];
     if (data is! Map<String, dynamic>) return;
     final prefs = await _instance;
@@ -339,6 +374,9 @@ class StorageService {
     try {
       for (final entry in data.entries) {
         if (entry.key == 'answer_versions' && entry.value is Map) {
+          if (syncSettings != null && !syncSettings.syncFullPracticeText) {
+            continue;
+          }
           for (final versionEntry in (entry.value as Map).entries) {
             await prefs.setString(
               'answer_versions_${versionEntry.key}',
@@ -348,6 +386,24 @@ class StorageService {
           continue;
         }
         if (!_syncKeys.contains(entry.key)) continue;
+        if (entry.key == 'practice_attempts') {
+          final merged = await _mergePracticeAttemptsForImport(
+            entry.value,
+            syncSettings: syncSettings,
+            preserveLocalSensitiveData: preserveLocalSensitiveData,
+          );
+          await prefs.setString(entry.key, json.encode(merged));
+          continue;
+        }
+        if (entry.key == 'mock_interview_sessions') {
+          final merged = await _mergeMockSessionsForImport(
+            entry.value,
+            syncSettings: syncSettings,
+            preserveLocalSensitiveData: preserveLocalSensitiveData,
+          );
+          await prefs.setString(entry.key, json.encode(merged));
+          continue;
+        }
         if (entry.key == 'settings') {
           final merged = await _mergeSettingsForImport(entry.value);
           await prefs.setString(entry.key, json.encode(merged));
@@ -503,6 +559,113 @@ class StorageService {
       if (item is! Map<String, dynamic>) return item;
       return {...item, 'answer': '', 'improvedAnswer': null};
     }).toList();
+  }
+
+  Future<dynamic> _mergePracticeAttemptsForImport(
+    dynamic incoming, {
+    required SyncSettings? syncSettings,
+    required bool preserveLocalSensitiveData,
+  }) async {
+    if (incoming is! List) return incoming;
+    if (!_shouldPreserveSensitiveData(
+      syncSettings,
+      preserveLocalSensitiveData,
+    )) {
+      return incoming;
+    }
+
+    final current = await loadPracticeAttempts();
+    final currentById = {
+      for (final attempt in current) attempt.id: attempt.toJson(),
+    };
+
+    return incoming.map((item) {
+      if (item is! Map) return item;
+      final imported = item.map((k, v) => MapEntry(k.toString(), v));
+      final id = imported['id'] as String?;
+      final local = id == null ? null : currentById[id];
+      return _preserveAttemptSensitiveFields(imported, local);
+    }).toList();
+  }
+
+  Future<dynamic> _mergeMockSessionsForImport(
+    dynamic incoming, {
+    required SyncSettings? syncSettings,
+    required bool preserveLocalSensitiveData,
+  }) async {
+    if (incoming is! List) return incoming;
+    if (!_shouldPreserveSensitiveData(
+      syncSettings,
+      preserveLocalSensitiveData,
+    )) {
+      return incoming;
+    }
+
+    final current = await loadMockInterviewSessions();
+    final currentById = {
+      for (final session in current) session.id: session.toJson(),
+    };
+
+    return incoming.map((item) {
+      if (item is! Map) return item;
+      final imported = item.map((k, v) => MapEntry(k.toString(), v));
+      final id = imported['id'] as String?;
+      final local = id == null ? null : currentById[id];
+      final localAttempts = <String, Map<String, dynamic>>{};
+      final localAttemptList = local?['attempts'];
+      if (localAttemptList is List) {
+        for (final attempt in localAttemptList) {
+          if (attempt is Map) {
+            final normalized = attempt.map((k, v) => MapEntry(k.toString(), v));
+            final attemptId = normalized['id'] as String?;
+            if (attemptId != null) localAttempts[attemptId] = normalized;
+          }
+        }
+      }
+
+      final importedAttempts = imported['attempts'];
+      if (importedAttempts is List) {
+        imported['attempts'] = importedAttempts.map((attempt) {
+          if (attempt is! Map) return attempt;
+          final normalized = attempt.map((k, v) => MapEntry(k.toString(), v));
+          final attemptId = normalized['id'] as String?;
+          return _preserveAttemptSensitiveFields(
+            normalized,
+            attemptId == null ? null : localAttempts[attemptId],
+          );
+        }).toList();
+      }
+      return imported;
+    }).toList();
+  }
+
+  bool _shouldPreserveSensitiveData(
+    SyncSettings? syncSettings,
+    bool preserveLocalSensitiveData,
+  ) {
+    return preserveLocalSensitiveData &&
+        syncSettings != null &&
+        !syncSettings.syncFullPracticeText;
+  }
+
+  Map<String, dynamic> _preserveAttemptSensitiveFields(
+    Map<String, dynamic> imported,
+    Map<String, dynamic>? local,
+  ) {
+    if (local == null) return imported;
+    final localAnswer = local['answer'] as String?;
+    if ((imported['answer'] as String? ?? '').isEmpty &&
+        localAnswer != null &&
+        localAnswer.isNotEmpty) {
+      imported['answer'] = localAnswer;
+    }
+    final localImprovedAnswer = local['improvedAnswer'] as String?;
+    if (imported['improvedAnswer'] == null &&
+        localImprovedAnswer != null &&
+        localImprovedAnswer.isNotEmpty) {
+      imported['improvedAnswer'] = localImprovedAnswer;
+    }
+    return imported;
   }
 
   Future<dynamic> _mergeSettingsForImport(dynamic incoming) async {

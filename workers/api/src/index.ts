@@ -116,15 +116,6 @@ export default {
       return handleAdminDeleteTicket(request, env);
     }
 
-    // 云端同步（需要认证）
-    if (url.pathname === "/sync/progress" && request.method === "POST") {
-      return handleSyncProgress(request, env);
-    }
-
-    if (url.pathname === "/sync/progress" && request.method === "GET") {
-      return handleGetProgress(request, env);
-    }
-
     // 代理测试环境内容: /content/test/* → staging-manifest / topics 等静态内容
     if (url.pathname.startsWith("/content/test/")) {
       const subPath = contentStageSubPath(
@@ -147,10 +138,6 @@ export default {
     if (url.pathname.startsWith("/content/production/")) {
       const subPath = url.pathname.slice("/content/production/".length);
       return proxyFetchWithFallback(contentTargetUrls(env, subPath), request);
-    }
-
-    if (url.pathname.startsWith("/sync/")) {
-      return json({ ok: true, mode: "local-first", queued: true });
     }
 
     return json({ error: "Not found" }, 404);
@@ -306,6 +293,12 @@ function fromHex(hex: string): Uint8Array {
   return bytes;
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function hashPassword(
   password: string,
   existingSalt?: string,
@@ -322,11 +315,16 @@ async function hashPassword(
     ["deriveBits"],
   );
   const derivedBits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    {
+      name: "PBKDF2",
+      salt: toArrayBuffer(salt),
+      iterations: PBKDF2_ITERATIONS,
+      hash: "SHA-256",
+    },
     key,
     HASH_BYTES * 8,
   );
-  const saltHex = toHex(salt.buffer);
+  const saltHex = toHex(toArrayBuffer(salt));
   const hashHex = toHex(derivedBits);
   return `${saltHex}:${hashHex}`;
 }
@@ -851,7 +849,6 @@ async function initDatabase(db: D1Database): Promise<void> {
 
 // 模块级标志，避免每次请求重复执行 DDL
 let dbInitialized = false;
-let syncTablesInitialized = false;
 
 const SECURITY_RULES_KV_KEY = "security_block_rules:v1";
 const SECURITY_RULES_CACHE_TTL = 300; // 5 分钟
@@ -1773,173 +1770,6 @@ async function upsertCountMap(
       )
       .bind(date, deviceId, userId, key, count)
       .run();
-  }
-}
-
-// 初始化同步表
-async function initSyncTables(db: D1Database): Promise<void> {
-  if (syncTablesInitialized) return;
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS user_progress (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      topic_id TEXT NOT NULL,
-      status TEXT DEFAULT 'unfamiliar',
-      score INTEGER DEFAULT 0,
-      review_count INTEGER DEFAULT 0,
-      next_review_at TEXT,
-      updated_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(user_id, topic_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_user_progress_user ON user_progress(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_progress_topic ON user_progress(user_id, topic_id);
-
-    CREATE TABLE IF NOT EXISTS user_settings (
-      user_id TEXT PRIMARY KEY,
-      current_domain TEXT DEFAULT 'java',
-      recommend_strategy TEXT DEFAULT 'weighted',
-      language TEXT DEFAULT 'zh',
-      theme_mode TEXT DEFAULT 'system',
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-  `);
-  syncTablesInitialized = true;
-}
-
-// 上传学习进度
-async function handleSyncProgress(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  try {
-    const activeUser = await getActiveUserFromRequest(request, env);
-    if (!activeUser) {
-      return json({ error: "未登录或 token 已过期" }, 401);
-    }
-    const userId = activeUser.id;
-
-    const body = (await request.json()) as any;
-    const { progressMap, settings } = body;
-
-    await initSyncTables(env.DB);
-
-    // 同步学习进度
-    if (progressMap && typeof progressMap === "object") {
-      for (const [topicId, progress] of Object.entries(progressMap)) {
-        const p = progress as any;
-        await env.DB.prepare(
-          `
-          INSERT INTO user_progress (user_id, topic_id, status, score, review_count, next_review_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-          ON CONFLICT(user_id, topic_id) DO UPDATE SET
-            status = CASE
-              WHEN excluded.score > user_progress.score THEN excluded.status
-              ELSE user_progress.status
-            END,
-            score = MAX(excluded.score, user_progress.score),
-            review_count = excluded.review_count,
-            next_review_at = COALESCE(excluded.next_review_at, user_progress.next_review_at),
-            updated_at = datetime('now')
-        `,
-        )
-          .bind(
-            userId,
-            topicId,
-            p.status || "unfamiliar",
-            p.score || 0,
-            p.reviewCount || 0,
-            p.nextReviewAt || null,
-          )
-          .run();
-      }
-    }
-
-    // 同步用户设置
-    if (settings && typeof settings === "object") {
-      await env.DB.prepare(
-        `
-        INSERT INTO user_settings (user_id, current_domain, recommend_strategy, language, theme_mode, updated_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(user_id) DO UPDATE SET
-          current_domain = excluded.current_domain,
-          recommend_strategy = excluded.recommend_strategy,
-          language = excluded.language,
-          theme_mode = excluded.theme_mode,
-          updated_at = datetime('now')
-      `,
-      )
-        .bind(
-          userId,
-          settings.currentDomain || "java",
-          settings.recommendStrategy || "weighted",
-          settings.language || "zh",
-          settings.themeMode || "system",
-        )
-        .run();
-    }
-
-    return json({ success: true, syncedAt: new Date().toISOString() });
-  } catch (e) {
-    console.error("SyncProgress error:", e);
-    return json({ error: "同步失败" }, 500);
-  }
-}
-
-// 获取云端学习进度
-async function handleGetProgress(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  try {
-    const activeUser = await getActiveUserFromRequest(request, env);
-    if (!activeUser) {
-      return json({ error: "未登录或 token 已过期" }, 401);
-    }
-    const userId = activeUser.id;
-
-    await initSyncTables(env.DB);
-
-    // 获取学习进度
-    const progressRows = await env.DB.prepare(
-      "SELECT topic_id, status, score, review_count, next_review_at, updated_at FROM user_progress WHERE user_id = ?",
-    )
-      .bind(userId)
-      .all();
-
-    const progressMap: Record<string, any> = {};
-    for (const row of progressRows.results) {
-      const r = row as any;
-      progressMap[r.topic_id] = {
-        status: r.status,
-        score: r.score,
-        reviewCount: r.review_count,
-        nextReviewAt: r.next_review_at,
-        updatedAt: r.updated_at,
-      };
-    }
-
-    // 获取用户设置
-    const settings = (await env.DB.prepare(
-      "SELECT current_domain, recommend_strategy, language, theme_mode FROM user_settings WHERE user_id = ?",
-    )
-      .bind(userId)
-      .first()) as any;
-
-    return json({
-      success: true,
-      progressMap,
-      settings: settings
-        ? {
-            currentDomain: settings.current_domain,
-            recommendStrategy: settings.recommend_strategy,
-            language: settings.language,
-            themeMode: settings.theme_mode,
-          }
-        : null,
-    });
-  } catch (e) {
-    console.error("GetProgress error:", e);
-    return json({ error: "获取进度失败" }, 500);
   }
 }
 

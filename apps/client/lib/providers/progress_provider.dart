@@ -467,37 +467,4 @@ class ProgressProvider extends ChangeNotifier {
   Map<String, dynamic> exportProgress() {
     return _progressMap.map((k, v) => MapEntry(k, v.toJson()));
   }
-
-  /// 从云端合并进度数据。
-  /// 合并策略：保留每 topic 的最高分；同分时保留更高的练习次数和更早的下次复习时间。
-  Future<void> mergeFromCloud(Map<String, dynamic> cloudProgress) async {
-    for (final entry in cloudProgress.entries) {
-      final topicId = entry.key;
-      final cloudData = entry.value as Map<String, dynamic>;
-      final localProgress = _progressMap[topicId];
-
-      if (localProgress == null) {
-        _progressMap[topicId] = TopicProgress.fromJson(cloudData);
-      } else {
-        final cloudScore = cloudData['score'] as int? ?? 0;
-        final cloudPracticeCount = cloudData['practiceCount'] as int? ?? 0;
-
-        if (cloudScore > localProgress.score ||
-            (cloudScore == localProgress.score &&
-                cloudPracticeCount > localProgress.practiceCount)) {
-          var merged = TopicProgress.fromJson(cloudData);
-          // 保留更早的下次复习时间
-          if (localProgress.nextReviewAt != null &&
-              merged.nextReviewAt != null &&
-              localProgress.nextReviewAt!.isBefore(merged.nextReviewAt!)) {
-            merged = merged.copyWith(nextReviewAt: localProgress.nextReviewAt);
-          }
-          _progressMap[topicId] = merged;
-        }
-      }
-    }
-
-    await _storage.saveProgressMap(_progressMap);
-    notifyListeners();
-  }
 }

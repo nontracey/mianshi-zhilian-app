@@ -56,17 +56,30 @@ class DataSyncService {
   Future<SyncResult> syncNow([SyncSettings? explicitSettings]) async {
     if (_running) return SyncResult.failure('sync_already_running');
     final settings = explicitSettings ?? await _storage.loadSyncSettings();
-    if (!_shouldAutoSync(settings, force: true)) {
+    final channel = _channelFor(settings);
+    if (!_shouldAutoSync(settings, force: true) || channel == null) {
       return SyncResult.success('local_mode');
     }
 
     _running = true;
     try {
       final localPackage = await _storage.exportSyncPackage(settings);
-      final remotePackage = await _download(settings);
-      final mergedPackage = _mergePackages(localPackage, remotePackage);
-      await _uploadWithConflictRetry(settings, localPackage, mergedPackage);
-      await _storage.importSyncPackage(mergedPackage);
+      final remotePackage = await channel.download();
+      final mergedPackage = _storage.sanitizeSyncPackage(
+        _mergePackages(localPackage, remotePackage),
+        settings,
+      );
+      await _uploadWithConflictRetry(
+        channel,
+        settings,
+        localPackage,
+        mergedPackage,
+      );
+      await _storage.importSyncPackage(
+        mergedPackage,
+        syncSettings: settings,
+        preserveLocalSensitiveData: true,
+      );
       await _storage.clearSyncDirty();
       await _storage.setLastSyncTime(DateTime.now());
       await _storage.saveSyncSettings(
@@ -91,14 +104,19 @@ class DataSyncService {
   Future<SyncResult> pullRemote([SyncSettings? explicitSettings]) async {
     if (_running) return SyncResult.failure('sync_already_running');
     final settings = explicitSettings ?? await _storage.loadSyncSettings();
-    if (!_shouldAutoSync(settings, force: true)) {
+    final channel = _channelFor(settings);
+    if (!_shouldAutoSync(settings, force: true) || channel == null) {
       return SyncResult.success('local_mode');
     }
     _running = true;
     try {
-      final remotePackage = await _download(settings);
+      final remotePackage = await channel.download();
       if (remotePackage != null) {
-        await _storage.importSyncPackage(remotePackage);
+        await _storage.importSyncPackage(
+          _storage.sanitizeSyncPackage(remotePackage, settings),
+          syncSettings: settings,
+          preserveLocalSensitiveData: true,
+        );
         await onDataImported?.call();
       }
       await _storage.saveSyncSettings(
@@ -125,15 +143,20 @@ class DataSyncService {
 
   Future<SyncResult> restoreFromRemote([SyncSettings? explicitSettings]) async {
     final settings = explicitSettings ?? await _storage.loadSyncSettings();
-    if (!_shouldAutoSync(settings, force: true)) {
+    final channel = _channelFor(settings);
+    if (!_shouldAutoSync(settings, force: true) || channel == null) {
       return SyncResult.failure('sync_method_not_restorable');
     }
     try {
-      final remotePackage = await _download(settings);
+      final remotePackage = await channel.download();
       if (remotePackage == null) {
         return SyncResult.failure('remote_sync_file_missing');
       }
-      await _storage.importSyncPackage(remotePackage);
+      await _storage.importSyncPackage(
+        _storage.sanitizeSyncPackage(remotePackage, settings),
+        syncSettings: settings,
+        preserveLocalSensitiveData: false,
+      );
       await _storage.clearSyncDirty();
       await _storage.saveSyncSettings(
         settings.copyWith(
@@ -150,11 +173,12 @@ class DataSyncService {
 
   Future<SyncResult> testConnection([SyncSettings? explicitSettings]) async {
     final settings = explicitSettings ?? await _storage.loadSyncSettings();
-    if (!_shouldAutoSync(settings, force: true)) {
+    final channel = _channelFor(settings);
+    if (!_shouldAutoSync(settings, force: true) || channel == null) {
       return SyncResult.success('local_mode');
     }
     try {
-      await _download(settings);
+      await channel.testConnection();
       return SyncResult.success('connection_success');
     } catch (e) {
       return SyncResult.failure('connection_failed_with_error', {
@@ -169,47 +193,46 @@ class DataSyncService {
     return true;
   }
 
-  Future<Map<String, dynamic>?> _download(SyncSettings settings) {
+  _SyncChannel? _channelFor(SyncSettings settings) {
     switch (settings.method) {
       case 'webdav':
-        return _downloadWebDav(settings);
+        return _SyncChannel(
+          download: () => _downloadWebDav(settings),
+          upload: (package) => _uploadWebDav(settings, package),
+          testConnection: () => _testWebDavConnection(settings),
+        );
       case 'github':
-        return _downloadGitHub(settings);
+        return _SyncChannel(
+          download: () => _downloadGitHub(settings),
+          upload: (package) => _uploadGitHub(settings, package),
+          testConnection: () => _testGitHubConnection(settings),
+        );
       case 'gitee':
-        return _downloadGitee(settings);
-      case 'cloud':
-        throw StateError('账号云同步已迁移至 /sync/progress；请使用 AuthProvider.syncToCloud / getCloudProgress');
+        return _SyncChannel(
+          download: () => _downloadGitee(settings),
+          upload: (package) => _uploadGitee(settings, package),
+          testConnection: () => _testGiteeConnection(settings),
+        );
       default:
-        return Future.value(null);
-    }
-  }
-
-  Future<void> _upload(SyncSettings settings, Map<String, dynamic> package) {
-    switch (settings.method) {
-      case 'webdav':
-        return _uploadWebDav(settings, package);
-      case 'github':
-        return _uploadGitHub(settings, package);
-      case 'gitee':
-        return _uploadGitee(settings, package);
-      case 'cloud':
-        throw StateError('账号云同步已迁移至 /sync/progress；请使用 AuthProvider.syncToCloud / getCloudProgress');
-      default:
-        throw StateError('Unsupported sync method: ${settings.method}');
+        return null;
     }
   }
 
   Future<void> _uploadWithConflictRetry(
+    _SyncChannel channel,
     SyncSettings settings,
     Map<String, dynamic> localPackage,
     Map<String, dynamic> mergedPackage,
   ) async {
     try {
-      await _upload(settings, mergedPackage);
+      await channel.upload(mergedPackage);
     } on SyncConflictException {
-      final latestRemotePackage = await _download(settings);
-      final retryPackage = _mergePackages(localPackage, latestRemotePackage);
-      await _upload(settings, retryPackage);
+      final latestRemotePackage = await channel.download();
+      final retryPackage = _storage.sanitizeSyncPackage(
+        _mergePackages(localPackage, latestRemotePackage),
+        settings,
+      );
+      await channel.upload(retryPackage);
       mergedPackage
         ..clear()
         ..addAll(retryPackage);
@@ -244,15 +267,33 @@ class DataSyncService {
     _ensureSuccess(response, 'WebDAV 上传失败');
   }
 
+  Future<void> _testWebDavConnection(SyncSettings settings) async {
+    _require(settings.webDavUrl.isNotEmpty, '缺少 WebDAV 地址');
+    _require(settings.webDavUsername.isNotEmpty, '缺少 WebDAV 用户名');
+    _require(settings.webDavPassword.isNotEmpty, '缺少 WebDAV 应用密码');
+    final base = _normalizeUrl(settings.webDavUrl);
+    final response = await _webDavRequest(
+      'PROPFIND',
+      Uri.parse(base),
+      settings,
+      headers: {'Depth': '0'},
+    );
+    _ensureSuccess(response, 'WebDAV 连接测试失败');
+  }
+
   Future<http.Response> _webDavRequest(
     String method,
     Uri uri,
     SyncSettings settings, {
     String? body,
+    Map<String, String>? headers,
   }) async {
     final request = http.Request(method, uri)
       ..headers['Authorization'] =
           'Basic ${base64Encode(utf8.encode('${settings.webDavUsername}:${settings.webDavPassword}'))}';
+    if (headers != null) {
+      request.headers.addAll(headers);
+    }
     if (body != null) {
       request.headers['Content-Type'] = 'application/json; charset=utf-8';
       request.body = body;
@@ -279,7 +320,9 @@ class DataSyncService {
       '/repos/${settings.githubOwner}/${settings.githubRepo}/contents/${settings.githubPath}',
       {'ref': settings.githubBranch},
     );
-    final response = await http.get(uri, headers: _githubHeaders(settings));
+    final response = await http
+        .get(uri, headers: _githubHeaders(settings))
+        .timeout(_timeout);
     if (response.statusCode == 404) return null;
     _ensureSuccess(response, 'GitHub 下载失败');
     final body = json.decode(response.body) as Map<String, dynamic>;
@@ -303,10 +346,12 @@ class DataSyncService {
       'api.github.com',
       '/repos/${settings.githubOwner}/${settings.githubRepo}/contents/${settings.githubPath}',
     );
-    final existing = await http.get(
-      uri.replace(queryParameters: {'ref': settings.githubBranch}),
-      headers: _githubHeaders(settings),
-    );
+    final existing = await http
+        .get(
+          uri.replace(queryParameters: {'ref': settings.githubBranch}),
+          headers: _githubHeaders(settings),
+        )
+        .timeout(_timeout);
     String? sha;
     if (existing.statusCode >= 200 && existing.statusCode < 300) {
       sha =
@@ -323,13 +368,38 @@ class DataSyncService {
       'branch': settings.githubBranch,
     };
     if (sha != null) payload['sha'] = sha;
-    final response = await http.put(
-      uri,
-      headers: _githubHeaders(settings),
-      body: json.encode(payload),
-    );
+    final response = await http
+        .put(uri, headers: _githubHeaders(settings), body: json.encode(payload))
+        .timeout(_timeout);
     if (response.statusCode == 409) throw const SyncConflictException();
     _ensureSuccess(response, 'GitHub 上传失败');
+  }
+
+  Future<void> _testGitHubConnection(SyncSettings settings) async {
+    _validateRepoSettings(
+      token: settings.githubToken,
+      owner: settings.githubOwner,
+      repo: settings.githubRepo,
+      path: settings.githubPath,
+      label: 'GitHub',
+    );
+    final repoUri = Uri.https(
+      'api.github.com',
+      '/repos/${settings.githubOwner}/${settings.githubRepo}',
+    );
+    final repoResponse = await http
+        .get(repoUri, headers: _githubHeaders(settings))
+        .timeout(_timeout);
+    _ensureSuccess(repoResponse, 'GitHub 仓库连接测试失败');
+
+    final branchUri = Uri.https(
+      'api.github.com',
+      '/repos/${settings.githubOwner}/${settings.githubRepo}/branches/${settings.githubBranch}',
+    );
+    final branchResponse = await http
+        .get(branchUri, headers: _githubHeaders(settings))
+        .timeout(_timeout);
+    _ensureSuccess(branchResponse, 'GitHub 分支连接测试失败');
   }
 
   Map<String, String> _githubHeaders(SyncSettings settings) => {
@@ -352,7 +422,7 @@ class DataSyncService {
       '/api/v5/repos/${settings.giteeOwner}/${settings.giteeRepo}/contents/${settings.giteePath}',
       {'access_token': settings.giteeToken, 'ref': settings.giteeBranch},
     );
-    final response = await http.get(uri);
+    final response = await http.get(uri).timeout(_timeout);
     if (response.statusCode == 404) return null;
     _ensureSuccess(response, 'Gitee 下载失败');
     final body = json.decode(response.body) as Map<String, dynamic>;
@@ -376,14 +446,16 @@ class DataSyncService {
       'gitee.com',
       '/api/v5/repos/${settings.giteeOwner}/${settings.giteeRepo}/contents/${settings.giteePath}',
     );
-    final existing = await http.get(
-      uri.replace(
-        queryParameters: {
-          'access_token': settings.giteeToken,
-          'ref': settings.giteeBranch,
-        },
-      ),
-    );
+    final existing = await http
+        .get(
+          uri.replace(
+            queryParameters: {
+              'access_token': settings.giteeToken,
+              'ref': settings.giteeBranch,
+            },
+          ),
+        )
+        .timeout(_timeout);
     String? sha;
     if (existing.statusCode >= 200 && existing.statusCode < 300) {
       sha =
@@ -402,10 +474,35 @@ class DataSyncService {
     };
     if (sha != null) body['sha'] = sha;
     final response = sha == null
-        ? await http.post(uri, body: body)
-        : await http.put(uri, body: body);
+        ? await http.post(uri, body: body).timeout(_timeout)
+        : await http.put(uri, body: body).timeout(_timeout);
     if (response.statusCode == 409) throw const SyncConflictException();
     _ensureSuccess(response, 'Gitee 上传失败');
+  }
+
+  Future<void> _testGiteeConnection(SyncSettings settings) async {
+    _validateRepoSettings(
+      token: settings.giteeToken,
+      owner: settings.giteeOwner,
+      repo: settings.giteeRepo,
+      path: settings.giteePath,
+      label: 'Gitee',
+    );
+    final repoUri = Uri.https(
+      'gitee.com',
+      '/api/v5/repos/${settings.giteeOwner}/${settings.giteeRepo}',
+      {'access_token': settings.giteeToken},
+    );
+    final repoResponse = await http.get(repoUri).timeout(_timeout);
+    _ensureSuccess(repoResponse, 'Gitee 仓库连接测试失败');
+
+    final branchUri = Uri.https(
+      'gitee.com',
+      '/api/v5/repos/${settings.giteeOwner}/${settings.giteeRepo}/branches/${settings.giteeBranch}',
+      {'access_token': settings.giteeToken},
+    );
+    final branchResponse = await http.get(branchUri).timeout(_timeout);
+    _ensureSuccess(branchResponse, 'Gitee 分支连接测试失败');
   }
 
   Map<String, dynamic> _mergePackages(
@@ -591,4 +688,16 @@ class SyncResult {
 
 class SyncConflictException implements Exception {
   const SyncConflictException();
+}
+
+class _SyncChannel {
+  const _SyncChannel({
+    required this.download,
+    required this.upload,
+    required this.testConnection,
+  });
+
+  final Future<Map<String, dynamic>?> Function() download;
+  final Future<void> Function(Map<String, dynamic> package) upload;
+  final Future<void> Function() testConnection;
 }
