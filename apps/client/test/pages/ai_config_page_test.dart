@@ -25,4 +25,19 @@ model=glm-4-flash
     expect(parsed.apiKey, 'ak-test');
     expect(parsed.model, 'glm-4-flash');
   });
+
+  test(
+    'bulk paste parser handles unrecognized api key prefix via position',
+    () {
+      final parsed = parseAiConfigPaste('''
+https://api.example.com/v1
+my-custom-api-key-12345
+my-model-name
+''');
+
+      expect(parsed.baseUrl, 'https://api.example.com/v1');
+      expect(parsed.apiKey, 'my-custom-api-key-12345');
+      expect(parsed.model, 'my-model-name');
+    },
+  );
 }

@@ -234,195 +234,224 @@ class _CatalogPageState extends State<CatalogPage> {
           color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
         ),
       ),
-      child: Column(
-        children: [
-          // 第一行：领域下拉 + 搜索 + 筛选按钮 + 视图切换
-          Row(
-            children: [
-              // 领域下拉选择
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 190),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: widget.currentDomainId,
-                      isDense: true,
-                      isExpanded: true,
-                      selectedItemBuilder: (_) => domains
-                          .map(
-                            (d) => Text(
-                              d.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      items: domains
-                          .map(
-                            (d) => DropdownMenuItem(
-                              value: d.id,
-                              child: Text(
-                                d.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          widget.onDomainChanged(value);
-                          if (contentProvider.getLoadedTopicCount(value) == 0) {
-                            contentProvider.loadDomainTopics(value);
-                          }
-                        }
-                      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 640;
+
+          if (isWide) {
+            // 宽屏：单行（领域 + 搜索 + 筛选 + 视图切换）
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    _buildDomainDropdown(domains, contentProvider),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildSearchField()),
+                    const SizedBox(width: 8),
+                    _buildFilterButton(),
+                    const SizedBox(width: 4),
+                    _buildViewToggle(),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildProgressRow(totalTopics, masteryPercent, isDark),
+              ],
+            );
+          } else {
+            // 窄屏：两行（第一行领域+搜索，第二行筛选+视图+进度）
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    _buildDomainDropdown(domains, contentProvider),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildSearchField()),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildFilterButton(),
+                    const SizedBox(width: 4),
+                    _buildViewToggle(),
+                    const SizedBox(width: 12),
+                    Text(
+                      l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // 搜索框
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: l10n.get('search_current_domain'),
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 16),
-                              onPressed: () =>
-                                  setState(() => _searchQuery = ''),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: masteryPercent / 100,
+                          backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          color: Theme.of(context).colorScheme.primary,
+                          minHeight: 4,
+                        ),
                       ),
-                      filled: true,
-                      fillColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 0,
-                      ),
-                      isDense: true,
                     ),
-                    style: const TextStyle(fontSize: 13),
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                  ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$masteryPercent%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-
-              // 筛选按钮
-              IconButton(
-                icon: Icon(
-                  _showFilters ? Icons.filter_list_off : Icons.filter_list,
-                  size: 20,
-                  color: _hasActiveFilters
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                onPressed: () => setState(() => _showFilters = !_showFilters),
-                tooltip: _showFilters
-                    ? l10n.get('hide_filter')
-                    : l10n.get('show_filter'),
-                style: IconButton.styleFrom(
-                  backgroundColor: _hasActiveFilters
-                      ? Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.1)
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 4),
-
-              // 视图切换
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                    value: false,
-                    icon: Icon(Icons.view_list, size: 16),
-                  ),
-                  ButtonSegment(
-                    value: true,
-                    icon: Icon(Icons.account_tree, size: 16),
-                  ),
-                ],
-                selected: {_roadmapView},
-                onSelectionChanged: (next) =>
-                    setState(() => _roadmapView = next.first),
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-
-          // 第二行：掌握度进度条
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white54 : Colors.grey,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: masteryPercent / 100,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
-                    color: Theme.of(context).colorScheme.primary,
-                    minHeight: 4,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '$masteryPercent%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            );
+          }
+        },
       ),
+    );
+  }
+
+  Widget _buildDomainDropdown(List<Domain> domains, ContentProvider contentProvider) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 190),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: widget.currentDomainId,
+            isDense: true,
+            isExpanded: true,
+            selectedItemBuilder: (_) => domains
+                .map(
+                  (d) => Text(
+                    d.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                )
+                .toList(),
+            items: domains
+                .map(
+                  (d) => DropdownMenuItem(
+                    value: d.id,
+                    child: Text(
+                      d.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                widget.onDomainChanged(value);
+                if (contentProvider.getLoadedTopicCount(value) == 0) {
+                  contentProvider.loadDomainTopics(value);
+                }
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return SizedBox(
+      height: 36,
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: l10n.get('search_current_domain'),
+          prefixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 16),
+                  onPressed: () => setState(() => _searchQuery = ''),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          isDense: true,
+        ),
+        style: const TextStyle(fontSize: 13),
+        onChanged: (v) => setState(() => _searchQuery = v),
+      ),
+    );
+  }
+
+  Widget _buildFilterButton() {
+    return IconButton(
+      icon: Icon(
+        _showFilters ? Icons.filter_list_off : Icons.filter_list,
+        size: 20,
+        color: _hasActiveFilters ? Theme.of(context).colorScheme.primary : null,
+      ),
+      onPressed: () => setState(() => _showFilters = !_showFilters),
+      tooltip: _showFilters ? l10n.get('hide_filter') : l10n.get('show_filter'),
+      style: IconButton.styleFrom(
+        backgroundColor: _hasActiveFilters
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildViewToggle() {
+    return SegmentedButton<bool>(
+      segments: const [
+        ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16)),
+        ButtonSegment(value: true, icon: Icon(Icons.account_tree, size: 16)),
+      ],
+      selected: {_roadmapView},
+      onSelectionChanged: (next) => setState(() => _roadmapView = next.first),
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  Widget _buildProgressRow(int totalTopics, int masteryPercent, bool isDark) {
+    return Row(
+      children: [
+        Text(
+          l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: masteryPercent / 100,
+              backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary,
+              minHeight: 4,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$masteryPercent%',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ],
     );
   }
 

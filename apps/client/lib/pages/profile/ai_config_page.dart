@@ -96,6 +96,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
     bool? testPassed;
     bool isTesting = false;
     bool showBulkPaste = false;
+    bool obscureApiKey = true;
 
     void applyBulkText(String text) {
       final parsed = parseAiConfigPaste(text);
@@ -179,10 +180,22 @@ class _AiConfigPageState extends State<AiConfigPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: apiKeyController,
-                    obscureText: true,
+                    obscureText: obscureApiKey,
                     decoration: InputDecoration(
                       labelText: l10n.get('api_key'),
                       hintText: 'sk-...',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureApiKey
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setDialogState(() => obscureApiKey = !obscureApiKey),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -538,10 +551,10 @@ ParsedAiConfigPaste parseAiConfigPaste(String input) {
       continue;
     }
 
-    if (model == null &&
-        !line.contains(' ') &&
-        !line.contains('://') &&
-        line.length <= 80) {
+    // 4. Positional fallback: 按 url → apiKey → model 顺序推断
+    if (apiKey == null && baseUrl != null) {
+      apiKey = line;
+    } else if (model == null && apiKey != null) {
       model = line;
     }
   }
