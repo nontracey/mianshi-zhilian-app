@@ -969,7 +969,7 @@ manifest 示例：
 | `estimatedMinutes` | 是 | 建议学习时长。 |
 | `order` | 是 | 领域内默认学习顺序。 |
 | `recommendWeight` | 是 | 推荐权重，0-100。 |
-| `status` | 否 | 生产状态，`production`（正式）或 `draft`（草稿），默认 `draft`。 |
+| `status` | 否 | 内容状态，`production`（正式）、`staging`（测试）或 `draft`（草稿），默认 `draft`。真正的环境隔离以 manifest 指向的文件路径为准。 |
 | `prerequisites` | 否 | 前置依赖知识点 ID 数组，例如 `["java.jvm.runtime-data-area"]`。 |
 | `interviewFrequency` | 否 | 面试频率，`high`（高频）/ `medium`（中频）/ `low`（低频）。 |
 | `interviewerFocus` | 否 | 面试官关注点，说明面试官问这个知识点时真正想考察什么。 |

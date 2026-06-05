@@ -46,7 +46,10 @@ class ContentProvider extends ChangeNotifier {
       final List<Domain> fullDomains = [];
       for (final domain in baseDomains) {
         try {
-          final fullDomain = await _api.fetchDomain(domain.id);
+          final fullDomain = await _api.fetchDomain(
+            domain.id,
+            entry: domain.entry,
+          );
           fullDomains.add(
             Domain(
               id: fullDomain.id,
@@ -55,6 +58,7 @@ class ContentProvider extends ChangeNotifier {
               icon: fullDomain.icon,
               themeColor: fullDomain.themeColor,
               accentColor: fullDomain.accentColor,
+              entry: domain.entry,
               categories: fullDomain.categories,
               learningPaths: fullDomain.learningPaths,
               topicCount: domain.topicCount,
@@ -208,11 +212,9 @@ class ContentProvider extends ChangeNotifier {
       final pathsToLoad = <String>[];
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
-          final cleanPath = topicPath
-              .replaceAll('topics/', '')
-              .replaceAll('.json', '');
-          if (!_topics.containsKey(cleanPath) || needsRefresh) {
-            pathsToLoad.add(cleanPath);
+          final cacheKey = ContentApiService.cacheKeyForTopicRef(topicPath);
+          if (!_topics.containsKey(cacheKey) || needsRefresh) {
+            pathsToLoad.add(topicPath);
           }
         }
       }
@@ -227,7 +229,7 @@ class ContentProvider extends ChangeNotifier {
           batch.map((path) => _api.fetchTopic(path)),
         );
         for (var j = 0; j < batch.length; j++) {
-          _topics[batch[j]] = results[j];
+          _topics[ContentApiService.cacheKeyForTopicRef(batch[j])] = results[j];
         }
         // 每批加载完后一次性通知 UI 更新
         notifyListeners();
@@ -416,7 +418,7 @@ class ContentProvider extends ChangeNotifier {
     for (final domain in _domains) {
       for (final category in domain.categories) {
         for (final topicPath in category.topics) {
-          refs.add(topicPath.replaceAll('topics/', '').replaceAll('.json', ''));
+          refs.add(ContentApiService.cacheKeyForTopicRef(topicPath));
         }
       }
     }

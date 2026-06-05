@@ -99,4 +99,41 @@ void main() {
       '${RouteResolver.appApiPrimary}/content/test/manifest.json',
     );
   });
+
+  test(
+    'environment domain and topic entries are fetched as manifest paths',
+    () async {
+      final client = _QueuedClient([
+        http.Response(
+          '{"id":"java","title":"Java","description":"Java","categories":[]}',
+          200,
+        ),
+        http.Response(
+          '{"id":"java.jvm.sample","domain":"java","category":"jvm","title":"Sample","summary":"Sample","tags":["Java"],"difficulty":1,"estimatedMinutes":1,"order":1,"recommendWeight":1,"learningCards":[],"recallPrompts":[],"rubric":{"mustHave":["a"],"goodToHave":[],"commonMistakes":[],"scoreWeights":{"coverage":25,"accuracy":25,"interviewExpression":25,"depth":25}}}',
+          200,
+        ),
+      ]);
+      final routeClient = EndpointFallbackClient(
+        stateStore: RouteStateStore(StorageService()),
+        httpClient: client,
+      );
+      final service = ContentApiService(
+        baseUrl: '${RouteResolver.appApiPrimary}/content/test',
+        routeClient: routeClient,
+      );
+
+      await service.fetchDomain('java', entry: 'staging/domains/java.json');
+      await service.fetchTopic('staging/topics/java/topic-sample.json');
+
+      expect(client.requests, hasLength(2));
+      expect(
+        client.requests[0].url.toString(),
+        '${RouteResolver.appApiPrimary}/content/test/staging/domains/java.json',
+      );
+      expect(
+        client.requests[1].url.toString(),
+        '${RouteResolver.appApiPrimary}/content/test/staging/topics/java/topic-sample.json',
+      );
+    },
+  );
 }

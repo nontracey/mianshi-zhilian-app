@@ -31,19 +31,23 @@ class ContentApiService {
     throw Exception('Failed to load manifest: ${response.statusCode}');
   }
 
-  Future<Domain> fetchDomain(String domainId) async {
-    final response = await _get('/domains/$domainId.json');
+  Future<Domain> fetchDomain(String domainId, {String? entry}) async {
+    final domainPath = _normalizeDomainPath(domainId, entry: entry);
+    final response = await _get(domainPath);
     if (response.statusCode == 200) {
       return Domain.fromJson(
         json.decode(response.body) as Map<String, dynamic>,
       );
     }
-    throw Exception('Failed to load domain $domainId: ${response.statusCode}');
+    throw Exception(
+      'Failed to load domain $domainPath: ${response.statusCode}',
+    );
   }
 
-  /// topicPath 格式: "java/jvm-runtime-data-area" (不带 .json)
+  /// 支持完整相对路径 "topics/java/a.json" / "staging/topics/java/a.json"，
+  /// 也兼容旧格式 "java/a" (不带 .json)。
   Future<Topic> fetchTopic(String topicPath) async {
-    final response = await _get('/topics/$topicPath.json');
+    final response = await _get(_normalizeTopicPath(topicPath));
     if (response.statusCode == 200) {
       return Topic.fromJson(json.decode(response.body) as Map<String, dynamic>);
     }
@@ -55,24 +59,45 @@ class ContentApiService {
     final topics = <Topic>[];
     for (final category in domain.categories) {
       for (final topicPath in category.topics) {
-        // topicPath 格式: "topics/java/jvm-runtime-data-area.json"
-        final cleanPath = topicPath
-            .replaceAll('topics/', '')
-            .replaceAll('.json', '');
         try {
-          final topic = await fetchTopic(cleanPath);
+          final topic = await fetchTopic(topicPath);
           topics.add(topic);
         } catch (e) {
           // 单个 topic 加载失败不阻断整体
-          debugPrint('Failed to load topic $cleanPath: $e');
+          debugPrint('Failed to load topic $topicPath: $e');
         }
       }
     }
     return topics;
   }
 
+  static String cacheKeyForTopicRef(String topicPath) =>
+      _normalizeRelativePath(topicPath).replaceAll(RegExp(r'\.json$'), '');
+
+  static String _normalizeDomainPath(String domainId, {String? entry}) {
+    if (entry != null && entry.trim().isNotEmpty) {
+      return _normalizeRelativePath(entry);
+    }
+    return 'domains/$domainId.json';
+  }
+
+  static String _normalizeTopicPath(String topicPath) {
+    final normalized = _normalizeRelativePath(topicPath);
+    if (normalized.endsWith('.json')) return normalized;
+    if (normalized.startsWith('topics/') ||
+        normalized.startsWith('staging/topics/') ||
+        normalized.startsWith('draft/topics/')) {
+      return '$normalized.json';
+    }
+    return 'topics/$normalized.json';
+  }
+
+  static String _normalizeRelativePath(String path) =>
+      path.trim().replaceFirst(RegExp(r'^/+'), '');
+
   Future<http.Response> _get(String path) {
-    final official = _officialRoute(path);
+    final requestPath = path.startsWith('/') ? path : '/$path';
+    final official = _officialRoute(requestPath);
     if (official != null && routeClient != null) {
       return routeClient!.request(
         official.service,
@@ -82,7 +107,7 @@ class ContentApiService {
       );
     }
     return _httpClient
-        .get(Uri.parse('${baseUrl.replaceAll(RegExp(r'/+$'), '')}$path'))
+        .get(Uri.parse('${baseUrl.replaceAll(RegExp(r'/+$'), '')}$requestPath'))
         .timeout(const Duration(seconds: 8));
   }
 

@@ -128,6 +128,25 @@ App Worker 仍坚持本地优先：学习记录、AI 配置和用户自定义同
 
 App 通过 `manifest.json` 中的 `contentVersion` 字段检测内容是否有更新。如果内容仓库更新了内容但没有更新版本号，App 会继续使用本地缓存的旧内容。
 
+### 内容环境隔离
+
+正式、测试、草稿三个入口路径保持不变：
+
+- 正式：`manifest.json`
+- 测试：`staging-manifest.json`，经 App API 代理时仍请求 `/content/test/manifest.json`
+- 草稿：`draft-manifest.json`，经 App API 代理时仍请求 `/content/draft/manifest.json`
+
+不同入口会指向不同的 domain/topic 文件。正式内容使用 `domains/`、`topics/`；测试内容使用 `staging/domains/`、`staging/topics/`；草稿内容使用 `draft/domains/`、`draft/topics/`。
+
+客户端加载规则：
+
+1. 先读取当前环境 manifest。
+2. 按 `manifest.domains[].entry` 请求 domain 文件。
+3. 按 `domain.categories[].topics[]` 请求 topic 文件。
+4. 缓存 key 使用 topic 相对路径归一化结果，避免不同环境同名 topic 串缓存。
+
+App 不应硬编码 `/domains/{id}.json` 或 `/topics/{domain}/{file}.json`。这样内容工作台编辑草稿和测试内容时，不会覆盖正式用户正在使用的同一知识点。
+
 ### App 缓存机制
 
 #### 缓存结构

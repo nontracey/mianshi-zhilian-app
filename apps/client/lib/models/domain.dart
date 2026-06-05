@@ -7,6 +7,7 @@ class Domain {
   final String? icon;
   final String? themeColor;
   final String? accentColor;
+  final String? entry;
   final List<Category> categories;
   final List<LearningPath> learningPaths;
   final int topicCount;
@@ -20,6 +21,7 @@ class Domain {
     this.icon,
     this.themeColor,
     this.accentColor,
+    this.entry,
     this.categories = const [],
     this.learningPaths = const [],
     this.topicCount = 0,
@@ -37,6 +39,7 @@ class Domain {
       icon: json['icon'] as String?,
       themeColor: json['themeColor'] as String?,
       accentColor: json['accentColor'] as String?,
+      entry: json['entry'] as String?,
       categories:
           (json['categories'] as List<dynamic>?)
               ?.map((e) => Category.fromJson(e as Map<String, dynamic>))
