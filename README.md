@@ -1,206 +1,131 @@
-# 面试智练 App
+# 面试智练
 
-面试智练是一款 AI 主动回忆学习工作台，通过"知识学习 → 主动复述 → AI 评估纠错 → 掌握度更新"帮助用户系统备战技术面试。
+[![CI](https://github.com/nontracey/mianshi-zhilian-app/actions/workflows/ci.yml/badge.svg)](https://github.com/nontracey/mianshi-zhilian-app/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
+面试智练是一款本地优先的技术面试主动回忆学习工作台，通过「知识学习 -> 主动复述 -> AI 评估纠错 -> 掌握度回流」帮助你把看过的知识真正说清楚。
+
+你可以直接使用 Web 版，也可以下载 Android、macOS、Windows 客户端。游客即可使用核心学习和练习功能，AI 模型由你自己配置，API Key 默认保存在本地。
+
+| 入口 | 链接 |
+| --- | --- |
+| 官网 | https://mianshizhilian.nontracey.de5.net |
+| Web App | https://mianshizhilian-app.nontracey.de5.net |
+| 备用 Web App | https://mianshi-zhilian-app.pages.dev |
+| 下载客户端 | https://github.com/nontracey/mianshi-zhilian-app/releases |
+| 隐私政策 | [docs/privacy-policy.md](./docs/privacy-policy.md) |
+| 支持项目 | [docs/sponsor.md](./docs/sponsor.md) |
 
 ## 界面预览
 
-| 学习工作台 | 知识目录 |
-| --- | --- |
-| <img src="./docs/assets/screenshots/dashboard.jpg" alt="学习工作台" width="260" /> | <img src="./docs/assets/screenshots/catalog.jpg" alt="知识目录" width="260" /> |
+| 学习中心 | 知识目录 | 复述练习 | 掌握度 |
+| --- | --- | --- | --- |
+| <img src="./docs/assets/screenshots/promo/01-dashboard.jpg" alt="学习中心" width="190" /> | <img src="./docs/assets/screenshots/promo/02-catalog.jpg" alt="知识目录" width="190" /> | <img src="./docs/assets/screenshots/promo/04-recall-practice.jpg" alt="复述练习" width="190" /> | <img src="./docs/assets/screenshots/promo/07-mastery.jpg" alt="掌握度看板" width="190" /> |
 
-| 练习模式 | 面试准备 |
-| --- | --- |
-| <img src="./docs/assets/screenshots/practice.jpg" alt="练习模式" width="260" /> | <img src="./docs/assets/screenshots/prep.jpg" alt="面试准备" width="260" /> |
+| 知识详情 | 练习模式 | 面试准备 | 个人中心 |
+| --- | --- | --- | --- |
+| <img src="./docs/assets/screenshots/promo/03-topic-detail.jpg" alt="知识详情" width="190" /> | <img src="./docs/assets/screenshots/promo/05-practice-modes.jpg" alt="练习模式" width="190" /> | <img src="./docs/assets/screenshots/promo/06-interview-prep.jpg" alt="面试准备" width="190" /> | <img src="./docs/assets/screenshots/promo/08-profile.jpg" alt="个人中心" width="190" /> |
 
-## 功能特性
+## 它解决什么问题
 
-### 学习工作台
-- **三栏布局**：左侧复习队列、中间学习路线、右侧掌握度概览
-- **今日复习队列**：基于遗忘曲线，展示到期、逾期、薄弱知识点
-- **薄弱知识点 TOP 5**：快速定位需要加强的内容
-- **掌握度趋势**：近 7 天掌握度变化图表
+很多面试准备停留在「看过」和「刷过」，真正上场时却说不完整、说不深入、经不起追问。面试智练把准备过程拆成四步：
 
-### 知识学习
-- **领域知识目录**：多维度筛选（难度、高频、代码题、LeetCode）
-- **知识详情**：Tab 切换布局（知识查阅 / 复述练习）
-- **前置知识**：显示具体名称，支持点击跳转
-- **学习路线**：按阶段分组，支持展开查看详情
+1. 按知识路线学习和复习技术面试题。
+2. 用文字、语音、图片或代码主动复述答案。
+3. 让 AI 评估遗漏点、错误点、表达质量和优化答案。
+4. 把评估结果回流到掌握度、今日复习和薄弱训练。
 
-### 练习模式
-- **复述练习**：文本/语音/图片/代码多模态输入，AI 评估纠错
-- **追问训练**：模拟面试官追问，渐进提示
-- **弱点训练包**：按错因分类（概念缺失/混淆/表达不清等）
-- **高频冲刺**：针对高频面试题强化训练
-- **项目深挖**：STAR 模板练习，本地维护项目信息
-- **系统设计**：需求澄清、容量估算、架构草图（从内容仓库动态加载）
+## 核心功能
 
-### 模拟面试
-- **场景选择**：基础知识、项目深挖、系统设计、代码题、行为面试
-- **面试房间**：计时、连续答题、追问
-- **面试报告**：总分、维度评分、下一轮训练包
+- **结构化知识路线**：覆盖 Java、算法、前端、Agent、.NET、架构、设计模式、操作系统、网络等领域。
+- **主动复述练习**：支持复述题目、关键点、常见错误、语音输入和 AI 深度评估。
+- **8 种练习模式**：今日复习、随机抽题、追问训练、薄弱训练、高频冲刺、项目深挖、系统设计、模拟面试。
+- **掌握度系统**：按领域、熟练度、逾期状态和薄弱点决定下一轮练什么。
+- **面试准备工作台**：设置目标岗位和面试日期，解析 JD，维护项目库和回答版本。
+- **多模型配置**：支持多个兼容 OpenAI API 格式的 AI 服务配置，未配置时可继续本地练习。
+- **本地优先与同步**：学习数据默认本地保存，可选文件、WebDAV、GitHub、Gitee 同步。
+- **多平台分发**：Flutter Web、Android、macOS、Windows，GitHub Releases 提供安装包和更新清单。
 
-### 掌握度系统
-- **掌握度看板**：领域切换、熟练度排序、诊断指标
-- **今日复习**：到期/逾期/薄弱回流分组
-- **就绪度评分**：综合评估面试准备程度
+## 快速开始
 
-### 面试准备
-- **准备目标**：目标岗位、面试日期、技术栈
-- **JD 解析**：粘贴 JD 自动提取关键词，匹配知识点并按掌握度排序
-- **训练计划**：根据面试日期自动生成冲刺节奏
-- **回答版本库**：初稿 → AI 修改 → 面试版，支持版本对比
-- **项目深挖库**：本地维护项目背景、技术决策
+### 直接使用
 
-### AI 配置
-- **多配置支持**：支持多个 AI 服务配置
-- **流式输出**：打字机模式实时显示 AI 分析
-- **模型选择**：导航栏快速切换
-- **未配置降级**：本地练习模式
-- **语音识别**：支持云端 AI 语音、系统语音和 sherpa-onnx 本机模型；本机识别需同时下载 ONNX Runtime 与模型资源
+打开 [Web App](https://mianshi-zhilian-app.pages.dev)，首次进入会看到新手引导。你可以先不配置 AI，直接浏览知识路线和进行本地练习；需要 AI 评估时，再到个人中心添加自己的模型配置。
 
-### 个性化设置
-- **主题系统**：典雅白、气质黑、午夜蓝、活力橙 4 种内置主题
-- **主题自定义**：主色/强调色自定义，实时预览
-- **侧边栏**：支持收缩/展开
-- **语言设置**：中英文切换
-- **数据管理**：导出/清除本地数据，支持单独清空练习数据重新开始
-- **数据同步**：文件导入导出、WebDAV、GitHub、Gitee 使用同一份同步快照
-- **软件更新**：应用内手动检查更新 + 安装包下载 + SHA256 校验
+### 下载客户端
 
-### 用户系统
-- **注册登录**：确认密码校验、防注入处理
-- **修改密码**：输入原密码修改
-- **工单系统**：密码重置申请、反馈建议
-- **数据同步**：当前采用本地优先 + 用户自备同步目标；账号云同步暂不开放
+前往 [GitHub Releases](https://github.com/nontracey/mianshi-zhilian-app/releases) 下载 Android、macOS 或 Windows 安装包。应用内支持检查更新，下载安装包时会进行 SHA256 校验。
 
-数据边界说明见 [docs/data-storage-and-sync.md](./docs/data-storage-and-sync.md)：列明哪些数据本地先存储后同步，哪些功能属于即时请求。
+### 本地开发
 
-## 技术栈
+前置条件：
 
-| 模块 | 技术 |
-|------|------|
-| 客户端 | Flutter (Web/Android/macOS/Windows) |
-| API | Cloudflare Workers |
-| 数据库 | Cloudflare D1 |
-| 内容 CDN | Cloudflare Pages |
-| CI/CD | GitHub Actions |
-
-## 项目结构
-
-```
-mianshi-zhilian-app/
-├── apps/client/                 # Flutter 客户端
-│   ├── lib/
-│   │   ├── models/             # 数据模型
-│   │   ├── pages/              # 页面
-│   │   │   ├── learning/       # 学习相关页面
-│   │   │   ├── practice/       # 练习相关页面
-│   │   │   ├── mastery/        # 掌握度页面
-│   │   │   ├── profile/        # 个人中心
-│   │   │   └── auth/           # 登录注册
-│   │   ├── providers/          # 状态管理
-│   │   ├── services/           # 服务层
-│   │   │   ├── data_sync_service.dart
-│   │   │   ├── whisper_stt_service.dart
-│   │   │   └── update_service.dart
-│   │   ├── widgets/            # 通用组件
-│   │   ├── utils/              # 工具类
-│   │   └── theme/              # 主题配置
-│   └── pubspec.yaml
-├── workers/api/                 # Cloudflare Worker API
-│   ├── src/index.ts            # API 路由和处理
-│   └── wrangler.toml           # Worker 配置
-├── scripts/                     # 构建脚本
-├── skills/                      # 项目级 AI 技能（skills），供 CLI/agent 共享使用
-│   └── doc-code-audit/          # 文档 vs 代码一致性审计
-└── .github/workflows/          # CI/CD 配置
-```
-
-## 本地运行
-
-### 前置条件
 - Flutter SDK 3.41+
 - Node.js 22+
 
-### 启动客户端
+启动客户端：
+
 ```bash
 cd apps/client
 flutter pub get
-flutter run -d chrome  # Web
-flutter run -d macos   # macOS
+flutter run -d chrome
 ```
 
-### 启动 Worker（可选）
+启动 Worker API：
+
 ```bash
 cd workers/api
 npm install
 npx wrangler dev
 ```
 
-## 提交前检查
-
-**重要：提交代码前必须运行本地检查脚本，避免 CI 报错。**
+提交前建议运行：
 
 ```bash
-# 在项目根目录运行
 ./scripts/pre-commit-check.sh
 ```
 
-脚本会依次执行：
-1. `flutter pub get` - 获取依赖
-2. `flutter analyze --no-fatal-infos` - 静态分析
-3. `flutter test` - 运行测试
-4. `flutter build web --release` - 构建 Web
+## 隐私与数据边界
 
-全部通过后方可提交推送。
+- API Key 默认保存在本地设备。
+- API Key 不会进入文件导出和同步快照。
+- 只有你主动发起 AI 评估、语音识别、图片分析或同步时，相关数据才会发送到你配置的外部服务。
+- 学习进度、练习记录、备考资料和应用设置默认本地保存。
+- 数据同步采用白名单快照，跳过登录态、同步目标凭证、缓存和运行态数据。
 
-## 部署
+完整说明见 [隐私政策](./docs/privacy-policy.md) 和 [数据存储与同步边界](./docs/data-storage-and-sync.md)。
 
-### 自动部署
-推送到 `main` 分支会自动触发：
-- `CI`：Flutter 分析和测试
-- `Deploy web`：部署 Web 版本到 Cloudflare Pages
-- `Deploy worker`：部署 Worker API
+## 技术栈
 
-### 发布版本
-```bash
-# 更新版本号
-# apps/client/pubspec.yaml: version: x.x.x+xxx
+| 模块 | 技术 |
+| --- | --- |
+| 客户端 | Flutter, Provider, SharedPreferences |
+| Web/多端 | Flutter Web, Android, macOS, Windows |
+| API | Cloudflare Workers |
+| 数据库 | Cloudflare D1 |
+| 内容分发 | Cloudflare Pages, 双线路容错 |
+| 发布 | GitHub Actions, GitHub Releases |
 
-# 创建 tag
-git tag -a vx.x.x -m "Release vx.x.x"
-git push origin vx.x.x
+## 项目结构
+
+```text
+mianshi-zhilian-app/
+├── apps/client/         # Flutter 客户端
+├── workers/api/         # Cloudflare Worker API
+├── docs/                # 设计、部署、隐私、同步和赞助文档
+├── scripts/             # 构建、发布和检查脚本
+└── .github/workflows/   # CI/CD 工作流
 ```
 
-会自动触发 `Release` 工作流，构建各平台安装包并上传到 GitHub Releases。
-
-## 内容源
-
-默认内容仓库：`nontracey/mianshi-zhilian-content`
-
-内容通过 `manifest.json` 驱动，支持：
-- 测试环境：`staging-manifest.json`
-- 正式环境：`manifest.json`
-
-## 相关仓库
+## 相关仓库(暂未开放)
 
 | 仓库 | 说明 |
-|------|------|
-| [mianshi-zhilian-content](https://github.com/nontracey/mianshi-zhilian-content) | 知识内容仓库 |
-| [mianshi-zhilian-content-studio](https://github.com/nontracey/mianshi-zhilian-content-studio) | 内容管理工作台 |
+| --- | --- |
+| [mianshi-zhilian-content]() | 知识内容仓库 |
+| [mianshi-zhilian-content-studio]() | 内容管理工作台 |
 
-## 访问地址
+## 贡献与反馈
 
-| 服务 | 主用 | 备用 |
-|------|------|------|
-| Web App | https://mianshi-zhilian-app.pages.dev | https://mianshizhilian-app.nontracey.de5.net |
-| 内容 CDN | https://mianshi-zhilian-content.pages.dev | https://mianshizhilian-content.nontracey.de5.net |
-| Worker API | https://mianshi-zhilian-api.pages.dev | https://mianshizhilian-api.nontracey.de5.net |
+欢迎提交 Issue 反馈 Bug、内容建议或体验问题。涉及 API Key、密码、Token 的日志请先脱敏。PR 请说明影响范围和验证方式，尤其是涉及用户数据、同步快照或隐私边界的改动。
 
-客户端官方请求使用 `RouteResolver` + `EndpointFallbackClient`，按服务名和路径自动选择 pages.dev / de5.net。用户自定义内容源仍然直连自定义 URL，不参与官方主备切换。
-
-更新检查固定走 `appApi + /update.json`，release manifest 会写入 `assetPath` 以生成官方 Web 主备下载候选；Android release 构建支持可选 keystore secrets，未配置时使用本地签名兜底。
-
-## 支持项目
-
-如果这个项目对你有帮助，欢迎[请作者喝杯咖啡 ☕](docs/sponsor.md)。
+如果这个项目对你有帮助，欢迎[请作者喝杯咖啡](./docs/sponsor.md)。

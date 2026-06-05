@@ -1,0 +1,54 @@
+name: Bug 反馈
+description: 报告应用崩溃、功能异常、内容加载或平台兼容问题
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 简要说明你遇到的问题。
+      placeholder: 例如：Web 端配置 AI 后点击评估没有返回结果。
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - Web
+        - Android
+        - macOS
+        - Windows
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      placeholder: 例如：0.1.4+144
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开...
+        2. 点击...
+        3. 出现...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 可以粘贴脱敏后的日志、截图或错误信息。请不要提交 API Key、密码、Token。

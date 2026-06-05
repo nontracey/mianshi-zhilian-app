@@ -1,0 +1,40 @@
+name: 功能建议
+description: 提出新功能、体验优化、内容扩展或推广建议
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题？
+      placeholder: 例如：面试前想快速按岗位生成一周冲刺计划。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望怎么改？
+      placeholder: 描述你期待的功能、流程或展示方式。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关模块
+      options:
+        - 学习中心
+        - 知识目录
+        - 复述练习
+        - 模拟面试
+        - 面试准备
+        - 掌握度
+        - AI 配置
+        - 数据同步
+        - 内容题库
+        - 其他
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你现在的替代做法
+      placeholder: 现在你会怎么绕过这个问题？

@@ -146,6 +146,7 @@ class AppSettings {
   final String mockInterviewPreference;
   final double fontScale;
   final String cardDensity;
+  final bool onboardingCompleted;
 
   // 语音识别配置
   // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'sherpa_onnx'
@@ -185,6 +186,7 @@ class AppSettings {
     this.mockInterviewPreference = 'mixed',
     this.fontScale = 1.0,
     this.cardDensity = 'comfortable',
+    this.onboardingCompleted = false,
     this.sttMode = 'auto',
     this.sttAiConfigId,
     this.onDeviceEngine = 'sense_voice',
@@ -255,6 +257,7 @@ class AppSettings {
     String? mockInterviewPreference,
     double? fontScale,
     String? cardDensity,
+    bool? onboardingCompleted,
     String? sttMode,
     Object? sttAiConfigId = _unset,
     String? onDeviceEngine,
@@ -286,6 +289,7 @@ class AppSettings {
         mockInterviewPreference ?? this.mockInterviewPreference,
     fontScale: fontScale ?? this.fontScale,
     cardDensity: cardDensity ?? this.cardDensity,
+    onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     sttMode: sttMode ?? this.sttMode,
     sttAiConfigId: sttAiConfigId == _unset
         ? this.sttAiConfigId
@@ -366,6 +370,7 @@ class AppSettings {
         json['mockInterviewPreference'] as String? ?? 'mixed',
     fontScale: (json['fontScale'] as num?)?.toDouble() ?? 1.0,
     cardDensity: json['cardDensity'] as String? ?? 'comfortable',
+    onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
     sttMode: json['sttMode'] as String? ?? 'auto',
     sttAiConfigId: json['sttAiConfigId'] as String?,
     onDeviceEngine: json['onDeviceEngine'] as String? ?? 'sense_voice',
@@ -399,6 +404,7 @@ class AppSettings {
     'mockInterviewPreference': mockInterviewPreference,
     'fontScale': fontScale,
     'cardDensity': cardDensity,
+    'onboardingCompleted': onboardingCompleted,
     'sttMode': sttMode,
     'sttAiConfigId': sttAiConfigId,
     'onDeviceEngine': onDeviceEngine,

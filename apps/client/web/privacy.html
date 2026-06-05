@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="index,follow">
+  <meta name="description" content="面试智练隐私政策：本地优先保存，API Key 不上传到面试智练服务器，外部服务调用由用户主动触发。">
+  <meta property="og:title" content="面试智练隐私政策">
+  <meta property="og:description" content="了解面试智练如何处理本地数据、AI API Key、同步快照和外部服务调用。">
+  <meta property="og:image" content="https://mianshi-zhilian-app.pages.dev/og-image.png">
+  <meta property="og:type" content="article">
+  <title>面试智练隐私政策</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f8fc;
+      --panel: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --line: #dce7f4;
+      --accent: #1d4ed8;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.75;
+    }
+    main {
+      width: min(880px, calc(100% - 32px));
+      margin: 32px auto;
+      padding: 40px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(32px, 6vw, 52px);
+      line-height: 1.15;
+    }
+    h2 {
+      margin-top: 32px;
+      font-size: 22px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .meta {
+      margin-bottom: 32px;
+      color: var(--muted);
+    }
+    .notice {
+      padding: 16px 18px;
+      background: #eaf2ff;
+      border-radius: 12px;
+      color: #1e3a8a;
+      font-weight: 600;
+    }
+    @media (max-width: 640px) {
+      main {
+        margin: 0;
+        width: 100%;
+        min-height: 100vh;
+        padding: 28px 20px;
+        border: 0;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>面试智练隐私政策</h1>
+    <p class="meta">生效日期：2026-06-06</p>
+    <p class="notice">面试智练是本地优先的技术面试主动回忆学习工具。学习记录、练习记录、AI 配置和个人备考资料默认保存在你的设备上。</p>
+
+    <h2>本地保存的数据</h2>
+    <p>学习进度、掌握度、练习记录、模拟面试记录、备考目标、JD 解析结果、项目资料、回答版本库、应用设置、AI 配置和同步配置默认保存在本地设备。</p>
+
+    <h2>会发送到外部服务的数据</h2>
+    <ul>
+      <li>使用 AI 评估、AI 改写、图片分析或云端语音识别时，当前题目、你的回答、附件或音频会发送到你自己配置的 AI 服务。</li>
+      <li>使用 WebDAV、GitHub、Gitee 或文件同步时，同步快照会写入你选择的同步目标。</li>
+      <li>使用账号、工单、更新检查或内容加载功能时，客户端会请求面试智练的官方服务。</li>
+    </ul>
+
+    <h2>API Key 和敏感信息</h2>
+    <p>API Key 默认保存在本地设备，不会进入文件导出和同步快照。复制诊断日志时，常见 Key 和 Authorization 字段会自动脱敏。</p>
+
+    <h2>同步边界</h2>
+    <p>同步快照只同步学习相关数据和必要配置，会跳过 API Key、登录态、同步目标凭证、缓存和运行态数据。</p>
+
+    <h2>账号、工单与统计</h2>
+    <p>如果你使用账号、工单或密码重置功能，相关用户名、登录令牌、工单内容和必要安全记录会由面试智练官方 API 处理。应用可能上报基础使用统计，用于判断功能稳定性和改进优先级。</p>
+
+    <h2>数据导出与删除</h2>
+    <p>你可以在应用内导出本地数据，也可以清空本地学习/练习数据。卸载应用、清除浏览器站点数据或清除应用数据通常也会删除本地保存的数据。</p>
+
+    <h2>第三方服务</h2>
+    <p>你自行配置的 AI 服务、WebDAV、GitHub、Gitee 等第三方服务会按其各自隐私政策处理数据。使用前请确认你信任这些服务。</p>
+
+    <h2>联系与更新</h2>
+    <p>如果数据处理方式发生明显变化，我们会更新本政策。如有隐私或数据安全问题，请通过 GitHub Issues 或项目主页提供的联系方式反馈。</p>
+
+    <p><a href="/">返回面试智练</a></p>
+  </main>
+</body>
+</html>

@@ -36,6 +36,7 @@ import 'pages/mastery/mastery_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'widgets/navigation_rail_panel.dart';
 import 'widgets/header_bar.dart';
+import 'widgets/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -227,7 +228,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             supportedLocales: L10n.supportedLocales,
             themeMode: settings.settings.themeMode,
             theme: theme,
-            home: const LearningShell(),
+            home: settings.settings.onboardingCompleted
+                ? const LearningShell()
+                : const OnboardingScreen(),
           );
         },
       ),

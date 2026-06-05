@@ -5,14 +5,53 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="面试智练 - AI 主动回忆学习工作台，帮你系统备战技术面试">
+  <meta name="keywords" content="面试智练, 技术面试, 面试准备, 主动回忆, AI 评估, Java 面试, 前端面试, 系统设计面试, 模拟面试, 掌握度追踪">
+  <meta name="author" content="nontracey">
+  <meta name="robots" content="index,follow">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0A0A0A">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="面试智练">
+  <meta property="og:site_name" content="面试智练">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:url" content="https://mianshizhilian.nontracey.de5.net/">
+  <meta property="og:title" content="面试智练 - AI 主动回忆学习工作台">
+  <meta property="og:description" content="通过主动复述、AI 评估和掌握度回流，系统备战技术面试。支持 Web、Android、macOS 和 Windows。">
+  <meta property="og:image" content="https://mianshi-zhilian-app.pages.dev/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="面试智练应用预览：主动复述、AI 评估、掌握度回流">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="面试智练 - AI 主动回忆学习工作台">
+  <meta name="twitter:description" content="本地优先的技术面试主动回忆学习工作台，覆盖知识路线、复述练习、追问训练和面试冲刺。">
+  <meta name="twitter:image" content="https://mianshi-zhilian-app.pages.dev/og-image.png">
+  <link rel="canonical" href="https://mianshizhilian.nontracey.de5.net/">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <title>面试智练</title>
   <link rel="manifest" href="manifest.json">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "面试智练",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web, Android, macOS, Windows",
+      "description": "面试智练是一款 AI 主动回忆学习工作台，通过知识学习、主动复述、AI 评估纠错和掌握度更新帮助用户系统备战技术面试。",
+      "url": "https://mianshizhilian.nontracey.de5.net/",
+      "image": "https://mianshi-zhilian-app.pages.dev/og-image.png",
+      "author": {
+        "@type": "Person",
+        "name": "nontracey"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CNY"
+      }
+    }
+  </script>
   <style>
     * {
       margin: 0;
@@ -63,6 +102,18 @@
       border-radius: 2px;
       animation: loading-slide 1.5s ease-in-out infinite;
     }
+    .privacy-link {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      color: #8B949E;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .privacy-link:hover {
+      color: #C9D1D9;
+    }
     @keyframes loading-slide {
       0% { transform: translateX(-100%); }
       100% { transform: translateX(350%); }
@@ -84,6 +135,7 @@
     <div class="loading-text">面试智练</div>
     <div class="loading-sub">AI 主动回忆学习工作台</div>
     <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+    <a class="privacy-link" href="privacy.html">隐私政策</a>
   </div>
   <script>
     // 当 Flutter 准备好时隐藏加载页面

@@ -1566,6 +1566,38 @@ class L10n {
     'logs_copied': '已复制 {count} 条日志',
     'clear_logs': '清空日志',
     'clear_logs_confirm': '确定清空所有本地日志吗？这不会影响学习数据、模型或设置。',
+    'onboarding_skip': '跳过',
+    'onboarding_next': '下一步',
+    'onboarding_start': '开始使用',
+    'onboarding_route_title': '先按路线建立面试知识网',
+    'onboarding_route_body': '从 Java、前端、算法、架构等领域开始，沿着知识路线逐步复习，不再靠临时翻面经补碎片。',
+    'onboarding_route_bullet_1': '按领域和阶段浏览知识点',
+    'onboarding_route_bullet_2': '高频、难度、前置知识一眼可见',
+    'onboarding_route_bullet_3': '可以从学习中心或目录直接进入练习',
+    'onboarding_recall_title': '用复述练习替代被动刷题',
+    'onboarding_recall_body': '看懂不等于说得清。你可以用文字或语音复述，再让 AI 帮你找遗漏点、错误点和表达问题。',
+    'onboarding_recall_bullet_1': '先说定义、机制、场景和误区',
+    'onboarding_recall_bullet_2': '未配置 AI 时也能先保存本地练习',
+    'onboarding_recall_bullet_3': '配置模型后可获得深度评估和优化答案',
+    'onboarding_mastery_title': '用掌握度决定下一题练什么',
+    'onboarding_mastery_body': '练习结果会回流到掌握度和复习队列，系统会优先把薄弱、高频、逾期知识点推回来。',
+    'onboarding_mastery_bullet_1': '今日复习、薄弱训练和高频冲刺联动',
+    'onboarding_mastery_bullet_2': '掌握度低的知识点自动进入回流队列',
+    'onboarding_mastery_bullet_3': '面试前可按目标岗位生成冲刺节奏',
+    'onboarding_privacy_title': '数据本地优先，模型由你自己配置',
+    'onboarding_privacy_body':
+        'API Key 和练习数据默认保存在本地。只有你发起评估、语音识别或同步时，相关数据才会发送到你配置的服务。',
+    'onboarding_privacy_bullet_1': '游客也能使用核心学习和练习功能',
+    'onboarding_privacy_bullet_2': 'API Key 不上传到面试智练服务器',
+    'onboarding_privacy_bullet_3': '可选 WebDAV、GitHub、Gitee 或文件同步',
+    'about_about': '关于',
+    'about_homepage': '项目主页',
+    'about_homepage_desc': '了解功能介绍、使用指南和最新更新',
+    'about_github': 'GitHub 仓库',
+    'about_github_desc': '查看源代码、提交 Issue 或参与贡献',
+    'about_sponsor': '支持项目',
+    'about_sponsor_desc': '如果这个项目对你有帮助，欢迎请作者喝杯咖啡',
+    'about_share_friends': '分享给朋友',
   };
 
   static const _en = {
@@ -3316,6 +3348,51 @@ class L10n {
     'clear_logs': 'Clear Logs',
     'clear_logs_confirm':
         'Clear all local logs? This will not affect learning data, models, or settings.',
+    'onboarding_skip': 'Skip',
+    'onboarding_next': 'Next',
+    'onboarding_start': 'Start',
+    'onboarding_route_title': 'Build an interview knowledge map first',
+    'onboarding_route_body':
+        'Start from Java, frontend, algorithms, architecture, and more. Follow structured routes instead of collecting scattered interview notes.',
+    'onboarding_route_bullet_1': 'Browse topics by domain and stage',
+    'onboarding_route_bullet_2': 'See frequency, difficulty, and prerequisites',
+    'onboarding_route_bullet_3':
+        'Jump into practice from the dashboard or catalog',
+    'onboarding_recall_title':
+        'Practice active recall instead of passive reading',
+    'onboarding_recall_body':
+        'Understanding is not the same as explaining. Recall with text or voice, then let AI find gaps, mistakes, and expression issues.',
+    'onboarding_recall_bullet_1':
+        'Explain definition, mechanism, scenarios, and pitfalls',
+    'onboarding_recall_bullet_2':
+        'Without AI, answers are still saved as local practice',
+    'onboarding_recall_bullet_3':
+        'Configure a model for deep scoring and refined answers',
+    'onboarding_mastery_title': 'Let mastery decide what to practice next',
+    'onboarding_mastery_body':
+        'Practice results flow back into mastery and review queues. Weak, frequent, and overdue topics are pulled back first.',
+    'onboarding_mastery_bullet_1':
+        'Daily review, weak-topic drills, and high-frequency sprint work together',
+    'onboarding_mastery_bullet_2':
+        'Low-mastery topics return to the review queue',
+    'onboarding_mastery_bullet_3':
+        'Create a sprint rhythm for your target role',
+    'onboarding_privacy_title': 'Local-first data, bring your own model',
+    'onboarding_privacy_body':
+        'API keys and practice data are stored locally by default. Data is sent only when you start evaluation, speech recognition, or sync.',
+    'onboarding_privacy_bullet_1': 'Core learning and practice work as a guest',
+    'onboarding_privacy_bullet_2':
+        'API keys are not uploaded to Interview Coach servers',
+    'onboarding_privacy_bullet_3':
+        'Optional WebDAV, GitHub, Gitee, or file sync',
+    'about_about': 'About',
+    'about_homepage': 'Project Homepage',
+    'about_homepage_desc': 'Features, guides, and latest updates',
+    'about_github': 'GitHub Repository',
+    'about_github_desc': 'Source code, issues, and contributions',
+    'about_sponsor': 'Sponsor',
+    'about_sponsor_desc': 'If this project helps you, buy the author a coffee',
+    'about_share_friends': 'Share with friends',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {

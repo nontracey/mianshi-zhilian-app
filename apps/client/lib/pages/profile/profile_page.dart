@@ -28,6 +28,7 @@ import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/pages/profile/log_management_page.dart';
@@ -4089,6 +4090,35 @@ class _AboutPanelState extends State<_AboutPanel> {
             padding: EdgeInsets.only(top: 8),
             child: LinearProgressIndicator(),
           ),
+        const Divider(height: 32),
+        Text(
+          l10n.get('about_about'),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _LinkTile(
+          icon: Icons.language,
+          title: l10n.get('about_homepage'),
+          subtitle: l10n.get('about_homepage_desc'),
+          url: 'https://mianshizhilian.nontracey.de5.net',
+        ),
+        _LinkTile(
+          icon: Icons.code,
+          title: l10n.get('about_github'),
+          subtitle: l10n.get('about_github_desc'),
+          url: 'https://github.com/nontracey/mianshi-zhilian-app',
+        ),
+        _LinkTile(
+          icon: Icons.favorite_outline,
+          title: l10n.get('about_sponsor'),
+          subtitle: l10n.get('about_sponsor_desc'),
+          url:
+              'https://github.com/nontracey/mianshi-zhilian-app/blob/main/docs/sponsor.md',
+        ),
       ],
     );
   }
@@ -4242,5 +4272,67 @@ class InfoRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _LinkTile extends StatelessWidget {
+  const _LinkTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.url,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _launchUrl(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.open_in_new,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _launchUrl(BuildContext context) {
+    // 使用 url_launcher 或默认浏览器打开
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    // ignore: deprecated_member_use
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

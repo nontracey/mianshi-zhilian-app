@@ -108,6 +108,12 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> completeOnboarding() async {
+    _settings = _settings.copyWith(onboardingCompleted: true);
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   Future<void> setThemeMode(ThemeMode mode) async {
     // 兼容旧代码，转换为 AppThemeType
     AppThemeType themeType;
