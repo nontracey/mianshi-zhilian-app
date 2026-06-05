@@ -1468,6 +1468,7 @@ class L10n {
     'ai_status_untested_model': 'AI 配置未测试：{model}，建议先测试再分析',
     'voice_transcribing': '正在转写',
     'voice_preparing': '正在准备语音识别...',
+    'voice_ready': '就绪，请说话',
     'voice_transcribing_background': '正在录音，并转写上一段...',
     'voice_stopping': '正在停止并处理最后一段',
     'voice_provider_unavailable': '没有可用的语音识别方式',
@@ -3201,6 +3202,7 @@ class L10n {
         'AI config is untested: {model}. Test it before analysis.',
     'voice_transcribing': 'Transcribing',
     'voice_preparing': 'Preparing voice recognition...',
+    'voice_ready': 'Ready, speak now',
     'voice_transcribing_background':
         'Recording and transcribing the previous segment...',
     'voice_stopping': 'Stopping and processing the last segment',

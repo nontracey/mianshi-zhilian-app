@@ -23,6 +23,7 @@ import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 enum VoiceInputState {
   idle,
   preparing,
+  ready,
   recording,
   transcribing,
   stopping,
@@ -66,7 +67,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   bool _finishAfterQueue = false;
   int _sessionId = 0;
   String _lastSystemText = '';
-  String _previewText = '';
   String? _statusMessageKey;
   OnDeviceSttService? _sherpaOnnxService;
   String? _sherpaOnnxServiceKey;
@@ -78,6 +78,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   String? _activeConfigLabel;
   bool get _isActive =>
       _state == VoiceInputState.preparing ||
+      _state == VoiceInputState.ready ||
       _state == VoiceInputState.recording ||
       _state == VoiceInputState.transcribing ||
       _state == VoiceInputState.stopping;
@@ -115,7 +116,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _activeProviderKind = provider.kind;
     _discardQueuedChunks();
     _lastSystemText = '';
-    _previewText = '';
     _activeConfigLabel = null;
     _setStatusMessage('voice_preparing');
     _setStateKind(VoiceInputState.preparing);
@@ -225,10 +225,16 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       return;
     }
 
-    _setStateKind(VoiceInputState.recording);
-    _setStatusMessage('voice_recording_hint');
+    _setStateKind(VoiceInputState.ready);
+    _setStatusMessage('voice_ready');
+    bool hadSystemResult = false;
     await _speech.listen(
       onResult: (result) {
+        if (!hadSystemResult && mounted) {
+          hadSystemResult = true;
+          _setStateKind(VoiceInputState.recording);
+          _setStatusMessage(null);
+        }
         final words = result.recognizedWords;
         final delta = _deltaFromCumulative(words, _lastSystemText);
         _lastSystemText = words;
@@ -258,8 +264,8 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
     if (!_isCurrentRecordingSession(sessionId)) return;
     _activeConfigLabel = '${config.name} · ${config.model}';
-    _setStateKind(VoiceInputState.recording);
-    _setStatusMessage('voice_recording_hint');
+    _setStateKind(VoiceInputState.ready);
+    _setStatusMessage('voice_ready');
     _producerRunning = true;
     unawaited(_runAiChunkLoop(sessionId, aiProvider, config));
   }
@@ -272,9 +278,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   ) async {
     try {
       while (_isCurrentRecordingSession(sessionId)) {
-        _setRecordingIfCurrent(sessionId);
-        _setStatusMessage('voice_recording_hint');
-        final chunkPath = await _recordVadChunk();
+        final chunkPath = await _recordVadChunk(
+          onSpeechStart: () {
+            if (mounted) {
+              _setStateKind(VoiceInputState.recording);
+              _setStatusMessage(null);
+            }
+          },
+        );
         if (!_isCurrentSession(sessionId)) break;
         if (chunkPath == null) {
           if (_running) continue;
@@ -315,7 +326,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   /// 使用 VAD 语音活动检测录制音频块，返回临时文件路径。
   /// 当检测到持续静音或达到最大时长时自动停止。
   /// 返回 null 表示无有效语音输入或录制失败。
-  Future<String?> _recordVadChunk() async {
+  Future<String?> _recordVadChunk({VoidCallback? onSpeechStart}) async {
     String? chunkPath;
     try {
       if (!_running) return null;
@@ -335,15 +346,16 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
       // VAD: record uses dB-like values on some platforms and normalized
       // linear values on others, so speech detection has to handle both.
+      bool speechStarted = false;
       int silentChecks = 0;
       int speechChecks = 0;
       int totalChecks = 0;
       const pollInterval = Duration(milliseconds: 80);
-      const warmupChecks = 4; // Let the recorder settle before judging noise.
-      const minSpeechChecks = 3; // ~240ms of speech avoids click/noise chunks.
-      const maxSilentChecks = 12; // ~960ms of trailing silence.
-      const maxTotalChecks = 150; // 12s chunks keep latency reasonable.
-      const noSpeechChecks = 100; // 8s of waiting before rotating the file.
+      const warmupChecks = 4;
+      const minSpeechChecks = 3;
+      const maxSilentChecks = 12;
+      const maxTotalChecks = 150;
+      const noSpeechChecks = 100;
 
       while (_running) {
         await Future.delayed(pollInterval);
@@ -355,6 +367,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         if (speechLike) {
           speechChecks++;
           silentChecks = 0;
+          if (!speechStarted && speechChecks >= minSpeechChecks) {
+            speechStarted = true;
+            onSpeechStart?.call();
+          }
         } else if (speechChecks > 0) {
           silentChecks++;
         }
@@ -468,8 +484,8 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
 
     _activeConfigLabel = _sherpaOnnxEngineLabel(engine);
-    _setStateKind(VoiceInputState.recording);
-    _setStatusMessage('voice_recording_hint');
+    _setStateKind(VoiceInputState.ready);
+    _setStatusMessage('voice_ready');
     _producerRunning = true;
     unawaited(_runSherpaOnnxChunkLoop(sessionId, service));
   }
@@ -481,9 +497,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   ) async {
     try {
       while (_isCurrentRecordingSession(sessionId)) {
-        _setRecordingIfCurrent(sessionId);
-        _setStatusMessage('voice_recording_hint');
-        final chunkPath = await _recordVadChunk();
+        final chunkPath = await _recordVadChunk(
+          onSpeechStart: () {
+            if (mounted) {
+              _setStateKind(VoiceInputState.recording);
+              _setStatusMessage(null);
+            }
+          },
+        );
         if (!_isCurrentSession(sessionId)) break;
         if (chunkPath == null) {
           if (_running) continue;
@@ -591,13 +612,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   bool _isCurrentRecordingSession(int sessionId) =>
       _isCurrentSession(sessionId) && _running;
-
-  void _setRecordingIfCurrent(int sessionId) {
-    if (!_isCurrentRecordingSession(sessionId)) return;
-    if (_state != VoiceInputState.recording) {
-      _setStateKind(VoiceInputState.recording);
-    }
-  }
 
   void _enqueueTranscription(_VoiceChunkJob job) {
     if (!_isCurrentSession(job.sessionId)) {
@@ -710,14 +724,6 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final cleaned = _cleanTranscriptionText(text);
     if (cleaned.isEmpty) return;
     widget.onResult(cleaned);
-    if (mounted) {
-      setState(() {
-        _previewText = (_previewText + cleaned).trim();
-        if (_previewText.length > 80) {
-          _previewText = _previewText.substring(_previewText.length - 80);
-        }
-      });
-    }
   }
 
   String _cleanTranscriptionText(String text) {
@@ -835,6 +841,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final color = switch (_state) {
       VoiceInputState.idle => null,
       VoiceInputState.preparing => Theme.of(context).colorScheme.primary,
+      VoiceInputState.ready => Theme.of(context).colorScheme.primary,
       VoiceInputState.recording => Colors.green,
       VoiceInputState.transcribing => Theme.of(context).colorScheme.primary,
       VoiceInputState.stopping => Colors.orange,
@@ -843,6 +850,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final tooltip = switch (_state) {
       VoiceInputState.idle => l10n.get('voice_input'),
       VoiceInputState.preparing => l10n.get('voice_preparing'),
+      VoiceInputState.ready => l10n.get('voice_ready'),
       VoiceInputState.recording => l10n.get('voice_stop_recording'),
       VoiceInputState.transcribing => l10n.get('voice_transcribing'),
       VoiceInputState.stopping => l10n.get('voice_stopping'),
@@ -860,36 +868,26 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           ),
           tooltip: tooltip,
         ),
-        if (_isActive && (_previewText.isNotEmpty || _statusMessageKey != null))
+        if (_statusMessageKey != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 220),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _previewText.isNotEmpty
-                        ? _previewText
-                        : l10n.get(_statusMessageKey!),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  if (_activeConfigLabel != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        _activeConfigLabel!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
+            child: Text(
+              l10n.get(_statusMessageKey!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        if (_activeConfigLabel != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              _activeConfigLabel!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
