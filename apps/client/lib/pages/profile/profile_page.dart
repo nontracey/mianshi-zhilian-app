@@ -3650,15 +3650,21 @@ class _AboutPanelState extends State<_AboutPanel> {
       if (!mounted) return;
       setState(() {
         _isChecking = false;
+        final localFullVersion =
+            result.localVersion?.fullVersion ?? currentVersion.fullVersion;
+        final remoteFullVersion = result.remoteFullVersion ?? '--';
         if (result.hasUpdate) {
-          _updateMessage = l10n.getp(
-            'publish_current_new_version_v_version_2',
-            {'version': result.updateInfo!.version},
-          );
+          _updateMessage = l10n.getp('update_available_with_versions', {
+            'local': localFullVersion,
+            'remote': remoteFullVersion,
+          });
         } else if (result.isError) {
           _updateMessage = l10n.get('inspect_check_update_fail');
         } else {
-          _updateMessage = l10n.get('already_is_most_new_version');
+          _updateMessage = l10n.getp('already_latest_with_versions', {
+            'local': localFullVersion,
+            'remote': remoteFullVersion,
+          });
         }
       });
       if (result.hasUpdate) {

@@ -87,19 +87,54 @@ class PlatformUpdate {
 class CheckUpdateResult {
   final UpdateInfo? updateInfo;
   final bool isError;
+  final AppBuildInfo? localVersion;
+  final String? remoteVersion;
+  final int? remoteBuildNumber;
 
-  const CheckUpdateResult._(this.updateInfo, this.isError);
+  const CheckUpdateResult._(
+    this.updateInfo,
+    this.isError, {
+    this.localVersion,
+    this.remoteVersion,
+    this.remoteBuildNumber,
+  });
 
   /// 发现新版本
-  const CheckUpdateResult.hasUpdate(UpdateInfo info) : this._(info, false);
+  CheckUpdateResult.hasUpdate(UpdateInfo info, {AppBuildInfo? localVersion})
+    : this._(
+        info,
+        false,
+        localVersion: localVersion,
+        remoteVersion: info.version,
+        remoteBuildNumber: info.buildNumber,
+      );
 
   /// 已是最新版本
-  const CheckUpdateResult.noUpdate() : this._(null, false);
+  const CheckUpdateResult.noUpdate({
+    AppBuildInfo? localVersion,
+    String? remoteVersion,
+    int? remoteBuildNumber,
+  }) : this._(
+         null,
+         false,
+         localVersion: localVersion,
+         remoteVersion: remoteVersion,
+         remoteBuildNumber: remoteBuildNumber,
+       );
 
   /// 检查失败（网络等原因）
-  const CheckUpdateResult.error() : this._(null, true);
+  const CheckUpdateResult.error({AppBuildInfo? localVersion})
+    : this._(null, true, localVersion: localVersion);
 
   bool get hasUpdate => updateInfo != null;
+
+  String? get remoteFullVersion {
+    final version = remoteVersion;
+    final buildNumber = remoteBuildNumber;
+    if (version == null || version.isEmpty) return null;
+    if (buildNumber == null || buildNumber <= 0) return version;
+    return '$version+$buildNumber';
+  }
 }
 
 /// 下载结果
@@ -222,7 +257,7 @@ class UpdateService {
             source: 'app_update',
           ),
         );
-        return const CheckUpdateResult.error();
+        return CheckUpdateResult.error(localVersion: currentVersion);
       }
 
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -241,16 +276,23 @@ class UpdateService {
         localVersion: currentVersion.version,
         localBuildNumber: currentVersion.buildNumber,
       )) {
-        return CheckUpdateResult.hasUpdate(UpdateInfo.fromJson(data));
+        return CheckUpdateResult.hasUpdate(
+          UpdateInfo.fromJson(data),
+          localVersion: currentVersion,
+        );
       }
 
-      return const CheckUpdateResult.noUpdate();
+      return CheckUpdateResult.noUpdate(
+        localVersion: currentVersion,
+        remoteVersion: remoteVersion,
+        remoteBuildNumber: remoteBuildNumber,
+      );
     } catch (e) {
       debugPrint('Check update error: $e');
       unawaited(
         AppLog.warning('Check update error', source: 'app_update', error: e),
       );
-      return const CheckUpdateResult.error();
+      return CheckUpdateResult.error(localVersion: currentVersion);
     }
   }
 

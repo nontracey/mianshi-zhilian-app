@@ -596,6 +596,7 @@ class L10n {
     'publish_version': '发布版本',
     'publish_version_address_retain_empty_use_default': '发布版地址（留空使用默认）',
     'publish_current_new_version_v_version_2': '当前最新版本v{version}',
+    'update_available_with_versions': '发现新版本：远端 {remote}（当前 {local}）',
     'achieved_results_data_metrics_experience': '取得的结果数据和指标经验',
     'output_improved_answer_only_no_prefix': '只输出改进后的回答内容，不要加前缀说明。\\n\\n',
     'optional_by_progress_enter_correct_mode_mock_end_after_7':
@@ -1048,6 +1049,7 @@ class L10n {
     'already_disable': '已禁用',
     'already_enable': '已启用',
     'already_is_most_new_version': '已是最新版本',
+    'already_latest_with_versions': '已是最新版本：当前 {local}，远端 {remote}',
     'already_practice': '已练习',
     'already_read_status': '已读状态',
     'application_password': '应用密码',
@@ -2287,6 +2289,8 @@ class L10n {
     'already_review_control_to_clip_clipboard_board': 'Copied to Clipboard',
     'already_complete': 'Completed',
     'already_is_most_new_version': 'Already Latest Version',
+    'already_latest_with_versions':
+        'Already latest: current {local}, remote {remote}',
     'already_add_to_answer': 'Added to Answer',
     'already_disable': 'Disabled',
     'already_practice': 'Practiced',
@@ -2897,6 +2901,8 @@ class L10n {
     'publish_day_date_2': 'Release date: {date}',
     'publish_current_new_version_v_version_2':
         'New version v{version} available',
+    'update_available_with_versions':
+        'New version available: remote {remote} (current {local})',
     'based_on_forgetting_curve_today_day_has_count_knowledg_2':
         'Based on forgetting curve, {count} topics to review today',
     'already_will_title_push_postpone_2': 'Postponed "{title}"',

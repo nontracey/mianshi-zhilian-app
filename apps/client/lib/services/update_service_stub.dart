@@ -79,13 +79,48 @@ class PlatformUpdate {
 class CheckUpdateResult {
   final UpdateInfo? updateInfo;
   final bool isError;
+  final AppBuildInfo? localVersion;
+  final String? remoteVersion;
+  final int? remoteBuildNumber;
 
-  const CheckUpdateResult._(this.updateInfo, this.isError);
-  const CheckUpdateResult.hasUpdate(UpdateInfo info) : this._(info, false);
-  const CheckUpdateResult.noUpdate() : this._(null, false);
-  const CheckUpdateResult.error() : this._(null, true);
+  const CheckUpdateResult._(
+    this.updateInfo,
+    this.isError, {
+    this.localVersion,
+    this.remoteVersion,
+    this.remoteBuildNumber,
+  });
+  CheckUpdateResult.hasUpdate(UpdateInfo info, {AppBuildInfo? localVersion})
+    : this._(
+        info,
+        false,
+        localVersion: localVersion,
+        remoteVersion: info.version,
+        remoteBuildNumber: info.buildNumber,
+      );
+  const CheckUpdateResult.noUpdate({
+    AppBuildInfo? localVersion,
+    String? remoteVersion,
+    int? remoteBuildNumber,
+  }) : this._(
+         null,
+         false,
+         localVersion: localVersion,
+         remoteVersion: remoteVersion,
+         remoteBuildNumber: remoteBuildNumber,
+       );
+  const CheckUpdateResult.error({AppBuildInfo? localVersion})
+    : this._(null, true, localVersion: localVersion);
 
   bool get hasUpdate => updateInfo != null;
+
+  String? get remoteFullVersion {
+    final version = remoteVersion;
+    final buildNumber = remoteBuildNumber;
+    if (version == null || version.isEmpty) return null;
+    if (buildNumber == null || buildNumber <= 0) return version;
+    return '$version+$buildNumber';
+  }
 }
 
 enum DownloadResult { success, networkError, verificationFailed, cancelled }
@@ -158,7 +193,9 @@ class UpdateService {
         '/update.json',
         timeout: const Duration(seconds: 15),
       );
-      if (response.statusCode != 200) return const CheckUpdateResult.error();
+      if (response.statusCode != 200) {
+        return CheckUpdateResult.error(localVersion: currentVersion);
+      }
       final data = json.decode(response.body) as Map<String, dynamic>;
       final remoteVersion = data['version'] as String? ?? '';
       final remoteBuildNumber = data['buildNumber'] as int? ?? 0;
@@ -168,11 +205,18 @@ class UpdateService {
         localVersion: currentVersion.version,
         localBuildNumber: currentVersion.buildNumber,
       )) {
-        return CheckUpdateResult.hasUpdate(UpdateInfo.fromJson(data));
+        return CheckUpdateResult.hasUpdate(
+          UpdateInfo.fromJson(data),
+          localVersion: currentVersion,
+        );
       }
-      return const CheckUpdateResult.noUpdate();
+      return CheckUpdateResult.noUpdate(
+        localVersion: currentVersion,
+        remoteVersion: remoteVersion,
+        remoteBuildNumber: remoteBuildNumber,
+      );
     } catch (_) {
-      return const CheckUpdateResult.error();
+      return CheckUpdateResult.error(localVersion: currentVersion);
     }
   }
 
