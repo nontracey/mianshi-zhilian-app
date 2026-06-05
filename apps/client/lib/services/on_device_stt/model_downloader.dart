@@ -375,8 +375,9 @@ class ModelDownloader {
     final root = await getStorageDir();
     final dir = Directory('${root.path}/runtimes/${config.id}');
     if (!await dir.exists()) return false;
+    final searchDir = await _runtimeSearchDir(dir);
     for (final file in config.files) {
-      final found = await _findFile(dir, file.fileName);
+      final found = await _findFile(searchDir, file.fileName);
       if (found == null) return false;
     }
     return true;
@@ -390,7 +391,10 @@ class ModelDownloader {
 
   static Future<String?> getRuntimeLibraryDir(OnDeviceRuntimeConfig config) async {
     final dir = await getRuntimeDir(config.id);
-    final first = config.files.isEmpty ? null : await _findFile(dir, config.files.first.fileName);
+    final firstFile = config.files.isEmpty ? null : config.files.first.fileName;
+    if (firstFile == null) return null;
+    final searchDir = await _runtimeSearchDir(dir);
+    final first = await _findFile(searchDir, firstFile);
     return first?.parent.path;
   }
 
@@ -646,8 +650,16 @@ class ModelDownloader {
         extracting: true,
       ));
       await _extractArchive(tempFile, runtimeDir);
+
+      // Android 归档包含多 ABI .so 文件（arm64-v8a/ 等），
+      // 清理其他 ABI 只保留当前设备的，避免 _findFile 找到错误架构。
+      if (Platform.isAndroid) {
+        await _keepOnlyCurrentAndroidAbi(runtimeDir);
+      }
+
       for (final file in config.files) {
-        final found = await _findFile(runtimeDir, file.fileName);
+        final searchDir = await _runtimeSearchDir(runtimeDir);
+        final found = await _findFile(searchDir, file.fileName);
         if (found == null) {
           throw HttpException('Runtime file missing: ${file.fileName}');
         }
@@ -950,6 +962,78 @@ class ModelDownloader {
     final tempFile = File('${tempDir.path}/model_${identifier}_download.part');
     if (await tempFile.exists()) {
       await tempFile.delete();
+    }
+  }
+
+  /// 返回运行时库文件应搜索的目录。
+  ///
+  /// Android 归档包含按 ABI 分层的子目录（arm64-v8a/ 等），
+  /// 先尝试当前设备 ABI 子目录；不存在时回退到整个运行时目录
+  /// （兼容旧版提取的扁平结构）。
+  static Future<Directory> _runtimeSearchDir(Directory runtimeDir) async {
+    if (!Platform.isAndroid) return runtimeDir;
+    final abi = currentSherpaOnnxRuntimeArch();
+    final abiDir = Directory('${runtimeDir.path}/$abi');
+    if (await abiDir.exists()) return abiDir;
+    return runtimeDir;
+  }
+
+  /// Android 归档提取后，只保留当前设备 ABI 的 .so 文件，
+  /// 删除其他架构的文件以节省磁盘空间，并确保搜索时不会定位到错误的 .so。
+  static Future<void> _keepOnlyCurrentAndroidAbi(Directory runtimeDir) async {
+    if (!Platform.isAndroid) return;
+    final abi = currentSherpaOnnxRuntimeArch();
+    // 归档可能包含 jniLibs/{abi}/ 或直接 {abi}/ 两种结构
+    for (final candidate in [
+      Directory('${runtimeDir.path}/jniLibs/$abi'),
+      Directory('${runtimeDir.path}/$abi'),
+    ]) {
+      if (await candidate.exists()) {
+        // 把当前 ABI 的文件移到 runtimeDir 根目录
+        await for (final entity in candidate.list()) {
+          if (entity is File) {
+            await entity.rename('${runtimeDir.path}/${entity.uri.pathSegments.last}');
+          } else if (entity is Directory) {
+            // 递归移动子目录内容
+            await _moveDirectoryContents(entity, runtimeDir);
+          }
+        }
+        break;
+      }
+    }
+    // 删除所有非当前 ABI 的子目录（jniLibs/armeabi-v7a/, x86 等）
+    await for (final entity in runtimeDir.list()) {
+      if (entity is Directory) {
+        final dirName = entity.uri.pathSegments.last;
+        if (dirName != abi && _isKnownAndroidAbi(dirName)) {
+          await entity.delete(recursive: true);
+        }
+        // 清理 jniLibs 空壳目录
+        if (dirName == 'jniLibs') {
+          await entity.delete(recursive: true);
+        }
+      }
+    }
+  }
+
+  static bool _isKnownAndroidAbi(String name) {
+    return name == 'arm64-v8a' ||
+        name == 'armeabi-v7a' ||
+        name == 'x86_64' ||
+        name == 'x86';
+  }
+
+  static Future<void> _moveDirectoryContents(Directory src, Directory dst) async {
+    await for (final entity in src.list()) {
+      if (entity is File) {
+        await entity.rename('${dst.path}/${entity.uri.pathSegments.last}');
+      } else if (entity is Directory) {
+        final subDst = Directory('${dst.path}/${entity.uri.pathSegments.last}');
+        if (!await subDst.exists()) {
+          await subDst.create(recursive: true);
+        }
+        await _moveDirectoryContents(entity, subDst);
+      }
     }
   }
 
