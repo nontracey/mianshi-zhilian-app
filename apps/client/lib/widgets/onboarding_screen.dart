@@ -140,6 +140,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _complete() async {
     await context.read<SettingsProvider>().completeOnboarding();
+    if (mounted) {
+      // 从关于页进入时 pop 到根，展示首页；首次启动时 home 由 main.dart Consumer 自动切换
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 }
 

@@ -4127,7 +4127,7 @@ class _AboutPanelState extends State<_AboutPanel> {
           onTap: () async {
             await context.read<SettingsProvider>().resetOnboarding();
             if (context.mounted) {
-              Navigator.of(context).pushReplacement(
+              Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const OnboardingScreen(),
                 ),
