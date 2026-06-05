@@ -189,6 +189,7 @@ class StorageService {
     };
 
     for (final key in keys) {
+      if (key == 'app_logs') continue;
       final value = prefs.getString(key);
       if (value != null) {
         try {

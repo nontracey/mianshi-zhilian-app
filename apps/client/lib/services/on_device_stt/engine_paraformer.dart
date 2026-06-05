@@ -27,7 +27,7 @@ class ParaformerEngine implements OnDeviceSttService {
 
   @override
   Future<void> initialize() async {
-    initBindings(await ModelDownloader.requireRuntimeLibraryDir());
+    await ModelDownloader.initSherpaOnnxBindings();
 
     // 优先使用离线模式（sherpa-onnx-paraformer-zh-small 仅支持离线，
     // 存档不含 encoder.int8.onnx/decoder.int8.onnx）。
@@ -56,14 +56,24 @@ class ParaformerEngine implements OnDeviceSttService {
   }
 
   @override
-  Future<OnDeviceSttResult> transcribe(Float32List samples, int sampleRate) async {
+  Future<OnDeviceSttResult> transcribe(
+    Float32List samples,
+    int sampleRate,
+  ) async {
     if (!isInitialized) {
-      throw StateError('ParaformerEngine not initialized. Call initialize() first.');
+      throw StateError(
+        'ParaformerEngine not initialized. Call initialize() first.',
+      );
     }
-    return _useOnline ? _transcribeOnline(samples, sampleRate) : _transcribeOffline(samples, sampleRate);
+    return _useOnline
+        ? _transcribeOnline(samples, sampleRate)
+        : _transcribeOffline(samples, sampleRate);
   }
 
-  Future<OnDeviceSttResult> _transcribeOnline(Float32List samples, int sampleRate) async {
+  Future<OnDeviceSttResult> _transcribeOnline(
+    Float32List samples,
+    int sampleRate,
+  ) async {
     final r = _onlineRecognizer!;
     final s = _onlineStream!;
 
@@ -90,7 +100,10 @@ class ParaformerEngine implements OnDeviceSttService {
     return OnDeviceSttResult(text: delta);
   }
 
-  Future<OnDeviceSttResult> _transcribeOffline(Float32List samples, int sampleRate) async {
+  Future<OnDeviceSttResult> _transcribeOffline(
+    Float32List samples,
+    int sampleRate,
+  ) async {
     final r = _offlineRecognizer!;
     final stream = r.createStream();
     try {
@@ -147,7 +160,9 @@ OfflineRecognizerConfig _paraformerOfflineConfig(String modelDir) {
   return OfflineRecognizerConfig(
     feat: const FeatureConfig(sampleRate: 16000, featureDim: 80),
     model: OfflineModelConfig(
-      paraformer: OfflineParaformerModelConfig(model: '$modelDir/model.int8.onnx'),
+      paraformer: OfflineParaformerModelConfig(
+        model: '$modelDir/model.int8.onnx',
+      ),
       tokens: '$modelDir/tokens.txt',
       modelType: 'paraformer',
       numThreads: 2,

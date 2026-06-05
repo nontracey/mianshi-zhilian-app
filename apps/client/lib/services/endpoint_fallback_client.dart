@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'app_log_service.dart';
 import 'route_resolver.dart';
 import 'route_state_store.dart';
 
@@ -49,6 +50,13 @@ class EndpointFallbackClient {
         if (i < candidates.length - 1 &&
             _canReplayOnHttpStatus(method, response.statusCode)) {
           lastError = 'HTTP ${response.statusCode} from ${candidate.url.host}';
+          unawaited(
+            AppLog.warning(
+              'Route fallback after HTTP ${response.statusCode}: '
+              '${service.name} ${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+            ),
+          );
           continue;
         }
         if (_isHealthyRouteResponse(response.statusCode)) {
@@ -57,17 +65,58 @@ class EndpointFallbackClient {
             candidate.endpoint.lane,
             ttl: _ttlFor(service),
           );
+          if (candidate.endpoint.lane != activeLane) {
+            unawaited(
+              AppLog.info(
+                'Active route selected: ${service.name} '
+                '${candidate.endpoint.lane.name} ${candidate.url.host}',
+                source: 'route',
+              ),
+            );
+          }
         }
         return response;
       } on TimeoutException catch (e) {
         lastError = e;
+        unawaited(
+          AppLog.warning(
+            'Route timeout: ${service.name} ${method.toUpperCase()} '
+            '${candidate.url.host}',
+            source: 'route',
+            error: e,
+          ),
+        );
       } on http.ClientException catch (e) {
         lastError = e;
+        unawaited(
+          AppLog.warning(
+            'Route client error: ${service.name} ${method.toUpperCase()} '
+            '${candidate.url.host}',
+            source: 'route',
+            error: e,
+          ),
+        );
       } catch (e) {
         lastError = e;
+        unawaited(
+          AppLog.warning(
+            'Route request failed: ${service.name} ${method.toUpperCase()} '
+            '${candidate.url.host}',
+            source: 'route',
+            error: e,
+          ),
+        );
       }
     }
 
+    unawaited(
+      AppLog.error(
+        'All endpoints unreachable: ${service.name} ${method.toUpperCase()} '
+        '$path',
+        source: 'route',
+        error: lastError,
+      ),
+    );
     throw http.ClientException(
       'All endpoints unreachable for ${service.name}: $lastError',
     );

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'api_headers.dart';
+import 'app_log_service.dart';
 import 'device_info_helper.dart';
 import 'endpoint_fallback_client.dart';
 import 'route_resolver.dart';
@@ -135,6 +136,9 @@ class AnalyticsService with WidgetsBindingObserver {
       // 失败时保留 buffer 和 batch_id，下次 flush 以同一批次重试
     } catch (e) {
       debugPrint('Analytics flush failed: $e');
+      unawaited(
+        AppLog.debug('Analytics flush failed: $e', source: 'analytics'),
+      );
     } finally {
       _flushing = false;
       _activeStartedAt = (restartActiveTimer || _isActive)
@@ -156,6 +160,7 @@ class AnalyticsService with WidgetsBindingObserver {
       );
     } catch (e) {
       debugPrint('Analytics bind failed: $e');
+      unawaited(AppLog.debug('Analytics bind failed: $e', source: 'analytics'));
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'app_log_service.dart';
 import 'app_version_service.dart';
 import 'endpoint_fallback_client.dart';
 import 'on_device_stt/runtime_platform.dart';
@@ -215,6 +216,12 @@ class UpdateService {
       );
       if (response.statusCode != 200) {
         debugPrint('Failed to check update: ${response.statusCode}');
+        unawaited(
+          AppLog.warning(
+            'Check update failed: HTTP ${response.statusCode}',
+            source: 'app_update',
+          ),
+        );
         return const CheckUpdateResult.error();
       }
 
@@ -234,6 +241,9 @@ class UpdateService {
       return const CheckUpdateResult.noUpdate();
     } catch (e) {
       debugPrint('Check update error: $e');
+      unawaited(
+        AppLog.warning('Check update error', source: 'app_update', error: e),
+      );
       return const CheckUpdateResult.error();
     }
   }
@@ -477,6 +487,13 @@ class UpdateService {
         ),
       );
       debugPrint('HEAD $sourceLabel → ${headResponse.statusCode}，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source skipped by HEAD: $sourceLabel '
+          'HTTP ${headResponse.statusCode}',
+          source: 'app_update',
+        ),
+      );
       return false;
     } on TimeoutException {
       cancelToken?._unbind(client);
@@ -490,6 +507,12 @@ class UpdateService {
         ),
       );
       debugPrint('HEAD $sourceLabel → 超时，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source HEAD timeout: $sourceLabel',
+          source: 'app_update',
+        ),
+      );
       return false;
     } catch (e) {
       cancelToken?._unbind(client);
@@ -503,6 +526,13 @@ class UpdateService {
         ),
       );
       debugPrint('HEAD $sourceLabel → $e，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source HEAD failed: $sourceLabel',
+          source: 'app_update',
+          error: e,
+        ),
+      );
       return false;
     }
   }
@@ -575,6 +605,12 @@ class UpdateService {
 
       if (response.statusCode != 200) {
         debugPrint('Download failed from $url: ${response.statusCode}');
+        unawaited(
+          AppLog.warning(
+            'Update download failed: $sourceLabel HTTP ${response.statusCode}',
+            source: 'app_update',
+          ),
+        );
         return _DownloadStatus.networkError;
       }
 
@@ -611,13 +647,31 @@ class UpdateService {
       final isValid = await verifySha256(filePath, platformUpdate.sha256);
       if (!isValid) {
         debugPrint('SHA256 verification failed for $url');
+        unawaited(
+          AppLog.error(
+            'Update SHA256 verification failed: $sourceLabel',
+            source: 'app_update',
+          ),
+        );
         await file.delete();
         return _DownloadStatus.verificationFailed;
       }
 
+      unawaited(
+        AppLog.info(
+          'Update download completed: $sourceLabel',
+          source: 'app_update',
+        ),
+      );
       return _DownloadStatus.success;
     } on StateError catch (e) {
       debugPrint('Download cancelled: $e');
+      unawaited(
+        AppLog.info(
+          'Update download cancelled: $sourceLabel error=$e',
+          source: 'app_update',
+        ),
+      );
       try {
         await sink?.close();
       } catch (_) {}
@@ -627,6 +681,13 @@ class UpdateService {
       return _DownloadStatus.cancelled;
     } catch (e) {
       debugPrint('Download error from $url: $e');
+      unawaited(
+        AppLog.warning(
+          'Update download error: $sourceLabel',
+          source: 'app_update',
+          error: e,
+        ),
+      );
       try {
         await sink?.close();
       } catch (_) {}

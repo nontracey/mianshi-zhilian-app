@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -18,6 +19,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
 import 'package:mianshi_zhilian/generated/release_notes.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
+import 'package:mianshi_zhilian/services/app_log_service.dart';
 import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
@@ -28,6 +30,7 @@ import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
+import 'package:mianshi_zhilian/pages/profile/log_management_page.dart';
 import 'package:mianshi_zhilian/pages/profile/on_device_model_management_page.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/voice_diagnostic_sheet.dart';
@@ -130,6 +133,14 @@ class ProfilePage extends StatelessWidget {
               subtitle: '自动 / pages.dev / de5.net',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const _RoutePreferencePage()),
+              ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.article_outlined,
+              title: '日志管理',
+              subtitle: '查看、复制和清理诊断日志',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LogManagementPage()),
               ),
             ),
             _ProfileSectionItem(
@@ -1777,7 +1788,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     }
 
     final engine = _settings.onDeviceEngine;
-    final onDeviceModelConfig = _modelConfigForEngine(engine, _settings.whisperModel);
+    final onDeviceModelConfig = _modelConfigForEngine(
+      engine,
+      _settings.whisperModel,
+    );
     final runtimeConfig = KnownRuntimes.current();
 
     if (onDeviceModelConfig == null || runtimeConfig == null) {
@@ -1793,10 +1807,14 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     }
 
     try {
-      final modelReady = await ModelDownloader.isModelReady(onDeviceModelConfig);
+      final modelReady = await ModelDownloader.isModelReady(
+        onDeviceModelConfig,
+      );
       final runtimeReady = await ModelDownloader.isRuntimeReady(runtimeConfig);
       final size = await ModelDownloader.getModelSize(onDeviceModelConfig.id);
-      final runtimeSize = await ModelDownloader.getRuntimeSize(runtimeConfig.id);
+      final runtimeSize = await ModelDownloader.getRuntimeSize(
+        runtimeConfig.id,
+      );
       if (mounted) {
         setState(() {
           _onDeviceChecking = false;
@@ -1844,8 +1862,9 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
                 icon: Icons.auto_awesome,
                 description: l10n.get('stt_mode_auto_desc'),
                 selected: mode == 'auto',
-                onTap: () =>
-                    widget.onSettingsChanged(_settings.copyWith(sttMode: 'auto')),
+                onTap: () => widget.onSettingsChanged(
+                  _settings.copyWith(sttMode: 'auto'),
+                ),
               ),
               _SttModeCard(
                 label: l10n.get('stt_mode_follow_current_ai'),
@@ -1870,8 +1889,9 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
                 icon: Icons.phone_android,
                 description: l10n.get('system_speech_voice_desc'),
                 selected: isSystem,
-                onTap: () =>
-                    widget.onSettingsChanged(_settings.copyWith(sttMode: 'system')),
+                onTap: () => widget.onSettingsChanged(
+                  _settings.copyWith(sttMode: 'system'),
+                ),
               ),
               _SttModeCard(
                 label: l10n.get('on_device_stt_title'),
@@ -2076,7 +2096,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
           const SizedBox(width: 8),
           Text(
             l10n.get('stt_testing'),
-            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+            style: TextStyle(
+              fontSize: 13,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       );
@@ -2100,7 +2123,9 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
                     : l10n.get('on_device_stt_requires_runtime_and_model'),
                 style: TextStyle(
                   fontSize: 13,
-                  color: _onDeviceReady ? Colors.green : theme.colorScheme.primary,
+                  color: _onDeviceReady
+                      ? Colors.green
+                      : theme.colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2136,7 +2161,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     );
   }
 
-  Widget _buildRuntimeResourceStatus(LocalizationProvider l10n, ThemeData theme) {
+  Widget _buildRuntimeResourceStatus(
+    LocalizationProvider l10n,
+    ThemeData theme,
+  ) {
     final config = KnownRuntimes.current();
     if (config == null) return const SizedBox.shrink();
     final sizeText = _onDeviceRuntimeSizeBytes != null
@@ -2187,7 +2215,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     );
   }
 
-  Future<void> _downloadModel(OnDeviceModelConfig config, LocalizationProvider l10n) async {
+  Future<void> _downloadModel(
+    OnDeviceModelConfig config,
+    LocalizationProvider l10n,
+  ) async {
     if (!mounted) return;
     final settings = context.read<SettingsProvider>().settings;
     final downloadSourceMode = await RouteStateStore(
@@ -2220,6 +2251,12 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         },
       );
       await _checkOnDeviceStatus();
+      unawaited(
+        AppLog.info(
+          'Downloaded on-device model ${config.id}',
+          source: 'on_device_stt',
+        ),
+      );
     } on ResourceDownloadStopped catch (e) {
       if (mounted) {
         setState(() {
@@ -2229,6 +2266,13 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         });
       }
     } catch (e) {
+      unawaited(
+        AppLog.error(
+          'Failed to download on-device model ${config.id}',
+          source: 'on_device_stt',
+          error: e,
+        ),
+      );
       if (mounted) {
         setState(() {
           _onDeviceError = '$e';
@@ -2245,7 +2289,9 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     }
   }
 
-  Future<void> _downloadMissingOnDeviceResources(LocalizationProvider l10n) async {
+  Future<void> _downloadMissingOnDeviceResources(
+    LocalizationProvider l10n,
+  ) async {
     final runtimeConfig = KnownRuntimes.current();
     final modelConfig = _modelConfigForEngine(
       _settings.onDeviceEngine,
@@ -2298,6 +2344,12 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         },
       );
       await _checkOnDeviceStatus();
+      unawaited(
+        AppLog.info(
+          'Downloaded on-device runtime ${config.id}',
+          source: 'on_device_stt',
+        ),
+      );
     } on ResourceDownloadStopped catch (e) {
       if (mounted) {
         setState(() {
@@ -2307,6 +2359,13 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         });
       }
     } catch (e) {
+      unawaited(
+        AppLog.error(
+          'Failed to download on-device runtime ${config.id}',
+          source: 'on_device_stt',
+          error: e,
+        ),
+      );
       if (mounted) {
         setState(() {
           _onDeviceError = '$e';
@@ -2420,7 +2479,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     };
   }
 
-  OnDeviceModelConfig? _modelConfigForEngine(String engine, String whisperSize) {
+  OnDeviceModelConfig? _modelConfigForEngine(
+    String engine,
+    String whisperSize,
+  ) {
     return KnownModels.forEngine(engine, whisperSize: whisperSize);
   }
 }
@@ -2536,7 +2598,9 @@ class _ResourceStatusBlock extends StatelessWidget {
                     FilledButton.tonalIcon(
                       onPressed: onDownload,
                       icon: const Icon(Icons.download, size: 16),
-                      label: Text('${l10n.get('model_download')}$downloadLabelSuffix'),
+                      label: Text(
+                        '${l10n.get('model_download')}$downloadLabelSuffix',
+                      ),
                     ),
                   if (onDelete != null)
                     TextButton.icon(
@@ -2558,7 +2622,9 @@ class _ResourceStatusBlock extends StatelessWidget {
 
   String _downloadDetailText(LocalizationProvider l10n) {
     final percent = '${(progress * 100).clamp(0, 100).toStringAsFixed(0)}%';
-    final speedText = speed > 0 ? '${UpdateService.formatSize(speed.round())}/s' : '--';
+    final speedText = speed > 0
+        ? '${UpdateService.formatSize(speed.round())}/s'
+        : '--';
     final sourceText = source.isNotEmpty ? source : '--';
     return l10n.getp('download_progress_source_speed', {
       'percent': percent,
@@ -2567,7 +2633,6 @@ class _ResourceStatusBlock extends StatelessWidget {
     });
   }
 }
-
 
 class _SttModeCard extends StatelessWidget {
   const _SttModeCard({

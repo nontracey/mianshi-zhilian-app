@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/app_log_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
@@ -63,6 +64,11 @@ class _OnDeviceModelManagementPageState
         _loading = false;
       });
     } catch (e) {
+      await AppLog.error(
+        'Load on-device model management state failed',
+        source: 'model_management',
+        error: e,
+      );
       if (mounted) {
         setState(() {
           _loading = false;
@@ -205,6 +211,10 @@ class _OnDeviceModelManagementPageState
       } else {
         await ModelDownloader.deleteModel(entry.id);
       }
+      await AppLog.info(
+        'Deleted ${entry.type}: ${entry.id}',
+        source: 'model_management',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -218,6 +228,11 @@ class _OnDeviceModelManagementPageState
         _load();
       }
     } catch (e) {
+      await AppLog.error(
+        'Delete ${entry.type} failed: ${entry.id}',
+        source: 'model_management',
+        error: e,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${l10n.get('delete_failed_message')}: $e')),
@@ -248,8 +263,18 @@ class _OnDeviceModelManagementPageState
       try {
         await Directory(orphan.path).delete(recursive: true);
         cleaned++;
-      } catch (_) {}
+      } catch (e) {
+        await AppLog.warning(
+          'Clean orphan directory failed: ${orphan.name}',
+          source: 'model_management',
+          error: e,
+        );
+      }
     }
+    await AppLog.info(
+      'Cleaned orphan directories: $cleaned/${_orphanDirs.length}',
+      source: 'model_management',
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -291,9 +316,17 @@ class _OnDeviceModelManagementPageState
     );
 
     try {
+      await AppLog.info(
+        'Download started: ${entry.type} ${entry.id}',
+        source: 'model_management',
+      );
       if (entry.type == 'runtime') {
         final runtimeConfig = KnownRuntimes.current();
         if (runtimeConfig == null) {
+          await AppLog.error(
+            'Runtime download failed: no runtime config for platform',
+            source: 'model_management',
+          );
           if (mounted) Navigator.of(context).pop();
           // 不 throw，catch 里会二次 pop
           if (mounted) {
@@ -329,6 +362,10 @@ class _OnDeviceModelManagementPageState
         ];
         final match = allConfigs.where((c) => c.id == entry.id);
         if (match.isEmpty) {
+          await AppLog.error(
+            'Model download failed: unknown model ${entry.id}',
+            source: 'model_management',
+          );
           if (mounted) Navigator.of(context).pop();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -354,6 +391,10 @@ class _OnDeviceModelManagementPageState
         );
       }
 
+      await AppLog.info(
+        'Download completed: ${entry.type} ${entry.id}',
+        source: 'model_management',
+      );
       if (mounted) {
         Navigator.of(context).pop(); // 关掉进度对话框
         ScaffoldMessenger.of(context).showSnackBar(
@@ -362,6 +403,10 @@ class _OnDeviceModelManagementPageState
         _load();
       }
     } on ResourceDownloadStopped catch (_) {
+      await AppLog.info(
+        'Download paused: ${entry.type} ${entry.id}',
+        source: 'model_management',
+      );
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(
@@ -369,6 +414,11 @@ class _OnDeviceModelManagementPageState
         ).showSnackBar(SnackBar(content: Text(l10n.get('download_paused'))));
       }
     } catch (e) {
+      await AppLog.error(
+        'Download failed: ${entry.type} ${entry.id}',
+        source: 'model_management',
+        error: e,
+      );
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(

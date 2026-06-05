@@ -10,10 +10,7 @@ import 'on_device_stt_service.dart';
 /// 特点：需要 encoder + decoder 两个 onnx 文件，支持 tiny/base/small/medium 四种尺寸。
 /// 非流式，需要完整音频后统一转写。
 class WhisperOnnxEngine implements OnDeviceSttService {
-  WhisperOnnxEngine({
-    required this.modelDir,
-    this.modelSize = 'base',
-  });
+  WhisperOnnxEngine({required this.modelDir, this.modelSize = 'base'});
 
   final String modelDir;
   final String modelSize;
@@ -24,16 +21,21 @@ class WhisperOnnxEngine implements OnDeviceSttService {
 
   @override
   Future<void> initialize() async {
-    initBindings(await ModelDownloader.requireRuntimeLibraryDir());
+    await ModelDownloader.initSherpaOnnxBindings();
     _recognizer = OfflineRecognizer(_whisperOnnxConfig(modelDir));
     isInitialized = true;
   }
 
   @override
-  Future<OnDeviceSttResult> transcribe(Float32List samples, int sampleRate) async {
+  Future<OnDeviceSttResult> transcribe(
+    Float32List samples,
+    int sampleRate,
+  ) async {
     final r = _recognizer;
     if (r == null) {
-      throw StateError('WhisperOnnxEngine not initialized. Call initialize() first.');
+      throw StateError(
+        'WhisperOnnxEngine not initialized. Call initialize() first.',
+      );
     }
     final stream = r.createStream();
     try {

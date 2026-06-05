@@ -1,14 +1,22 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../models/ai_config.dart';
 import '../providers/ai_provider.dart';
 import '../providers/localization_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/app_log_service.dart';
 import '../services/on_device_stt/model_downloader.dart';
+import '../services/on_device_stt/on_device_stt_factory.dart';
+import '../utils/platform_file_reader.dart';
 
 enum _DiagStatus { checking, pass, fail }
 
@@ -20,12 +28,17 @@ class VoiceDiagnosticSheet extends StatefulWidget {
 }
 
 class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
+  final AudioRecorder _recorder = AudioRecorder();
+
   _DiagStatus _micStatus = _DiagStatus.checking;
   _DiagStatus _speechStatus = _DiagStatus.checking;
   _DiagStatus _modelStatus = _DiagStatus.checking;
+  _DiagStatus _transcribeStatus = _DiagStatus.checking;
   String _speechDetail = '';
   String _modelDetail = '';
+  String _transcribeDetail = '';
   bool _running = false;
+  bool _transcribeRunning = false;
 
   @override
   void initState() {
@@ -61,7 +74,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     if (mounted) setState(() {});
 
     // ── 本机模型检测（sherpa_onnx 模式）──
-    if (route.kind == _DiagRouteKind.sherpaOnnx || currentMode == 'sherpa_onnx') {
+    if (route.kind == _DiagRouteKind.sherpaOnnx ||
+        currentMode == 'sherpa_onnx') {
       final (ok, detail) = await _checkModelReady(settings);
       _modelStatus = ok ? _DiagStatus.pass : _DiagStatus.fail;
       _modelDetail = detail;
@@ -72,6 +86,12 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     if (mounted) setState(() {});
 
     if (mounted) setState(() => _running = false);
+  }
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
   }
 
   Future<bool> _checkMicPermission() async {
@@ -119,7 +139,208 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     }
   }
 
-  OnDeviceModelConfig? _modelConfigForEngine(String engine, String whisperSize) {
+  Future<void> _runTranscriptionTest() async {
+    if (_transcribeRunning) return;
+
+    final settings = context.read<SettingsProvider>().settings;
+    final aiProvider = context.read<AiProvider>();
+    final l10n = context.read<LocalizationProvider>();
+    final route = _resolveRoute(settings, aiProvider);
+
+    setState(() {
+      _transcribeRunning = true;
+      _transcribeStatus = _DiagStatus.checking;
+      _transcribeDetail = l10n.get('voice_live_transcription_speak_hint');
+    });
+
+    try {
+      final text = switch (route.kind) {
+        _DiagRouteKind.ai => await _testAiTranscription(route, aiProvider),
+        _DiagRouteKind.system => await _testSystemTranscription(),
+        _DiagRouteKind.sherpaOnnx => await _testSherpaOnnxTranscription(
+          settings,
+        ),
+      };
+      final cleaned = text.trim();
+      if (cleaned.isEmpty) {
+        _transcribeStatus = _DiagStatus.fail;
+        _transcribeDetail = l10n.get('voice_live_transcription_empty');
+        unawaited(
+          AppLog.warning(
+            'Voice diagnostic transcription returned empty text: '
+            '${route.kind.name}',
+            source: 'voice_diagnostic',
+          ),
+        );
+      } else {
+        _transcribeStatus = _DiagStatus.pass;
+        _transcribeDetail = cleaned;
+        unawaited(
+          AppLog.info(
+            'Voice diagnostic transcription succeeded: ${route.kind.name}',
+            source: 'voice_diagnostic',
+          ),
+        );
+      }
+    } catch (e) {
+      _transcribeStatus = _DiagStatus.fail;
+      _transcribeDetail = '$e';
+      unawaited(
+        AppLog.error(
+          'Voice diagnostic transcription failed: ${route.kind.name}',
+          source: 'voice_diagnostic',
+          error: e,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _transcribeRunning = false);
+      }
+    }
+  }
+
+  Future<String> _testAiTranscription(
+    _DiagRoute route,
+    AiProvider aiProvider,
+  ) async {
+    final config = route.aiConfig;
+    if (config == null) {
+      throw StateError('No AI transcription config resolved');
+    }
+    final audioBytes = await _recordDiagnosticWav();
+    return aiProvider.transcribeAudio(config: config, audioBytes: audioBytes);
+  }
+
+  Future<String> _testSystemTranscription() async {
+    if (!kIsWeb) {
+      final status = await Permission.speech.status;
+      if (!status.isGranted && !status.isLimited) {
+        final requested = await Permission.speech.request();
+        if (!requested.isGranted && !requested.isLimited) {
+          throw StateError('Speech recognition permission denied');
+        }
+      }
+    }
+    final speech = stt.SpeechToText();
+    final completer = Completer<String>();
+    var latest = '';
+    final available = await speech.initialize(
+      onStatus: (status) {
+        if ((status == 'done' || status == 'notListening') &&
+            !completer.isCompleted) {
+          completer.complete(latest);
+        }
+      },
+      onError: (error) {
+        if (!completer.isCompleted) {
+          completer.completeError(error.errorMsg);
+        }
+      },
+    );
+    if (!available) {
+      throw StateError('initialize() returned false');
+    }
+    await speech.listen(
+      onResult: (result) {
+        latest = result.recognizedWords;
+        if (result.finalResult && !completer.isCompleted) {
+          completer.complete(latest);
+        }
+      },
+      listenOptions: stt.SpeechListenOptions(
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: true,
+        localeId: 'zh_CN',
+      ),
+    );
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => latest,
+      );
+    } finally {
+      await speech.stop();
+    }
+  }
+
+  Future<String> _testSherpaOnnxTranscription(dynamic settings) async {
+    if (kIsWeb) {
+      throw UnsupportedError('On-device STT is not supported on web');
+    }
+    final engine = settings.onDeviceEngine as String? ?? 'sense_voice';
+    final whisperSize = settings.whisperModel as String? ?? 'base';
+    final config = _modelConfigForEngine(engine, whisperSize);
+    if (config == null) {
+      throw StateError('Unknown engine: $engine');
+    }
+    final ready = await ModelDownloader.isOnDeviceReady(config);
+    if (!ready) {
+      throw StateError('Runtime or model not downloaded');
+    }
+    final modelDir = await ModelDownloader.getModelDir(config.id);
+    final audioBytes = await _recordDiagnosticWav();
+    final samples = _wavBytesToFloat32List(audioBytes);
+    if (samples == null || samples.isEmpty) {
+      throw StateError('Recorded WAV has no PCM samples');
+    }
+
+    final service = createOnDeviceSttService(
+      engine: engine,
+      modelDir: modelDir.path,
+      whisperModelSize: whisperSize,
+    );
+    try {
+      await service.initialize();
+      final result = await service.transcribe(samples, 16000);
+      return result.text;
+    } finally {
+      await service.dispose();
+    }
+  }
+
+  Future<Uint8List> _recordDiagnosticWav() async {
+    if (kIsWeb) {
+      throw UnsupportedError('Recording diagnostic is not supported on web');
+    }
+    final tempDir = await getTemporaryDirectory();
+    final chunkPath =
+        '${tempDir.path}/voice_diag_${DateTime.now().millisecondsSinceEpoch}.wav';
+    await _recorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: chunkPath,
+    );
+    await Future.delayed(const Duration(seconds: 3));
+    final path = await _recorder.stop();
+    if (path == null || path.isEmpty) {
+      throw StateError('Recorder returned empty path');
+    }
+    final bytes = await readBytesFromPath(path);
+    unawaited(deleteFileAtPath(path));
+    return bytes;
+  }
+
+  Float32List? _wavBytesToFloat32List(Uint8List bytes) {
+    if (bytes.length < 44) return null;
+    final dataSize = bytes.length - 44;
+    if (dataSize < 2) return null;
+    final sampleCount = dataSize ~/ 2;
+    final result = Float32List(sampleCount);
+    for (var i = 0; i < sampleCount; i++) {
+      final offset = 44 + i * 2;
+      final sample = (bytes[offset] | (bytes[offset + 1] << 8)).toSigned(16);
+      result[i] = sample / 32768.0;
+    }
+    return result;
+  }
+
+  OnDeviceModelConfig? _modelConfigForEngine(
+    String engine,
+    String whisperSize,
+  ) {
     return KnownModels.forEngine(engine, whisperSize: whisperSize);
   }
 
@@ -245,7 +466,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
               ),
 
             // 本机模型检测诊断（仅 sherpa_onnx 模式）
-            if (route.kind == _DiagRouteKind.sherpaOnnx || currentMode == 'sherpa_onnx')
+            if (route.kind == _DiagRouteKind.sherpaOnnx ||
+                currentMode == 'sherpa_onnx')
               _DiagRow(
                 icon: _iconFor(_modelStatus),
                 color: _colorFor(_modelStatus),
@@ -264,6 +486,28 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 detail: _modelDetail.isNotEmpty ? _modelDetail : null,
               ),
 
+            _DiagRow(
+              icon: _iconFor(_transcribeStatus),
+              color: _colorFor(_transcribeStatus),
+              label: l10n.get('voice_live_transcription_test'),
+              trailing: Text(
+                _transcribeRunning
+                    ? l10n.get('stt_testing')
+                    : (_transcribeStatus == _DiagStatus.pass
+                          ? l10n.get('stt_available')
+                          : (_transcribeDetail.isEmpty
+                                ? l10n.get('capability_test_untested')
+                                : l10n.get('stt_unavailable'))),
+                style: TextStyle(
+                  color: _transcribeDetail.isEmpty && !_transcribeRunning
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : _colorFor(_transcribeStatus),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              detail: _transcribeDetail.isNotEmpty ? _transcribeDetail : null,
+            ),
+
             const SizedBox(height: 20),
 
             // 提示信息
@@ -278,7 +522,8 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                   ),
                 ),
               ),
-            if (_modelStatus == _DiagStatus.fail && currentMode == 'sherpa_onnx')
+            if (_modelStatus == _DiagStatus.fail &&
+                currentMode == 'sherpa_onnx')
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
@@ -294,7 +539,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _running
+                onPressed: (_running || _transcribeRunning)
                     ? null
                     : () {
                         setState(() {
@@ -316,6 +561,23 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
                 label: Text(
                   _running ? l10n.get('stt_testing') : l10n.get('refresh'),
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_running || _transcribeRunning)
+                    ? null
+                    : _runTranscriptionTest,
+                icon: _transcribeRunning
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.mic),
+                label: Text(l10n.get('voice_live_transcription_test')),
               ),
             ),
           ],
@@ -354,6 +616,7 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
       return _DiagRoute(
         _DiagRouteKind.ai,
         '${audioConfig.name} · ${audioConfig.model}',
+        audioConfig,
       );
     }
 
@@ -414,10 +677,11 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
 enum _DiagRouteKind { ai, system, sherpaOnnx }
 
 class _DiagRoute {
-  const _DiagRoute(this.kind, [this.detail]);
+  const _DiagRoute(this.kind, [this.detail, this.aiConfig]);
 
   final _DiagRouteKind kind;
   final String? detail;
+  final AiConfig? aiConfig;
 }
 
 class _DiagRow extends StatelessWidget {

@@ -12,6 +12,7 @@ import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/app_log_service.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_factory.dart';
@@ -273,7 +274,14 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       await Future.delayed(duration);
       final path = await _recorder.stop();
       return (path != null && path.isNotEmpty) ? path : null;
-    } catch (_) {
+    } catch (e) {
+      unawaited(
+        AppLog.warning(
+          'Voice chunk recording failed',
+          source: 'voice',
+          error: e,
+        ),
+      );
       return null;
     }
   }
@@ -359,6 +367,13 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         } catch (e) {
           // 单段转录失败不影响连续录音
           debugPrint('sherpa_onnx chunk transcribe failed: $e');
+          unawaited(
+            AppLog.warning(
+              'On-device voice chunk transcription failed',
+              source: 'voice',
+              error: e,
+            ),
+          );
         }
 
         if (_running) _setStateKind(VoiceInputState.recording);
@@ -393,7 +408,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     return result;
   }
 
-  OnDeviceModelConfig? _sherpaOnnxModelConfig(String engine, String whisperModel) {
+  OnDeviceModelConfig? _sherpaOnnxModelConfig(
+    String engine,
+    String whisperModel,
+  ) {
     return KnownModels.forEngine(engine, whisperSize: whisperModel);
   }
 
@@ -474,6 +492,13 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _running = false;
     _setStateKind(VoiceInputState.error);
     widget.onError?.call(messageKey);
+    unawaited(
+      AppLog.warning(
+        'Voice input error: $messageKey',
+        source: 'voice',
+        error: error,
+      ),
+    );
     if (mounted) {
       final l10n = context.read<LocalizationProvider>();
       final message = error == null
@@ -582,7 +607,12 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 enum _VoiceProviderKind { ai, system, sherpaOnnx, none }
 
 class _ResolvedVoiceProvider {
-  const _ResolvedVoiceProvider._(this.kind, this.config, this.engine, this.whisperModel);
+  const _ResolvedVoiceProvider._(
+    this.kind,
+    this.config,
+    this.engine,
+    this.whisperModel,
+  );
   const _ResolvedVoiceProvider.ai(AiConfig config)
     : this._(_VoiceProviderKind.ai, config, null, null);
   const _ResolvedVoiceProvider.system()

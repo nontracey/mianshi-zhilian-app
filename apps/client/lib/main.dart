@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +19,7 @@ import 'providers/settings_provider.dart';
 import 'services/content_api_service.dart';
 import 'services/ai_service.dart';
 import 'services/analytics_service.dart';
+import 'services/app_log_service.dart';
 import 'services/data_sync_service.dart';
 import 'services/endpoint_fallback_client.dart';
 import 'services/route_state_store.dart';
@@ -36,6 +40,38 @@ import 'widgets/header_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLogService.instance.initialize();
+  final originalDebugPrint = debugPrint;
+  debugPrint = (String? message, {int? wrapWidth}) {
+    originalDebugPrint(message, wrapWidth: wrapWidth);
+    final text = message;
+    if (text != null && text.trim().isNotEmpty) {
+      unawaited(AppLog.debug(text, source: 'debugPrint'));
+    }
+  };
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(
+      AppLog.error(
+        details.exceptionAsString(),
+        source: 'flutter',
+        error: details.exception,
+        stackTrace: details.stack,
+      ),
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    unawaited(
+      AppLog.error(
+        'Uncaught platform error',
+        source: 'platform',
+        error: error,
+        stackTrace: stack,
+      ),
+    );
+    return false;
+  };
+
   final storage = StorageService();
   final routeClient = EndpointFallbackClient(
     stateStore: RouteStateStore(storage),

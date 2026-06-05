@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/user_progress.dart';
+import 'app_log_service.dart';
 import 'storage_service.dart';
 
 class DataSyncService {
@@ -92,6 +93,13 @@ class DataSyncService {
       return SyncResult.success('sync_success');
     } catch (e) {
       debugPrint('Data sync failed: $e');
+      unawaited(
+        AppLog.warning(
+          'Data sync failed: ${settings.method}',
+          source: 'data_sync',
+          error: e,
+        ),
+      );
       await _storage.saveSyncSettings(
         settings.copyWith(lastSyncStatus: 'sync_failed'),
       );
@@ -132,6 +140,13 @@ class DataSyncService {
       );
     } catch (e) {
       debugPrint('Data sync pull failed: $e');
+      unawaited(
+        AppLog.warning(
+          'Data sync pull failed: ${settings.method}',
+          source: 'data_sync',
+          error: e,
+        ),
+      );
       await _storage.saveSyncSettings(
         settings.copyWith(lastSyncStatus: 'sync_failed'),
       );
@@ -167,6 +182,13 @@ class DataSyncService {
       await onDataImported?.call();
       return SyncResult.success('sync_restore_complete');
     } catch (e) {
+      unawaited(
+        AppLog.error(
+          'Data sync restore failed: ${settings.method}',
+          source: 'data_sync',
+          error: e,
+        ),
+      );
       return SyncResult.failure('restore_error', {'error': '$e'});
     }
   }
@@ -181,6 +203,13 @@ class DataSyncService {
       await channel.testConnection();
       return SyncResult.success('connection_success');
     } catch (e) {
+      unawaited(
+        AppLog.warning(
+          'Data sync connection test failed: ${settings.method}',
+          source: 'data_sync',
+          error: e,
+        ),
+      );
       return SyncResult.failure('connection_failed_with_error', {
         'error': '$e',
       });

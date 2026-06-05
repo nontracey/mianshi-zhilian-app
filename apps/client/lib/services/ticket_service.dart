@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/ticket.dart';
 import 'api_headers.dart';
+import 'app_log_service.dart';
 import 'endpoint_fallback_client.dart';
 import 'route_resolver.dart';
 import 'route_state_store.dart';
@@ -102,6 +104,13 @@ class TicketService {
         }
       } catch (e) {
         debugPrint('Failed to sync ticket: $e');
+        unawaited(
+          AppLog.warning(
+            'Ticket sync failed: $type',
+            source: 'ticket',
+            error: e,
+          ),
+        );
       }
     }
 
@@ -131,6 +140,9 @@ class TicketService {
         }
       } catch (e) {
         debugPrint('Failed to fetch tickets: $e');
+        unawaited(
+          AppLog.warning('Fetch tickets failed', source: 'ticket', error: e),
+        );
       }
     }
     return getLocalTickets();

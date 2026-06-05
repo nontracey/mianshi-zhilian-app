@@ -448,6 +448,9 @@ class L10n {
     'voice_stop_recording': '停止录音',
     'voice_web_unsupported': 'Web 端暂不支持本机语音录音',
     'voice_diagnostic_title': '语音诊断',
+    'voice_live_transcription_test': '实际转写测试',
+    'voice_live_transcription_speak_hint': '请说一句话，正在录音测试...',
+    'voice_live_transcription_empty': '没有识别到清晰语音，请靠近麦克风再试一次',
     'stt_testing': '正在检测...',
     'stt_available': '可用',
     'stt_unavailable': '不可用',
@@ -1487,10 +1490,12 @@ class L10n {
     'on_device_engine_whisper': 'Whisper（高精度英文/多语言）',
     'on_device_engine_paraformer': 'Paraformer（流式中文）',
     'on_device_engine_sense_voice_hint': '中/英/日/韩/粤多语言，约 41MB，支持情感标签，速度和准确率均衡。',
-    'on_device_engine_whisper_hint': '高精度多语言，支持 tiny/base/small/medium 四种型号，大模型准确率高但速度慢。',
+    'on_device_engine_whisper_hint':
+        '高精度多语言，支持 tiny/base/small/medium 四种型号，大模型准确率高但速度慢。',
     'on_device_engine_paraformer_hint': '纯中文流式，约 41MB，边录边识别，适合中文面试练习。',
     'on_device_engine_unknown': '未知的本机引擎类型',
-    'on_device_model_not_downloaded': '本机 STT 需要 ONNX Runtime 和模型都已下载，请先到设置页面下载所需资源。',
+    'on_device_model_not_downloaded':
+        '本机 STT 需要 ONNX Runtime 和模型都已下载，请先到设置页面下载所需资源。',
     'on_device_stt_init_failed': '本机 STT 模型初始化失败',
     'whisper_model_tiny': 'Tiny（~78 MB）',
     'whisper_model_tiny_hint': '约 78MB，速度最快但中文准确率低',
@@ -1521,7 +1526,8 @@ class L10n {
     'pause_download': '暂停',
     'download_paused': '下载已暂停，可再次点击下载继续',
     'confirm_delete_runtime_title': '确认删除 ONNX Runtime',
-    'confirm_delete_runtime_desc': '确定要删除已下载的 ONNX Runtime 吗？删除后本机 STT 模型将无法使用，直到重新下载运行时。',
+    'confirm_delete_runtime_desc':
+        '确定要删除已下载的 ONNX Runtime 吗？删除后本机 STT 模型将无法使用，直到重新下载运行时。',
     'on_device_model_management': '模型管理',
     'model_management_all_models': '所有模型',
     'model_management_others_runtime': '运行时',
@@ -1980,6 +1986,11 @@ class L10n {
     'voice_web_unsupported':
         'On-device voice recording is not supported on Web',
     'voice_diagnostic_title': 'Voice Diagnostic',
+    'voice_live_transcription_test': 'Live transcription test',
+    'voice_live_transcription_speak_hint':
+        'Say one sentence. Recording a short test...',
+    'voice_live_transcription_empty':
+        'No clear speech was recognized. Move closer to the microphone and try again.',
     'stt_testing': 'Testing...',
     'stt_available': 'Available',
     'stt_unavailable': 'Unavailable',
@@ -3204,7 +3215,8 @@ class L10n {
     'whisper_model_tiny': 'Tiny (~78 MB)',
     'whisper_model_tiny_hint': '~78MB, fastest speed but low Chinese accuracy',
     'whisper_model_base': 'Base (~150 MB)',
-    'whisper_model_base_hint': '~150MB, balanced speed and accuracy, recommended',
+    'whisper_model_base_hint':
+        '~150MB, balanced speed and accuracy, recommended',
     'whisper_model_small': 'Small (~490 MB)',
     'whisper_model_small_hint': '~490MB, good accuracy but slower',
     'whisper_model_medium': 'Medium (~1.5 GB)',
@@ -3246,7 +3258,8 @@ class L10n {
     'runtime_deleted_success': 'Runtime deleted',
     'delete_failed_message': 'Delete failed',
     'clean_orphan_dirs': 'Clean Orphaned Directories',
-    'clean_orphan_dirs_desc': 'Clean up residual directories from failed downloads or deleted models',
+    'clean_orphan_dirs_desc':
+        'Clean up residual directories from failed downloads or deleted models',
     'orphan_dirs_cleaned': 'Cleaned {count} orphaned directories',
   };
 

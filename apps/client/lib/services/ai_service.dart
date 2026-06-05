@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../l10n/l10n.dart';
 import '../models/ai_config.dart';
+import 'app_log_service.dart';
 
 class AiTestResult {
   final bool success;
@@ -61,6 +62,12 @@ class AiService {
       return _parseEvaluationResult(content);
     }
 
+    _logAiFailure(
+      config,
+      'evaluate_answer',
+      statusCode: response.statusCode,
+      detail: response.body,
+    );
     throw AiServiceException.fromResponse(response.statusCode, response.body);
   }
 
@@ -99,6 +106,12 @@ class AiService {
       final response = await client.send(request);
       if (response.statusCode != 200) {
         final body = await response.stream.bytesToString();
+        _logAiFailure(
+          config,
+          'evaluate_answer_stream',
+          statusCode: response.statusCode,
+          detail: body,
+        );
         throw AiServiceException.fromResponse(response.statusCode, body);
       }
 
@@ -134,6 +147,12 @@ class AiService {
           messageKey: 'connection_success',
         );
       }
+      _logAiFailure(
+        config,
+        'test_text_connection',
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
       final exception = AiServiceException.fromResponse(
         response.statusCode,
         response.body,
@@ -144,9 +163,25 @@ class AiService {
         detail: exception.safeDetail,
         statusCode: exception.statusCode,
       );
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      unawaited(
+        AppLog.warning(
+          'AI text connection test timeout: ${_baseHost(config)} '
+          'model=${config.model}',
+          source: 'ai',
+          error: e,
+        ),
+      );
       return const AiTestResult(success: false, messageKey: 'ai_test_timeout');
     } catch (e) {
+      unawaited(
+        AppLog.warning(
+          'AI text connection test failed: ${_baseHost(config)} '
+          'model=${config.model}',
+          source: 'ai',
+          error: e,
+        ),
+      );
       return AiTestResult(
         success: false,
         messageKey: 'ai_test_network_error',
@@ -182,9 +217,25 @@ class AiService {
         detail: e.safeDetail,
         statusCode: e.statusCode,
       );
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      unawaited(
+        AppLog.warning(
+          'AI audio connection test timeout: ${_baseHost(config)} '
+          'model=${config.model} mode=${config.audioMode.name}',
+          source: 'ai',
+          error: e,
+        ),
+      );
       return const AiTestResult(success: false, messageKey: 'ai_test_timeout');
     } catch (e) {
+      unawaited(
+        AppLog.warning(
+          'AI audio connection test failed: ${_baseHost(config)} '
+          'model=${config.model} mode=${config.audioMode.name}',
+          source: 'ai',
+          error: e,
+        ),
+      );
       return AiTestResult(
         success: false,
         messageKey: 'ai_test_network_error',
@@ -247,6 +298,12 @@ class AiService {
       final response = await client.send(request);
       if (response.statusCode != 200) {
         final body = await response.stream.bytesToString();
+        _logAiFailure(
+          config,
+          'send_message_stream',
+          statusCode: response.statusCode,
+          detail: body,
+        );
         throw AiServiceException.fromResponse(response.statusCode, body);
       }
 
@@ -280,6 +337,12 @@ class AiService {
           .timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode != 200) {
+        _logAiFailure(
+          config,
+          'transcribe_endpoint',
+          statusCode: response.statusCode,
+          detail: response.body,
+        );
         throw AiServiceException.fromResponse(
           response.statusCode,
           response.body,
@@ -331,6 +394,12 @@ class AiService {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) {
+      _logAiFailure(
+        config,
+        'transcribe_chat_audio',
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
       throw AiServiceException.fromResponse(response.statusCode, response.body);
     }
     final body = json.decode(response.body) as Map<String, dynamic>;
@@ -524,6 +593,34 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
   static String _safeErrorDetail(Object error) {
     final text = error.toString();
     return text.length > 160 ? '${text.substring(0, 160)}...' : text;
+  }
+
+  static void _logAiFailure(
+    AiConfig config,
+    String operation, {
+    required int statusCode,
+    required String detail,
+  }) {
+    unawaited(
+      AppLog.warning(
+        'AI $operation failed: HTTP $statusCode ${_baseHost(config)} '
+        'model=${config.model} audioMode=${config.audioMode.name}',
+        source: 'ai',
+        error: _safeBodyDetail(detail),
+      ),
+    );
+  }
+
+  static String _baseHost(AiConfig config) {
+    final uri = Uri.tryParse(config.baseUrl);
+    return uri?.host.isNotEmpty == true ? uri!.host : 'custom_endpoint';
+  }
+
+  static String _safeBodyDetail(String body) {
+    if (body.isEmpty) return '';
+    final detail = AiServiceException._extractSafeDetail(body);
+    if (detail.isNotEmpty) return detail;
+    return body.length > 240 ? '${body.substring(0, 240)}...' : body;
   }
 }
 

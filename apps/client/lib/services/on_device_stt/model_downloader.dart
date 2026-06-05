@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart';
 
+import '../app_log_service.dart';
 import '../route_resolver.dart';
 import 'runtime_platform.dart';
 
@@ -399,6 +402,54 @@ class ModelDownloader {
     if (runtimeConfig == null) return false;
     return await isRuntimeReady(runtimeConfig) &&
         await isModelReady(modelConfig);
+  }
+
+  static Future<void> initSherpaOnnxBindings() async {
+    final runtimeDir = await requireRuntimeLibraryDir();
+    unawaited(
+      AppLog.info(
+        'Initializing sherpa-onnx runtime from $runtimeDir',
+        source: 'on_device_stt',
+      ),
+    );
+
+    // Android dlopen of an absolute-path library does not reliably resolve its
+    // transitive dependencies from that same downloaded directory. Preload the
+    // dependency chain in order, then let sherpa_onnx open the c-api library.
+    try {
+      if (Platform.isAndroid) {
+        final onnxRuntime = File('$runtimeDir/libonnxruntime.so');
+        final cxxApi = File('$runtimeDir/libsherpa-onnx-cxx-api.so');
+        if (await onnxRuntime.exists()) {
+          unawaited(
+            AppLog.debug(
+              'Preloading ${onnxRuntime.path}',
+              source: 'on_device_stt',
+            ),
+          );
+          DynamicLibrary.open(onnxRuntime.path);
+        }
+        if (await cxxApi.exists()) {
+          unawaited(
+            AppLog.debug('Preloading ${cxxApi.path}', source: 'on_device_stt'),
+          );
+          DynamicLibrary.open(cxxApi.path);
+        }
+      }
+
+      initBindings(runtimeDir);
+    } catch (e) {
+      unawaited(
+        AppLog.error(
+          'Failed to load sherpa-onnx runtime from $runtimeDir',
+          source: 'on_device_stt',
+          error: e,
+        ),
+      );
+      throw StateError(
+        'Failed to load sherpa-onnx runtime from $runtimeDir: $e',
+      );
+    }
   }
 
   static Future<String?> getRuntimeLibraryDir(

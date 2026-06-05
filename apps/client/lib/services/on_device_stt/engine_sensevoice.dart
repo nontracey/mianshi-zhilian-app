@@ -21,16 +21,21 @@ class SenseVoiceEngine implements OnDeviceSttService {
 
   @override
   Future<void> initialize() async {
-    initBindings(await ModelDownloader.requireRuntimeLibraryDir());
+    await ModelDownloader.initSherpaOnnxBindings();
     _recognizer = OfflineRecognizer(_senseVoiceConfig(modelDir, language));
     isInitialized = true;
   }
 
   @override
-  Future<OnDeviceSttResult> transcribe(Float32List samples, int sampleRate) async {
+  Future<OnDeviceSttResult> transcribe(
+    Float32List samples,
+    int sampleRate,
+  ) async {
     final r = _recognizer;
     if (r == null) {
-      throw StateError('SenseVoiceEngine not initialized. Call initialize() first.');
+      throw StateError(
+        'SenseVoiceEngine not initialized. Call initialize() first.',
+      );
     }
     final stream = r.createStream();
     try {
