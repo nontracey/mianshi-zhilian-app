@@ -305,6 +305,8 @@ class StorageService {
   ) async {
     final prefs = await _instance;
     final deviceId = await getOrCreateDeviceId();
+    final appSettings = await loadSettings();
+    final contentVersion = await _loadContentVersionSnapshot(appSettings);
     final data = <String, dynamic>{};
 
     for (final key in _syncKeys) {
@@ -334,9 +336,26 @@ class StorageService {
       'app': 'mianshi-zhilian',
       'updatedAt': DateTime.now().toIso8601String(),
       'deviceId': deviceId,
+      'contentEnv': appSettings.contentEnv.key,
+      'contentVersion': ?contentVersion,
       'data': data,
     }, syncSettings);
   }
+
+  Future<String?> _loadContentVersionSnapshot(AppSettings settings) async {
+    final version = await load(
+      _contentCacheKey(settings.contentBaseUrl, 'content_version'),
+    );
+    return version is String && version.isNotEmpty ? version : null;
+  }
+
+  String _contentCacheKey(String baseUrl, String key) =>
+      'content_cache_${_contentCacheScope(baseUrl)}_$key';
+
+  String _contentCacheScope(String baseUrl) => baseUrl
+      .replaceAll(RegExp(r'^https?://'), '')
+      .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
 
   /// 对同步快照应用当前隐私策略。远端已有历史数据参与合并后也要再过一遍，
   /// 避免旧快照中的完整回答被当前设备继续上传。
@@ -487,7 +506,18 @@ class StorageService {
   }
 
   Future<void> recordAnalyticsFeature(String feature) async {
-    const allowed = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
+    const allowed = {
+      'ai_eval',
+      'ai_eval_success',
+      'ai_eval_failed',
+      'content_load_failed',
+      'manual_sync',
+      'sync_success',
+      'sync_failed',
+      'ticket_submit',
+      'login',
+      'update_check',
+    };
     if (!allowed.contains(feature)) return;
     await incrementAnalyticsNestedCounter('feature_counts', feature);
   }

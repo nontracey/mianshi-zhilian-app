@@ -196,9 +196,16 @@ class ProgressProvider extends ChangeNotifier {
 
     switch (strategy) {
       case 'smart':
+        final availableTopicIds = domainTopics.map((t) => t.id).toSet();
+        final prerequisiteDemand = _prerequisiteDemand(
+          domainTopics,
+          availableTopicIds,
+        );
         result.sort((a, b) {
           final scoreA = _recommendationScore(
             a,
+            availableTopicIds: availableTopicIds,
+            prerequisiteDemand: prerequisiteDemand[a.id] ?? 0,
             lowScoreWeight: lowScoreWeight,
             overdueWeight: overdueWeight,
             highFrequencyWeight: highFrequencyWeight,
@@ -209,6 +216,8 @@ class ProgressProvider extends ChangeNotifier {
           );
           final scoreB = _recommendationScore(
             b,
+            availableTopicIds: availableTopicIds,
+            prerequisiteDemand: prerequisiteDemand[b.id] ?? 0,
             lowScoreWeight: lowScoreWeight,
             overdueWeight: overdueWeight,
             highFrequencyWeight: highFrequencyWeight,
@@ -256,6 +265,8 @@ class ProgressProvider extends ChangeNotifier {
 
   int _recommendationScore(
     Topic topic, {
+    required Set<String> availableTopicIds,
+    required int prerequisiteDemand,
     required int lowScoreWeight,
     required int overdueWeight,
     required int highFrequencyWeight,
@@ -276,13 +287,48 @@ class ProgressProvider extends ChangeNotifier {
     final notPracticedPart = progress == null ? 100 * notPracticedWeight : 0;
     final lowFrequencyPenalty =
         !allowSkipLowFrequency && topic.interviewFrequency == 'low' ? 500 : 0;
+    final unreadyPrerequisitePenalty = prioritizePrerequisites
+        ? _unreadyPrerequisiteCount(topic, availableTopicIds) * 2500
+        : 0;
+    final prerequisiteDemandBoost = prioritizePrerequisites
+        ? prerequisiteDemand * 150
+        : 0;
     return lowScorePart +
         overduePart +
         highFrequencyPart +
         pathPart +
         notPracticedPart -
-        lowFrequencyPenalty;
+        lowFrequencyPenalty -
+        unreadyPrerequisitePenalty +
+        prerequisiteDemandBoost;
   }
+
+  Map<String, int> _prerequisiteDemand(
+    List<Topic> topics,
+    Set<String> availableTopicIds,
+  ) {
+    final result = <String, int>{};
+    for (final topic in topics) {
+      for (final prerequisiteId in topic.prerequisites) {
+        if (!availableTopicIds.contains(prerequisiteId)) continue;
+        if (_isPrerequisiteReady(prerequisiteId)) continue;
+        result[prerequisiteId] = (result[prerequisiteId] ?? 0) + 1;
+      }
+    }
+    return result;
+  }
+
+  int _unreadyPrerequisiteCount(Topic topic, Set<String> availableTopicIds) {
+    var count = 0;
+    for (final prerequisiteId in topic.prerequisites) {
+      if (!availableTopicIds.contains(prerequisiteId)) continue;
+      if (!_isPrerequisiteReady(prerequisiteId)) count++;
+    }
+    return count;
+  }
+
+  bool _isPrerequisiteReady(String topicId) =>
+      (_progressMap[topicId]?.score ?? 0) >= 60;
 
   bool _isReviewDue(TopicProgress? progress) {
     if (progress?.nextReviewAt == null) return false;

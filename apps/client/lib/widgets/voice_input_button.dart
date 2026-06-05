@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -19,7 +20,14 @@ import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_factory.dar
 import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_service.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 
-enum VoiceInputState { idle, recording, transcribing, stopping, error }
+enum VoiceInputState {
+  idle,
+  preparing,
+  recording,
+  transcribing,
+  stopping,
+  error,
+}
 
 class VoiceInputButton extends StatefulWidget {
   const VoiceInputButton({
@@ -50,25 +58,40 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   final AudioRecorder _recorder = AudioRecorder();
 
   VoiceInputState _state = VoiceInputState.idle;
+  VoiceInputState _lastNotifiedState = VoiceInputState.idle;
   bool _systemAvailable = false;
   bool _running = false;
+  bool _producerRunning = false;
+  bool _consumerRunning = false;
+  bool _finishAfterQueue = false;
+  int _sessionId = 0;
   String _lastSystemText = '';
   String _previewText = '';
   String? _statusMessageKey;
   OnDeviceSttService? _sherpaOnnxService;
+  String? _sherpaOnnxServiceKey;
+  Timer? _sherpaIdleDisposeTimer;
+  _VoiceProviderKind? _activeProviderKind;
+  final Queue<_VoiceChunkJob> _chunkQueue = Queue<_VoiceChunkJob>();
 
   /// 当前活跃的 AI 配置名（用于转写时显示模型信息）
   String? _activeConfigLabel;
   bool get _isActive =>
+      _state == VoiceInputState.preparing ||
       _state == VoiceInputState.recording ||
       _state == VoiceInputState.transcribing ||
       _state == VoiceInputState.stopping;
 
   void _setStateKind(VoiceInputState state) {
-    if (!mounted) return;
-    setState(() => _state = state);
-    widget.onListeningChanged?.call(_isActive);
-    widget.onStateChanged?.call(state);
+    if (_state == state) return;
+    final wasActive = _isActive;
+    if (mounted) setState(() => _state = state);
+    final isActive = _isActive;
+    if (wasActive != isActive) widget.onListeningChanged?.call(isActive);
+    if (_lastNotifiedState != state) {
+      _lastNotifiedState = state;
+      widget.onStateChanged?.call(state);
+    }
   }
 
   Future<void> _toggleListening() async {
@@ -83,25 +106,33 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final aiProvider = context.read<AiProvider>();
     final settings = context.read<SettingsProvider>().settings;
     final provider = _resolveProvider(settings, aiProvider);
+    final sessionId = ++_sessionId;
 
     _running = true;
+    _finishAfterQueue = false;
+    _producerRunning = false;
+    _consumerRunning = false;
+    _activeProviderKind = provider.kind;
+    _discardQueuedChunks();
     _lastSystemText = '';
     _previewText = '';
-    _statusMessageKey = null;
     _activeConfigLabel = null;
+    _setStatusMessage('voice_preparing');
+    _setStateKind(VoiceInputState.preparing);
 
     switch (provider.kind) {
       case _VoiceProviderKind.ai:
-        await _startAiStreaming(provider.config!);
+        await _startAiStreaming(sessionId, aiProvider, provider.config!);
         break;
       case _VoiceProviderKind.system:
-        await _startSystemListening();
+        await _startSystemListening(sessionId);
         break;
       case _VoiceProviderKind.sherpaOnnx:
         final engine = provider.engine;
         final whisperModel = provider.whisperModel;
         if (engine == null || whisperModel == null) break;
         await _startSherpaOnnxListening(
+          sessionId: sessionId,
           engine: engine,
           whisperModel: whisperModel,
         );
@@ -167,11 +198,12 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     return const _ResolvedVoiceProvider.none();
   }
 
-  Future<void> _startSystemListening() async {
+  Future<void> _startSystemListening(int sessionId) async {
     if (!await AppPermissionService.ensureSpeechRecognition(context)) {
       _resetStartFailure();
       return;
     }
+    if (!_isCurrentRecordingSession(sessionId)) return;
     if (!_systemAvailable) {
       _systemAvailable = await _speech.initialize(
         onStatus: (status) {
@@ -186,6 +218,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         },
       );
     }
+    if (!_isCurrentRecordingSession(sessionId)) return;
     if (!_systemAvailable) {
       _resetStartFailure();
       _showError('system_speech_unsupported');
@@ -209,7 +242,11 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     );
   }
 
-  Future<void> _startAiStreaming(AiConfig config) async {
+  Future<void> _startAiStreaming(
+    int sessionId,
+    AiProvider aiProvider,
+    AiConfig config,
+  ) async {
     if (kIsWeb) {
       _resetStartFailure();
       _showError('voice_web_unsupported');
@@ -219,43 +256,47 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       _resetStartFailure();
       return;
     }
+    if (!_isCurrentRecordingSession(sessionId)) return;
     _activeConfigLabel = '${config.name} · ${config.model}';
     _setStateKind(VoiceInputState.recording);
     _setStatusMessage('voice_recording_hint');
-    unawaited(_runAiChunkLoop(config));
+    _producerRunning = true;
+    unawaited(_runAiChunkLoop(sessionId, aiProvider, config));
   }
 
   /// 生产者循环：不间断录制音频块，每块转写异步派发不阻塞收音。
-  Future<void> _runAiChunkLoop(AiConfig config) async {
-    final aiProvider = context.read<AiProvider>();
-    try {
-      while (_running) {
-        _setStateKind(VoiceInputState.recording);
-        _setStatusMessage('voice_recording_hint');
-        final chunkPath = await _recordVadChunk();
-        if (chunkPath == null || !_running) break;
-        // 异步转写：检查 _running，停止后静默丢弃不追加
-        unawaited(_transcribeAiAndEmitIfRunning(aiProvider, config, chunkPath));
-      }
-    } catch (e) {
-      _showError(_messageKeyForError(e));
-    } finally {
-      _running = false;
-      if (mounted && _state != VoiceInputState.error) {
-        _setStateKind(VoiceInputState.idle);
-      }
-    }
-  }
-
-  /// 转写一个音频块，若用户已停止则静默丢弃结果。
-  Future<void> _transcribeAiAndEmitIfRunning(
+  Future<void> _runAiChunkLoop(
+    int sessionId,
     AiProvider aiProvider,
     AiConfig config,
-    String chunkPath,
   ) async {
-    final text = await _transcribeAiChunk(aiProvider, config, chunkPath);
-    if (!_running) return;
-    if (text.isNotEmpty) _emitText(text);
+    try {
+      while (_isCurrentRecordingSession(sessionId)) {
+        _setRecordingIfCurrent(sessionId);
+        _setStatusMessage('voice_recording_hint');
+        final chunkPath = await _recordVadChunk();
+        if (!_isCurrentSession(sessionId)) break;
+        if (chunkPath == null) {
+          if (_running) continue;
+          break;
+        }
+        _enqueueTranscription(
+          _VoiceChunkJob.ai(
+            sessionId: sessionId,
+            chunkPath: chunkPath,
+            aiProvider: aiProvider,
+            config: config,
+          ),
+        );
+      }
+    } catch (e) {
+      if (_isCurrentSession(sessionId)) _showError(_messageKeyForError(e));
+    } finally {
+      if (_isCurrentSession(sessionId)) {
+        _producerRunning = false;
+        _finishSessionIfReady();
+      }
+    }
   }
 
   /// 读取音频块 → 调用 AI 转写 → 返回文本。
@@ -268,19 +309,19 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     try {
       await deleteFileAtPath(chunkPath);
     } catch (_) {}
-    if (!_running) return '';
     return aiProvider.transcribeAudio(config: config, audioBytes: bytes);
   }
 
   /// 使用 VAD 语音活动检测录制音频块，返回临时文件路径。
-  /// 当检测到持续静音（>1.5s）或达到最大时长（30s）时自动停止。
+  /// 当检测到持续静音或达到最大时长时自动停止。
   /// 返回 null 表示无有效语音输入或录制失败。
   Future<String?> _recordVadChunk() async {
+    String? chunkPath;
     try {
       if (!_running) return null;
 
       final tempDir = await getTemporaryDirectory();
-      final chunkPath =
+      chunkPath =
           '${tempDir.path}/voice_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
 
       await _recorder.start(
@@ -292,31 +333,49 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         path: chunkPath,
       );
 
-      // VAD: monitor amplitude, stop on sustained silence
+      // VAD: record uses dB-like values on some platforms and normalized
+      // linear values on others, so speech detection has to handle both.
       int silentChecks = 0;
-      const maxSilentChecks = 15; // ~1.5s of silence (100ms × 15)
-      const maxChunkDurationSeconds = 30;
-      final maxTotalChecks = maxChunkDurationSeconds * 10; // 100ms per check
+      int speechChecks = 0;
       int totalChecks = 0;
+      const pollInterval = Duration(milliseconds: 80);
+      const warmupChecks = 4; // Let the recorder settle before judging noise.
+      const minSpeechChecks = 3; // ~240ms of speech avoids click/noise chunks.
+      const maxSilentChecks = 12; // ~960ms of trailing silence.
+      const maxTotalChecks = 150; // 12s chunks keep latency reasonable.
+      const noSpeechChecks = 100; // 8s of waiting before rotating the file.
 
       while (_running) {
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(pollInterval);
         final amplitude = await _recorder.getAmplitude();
+        totalChecks++;
+        final speechLike =
+            totalChecks > warmupChecks && _isSpeechAmplitude(amplitude.current);
 
-        // 低阈值 0.01 兼容 iOS 对数归一化与 Android 线性映射差异
-        if (amplitude.current < 0.01) {
-          silentChecks++;
-          if (silentChecks >= maxSilentChecks) break;
-        } else {
+        if (speechLike) {
+          speechChecks++;
           silentChecks = 0;
+        } else if (speechChecks > 0) {
+          silentChecks++;
         }
 
-        totalChecks++;
+        if (speechChecks >= minSpeechChecks &&
+            silentChecks >= maxSilentChecks) {
+          break;
+        }
+        if (speechChecks == 0 && totalChecks >= noSpeechChecks) break;
         if (totalChecks >= maxTotalChecks) break;
       }
 
       final path = await _recorder.stop();
-      return (path != null && path.isNotEmpty) ? path : null;
+      final hasEnoughSpeech = speechChecks >= minSpeechChecks;
+      if (path == null || path.isEmpty || !hasEnoughSpeech) {
+        if (path != null && path.isNotEmpty) {
+          unawaited(deleteFileAtPath(path));
+        }
+        return null;
+      }
+      return path;
     } catch (e) {
       unawaited(
         AppLog.warning(
@@ -325,11 +384,25 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           error: e,
         ),
       );
+      if (_running) rethrow;
+      if (chunkPath != null) {
+        try {
+          await deleteFileAtPath(chunkPath);
+        } catch (_) {}
+      }
       return null;
     }
   }
 
+  bool _isSpeechAmplitude(double value) {
+    if (value.isNaN || value.isInfinite) return false;
+    if (value <= 0) return value > -45; // dBFS-style values.
+    if (value <= 1) return value >= 0.018; // Normalized linear values.
+    return value >= 8; // Defensive fallback for positive dB-style values.
+  }
+
   Future<void> _startSherpaOnnxListening({
+    required int sessionId,
     required String engine,
     required String whisperModel,
   }) async {
@@ -342,6 +415,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       _resetStartFailure();
       return;
     }
+    if (!_isCurrentRecordingSession(sessionId)) return;
 
     // 确定模型配置并检查是否就绪
     final modelConfig = _sherpaOnnxModelConfig(engine, whisperModel);
@@ -351,6 +425,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
       return;
     }
     final ready = await ModelDownloader.isOnDeviceReady(modelConfig);
+    if (!_isCurrentRecordingSession(sessionId)) return;
     if (!ready) {
       _showError('on_device_model_not_downloaded');
       _resetStartFailure();
@@ -359,70 +434,95 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
     // 创建并初始化本机 STT 服务
     final modelDir = await ModelDownloader.getModelDir(modelConfig.id);
-    final service = createOnDeviceSttService(
-      engine: engine,
-      modelDir: modelDir.path,
-      whisperModelSize: whisperModel,
-    );
+    if (!_isCurrentRecordingSession(sessionId)) return;
+    final serviceKey = '$engine|$whisperModel|${modelDir.path}';
+    _sherpaIdleDisposeTimer?.cancel();
+    var service = _sherpaOnnxService;
+    if (service == null ||
+        _sherpaOnnxServiceKey != serviceKey ||
+        !service.isInitialized) {
+      await _disposeSherpaOnnxService();
+      service = createOnDeviceSttService(
+        engine: engine,
+        modelDir: modelDir.path,
+        whisperModelSize: whisperModel,
+      );
+      _sherpaOnnxService = service;
+      _sherpaOnnxServiceKey = serviceKey;
+    }
     try {
-      await service.initialize();
+      if (!service.isInitialized) await service.initialize();
     } catch (e) {
       _showErrorDetail('on_device_stt_init_failed', e);
       await service.dispose();
+      if (_sherpaOnnxService == service) {
+        _sherpaOnnxService = null;
+        _sherpaOnnxServiceKey = null;
+      }
       _resetStartFailure();
       return;
     }
-    _sherpaOnnxService = service;
+    if (!_isCurrentRecordingSession(sessionId)) {
+      _finishSessionIfReady();
+      return;
+    }
 
     _activeConfigLabel = _sherpaOnnxEngineLabel(engine);
     _setStateKind(VoiceInputState.recording);
     _setStatusMessage('voice_recording_hint');
-    unawaited(_runSherpaOnnxChunkLoop());
+    _producerRunning = true;
+    unawaited(_runSherpaOnnxChunkLoop(sessionId, service));
   }
 
   /// 生产者循环：不间断录制音频块，每块转写异步派发（本机离线引擎）。
-  Future<void> _runSherpaOnnxChunkLoop() async {
+  Future<void> _runSherpaOnnxChunkLoop(
+    int sessionId,
+    OnDeviceSttService service,
+  ) async {
     try {
-      while (_running) {
-        _setStateKind(VoiceInputState.recording);
+      while (_isCurrentRecordingSession(sessionId)) {
+        _setRecordingIfCurrent(sessionId);
         _setStatusMessage('voice_recording_hint');
         final chunkPath = await _recordVadChunk();
-        if (chunkPath == null || !_running) break;
-        // 异步转写：检查 _running，停止后静默丢弃不追加
-        unawaited(_transcribeSherpaAndEmitIfRunning(chunkPath));
+        if (!_isCurrentSession(sessionId)) break;
+        if (chunkPath == null) {
+          if (_running) continue;
+          break;
+        }
+        _enqueueTranscription(
+          _VoiceChunkJob.sherpa(
+            sessionId: sessionId,
+            chunkPath: chunkPath,
+            service: service,
+          ),
+        );
       }
     } catch (e) {
-      _showError('voice_recognize_failed');
+      if (_isCurrentSession(sessionId)) _showError('voice_recognize_failed');
     } finally {
-      _running = false;
-      await _disposeSherpaOnnxService();
-      if (mounted && _state != VoiceInputState.error) {
-        _setStateKind(VoiceInputState.idle);
+      if (_isCurrentSession(sessionId)) {
+        _producerRunning = false;
+        _finishSessionIfReady();
       }
     }
   }
 
-  /// 转写一个 sherpa-onnx 音频块，若用户已停止则静默丢弃结果。
-  Future<void> _transcribeSherpaAndEmitIfRunning(String chunkPath) async {
-    final text = await _transcribeSherpaChunk(chunkPath);
-    if (!_running) return;
-    if (text.isNotEmpty) _emitText(text);
-  }
-
   /// 读取音频块 → 调用 sherpa-onnx 转写 → 返回文本。
-  Future<String> _transcribeSherpaChunk(String chunkPath) async {
+  Future<String> _transcribeSherpaChunk(
+    String chunkPath,
+    OnDeviceSttService service,
+  ) async {
     final bytes = await readBytesFromPath(chunkPath);
     try {
       await deleteFileAtPath(chunkPath);
     } catch (_) {}
-    if (!_running || _sherpaOnnxService == null) return '';
 
     final samples = _wavBytesToFloat32List(bytes);
     if (samples == null || samples.isEmpty) return '';
 
     try {
-      final result = await _sherpaOnnxService!.transcribe(samples, 16000);
-      return result.text.trim();
+      final result = await service.transcribe(samples, 16000);
+      return _cleanTranscriptionText(result.text);
     } catch (e) {
       debugPrint('sherpa_onnx chunk transcribe failed: $e');
       unawaited(
@@ -471,27 +571,143 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   Future<void> _disposeSherpaOnnxService() async {
+    _sherpaIdleDisposeTimer?.cancel();
+    _sherpaIdleDisposeTimer = null;
     try {
       await _sherpaOnnxService?.dispose();
     } catch (_) {}
     _sherpaOnnxService = null;
+    _sherpaOnnxServiceKey = null;
+  }
+
+  void _scheduleSherpaIdleDispose() {
+    _sherpaIdleDisposeTimer?.cancel();
+    _sherpaIdleDisposeTimer = Timer(const Duration(minutes: 2), () {
+      unawaited(_disposeSherpaOnnxService());
+    });
+  }
+
+  bool _isCurrentSession(int sessionId) => _sessionId == sessionId;
+
+  bool _isCurrentRecordingSession(int sessionId) =>
+      _isCurrentSession(sessionId) && _running;
+
+  void _setRecordingIfCurrent(int sessionId) {
+    if (!_isCurrentRecordingSession(sessionId)) return;
+    if (_state != VoiceInputState.recording) {
+      _setStateKind(VoiceInputState.recording);
+    }
+  }
+
+  void _enqueueTranscription(_VoiceChunkJob job) {
+    if (!_isCurrentSession(job.sessionId)) {
+      unawaited(deleteFileAtPath(job.chunkPath));
+      return;
+    }
+    _chunkQueue.add(job);
+    if (!_running) {
+      _setStateKind(VoiceInputState.transcribing);
+      _setStatusMessage('voice_transcribing');
+    } else if (_chunkQueue.length > 1) {
+      _setStatusMessage('voice_transcribing_background');
+    }
+    if (!_consumerRunning) unawaited(_consumeTranscriptionQueue());
+  }
+
+  Future<void> _consumeTranscriptionQueue() async {
+    if (_consumerRunning) return;
+    _consumerRunning = true;
+    try {
+      while (_chunkQueue.isNotEmpty) {
+        final job = _chunkQueue.removeFirst();
+        if (!_isCurrentSession(job.sessionId)) {
+          unawaited(deleteFileAtPath(job.chunkPath));
+          continue;
+        }
+        if (!_running) {
+          _setStateKind(VoiceInputState.transcribing);
+          _setStatusMessage('voice_transcribing');
+        }
+
+        try {
+          final text = switch (job.kind) {
+            _VoiceChunkKind.ai => await _transcribeAiChunk(
+              job.aiProvider!,
+              job.config!,
+              job.chunkPath,
+            ),
+            _VoiceChunkKind.sherpa => await _transcribeSherpaChunk(
+              job.chunkPath,
+              job.service!,
+            ),
+          };
+          if (_isCurrentSession(job.sessionId) &&
+              (_running || _finishAfterQueue)) {
+            _emitText(_cleanTranscriptionText(text));
+          }
+        } catch (e) {
+          unawaited(
+            AppLog.warning(
+              'Voice chunk transcription failed',
+              source: 'voice',
+              error: e,
+            ),
+          );
+          if (_isCurrentSession(job.sessionId) && _running) {
+            _showError(_messageKeyForError(e));
+          }
+        }
+      }
+    } finally {
+      _consumerRunning = false;
+      _finishSessionIfReady();
+    }
+  }
+
+  void _finishSessionIfReady() {
+    if (!_finishAfterQueue) return;
+    if (_producerRunning || _consumerRunning || _chunkQueue.isNotEmpty) return;
+    _finishAfterQueue = false;
+    _running = false;
+    _setStatusMessage(null);
+    if (mounted && _state != VoiceInputState.error) {
+      _setStateKind(VoiceInputState.idle);
+    }
+    if (_activeProviderKind == _VoiceProviderKind.sherpaOnnx) {
+      _scheduleSherpaIdleDispose();
+    }
+  }
+
+  void _discardQueuedChunks() {
+    while (_chunkQueue.isNotEmpty) {
+      final job = _chunkQueue.removeFirst();
+      unawaited(deleteFileAtPath(job.chunkPath));
+    }
   }
 
   Future<void> _stopListening() async {
+    if (_state == VoiceInputState.stopping) return;
+    final providerKind = _activeProviderKind;
     _running = false;
+    _finishAfterQueue = true;
     _setStateKind(VoiceInputState.stopping);
     _setStatusMessage('voice_stopping');
-    try {
-      await _speech.stop();
-    } catch (_) {}
-    try {
-      await _recorder.stop();
-    } catch (_) {}
-    if (mounted) _setStateKind(VoiceInputState.idle);
+    if (providerKind == _VoiceProviderKind.system) {
+      try {
+        await _speech.stop();
+      } catch (_) {}
+      _producerRunning = false;
+      _consumerRunning = false;
+      _finishAfterQueue = false;
+      _setStatusMessage(null);
+      if (mounted) _setStateKind(VoiceInputState.idle);
+      return;
+    }
+    _finishSessionIfReady();
   }
 
   void _emitText(String text) {
-    final cleaned = text.trim();
+    final cleaned = _cleanTranscriptionText(text);
     if (cleaned.isEmpty) return;
     widget.onResult(cleaned);
     if (mounted) {
@@ -502,6 +718,21 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         }
       });
     }
+  }
+
+  String _cleanTranscriptionText(String text) {
+    final cleaned = text
+        .replaceAll(RegExp(r'<\|[^>]*\|>'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final lower = cleaned.toLowerCase();
+    const silenceHallucinations = {
+      '谢谢观看',
+      '感谢观看',
+      '字幕由 amara.org 社区提供',
+      'thanks for watching',
+    };
+    return silenceHallucinations.contains(lower) ? '' : cleaned;
   }
 
   String _deltaFromCumulative(String current, String previous) {
@@ -529,6 +760,12 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   void _resetStartFailure() {
     _running = false;
+    _finishAfterQueue = false;
+    _producerRunning = false;
+    _consumerRunning = false;
+    _activeProviderKind = null;
+    _discardQueuedChunks();
+    _setStatusMessage(null);
     if (mounted && _state != VoiceInputState.idle) {
       _setStateKind(VoiceInputState.idle);
     }
@@ -536,6 +773,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   void _showErrorDetail(String messageKey, Object? error) {
     _running = false;
+    _finishAfterQueue = false;
+    _producerRunning = false;
+    _discardQueuedChunks();
     _setStateKind(VoiceInputState.error);
     widget.onError?.call(messageKey);
     unawaited(
@@ -559,8 +799,9 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
-  void _setStatusMessage(String messageKey) {
+  void _setStatusMessage(String? messageKey) {
     if (!mounted) return;
+    if (_statusMessageKey == messageKey) return;
     setState(() => _statusMessageKey = messageKey);
   }
 
@@ -577,8 +818,13 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 
   @override
   void dispose() {
+    _sessionId++;
+    _running = false;
+    _finishAfterQueue = false;
+    _discardQueuedChunks();
     _speech.stop();
     _recorder.dispose();
+    _sherpaIdleDisposeTimer?.cancel();
     _disposeSherpaOnnxService();
     super.dispose();
   }
@@ -588,6 +834,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final l10n = context.watch<LocalizationProvider>();
     final color = switch (_state) {
       VoiceInputState.idle => null,
+      VoiceInputState.preparing => Theme.of(context).colorScheme.primary,
       VoiceInputState.recording => Colors.green,
       VoiceInputState.transcribing => Theme.of(context).colorScheme.primary,
       VoiceInputState.stopping => Colors.orange,
@@ -595,6 +842,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     };
     final tooltip = switch (_state) {
       VoiceInputState.idle => l10n.get('voice_input'),
+      VoiceInputState.preparing => l10n.get('voice_preparing'),
       VoiceInputState.recording => l10n.get('voice_stop_recording'),
       VoiceInputState.transcribing => l10n.get('voice_transcribing'),
       VoiceInputState.stopping => l10n.get('voice_stopping'),
@@ -651,6 +899,50 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
 }
 
 enum _VoiceProviderKind { ai, system, sherpaOnnx, none }
+
+enum _VoiceChunkKind { ai, sherpa }
+
+class _VoiceChunkJob {
+  const _VoiceChunkJob._({
+    required this.kind,
+    required this.sessionId,
+    required this.chunkPath,
+    this.aiProvider,
+    this.config,
+    this.service,
+  });
+
+  const _VoiceChunkJob.ai({
+    required int sessionId,
+    required String chunkPath,
+    required AiProvider aiProvider,
+    required AiConfig config,
+  }) : this._(
+         kind: _VoiceChunkKind.ai,
+         sessionId: sessionId,
+         chunkPath: chunkPath,
+         aiProvider: aiProvider,
+         config: config,
+       );
+
+  const _VoiceChunkJob.sherpa({
+    required int sessionId,
+    required String chunkPath,
+    required OnDeviceSttService service,
+  }) : this._(
+         kind: _VoiceChunkKind.sherpa,
+         sessionId: sessionId,
+         chunkPath: chunkPath,
+         service: service,
+       );
+
+  final _VoiceChunkKind kind;
+  final int sessionId;
+  final String chunkPath;
+  final AiProvider? aiProvider;
+  final AiConfig? config;
+  final OnDeviceSttService? service;
+}
 
 class _ResolvedVoiceProvider {
   const _ResolvedVoiceProvider._(

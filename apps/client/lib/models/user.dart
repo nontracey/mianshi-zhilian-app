@@ -21,9 +21,9 @@ enum UserRole {
       case UserRole.guest:
         return ['production'];
       case UserRole.user:
-        return ['production', 'test'];
+        return ['production', 'staging', 'test'];
       case UserRole.admin:
-        return ['production', 'test', 'draft'];
+        return ['production', 'staging', 'test', 'draft'];
     }
   }
 }

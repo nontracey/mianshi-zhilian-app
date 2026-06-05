@@ -10,7 +10,7 @@ import 'on_device_stt_service.dart';
 /// 特点：单一 .onnx 模型文件，支持中/英/日/韩/粤，返回情感和事件标签。
 /// 非流式，需要完整音频后统一转写。
 class SenseVoiceEngine implements OnDeviceSttService {
-  SenseVoiceEngine({required this.modelDir, this.language = ''});
+  SenseVoiceEngine({required this.modelDir, this.language = 'zh'});
 
   final String modelDir;
   final String language;

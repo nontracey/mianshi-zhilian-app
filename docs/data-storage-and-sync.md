@@ -5,7 +5,23 @@
 同步实现分两层：
 
 - 同步数据包：由 `StorageService.exportSyncPackage` / `importSyncPackage` 定义，所有渠道共享同一份业务快照和隐私策略。
+  同步包顶层包含元数据字段 `contentEnv` 和 `contentVersion`，记录同步时刻使用的知识内容环境和版本号。
+  导入时可据此判断远端内容版本与本机是否一致，避免内容不匹配导致的进度错乱。
 - 同步渠道：由 `DataSyncService` 选择 WebDAV、GitHub、Gitee 等传输目标；新增渠道只负责连接测试、下载快照、上传快照，不直接决定业务数据结构。
+
+同步包 JSON 结构示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "app": "mianshi-zhilian",
+  "updatedAt": "2026-06-02T00:00:00.000Z",
+  "deviceId": "device_xxx",
+  "contentEnv": "production",
+  "contentVersion": "2026-06-02T00:00:00.000Z",
+  "data": { ... }
+}
+```
 
 ## 本地优先并参与同步的数据
 

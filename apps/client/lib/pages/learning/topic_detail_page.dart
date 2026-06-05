@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -117,7 +119,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (topic.status != null && topic.status != 'production')
+                    if (topic.isNonProductionStatus)
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         padding: const EdgeInsets.symmetric(
@@ -125,19 +127,19 @@ class _TopicDetailPageState extends State<TopicDetailPage>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: topic.status == 'test'
+                          color: topic.isStagingStatus
                               ? AppColors.warning.withValues(alpha: 0.1)
                               : AppColors.info.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          topic.status == 'test'
+                          topic.isStagingStatus
                               ? l10n.get('test_content')
                               : l10n.get('draft_content'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: topic.status == 'test'
+                            color: topic.isStagingStatus
                                 ? AppColors.warning
                                 : AppColors.info,
                           ),
@@ -368,19 +370,26 @@ class _TopicDetailPageState extends State<TopicDetailPage>
             analysisStatus: result['aiUnavailable'] == true
                 ? 'unanalysed'
                 : result['score'] == null
-                    ? 'unanalysed'
-                    : 'success',
+                ? 'unanalysed'
+                : 'success',
           ),
         );
-        if (result['aiUnavailable'] != true && result['score'] is int) {
+        final aiEvaluationSucceeded =
+            result['aiUnavailable'] != true && result['score'] is int;
+        if (aiEvaluationSucceeded) {
           await progressProvider.updateTopicProgress(
             topic.id,
             score: result['score'] as int,
           );
         }
-        await StorageService().recordAnalyticsFeature('ai_eval');
+        final storage = StorageService();
+        await storage.recordAnalyticsFeature('ai_eval');
+        await storage.recordAnalyticsFeature(
+          aiEvaluationSucceeded ? 'ai_eval_success' : 'ai_eval_failed',
+        );
       }
     } catch (e) {
+      unawaited(StorageService().recordAnalyticsFeature('ai_eval_failed'));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -507,10 +516,12 @@ class _LeftSidebar extends StatelessWidget {
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          ...topic.prerequisites.map((prereq) => _PrerequisiteTile(
-            key: ValueKey('prereq_$prereq'),
-            prereqId: prereq,
-          )),
+          ...topic.prerequisites.map(
+            (prereq) => _PrerequisiteTile(
+              key: ValueKey('prereq_$prereq'),
+              prereqId: prereq,
+            ),
+          ),
         ],
         // LeetCode 链接
         if (topic.leetcodeUrl != null && topic.leetcodeUrl!.isNotEmpty) ...[

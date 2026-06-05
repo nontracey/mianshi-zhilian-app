@@ -567,6 +567,10 @@ class DataSyncService {
       'app': 'mianshi-zhilian',
       'updatedAt': DateTime.now().toIso8601String(),
       'deviceId': local['deviceId'],
+      if ((local['contentEnv'] ?? remote['contentEnv']) != null)
+        'contentEnv': local['contentEnv'] ?? remote['contentEnv'],
+      if ((local['contentVersion'] ?? remote['contentVersion']) != null)
+        'contentVersion': local['contentVersion'] ?? remote['contentVersion'],
       'data': merged..removeWhere((_, value) => value == null),
     };
   }

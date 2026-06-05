@@ -27,12 +27,20 @@ class AiService {
     required AiConfig config,
     required String topicTitle,
     required List<String> mustHave,
+    required List<String> goodToHave,
     required List<String> commonMistakes,
+    Map<String, int>? scoreWeights,
     required String userAnswer,
     required String language,
     Uint8List? imageBytes,
   }) async {
-    final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
+    final systemPrompt = _buildSystemPrompt(
+      mustHave: mustHave,
+      goodToHave: goodToHave,
+      commonMistakes: commonMistakes,
+      scoreWeights: scoreWeights,
+      language: language,
+    );
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
     final response = await http.post(
@@ -75,12 +83,20 @@ class AiService {
     required AiConfig config,
     required String topicTitle,
     required List<String> mustHave,
+    required List<String> goodToHave,
     required List<String> commonMistakes,
+    Map<String, int>? scoreWeights,
     required String userAnswer,
     required String language,
     Uint8List? imageBytes,
   }) async* {
-    final systemPrompt = _buildSystemPrompt(mustHave, commonMistakes, language);
+    final systemPrompt = _buildSystemPrompt(
+      mustHave: mustHave,
+      goodToHave: goodToHave,
+      commonMistakes: commonMistakes,
+      scoreWeights: scoreWeights,
+      language: language,
+    );
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
 
@@ -326,6 +342,7 @@ class AiService {
     request.fields['model'] = config.model;
     request.fields['language'] = language;
     request.fields['response_format'] = 'text';
+    request.fields['temperature'] = '0';
     request.files.add(
       http.MultipartFile.fromBytes('file', audioBytes, filename: fileName),
     );
@@ -376,7 +393,10 @@ class AiService {
                 'content': [
                   {
                     'type': 'text',
-                    'text': '请把这段音频转写成$language文本。只返回转写文本，不要解释。',
+                    'text':
+                        '请把这段技术面试练习音频逐字转写成$language文本。'
+                        '保留技术名词、英文缩写和代码词，不要总结、不要补全、不要解释。'
+                        '如果没有清晰语音，只返回空字符串。',
                   },
                   {
                     'type': 'input_audio',
@@ -462,21 +482,25 @@ class AiService {
     ];
   }
 
-  String _buildSystemPrompt(
-    List<String> mustHave,
-    List<String> commonMistakes,
-    String language,
-  ) {
+  String _buildSystemPrompt({
+    required List<String> mustHave,
+    required List<String> goodToHave,
+    required List<String> commonMistakes,
+    required Map<String, int>? scoreWeights,
+    required String language,
+  }) {
+    final weights = _normalizeScoreWeights(scoreWeights);
     return '''你是一个技术面试评估专家。请评估用户对知识点的回答。
 
 评估维度：
-1. 核心概念完整性 (40%)：是否覆盖标准要点
-2. 表达准确性 (25%)：是否有明显错误或混淆
-3. 面试表达质量 (20%)：是否像面试回答，结构是否清晰
-4. 扩展深度 (15%)：是否能结合场景、优缺点、实践经验
+1. 核心概念完整性 (${weights.coverage}%)：是否覆盖标准要点
+2. 表达准确性 (${weights.accuracy}%)：是否有明显错误或混淆
+3. 面试表达质量 (${weights.expression}%)：是否像面试回答，结构是否清晰
+4. 扩展深度 (${weights.depth}%)：是否能结合场景、优缺点、实践经验
 
-标准要点：${mustHave.join('、')}
-常见错误：${commonMistakes.join('、')}
+标准要点：${mustHave.isEmpty ? '无' : mustHave.join('、')}
+加分要点：${goodToHave.isEmpty ? '无' : goodToHave.join('、')}
+常见错误：${commonMistakes.isEmpty ? '无' : commonMistakes.join('、')}
 
 请用$language回答，并以如下 JSON 格式输出：
 {
@@ -490,6 +514,24 @@ class AiService {
 }
 
 score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''';
+  }
+
+  _EvaluationWeights _normalizeScoreWeights(Map<String, int>? raw) {
+    int pick(String key, int fallback, [List<String> aliases = const []]) {
+      var value = raw?[key];
+      for (final alias in aliases) {
+        value ??= raw?[alias];
+      }
+      if (value == null || value <= 0) return fallback;
+      return value;
+    }
+
+    return _EvaluationWeights(
+      coverage: pick('coverage', 40),
+      accuracy: pick('accuracy', 25),
+      expression: pick('interviewExpression', 20, ['expression']),
+      depth: pick('depth', 15, ['goodToHave']),
+    );
   }
 
   Map<String, dynamic> _parseEvaluationResult(String content) {
@@ -622,6 +664,20 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
     if (detail.isNotEmpty) return detail;
     return body.length > 240 ? '${body.substring(0, 240)}...' : body;
   }
+}
+
+class _EvaluationWeights {
+  const _EvaluationWeights({
+    required this.coverage,
+    required this.accuracy,
+    required this.expression,
+    required this.depth,
+  });
+
+  final int coverage;
+  final int accuracy;
+  final int expression;
+  final int depth;
 }
 
 class AiServiceException implements Exception {

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/domain.dart';
 import '../models/topic.dart';
+import '../services/app_log_service.dart';
 import '../services/content_api_service.dart';
 import '../services/storage_service.dart';
 
@@ -17,6 +20,7 @@ class ContentProvider extends ChangeNotifier {
   bool _isLoadingTopics = false;
   bool _isCheckingUpdate = false;
   String? _error;
+  List<String> _topicLoadFailures = [];
   String? _cachedContentVersion;
   int _loadEpoch = 0;
 
@@ -27,6 +31,7 @@ class ContentProvider extends ChangeNotifier {
   bool get isLoadingTopics => _isLoadingTopics;
   bool get isCheckingUpdate => _isCheckingUpdate;
   String? get error => _error;
+  List<String> get topicLoadFailures => List.unmodifiable(_topicLoadFailures);
 
   String get _cacheScope => _api.baseUrl
       .replaceAll(RegExp(r'^https?://'), '')
@@ -45,6 +50,7 @@ class ContentProvider extends ChangeNotifier {
     final epoch = ++_loadEpoch;
     _isLoading = true;
     _error = null;
+    _topicLoadFailures = [];
     notifyListeners();
 
     try {
@@ -145,6 +151,7 @@ class ContentProvider extends ChangeNotifier {
     if (_isCheckingUpdate) return false;
 
     _isCheckingUpdate = true;
+    unawaited(_storage.recordAnalyticsFeature('update_check'));
     notifyListeners();
 
     try {
@@ -195,6 +202,7 @@ class ContentProvider extends ChangeNotifier {
   Future<void> loadDomainTopics(String domainId) async {
     final epoch = _loadEpoch;
     _isLoadingTopics = true;
+    _topicLoadFailures = [];
     notifyListeners();
 
     try {
@@ -244,7 +252,7 @@ class ContentProvider extends ChangeNotifier {
           }
         }
       }
-      // 分批并发加载，每批 8 个
+      // 分批并发加载，每个 topic 独立容错，避免一个坏 JSON/404 拖垮整批。
       const batchSize = 8;
       for (var i = 0; i < pathsToLoad.length; i += batchSize) {
         final batch = pathsToLoad.sublist(
@@ -252,11 +260,33 @@ class ContentProvider extends ChangeNotifier {
           (i + batchSize < pathsToLoad.length) ? i + batchSize : null,
         );
         final results = await Future.wait(
-          batch.map((path) => _api.fetchTopic(path)),
+          batch.map((path) async {
+            try {
+              return _TopicLoadResult.success(
+                path,
+                await _api.fetchTopic(path),
+              );
+            } catch (e) {
+              return _TopicLoadResult.failure(path, e);
+            }
+          }),
         );
         if (epoch != _loadEpoch) return;
-        for (var j = 0; j < batch.length; j++) {
-          _topics[ContentApiService.cacheKeyForTopicRef(batch[j])] = results[j];
+        for (final result in results) {
+          final topic = result.topic;
+          if (topic != null) {
+            _topics[ContentApiService.cacheKeyForTopicRef(result.path)] = topic;
+            continue;
+          }
+          _topicLoadFailures.add(result.path);
+          unawaited(_storage.recordAnalyticsFeature('content_load_failed'));
+          unawaited(
+            AppLog.warning(
+              'Content topic load failed: ${result.path}',
+              source: 'content',
+              error: result.error,
+            ),
+          );
         }
         // 每批加载完后一次性通知 UI 更新
         notifyListeners();
@@ -382,6 +412,7 @@ class ContentProvider extends ChangeNotifier {
     _loadEpoch++;
     _domains = [];
     _topics = {};
+    _topicLoadFailures = [];
     _manifest = null;
     _cachedContentVersion = null;
     _error = null;
@@ -476,4 +507,18 @@ class ContentProvider extends ChangeNotifier {
       );
     }
   }
+}
+
+class _TopicLoadResult {
+  const _TopicLoadResult._(this.path, this.topic, this.error);
+
+  factory _TopicLoadResult.success(String path, Topic topic) =>
+      _TopicLoadResult._(path, topic, null);
+
+  factory _TopicLoadResult.failure(String path, Object error) =>
+      _TopicLoadResult._(path, null, error);
+
+  final String path;
+  final Topic? topic;
+  final Object? error;
 }

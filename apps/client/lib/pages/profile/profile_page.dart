@@ -1562,9 +1562,11 @@ class _ContentEnvPanel extends StatelessWidget {
               label: Text(l10n.get('publish_version')),
             ),
             ButtonSegment(
-              value: ContentEnv.test,
+              value: ContentEnv.staging,
               label: Text(l10n.get('test_version')),
-              enabled: userRole.allowedContentEnvs.contains('test'),
+              enabled: ContentEnv.staging.isAllowedBy(
+                userRole.allowedContentEnvs,
+              ),
             ),
             ButtonSegment(
               value: ContentEnv.draft,
@@ -1587,7 +1589,7 @@ class _ContentEnvPanel extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                settings.contentEnv == ContentEnv.test
+                settings.contentEnv == ContentEnv.staging
                     ? Icons.science_outlined
                     : settings.contentEnv == ContentEnv.draft
                     ? Icons.edit_note_outlined
@@ -1707,7 +1709,7 @@ class _ContentEnvPanel extends StatelessWidget {
         settings.customProdContentUrl?.isNotEmpty == true) {
       return '${settings.customProdContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
-    if (settings.contentEnv == ContentEnv.test &&
+    if (settings.contentEnv == ContentEnv.staging &&
         settings.customTestContentUrl?.isNotEmpty == true) {
       return '${settings.customTestContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
@@ -1718,7 +1720,7 @@ class _ContentEnvPanel extends StatelessWidget {
     if (settings.contentEnv == ContentEnv.production) {
       return '${RouteResolver.contentPrimary} / ${RouteResolver.contentBackup}';
     }
-    final stage = settings.contentEnv == ContentEnv.draft ? 'draft' : 'test';
+    final stage = settings.contentEnv.routeStage;
     return '${RouteResolver.appApiPrimary}/content/$stage / ${RouteResolver.appApiBackup}/content/$stage';
   }
 }

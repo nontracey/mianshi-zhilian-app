@@ -403,14 +403,16 @@ flowchart LR
 | 代码原理 | 代码块 + 行级解释 + 常见追问 |
 | 面试表达 | 标准回答、精简版回答、进阶版回答 |
 
-AI 评分维度建议：
+AI 评分维度建议（默认值；实际权重由 `rubric.scoreWeights` 动态加载）：
 
-| 维度 | 权重 | 说明 |
+| 维度 | 默认权重 | 说明 |
 | --- | --- | --- |
 | 核心概念完整性 | 40% | 是否覆盖标准要点 |
 | 表达准确性 | 25% | 是否有明显错误或混淆 |
 | 面试表达质量 | 20% | 是否像面试回答，结构是否清晰 |
 | 扩展深度 | 15% | 是否能结合场景、优缺点、实践经验 |
+
+每个 topic 的 `rubric.scoreWeights` 可覆盖上述默认权重。`AiService._normalizeScoreWeights` 会校验权重之和是否为 100，不足项使用默认值填充，超 100 项则等比例缩放。`temperature` 在所有评估中固定为 0。`rubric.goodToHave` 为加分项，达到不扣分，未达到不降级。
 
 掌握状态规则：
 
@@ -1067,6 +1069,8 @@ flowchart LR
   "app": "mianshi-zhilian",
   "updatedAt": "2026-06-02T00:00:00.000Z",
   "deviceId": "device_xxx",
+  "contentEnv": "production",
+  "contentVersion": "2026-06-02T00:00:00.000Z",
   "data": {
     "progress_map": {},
     "practice_attempts": [],
@@ -1214,10 +1218,14 @@ AI 请求统一走一个 OpenAI 兼容格式，降低不同模型适配成本。
 | --- | --- |
 | 知识点标题 | 当前知识点 |
 | 标准要点 | `rubric.mustHave` |
+| 加分要点 | `rubric.goodToHave`，达到加分不扣分 |
 | 常见错误 | `rubric.commonMistakes` |
+| 评分权重 | `scoreWeights`，动态分配各维度权重 |
 | 用户回答 | 用户输入文本 |
 | 目标语言 | 中文或英文 |
 | 输出格式 | 固定 JSON |
+
+`goodToHave` 为动态加分项，由 `AiProvider.evaluateAnswerStream` 传入 `AiService._buildSystemPrompt`。`scoreWeights` 控制各评分维度的权重分配，经 `_normalizeScoreWeights` 归一化后嵌入 prompt。
 
 AI 输出格式：
 
@@ -1483,13 +1491,25 @@ on_device_stt_factory.dart              # 条件导出工厂函数
 - sherpa-onnx 模型未下载或初始化失败
 - AI 语音配置未通过测试、接口超时、鉴权失败、模型不支持音频输入
 
-### 17.5 构建约束
+### 17.6 构建约束
 
 sherpa-onnx 通过 `sherpa_onnx` Dart 包接入，底层依赖 `dart:ffi`，因此 **Web 平台无法编译 sherpa-onnx**。通过 §17.4 的条件导入模式，Web 构建时不解析 `sherpa_onnx` 包，编译不会失败。
 
 `sherpa_onnx` 提供了各原生平台的正确 podspec 和 CMakeLists.txt，无需额外桩文件。
 
-### 17.6 l10n Key 约定
+### 17.7 语音双缓冲流水线
+
+录音转写采用双缓冲流水线模式（详见 [voice-chunk-pipeline.md](voice-chunk-pipeline.md)）：
+
+1. 录音线程录制当前音频块时，转写线程静默处理上一块。
+2. `_sessionId` 递增机制防止旧 session 的回调串扰当前 session。
+3. `_chunkQueue` 生产者-消费者模型，`_producerRunning`/`_consumerRunning` 分别跟踪各线程生命周期。
+4. 录完一个块即入队，消费者从队首顺序取出转写，确保写入业务输入区域的文本顺序正确。
+5. `_finishSessionIfReady()` 在队列耗尽时自动进入 `idle` 状态。
+6. `_sherpaIdleDisposeTimer` 控制离线引擎在 2 分钟无活动后自动释放 native 资源。
+7. `_cleanTranscriptionText` 清洗 SenseVoice 标签和常见幻觉文本（"谢谢观看"等）。
+
+### 17.8 l10n Key 约定
 
 STT 相关文案遵循项目 l10n 规范，新增 keys：
 

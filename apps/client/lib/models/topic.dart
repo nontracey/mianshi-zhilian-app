@@ -48,7 +48,8 @@ class Topic {
   final Rubric? rubric;
   final List<FollowUpQuestion> followUps;
   final List<String> prerequisites;
-  final String? status; // production / draft
+  final String?
+  status; // production / staging / draft; legacy test maps to staging
   final String? interviewFrequency; // high / medium / low
   final String? interviewerFocus;
   final String? phase;
@@ -116,6 +117,20 @@ class Topic {
     updatedAt: json['updatedAt'] as String?,
     leetcodeUrl: json['leetcodeUrl'] as String?,
   );
+
+  String get normalizedStatus {
+    final value = status?.trim().toLowerCase();
+    return switch (value) {
+      null || '' || 'production' => 'production',
+      'test' || 'staging' => 'staging',
+      'draft' => 'draft',
+      _ => 'draft',
+    };
+  }
+
+  bool get isProductionStatus => normalizedStatus == 'production';
+  bool get isStagingStatus => normalizedStatus == 'staging';
+  bool get isNonProductionStatus => status != null && !isProductionStatus;
 
   /// 解析追问列表：优先取顶层 followUps，否则从 interviewAnswer 卡片中提取 followUpQuestions
   static List<FollowUpQuestion> _parseFollowUps(Map<String, dynamic> json) {

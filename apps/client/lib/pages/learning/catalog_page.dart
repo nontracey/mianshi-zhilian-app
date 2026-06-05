@@ -276,8 +276,13 @@ class _CatalogPageState extends State<CatalogPage> {
                     _buildViewToggle(),
                     const SizedBox(width: 12),
                     Text(
-                      l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+                      l10n.getp('count_knowledge_point_2', {
+                        'count': totalTopics,
+                      }),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white54 : Colors.grey,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -285,7 +290,9 @@ class _CatalogPageState extends State<CatalogPage> {
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
                           value: masteryPercent / 100,
-                          backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.1),
                           color: Theme.of(context).colorScheme.primary,
                           minHeight: 4,
                         ),
@@ -310,7 +317,10 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildDomainDropdown(List<Domain> domains, ContentProvider contentProvider) {
+  Widget _buildDomainDropdown(
+    List<Domain> domains,
+    ContentProvider contentProvider,
+  ) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 190),
       child: Container(
@@ -330,7 +340,10 @@ class _CatalogPageState extends State<CatalogPage> {
                     d.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 )
                 .toList(),
@@ -342,7 +355,10 @@ class _CatalogPageState extends State<CatalogPage> {
                       d.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 )
@@ -382,7 +398,10 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
           filled: true,
           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 0,
+          ),
           isDense: true,
         ),
         style: const TextStyle(fontSize: 13),
@@ -428,7 +447,10 @@ class _CatalogPageState extends State<CatalogPage> {
       children: [
         Text(
           l10n.getp('count_knowledge_point_2', {'count': totalTopics}),
-          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : Colors.grey,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -436,7 +458,9 @@ class _CatalogPageState extends State<CatalogPage> {
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
               value: masteryPercent / 100,
-              backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               color: Theme.of(context).colorScheme.primary,
               minHeight: 4,
             ),
@@ -785,8 +809,7 @@ class _CatalogPageState extends State<CatalogPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (topic.status != null &&
-                            topic.status != 'production')
+                        if (topic.isNonProductionStatus)
                           Container(
                             margin: const EdgeInsets.only(left: 6),
                             padding: const EdgeInsets.symmetric(
@@ -794,19 +817,19 @@ class _CatalogPageState extends State<CatalogPage> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: topic.status == 'test'
+                              color: topic.isStagingStatus
                                   ? AppColors.warning.withValues(alpha: 0.1)
                                   : AppColors.info.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              topic.status == 'test'
+                              topic.isStagingStatus
                                   ? l10n.get('test')
                                   : l10n.get('draft_2'),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: topic.status == 'test'
+                                color: topic.isStagingStatus
                                     ? AppColors.warning
                                     : AppColors.info,
                               ),

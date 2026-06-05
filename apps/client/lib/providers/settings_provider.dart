@@ -229,22 +229,48 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<String> syncData([SyncSettings? syncSettings]) async {
     await _storage.recordAnalyticsFeature('manual_sync');
-    final settings = syncSettings ?? const SyncSettings();
-    if (settings.method == 'local') {
-      return 'local_mode_data_saved';
+    try {
+      final settings = syncSettings ?? const SyncSettings();
+      late final String resultKey;
+      if (settings.method == 'local') {
+        resultKey = 'local_mode_data_saved';
+      } else if (settings.method == 'file') {
+        await exportData();
+        resultKey = 'local_export_generated';
+      } else if (settings.isAutomaticMethod) {
+        final result = await _dataSync.syncNow(settings);
+        resultKey = result.l10nKey;
+      } else if ([
+        'baidu',
+        'quark',
+        'aliyun',
+        'onedrive',
+      ].contains(settings.method)) {
+        resultKey = 'third_party_sync_coming_soon';
+      } else {
+        resultKey = 'cloud_sync_unavailable';
+      }
+
+      await _storage.recordAnalyticsFeature(
+        _isSuccessfulSyncResult(resultKey) ? 'sync_success' : 'sync_failed',
+      );
+      return resultKey;
+    } catch (_) {
+      await _storage.recordAnalyticsFeature('sync_failed');
+      rethrow;
     }
-    if (settings.method == 'file') {
-      await exportData();
-      return 'local_export_generated';
-    }
-    if (settings.isAutomaticMethod) {
-      final result = await _dataSync.syncNow(settings);
-      return result.l10nKey;
-    }
-    if (['baidu', 'quark', 'aliyun', 'onedrive'].contains(settings.method)) {
-      return 'third_party_sync_coming_soon';
-    }
-    return 'cloud_sync_unavailable';
+  }
+
+  bool _isSuccessfulSyncResult(String resultKey) {
+    return {
+      'local_mode_data_saved',
+      'local_export_generated',
+      'sync_success',
+      'sync_upload_success',
+      'sync_download_success',
+      'sync_merged_success',
+      'sync_no_changes',
+    }.contains(resultKey);
   }
 
   Future<void> exportData() async {

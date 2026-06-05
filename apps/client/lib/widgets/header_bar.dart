@@ -392,7 +392,8 @@ class _HeaderBarState extends State<HeaderBar> {
     final settingsProvider = context.watch<SettingsProvider>();
 
     // 获取当前使用的AI模型名称
-    final currentModelName = aiProvider.defaultConfig?.name ??
+    final currentModelName =
+        aiProvider.defaultConfig?.name ??
         aiProvider.enabledConfigs.firstOrNull?.name ??
         l10n.get('ai_not_configured');
 
@@ -513,11 +514,21 @@ class _HeaderBarState extends State<HeaderBar> {
 
   // 种子头像调色板
   static const List<Color> _seedColors = [
-    Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
-    Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF009688),
-    Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFFF5722),
-    Color(0xFF795548), Color(0xFF607D8B), Color(0xFFE67E22),
-    Color(0xFF2ECC71), Color(0xFF3498DB), Color(0xFF9B59B6),
+    Color(0xFFE91E63),
+    Color(0xFF9C27B0),
+    Color(0xFF673AB7),
+    Color(0xFF3F51B5),
+    Color(0xFF2196F3),
+    Color(0xFF009688),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFFFF5722),
+    Color(0xFF795548),
+    Color(0xFF607D8B),
+    Color(0xFFE67E22),
+    Color(0xFF2ECC71),
+    Color(0xFF3498DB),
+    Color(0xFF9B59B6),
     Color(0xFF1ABC9C),
   ];
 
@@ -529,7 +540,8 @@ class _HeaderBarState extends State<HeaderBar> {
   Widget _buildUserAvatar(BuildContext context, bool isDark) {
     final progress = context.watch<ProgressProvider>();
     final profile = progress.localProfile;
-    final hasAvatarUrl = profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
+    final hasAvatarUrl =
+        profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty;
     final hasSeed = profile.avatarSeed.isNotEmpty;
     final seedColor = _seedColor(profile.avatarSeed);
 
@@ -552,7 +564,7 @@ class _HeaderBarState extends State<HeaderBar> {
 
     final diceBearUrl = hasSeed && !hasAvatarUrl
         ? 'https://api.dicebear.com/9.x/fun-emoji/png'
-            '?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
+              '?seed=${Uri.encodeComponent(profile.avatarSeed)}&backgroundColor=transparent'
         : null;
 
     return GestureDetector(
@@ -565,8 +577,8 @@ class _HeaderBarState extends State<HeaderBar> {
         backgroundImage: hasAvatarUrl
             ? NetworkImage(profile.avatarUrl!)
             : diceBearUrl != null
-                ? NetworkImage(diceBearUrl)
-                : null,
+            ? NetworkImage(diceBearUrl)
+            : null,
       ),
     );
   }
@@ -697,9 +709,9 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
         allowedEnvs.contains(ContentEnv.production.key),
       ),
       (
-        ContentEnv.test,
+        ContentEnv.staging,
         l10n.get('content_testing'),
-        allowedEnvs.contains(ContentEnv.test.key),
+        ContentEnv.staging.isAllowedBy(allowedEnvs),
       ),
       (
         ContentEnv.draft,

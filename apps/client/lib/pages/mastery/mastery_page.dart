@@ -576,15 +576,10 @@ class _MasteryPageState extends State<MasteryPage> {
       filteredTopics = topics
           .where((t) => t.status == null || t.status == 'production')
           .toList();
-    } else if (contentEnv == ContentEnv.test) {
-      // 测试阶段显示 production 和 test 状态的内容
+    } else if (contentEnv == ContentEnv.staging) {
+      // 测试阶段显示 production 和 staging 状态的内容；兼容旧 test 值
       filteredTopics = topics
-          .where(
-            (t) =>
-                t.status == null ||
-                t.status == 'production' ||
-                t.status == 'test',
-          )
+          .where((t) => t.isProductionStatus || t.isStagingStatus)
           .toList();
     }
     // draft 阶段显示所有内容

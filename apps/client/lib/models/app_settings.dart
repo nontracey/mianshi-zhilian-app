@@ -29,14 +29,14 @@ enum OnDeviceEngine {
 
 /// 知识源环境
 enum ContentEnv {
-  test,
+  staging,
   draft,
   production;
 
   String get key {
     switch (this) {
-      case ContentEnv.test:
-        return 'test';
+      case ContentEnv.staging:
+        return 'staging';
       case ContentEnv.draft:
         return 'draft';
       case ContentEnv.production:
@@ -47,7 +47,7 @@ enum ContentEnv {
   /// 返回 l10n key，UI 层使用 l10n.get() 获取显示文本
   String get labelKey {
     switch (this) {
-      case ContentEnv.test:
+      case ContentEnv.staging:
         return 'test_version';
       case ContentEnv.draft:
         return 'draft_version';
@@ -56,10 +56,24 @@ enum ContentEnv {
     }
   }
 
-  static ContentEnv fromKey(String key) => ContentEnv.values.firstWhere(
-    (e) => e.key == key,
-    orElse: () => ContentEnv.production,
-  );
+  String get routeStage => switch (this) {
+    ContentEnv.staging => 'test',
+    ContentEnv.draft => 'draft',
+    ContentEnv.production => 'production',
+  };
+
+  bool isAllowedBy(Iterable<String> allowedKeys) {
+    if (allowedKeys.contains(key)) return true;
+    return this == ContentEnv.staging && allowedKeys.contains('test');
+  }
+
+  static ContentEnv fromKey(String key) {
+    final normalized = key == 'test' ? 'staging' : key;
+    return ContentEnv.values.firstWhere(
+      (e) => e.key == normalized,
+      orElse: () => ContentEnv.production,
+    );
+  }
 }
 
 /// 主题类型
@@ -190,7 +204,7 @@ class AppSettings {
 
   /// 获取当前内容源的基础 URL
   String get contentBaseUrl {
-    if (contentEnv == ContentEnv.test) {
+    if (contentEnv == ContentEnv.staging) {
       return customTestContentUrl?.isNotEmpty == true
           ? customTestContentUrl!
           : '$defaultWorkerApiUrl/content/test';

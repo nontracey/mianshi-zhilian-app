@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+String _contentCacheKey(String baseUrl, String key) =>
+    'content_cache_${baseUrl.replaceAll(RegExp(r'^https?://'), '').replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '')}_$key';
 
 void main() {
   group('sync package privacy', () {
@@ -38,6 +42,22 @@ void main() {
         expect(data.containsKey('answer_versions'), isFalse);
       },
     );
+
+    test('export includes content environment and version metadata', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      const settings = AppSettings(contentEnv: ContentEnv.staging);
+      await storage.saveSettings(settings);
+      await storage.save(
+        _contentCacheKey(settings.contentBaseUrl, 'content_version'),
+        'content-2026-06-05',
+      );
+
+      final package = await storage.exportSyncPackage(const SyncSettings());
+
+      expect(package['contentEnv'], 'staging');
+      expect(package['contentVersion'], 'content-2026-06-05');
+    });
 
     test(
       'full-answer export includes practice answers and answer versions',

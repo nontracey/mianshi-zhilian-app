@@ -37,7 +37,18 @@ class AnalyticsService with WidgetsBindingObserver {
     'mastery',
     'profile',
   };
-  static const _features = {'ai_eval', 'manual_sync', 'ticket_submit', 'login'};
+  static const _features = {
+    'ai_eval',
+    'ai_eval_success',
+    'ai_eval_failed',
+    'content_load_failed',
+    'manual_sync',
+    'sync_success',
+    'sync_failed',
+    'ticket_submit',
+    'login',
+    'update_check',
+  };
 
   void start() {
     _isActive = true;

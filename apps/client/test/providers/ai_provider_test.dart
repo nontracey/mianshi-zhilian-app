@@ -18,7 +18,9 @@ class _FakeAiService extends AiService {
     required AiConfig config,
     required String topicTitle,
     required List<String> mustHave,
+    required List<String> goodToHave,
     required List<String> commonMistakes,
+    Map<String, int>? scoreWeights,
     required String userAnswer,
     required String language,
     Uint8List? imageBytes,
@@ -42,9 +44,7 @@ AiConfig _textConfig() => AiConfig(
   },
 );
 
-Future<AiProvider> _providerWith(
-  List<Stream<String>> streams,
-) async {
+Future<AiProvider> _providerWith(List<Stream<String>> streams) async {
   SharedPreferences.setMockInitialValues({});
   final provider = AiProvider(_FakeAiService(streams), StorageService());
   await provider.addConfig(_textConfig());
@@ -52,53 +52,61 @@ Future<AiProvider> _providerWith(
 }
 
 void main() {
-  test('stream parse failure is marked unavailable without a zero score', () async {
-    final provider = await _providerWith([
-      Stream.value('plain text, not json'),
-    ]);
+  test(
+    'stream parse failure is marked unavailable without a zero score',
+    () async {
+      final provider = await _providerWith([
+        Stream.value('plain text, not json'),
+      ]);
 
-    final eval = provider.evaluateAnswerStream(
-      topicId: 'topic-1',
-      question: 'question',
-      userAnswer: 'answer',
-    );
+      final eval = provider.evaluateAnswerStream(
+        topicId: 'topic-1',
+        question: 'question',
+        userAnswer: 'answer',
+      );
 
-    expect(await eval.stream.join(), 'plain text, not json');
-    final result = await eval.result;
+      expect(await eval.stream.join(), 'plain text, not json');
+      final result = await eval.result;
 
-    expect(result['score'], isNull);
-    expect(result['aiUnavailable'], isTrue);
-  });
+      expect(result['score'], isNull);
+      expect(result['aiUnavailable'], isTrue);
+    },
+  );
 
-  test('starting a second stream completes the first call instead of hanging', () async {
-    final first = StreamController<String>();
-    final provider = await _providerWith([
-      first.stream,
-      Stream.value('{"score": 88, "summary": "ok"}'),
-    ]);
+  test(
+    'starting a second stream completes the first call instead of hanging',
+    () async {
+      final first = StreamController<String>();
+      final provider = await _providerWith([
+        first.stream,
+        Stream.value('{"score": 88, "summary": "ok"}'),
+      ]);
 
-    final firstEval = provider.evaluateAnswerStream(
-      topicId: 'topic-1',
-      question: 'question',
-      userAnswer: 'answer',
-    );
-    final firstDone = firstEval.stream.drain<void>();
+      final firstEval = provider.evaluateAnswerStream(
+        topicId: 'topic-1',
+        question: 'question',
+        userAnswer: 'answer',
+      );
+      final firstDone = firstEval.stream.drain<void>();
 
-    final secondEval = provider.evaluateAnswerStream(
-      topicId: 'topic-1',
-      question: 'question',
-      userAnswer: 'answer',
-    );
+      final secondEval = provider.evaluateAnswerStream(
+        topicId: 'topic-1',
+        question: 'question',
+        userAnswer: 'answer',
+      );
 
-    await firstDone.timeout(const Duration(seconds: 1));
-    final cancelled = await firstEval.result.timeout(const Duration(seconds: 1));
-    expect(cancelled['score'], isNull);
-    expect(cancelled['aiUnavailable'], isTrue);
+      await firstDone.timeout(const Duration(seconds: 1));
+      final cancelled = await firstEval.result.timeout(
+        const Duration(seconds: 1),
+      );
+      expect(cancelled['score'], isNull);
+      expect(cancelled['aiUnavailable'], isTrue);
 
-    final second = await secondEval.result;
-    expect(second['score'], 88);
-    expect(second['aiUnavailable'], isNot(isTrue));
+      final second = await secondEval.result;
+      expect(second['score'], 88);
+      expect(second['aiUnavailable'], isNot(isTrue));
 
-    await first.close();
-  });
+      await first.close();
+    },
+  );
 }
