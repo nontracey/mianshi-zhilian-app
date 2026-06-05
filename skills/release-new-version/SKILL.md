@@ -1,6 +1,6 @@
 ---
 name: release-new-version
-description: 发布新版本——版本号+1、构建号重置为100、打新版本 tag
+description: 发布新版本——版本号+1、构建号递增、打新版本 tag
 source: project
 keywords: [发布新版本, 推送新版本, 发布新版, release new version, bump version]
 ---
@@ -13,12 +13,12 @@ keywords: [发布新版本, 推送新版本, 发布新版, release new version, 
 
 ## 适用场景
 
-功能里程碑达成、重大更新或需要更新版本号时，递增版本号并将构建号重置为 100。
+功能里程碑达成、重大更新或需要更新版本号时，递增版本号并将构建号递增。
 
 ## 工作流概览
 
 ```
-检测变更 → 提交功能变更(feat/fix)并推送main → 递增版本号+重置构建号(chore) → 推送 → 打新版本 tag → 推送 tag
+检测变更 → 提交功能变更(feat/fix)并推送main → 递增版本号+构建号(chore) → 推送 → 打新版本 tag → 推送 tag
 ```
 
 > **关键：功能变更和版本号递增必须分开提交。** 功能变更先推上去，再单独一个 `chore:` 提交版本号递增。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
@@ -53,13 +53,13 @@ git log origin/main..HEAD --oneline
 | `apps/client/` | `pubspec.yaml` — `version:` 字段 | `x.x.x+buildNumber` (如 `0.1.3+112`) |
 | `workers/api/` | `package.json` — `"version"` 字段 | `x.x.x` 或 `x.x.x+buildNumber` |
 
-### 2. 递增版本号 + 重置构建号
+### 2. 递增版本号 + 构建号递增
 
 #### apps/client (`pubspec.yaml`)
 
 - 版本号最后一位（patch）+1
-- 构建号重置为 **100**
-- 示例：`0.1.3+112` → `0.1.4+100`
+- 构建号在当前基础上 **+1**（不能重置，因为 Android 的 `versionCode` 使用构建号，必须单调递增）
+- 示例：`0.1.3+112` → `0.1.4+113`
 
 版本号递增规则：
 - **patch 递增**（默认）：`0.1.3` → `0.1.4`（功能修复、小改动）
@@ -89,13 +89,13 @@ git commit -m "feat: 新增关于页推广入口、隐私政策与 OG 图片"
 git push origin main
 ```
 
-### 4. 递增版本号 + 重置构建号 + 推送
+### 4. 递增版本号 + 构建号递增 + 推送
 
 功能变更推送后，单独提交版本号递增：
 
 ```bash
-# 编辑 apps/client/pubspec.yaml：patch +1，buildNumber 重置为 100
-# 示例：0.1.3+112 → 0.1.4+100
+# 编辑 apps/client/pubspec.yaml：patch +1，buildNumber +1
+# 示例：0.1.3+112 → 0.1.4+113
 # 如果 API 有变更：同步递增 workers/api/package.json
 
 git add apps/client/pubspec.yaml
@@ -104,11 +104,11 @@ git add workers/api/package.json  # 如需要
 
 提交信息格式：
 ```
-chore: 版本号 0.1.3→0.1.4，构建号重置为 100
+chore: 版本号 0.1.3→0.1.4，构建号 112→113
 ```
 
 ```bash
-git commit -m "chore: 版本号 0.1.3→0.1.4，构建号重置为 100"
+git commit -m "chore: 版本号 0.1.3→0.1.4，构建号 112→113"
 git push origin main
 ```
 
@@ -156,7 +156,7 @@ git push origin v{newVersion}
 ### 7. 验证
 
 推送后，GitHub Actions Release workflow 自动触发：
-- CI 验证 tag `v0.1.4` 与 `pubspec.yaml` 中 `0.1.4+100` 的版本部分一致
+- CI 验证 tag `v0.1.4` 与 `pubspec.yaml` 中 `0.1.4+113` 的版本部分一致
 - 并行构建 Android / Web / Windows / macOS 四平台
 - `update-manifest` job 生成 `update.json` 并发布为 latest
 
@@ -167,14 +167,14 @@ git push origin v{newVersion}
 | 维度 | 发布构建 | 发布新版本 |
 |------|---------|-----------|
 | 版本号 | 不变 | +1（patch 递增） |
-| 构建号 | +1 | 重置为 100 |
+| 构建号 | +1 | +1（递增，非重置） |
 | Tag | 重新打当前 tag (`force-push`) | 打新 tag (如 `v0.1.4`) |
 | 适用 | 日常迭代、hotfix | 功能里程碑、发布说明更新 |
 
 ## 注意事项
 
 - **版本号一旦发布不可修改**。`v0.1.4` tag 是永久记录，不可 force-push 覆盖（不像构建 tag `v0.1.3` 可以被覆盖）。
-- 发布新版本后，**下一次发布构建会自动从 +100 开始递增**。例如 `0.1.4+100` → 下次构建 → `0.1.4+101`。
+- 发布新版本后，**下一次发布构建会自动从递增后的构建号继续**。例如 `0.1.4+113` → 下次构建 → `0.1.4+114`。
 - `pubspec.yaml` 版本号不得包含字母（如 `0.1.4-beta`），否则 CI 解析会失败。
 - 建议在发布新版本时同步更新 `docs/` 目录下的部署文档中的版本信息。
 - 如果 `workers/api/` 也需要发布新版本，确保 API 的 `package.json` 版本号也同步递增。
