@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
-import 'model_downloader.dart';
+import 'model_downloader_io.dart';
 import 'on_device_stt_service.dart';
 
 /// Whisper 引擎实现（基于 sherpa_onnx OfflineRecognizer）

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
-import 'model_downloader.dart';
+import 'model_downloader_io.dart';
 import 'on_device_stt_service.dart';
 
 /// Paraformer 流式引擎实现（基于 sherpa_onnx OnlineRecognizer）

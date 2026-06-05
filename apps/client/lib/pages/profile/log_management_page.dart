@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/services/app_log_service.dart';
 
 class LogManagementPage extends StatefulWidget {
@@ -16,13 +18,14 @@ class _LogManagementPageState extends State<LogManagementPage> {
   @override
   Widget build(BuildContext context) {
     final logger = AppLogService.instance;
+    final l10n = context.watch<LocalizationProvider>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日志管理'),
+        title: Text(l10n.get('log_management')),
         actions: [
           IconButton(
-            tooltip: '复制',
-            onPressed: () => _copyLogs(logger),
+            tooltip: l10n.get('copy'),
+            onPressed: () => _copyLogs(logger, l10n),
             icon: const Icon(Icons.copy_all_outlined),
           ),
           PopupMenuButton<String>(
@@ -33,9 +36,15 @@ class _LogManagementPageState extends State<LogManagementPage> {
                 logger.clear(belowLevel: AppLogLevel.warning);
               }
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'clear_noise', child: Text('清理普通日志')),
-              PopupMenuItem(value: 'clear_all', child: Text('清空全部日志')),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'clear_noise',
+                child: Text(l10n.get('clear_regular_logs')),
+              ),
+              PopupMenuItem(
+                value: 'clear_all',
+                child: Text(l10n.get('clear_all_logs')),
+              ),
             ],
           ),
         ],
@@ -67,7 +76,9 @@ class _LogManagementPageState extends State<LogManagementPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '显示 ${logs.length} 条，最多保留 1000 条或 14 天。复制日志会自动脱敏常见 Key 和 Authorization。',
+                      l10n.getp('log_management_summary', {
+                        'count': '${logs.length}',
+                      }),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -78,7 +89,7 @@ class _LogManagementPageState extends State<LogManagementPage> {
               const Divider(height: 1),
               Expanded(
                 child: logs.isEmpty
-                    ? const Center(child: Text('暂无日志'))
+                    ? Center(child: Text(l10n.get('no_logs')))
                     : ListView.separated(
                         itemCount: logs.length,
                         separatorBuilder: (context, index) =>
@@ -95,29 +106,35 @@ class _LogManagementPageState extends State<LogManagementPage> {
     );
   }
 
-  Future<void> _copyLogs(AppLogService logger) async {
+  Future<void> _copyLogs(
+    AppLogService logger,
+    LocalizationProvider l10n,
+  ) async {
     final logs = logger.filter(_minimumLevel);
     await Clipboard.setData(ClipboardData(text: logger.formatEntries(logs)));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('已复制 ${logs.length} 条日志')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.getp('logs_copied', {'count': '${logs.length}'})),
+      ),
+    );
   }
 
   Future<void> _confirmClearAll(AppLogService logger) async {
+    final l10n = context.read<LocalizationProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('清空日志'),
-        content: const Text('确定清空所有本地日志吗？这不会影响学习数据、模型或设置。'),
+        title: Text(l10n.get('clear_logs')),
+        content: Text(l10n.get('clear_logs_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l10n.get('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('清空'),
+            child: Text(l10n.get('clear')),
           ),
         ],
       ),

@@ -39,6 +39,7 @@ jobs:
       - run: flutter pub get
       - run: bash tool/generate_version.sh
       - run: test -f lib/generated/app_version.g.dart
+      - run: python3 lib/l10n/check_l10n_keys.py
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - run: flutter build web --release

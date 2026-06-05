@@ -1542,6 +1542,16 @@ class L10n {
     'clean_orphan_dirs': '清理孤立目录',
     'clean_orphan_dirs_desc': '清理下载失败或已删除模型的残留目录',
     'orphan_dirs_cleaned': '已清理 {count} 个孤立目录',
+    'copy': '复制',
+    'log_management': '日志管理',
+    'clear_regular_logs': '清理普通日志',
+    'clear_all_logs': '清空全部日志',
+    'log_management_summary':
+        '显示 {count} 条，最多保留 1000 条或 14 天。复制日志会自动脱敏常见 Key 和 Authorization。',
+    'no_logs': '暂无日志',
+    'logs_copied': '已复制 {count} 条日志',
+    'clear_logs': '清空日志',
+    'clear_logs_confirm': '确定清空所有本地日志吗？这不会影响学习数据、模型或设置。',
   };
 
   static const _en = {
@@ -3261,6 +3271,17 @@ class L10n {
     'clean_orphan_dirs_desc':
         'Clean up residual directories from failed downloads or deleted models',
     'orphan_dirs_cleaned': 'Cleaned {count} orphaned directories',
+    'copy': 'Copy',
+    'log_management': 'Log Management',
+    'clear_regular_logs': 'Clear Regular Logs',
+    'clear_all_logs': 'Clear All Logs',
+    'log_management_summary':
+        'Showing {count} logs. Up to 1000 entries or 14 days are kept. Copied logs redact common Key and Authorization values.',
+    'no_logs': 'No logs',
+    'logs_copied': 'Copied {count} logs',
+    'clear_logs': 'Clear Logs',
+    'clear_logs_confirm':
+        'Clear all local logs? This will not affect learning data, models, or settings.',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {

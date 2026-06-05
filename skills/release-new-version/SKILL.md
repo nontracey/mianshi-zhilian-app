@@ -21,6 +21,17 @@ keywords: [发布新版本, 推送新版本, 发布新版, release new version, 
 检测变更 → 递增版本号 + 重置构建号 → 提交(中文gitmessage) → 推送main → 打新版本 tag → 推送 tag
 ```
 
+## 前置检查
+
+在开始发布新版本前，**必须**在项目根目录运行提交前检查脚本，确保代码通过所有质量门禁：
+
+```bash
+cd /Users/yingjunchi/code/mianshi-zhilian-app
+./scripts/pre-commit-check.sh
+```
+
+该脚本依次执行：`flutter pub get` → 生成版本文件 → l10n key 校验 → `flutter analyze` → `flutter test` → `flutter build web --release`。任何一步失败则中止，修复后再继续。
+
 ## 详细步骤
 
 ### 1. 检测变更区域

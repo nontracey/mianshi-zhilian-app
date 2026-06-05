@@ -55,6 +55,17 @@ ci: 添加 pub-cache 缓存加速依赖安装
 
 **多行描述：** 一个点一行写完，多个点可以多行。
 
+## 前置检查
+
+在提交前，**必须**在项目根目录运行提交前检查脚本，确保代码通过所有质量门禁：
+
+```bash
+cd /Users/yingjunchi/code/mianshi-zhilian-app
+./scripts/pre-commit-check.sh
+```
+
+该脚本依次执行：`flutter pub get` → 生成版本文件 → l10n key 校验 → `flutter analyze` → `flutter test` → `flutter build web --release`。任何一步失败则中止，修复后再继续。
+
 ## 操作步骤
 
 ### 1. 暂存变更

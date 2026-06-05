@@ -1,0 +1,806 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'app_log_service.dart';
+import 'app_version_service.dart';
+import 'endpoint_fallback_client.dart';
+import 'on_device_stt/runtime_platform.dart';
+import 'route_resolver.dart';
+import 'route_state_store.dart';
+import 'storage_service.dart';
+
+class UpdateInfo {
+  final String version;
+  final int buildNumber;
+  final String releaseDate;
+  final String minimumRequiredVersion;
+  final List<String> notes;
+  final Map<String, PlatformUpdate> platforms;
+
+  const UpdateInfo({
+    required this.version,
+    required this.buildNumber,
+    required this.releaseDate,
+    required this.minimumRequiredVersion,
+    required this.notes,
+    required this.platforms,
+  });
+
+  factory UpdateInfo.fromJson(Map<String, dynamic> json) {
+    final platforms = <String, PlatformUpdate>{};
+    final platformsJson = json['platforms'] as Map<String, dynamic>? ?? {};
+    for (final entry in platformsJson.entries) {
+      platforms[entry.key] = PlatformUpdate.fromJson(
+        entry.value as Map<String, dynamic>,
+      );
+    }
+
+    return UpdateInfo(
+      version: json['version'] as String? ?? '',
+      buildNumber: json['buildNumber'] as int? ?? 0,
+      releaseDate: json['releaseDate'] as String? ?? '',
+      minimumRequiredVersion: json['minimumRequiredVersion'] as String? ?? '',
+      notes: (json['notes'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      platforms: platforms,
+    );
+  }
+}
+
+class PlatformUpdate {
+  final String url;
+  final String? assetPath;
+  final List<String> mirrors;
+  final String sha256;
+  final int size;
+
+  const PlatformUpdate({
+    required this.url,
+    this.assetPath,
+    this.mirrors = const [],
+    required this.sha256,
+    required this.size,
+  });
+
+  factory PlatformUpdate.fromJson(Map<String, dynamic> json) {
+    return PlatformUpdate(
+      url: json['url'] as String? ?? '',
+      assetPath: json['assetPath'] as String?,
+      mirrors: (json['mirrors'] as List<dynamic>? ?? [])
+          .map((item) => item.toString())
+          .where((item) => item.isNotEmpty)
+          .toList(),
+      sha256: json['sha256'] as String? ?? '',
+      size: json['size'] as int? ?? 0,
+    );
+  }
+}
+
+/// 更新检查结果
+class CheckUpdateResult {
+  final UpdateInfo? updateInfo;
+  final bool isError;
+
+  const CheckUpdateResult._(this.updateInfo, this.isError);
+
+  /// 发现新版本
+  const CheckUpdateResult.hasUpdate(UpdateInfo info) : this._(info, false);
+
+  /// 已是最新版本
+  const CheckUpdateResult.noUpdate() : this._(null, false);
+
+  /// 检查失败（网络等原因）
+  const CheckUpdateResult.error() : this._(null, true);
+
+  bool get hasUpdate => updateInfo != null;
+}
+
+/// 下载结果
+enum DownloadResult {
+  /// 下载成功
+  success,
+
+  /// 下载失败 — 网络原因
+  networkError,
+
+  /// 下载失败 — 校验不通过
+  verificationFailed,
+
+  /// 下载被取消
+  cancelled,
+}
+
+/// 单次下载源尝试记录
+class DownloadAttempt {
+  final String url;
+  final String sourceLabel;
+  final bool reached;
+  final int? statusCode;
+  final String? errorSummary;
+
+  const DownloadAttempt({
+    required this.url,
+    required this.sourceLabel,
+    required this.reached,
+    this.statusCode,
+    this.errorSummary,
+  });
+
+  /// 用户可读的失败原因
+  String get failureReason {
+    if (reached) {
+      if (statusCode != null && statusCode != 200) {
+        return 'HTTP $statusCode';
+      }
+      return '校验不通过';
+    }
+    return errorSummary ?? '无法连接';
+  }
+}
+
+/// 下载进度回调
+/// [received] 已下载字节数, [total] 总字节数, [sourceLabel] 当前下载源描述
+typedef DownloadProgressCallback =
+    void Function(int received, int total, String sourceLabel);
+
+class DownloadCancelToken {
+  bool _isCancelled = false;
+  http.Client? _client;
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    _isCancelled = true;
+    _client?.close();
+  }
+
+  void _bind(http.Client client) {
+    if (_isCancelled) {
+      client.close();
+      return;
+    }
+    _client = client;
+  }
+
+  void _unbind(http.Client client) {
+    if (_client == client) {
+      _client = null;
+    }
+  }
+}
+
+class UpdateService {
+  final String updateManifestUrl;
+  final EndpointFallbackClient _routeClient;
+
+  /// 用户自定义的 GitHub 镜像站前缀（如 https://mirror.example.com）
+  /// 如果设置了，下载时会优先插入自定义镜像到 mirrors 列表头部
+  final String? customMirrorPrefix;
+
+  /// 下载源模式，控制各来源的尝试顺序
+  final DownloadSourceMode downloadSourceMode;
+
+  /// 最近一次下载的源尝试记录（供 UI 展示失败详情）
+  List<DownloadAttempt> _lastAttempts = [];
+  List<DownloadAttempt> get lastAttempts => List.unmodifiable(_lastAttempts);
+
+  UpdateService({
+    this.updateManifestUrl = '',
+    this.customMirrorPrefix,
+    this.downloadSourceMode = DownloadSourceMode.auto,
+    EndpointFallbackClient? routeClient,
+  }) : _routeClient =
+           routeClient ??
+           EndpointFallbackClient(
+             stateStore: RouteStateStore(StorageService()),
+           );
+
+  /// 默认备用镜像站
+  static const defaultMirrorPrefix = 'https://ghfast.top';
+
+  /// 检查是否有新版本
+  Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
+    try {
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'GET',
+        '/update.json',
+        timeout: const Duration(seconds: 15),
+      );
+      if (response.statusCode != 200) {
+        debugPrint('Failed to check update: ${response.statusCode}');
+        unawaited(
+          AppLog.warning(
+            'Check update failed: HTTP ${response.statusCode}',
+            source: 'app_update',
+          ),
+        );
+        return const CheckUpdateResult.error();
+      }
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final remoteVersion = data['version'] as String? ?? '';
+
+      final remoteBuildNumber = data['buildNumber'] as int? ?? 0;
+      if (_isNewerVersion(
+        remoteVersion: remoteVersion,
+        remoteBuildNumber: remoteBuildNumber,
+        localVersion: currentVersion.version,
+        localBuildNumber: currentVersion.buildNumber,
+      )) {
+        return CheckUpdateResult.hasUpdate(UpdateInfo.fromJson(data));
+      }
+
+      return const CheckUpdateResult.noUpdate();
+    } catch (e) {
+      debugPrint('Check update error: $e');
+      unawaited(
+        AppLog.warning('Check update error', source: 'app_update', error: e),
+      );
+      return const CheckUpdateResult.error();
+    }
+  }
+
+  bool isRequiredUpdate(UpdateInfo updateInfo, AppBuildInfo currentVersion) {
+    final minimumVersion = updateInfo.minimumRequiredVersion;
+    if (minimumVersion.isEmpty) return false;
+    return _isVersionGreater(minimumVersion, currentVersion.version);
+  }
+
+  /// 获取当前平台的更新信息
+  PlatformUpdate? getPlatformUpdate(UpdateInfo updateInfo) {
+    if (kIsWeb) {
+      return null; // Web 端自动更新，不需要下载
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // 优先按 ABI 特化条目下载（如 android-arm64-v8a），
+      // 回退到通用 android 条目兼容旧 update.json
+      final abi = currentSherpaOnnxRuntimeArch();
+      final abiKey = 'android-$abi';
+      return updateInfo.platforms[abiKey] ?? updateInfo.platforms['android'];
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return updateInfo.platforms['macos']; // iOS 暂用 macOS 包
+    }
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      return updateInfo.platforms['macos'];
+    }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return updateInfo.platforms['windows'];
+    }
+    if (defaultTargetPlatform == TargetPlatform.linux) {
+      return updateInfo.platforms['linux'];
+    }
+
+    return null;
+  }
+
+  /// 根据 URL 生成用户可读的下载源描述
+  ///
+  /// 注意：镜像 URL 格式为 `mirrorPrefix/https://github.com/...`，
+  /// 镜像 URL 中也包含 `github.com`，必须先检查镜像前缀再检查 GitHub。
+  String _sourceLabelFromUrl(String url) {
+    // 优先检查自定义镜像前缀（URL 以镜像域名开头，说明走的是镜像）
+    if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
+      final prefix = customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '');
+      if (url.startsWith(prefix)) {
+        try {
+          final uri = Uri.parse(url);
+          return uri.host;
+        } catch (_) {
+          return prefix;
+        }
+      }
+    }
+    // 内置默认镜像
+    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
+    // ghproxy.com 已废弃但保留兼容
+    if (url.startsWith('https://ghproxy.com')) return 'ghproxy.com';
+    // 最后才检查是否为 GitHub 官方源
+    if (url.contains('github.com')) return 'GitHub';
+    // 其他：提取域名
+    try {
+      final uri = Uri.parse(url);
+      return uri.host;
+    } catch (_) {
+      return url.substring(0, url.length.clamp(0, 30));
+    }
+  }
+
+  /// 构建下载 URL 列表，按 [downloadSourceMode] 排序
+  @visibleForTesting
+  List<String> buildDownloadUrlsForTest(PlatformUpdate platformUpdate) {
+    return _buildDownloadUrls(platformUpdate);
+  }
+
+  List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
+    final githubUrl = platformUpdate.url.trim();
+    final mirrorPrefix = (customMirrorPrefix ?? '').replaceAll(
+      RegExp(r'/+$'),
+      '',
+    );
+    final customMirrorUrl = mirrorPrefix.isNotEmpty
+        ? '$mirrorPrefix/$githubUrl'
+        : '';
+    final defaultMirrorUrl = githubUrl.isNotEmpty
+        ? '$defaultMirrorPrefix/$githubUrl'
+        : '';
+    final manifestMirrors = platformUpdate.mirrors
+        .where((m) => m.trim().isNotEmpty)
+        .toList();
+
+    // 按模式构造 URL 列表
+    List<String> buildList(bool mirrorFirst) {
+      final urls = <String>[];
+      if (mirrorFirst) {
+        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
+        if (githubUrl.isNotEmpty) urls.add(githubUrl);
+      } else {
+        if (githubUrl.isNotEmpty) urls.add(githubUrl);
+        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
+      }
+      if (defaultMirrorUrl.isNotEmpty && !urls.contains(defaultMirrorUrl)) {
+        urls.add(defaultMirrorUrl);
+      }
+      for (final mirror in manifestMirrors) {
+        if (!urls.contains(mirror)) urls.add(mirror);
+      }
+      return urls;
+    }
+
+    switch (downloadSourceMode) {
+      case DownloadSourceMode.githubOnly:
+        return githubUrl.isNotEmpty ? [githubUrl] : [];
+      case DownloadSourceMode.auto:
+      case DownloadSourceMode.githubFirst:
+        return buildList(false);
+      case DownloadSourceMode.mirrorFirst:
+        return buildList(true);
+    }
+  }
+
+  /// 下载更新文件
+  /// 返回 (文件路径, 下载结果)，失败时路径为 null。
+  /// 可通过 [lastAttempts] 获取每个源的尝试详情。
+  Future<(String?, DownloadResult)> downloadUpdate({
+    required PlatformUpdate platformUpdate,
+    required String version,
+    DownloadProgressCallback? onProgress,
+    DownloadCancelToken? cancelToken,
+  }) async {
+    var urls = _buildDownloadUrls(platformUpdate);
+    if (downloadSourceMode == DownloadSourceMode.auto) {
+      urls = await _orderUrlsByProbeLatency(urls);
+    }
+
+    if (urls.isEmpty) {
+      _lastAttempts = [];
+      return (null, DownloadResult.networkError);
+    }
+
+    // 获取临时目录
+    final tempDir = await getTemporaryDirectory();
+    final fileName = 'mianshi-zhilian-v$version.${_getFileExtension()}';
+    final filePath = '${tempDir.path}/$fileName';
+
+    final attempts = <DownloadAttempt>[];
+    bool lastVerificationFailed = false;
+
+    for (final url in urls) {
+      if (cancelToken?.isCancelled ?? false) {
+        _lastAttempts = attempts;
+        return (null, DownloadResult.cancelled);
+      }
+      final sourceLabel = _sourceLabelFromUrl(url);
+
+      // HEAD 预检：快速判断源是否可达，避免等待完整超时
+      if (!await _headCheck(url, sourceLabel, attempts, cancelToken)) {
+        continue;
+      }
+
+      final result = await _downloadFromUrl(
+        url: url,
+        filePath: filePath,
+        platformUpdate: platformUpdate,
+        sourceLabel: sourceLabel,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      switch (result) {
+        case _DownloadStatus.success:
+          // 只记录成功的，前面的失败已在 HEAD 预检中记录
+          _lastAttempts = attempts;
+          return (filePath, DownloadResult.success);
+        case _DownloadStatus.cancelled:
+          _lastAttempts = attempts;
+          return (null, DownloadResult.cancelled);
+        case _DownloadStatus.verificationFailed:
+          attempts.add(
+            DownloadAttempt(
+              url: url,
+              sourceLabel: sourceLabel,
+              reached: true,
+              errorSummary: 'SHA256 校验不通过',
+            ),
+          );
+          lastVerificationFailed = true;
+          continue;
+        case _DownloadStatus.networkError:
+          attempts.add(
+            DownloadAttempt(
+              url: url,
+              sourceLabel: sourceLabel,
+              reached: false,
+              errorSummary: '下载中断',
+            ),
+          );
+          continue;
+      }
+    }
+
+    _lastAttempts = attempts;
+    // 所有源都失败
+    if (lastVerificationFailed) {
+      return (null, DownloadResult.verificationFailed);
+    }
+    return (null, DownloadResult.networkError);
+  }
+
+  /// HEAD 预检：快速判断下载源是否可达
+  ///
+  /// 返回 true 表示可以继续尝试下载，false 表示应跳过该源
+  Future<bool> _headCheck(
+    String url,
+    String sourceLabel,
+    List<DownloadAttempt> attempts,
+    DownloadCancelToken? cancelToken,
+  ) async {
+    final client = http.Client();
+    cancelToken?._bind(client);
+    try {
+      final headRequest = http.Request('HEAD', Uri.parse(url));
+      final headResponse = await client
+          .send(headRequest)
+          .timeout(const Duration(seconds: 12));
+      cancelToken?._unbind(client);
+      client.close();
+
+      if (headResponse.statusCode == 200) {
+        return true; // 源可达，继续下载
+      }
+
+      // 返回非 200，记录并跳过
+      attempts.add(
+        DownloadAttempt(
+          url: url,
+          sourceLabel: sourceLabel,
+          reached: true,
+          statusCode: headResponse.statusCode,
+        ),
+      );
+      debugPrint('HEAD $sourceLabel → ${headResponse.statusCode}，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source skipped by HEAD: $sourceLabel '
+          'HTTP ${headResponse.statusCode}',
+          source: 'app_update',
+        ),
+      );
+      return false;
+    } on TimeoutException {
+      cancelToken?._unbind(client);
+      client.close();
+      attempts.add(
+        DownloadAttempt(
+          url: url,
+          sourceLabel: sourceLabel,
+          reached: false,
+          errorSummary: '连接超时',
+        ),
+      );
+      debugPrint('HEAD $sourceLabel → 超时，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source HEAD timeout: $sourceLabel',
+          source: 'app_update',
+        ),
+      );
+      return false;
+    } catch (e) {
+      cancelToken?._unbind(client);
+      client.close();
+      attempts.add(
+        DownloadAttempt(
+          url: url,
+          sourceLabel: sourceLabel,
+          reached: false,
+          errorSummary: '$e'.length > 60 ? '${'$e'.substring(0, 60)}...' : '$e',
+        ),
+      );
+      debugPrint('HEAD $sourceLabel → $e，跳过');
+      unawaited(
+        AppLog.warning(
+          'Update source HEAD failed: $sourceLabel',
+          source: 'app_update',
+          error: e,
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<List<String>> _orderUrlsByProbeLatency(List<String> urls) async {
+    if (urls.length <= 1) return urls;
+    final probes = await Future.wait(urls.map((url) => _probeDownloadUrl(url)));
+    final byUrl = {for (final probe in probes) probe.url: probe};
+    final ordered = [...urls]
+      ..sort((a, b) {
+        final pa = byUrl[a]!;
+        final pb = byUrl[b]!;
+        if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
+        if (!pa.reachable && !pb.reachable) {
+          return urls.indexOf(a).compareTo(urls.indexOf(b));
+        }
+        return pa.elapsed.compareTo(pb.elapsed);
+      });
+    return ordered;
+  }
+
+  Future<_DownloadSourceProbe> _probeDownloadUrl(String url) async {
+    final client = http.Client();
+    final stopwatch = Stopwatch()..start();
+    try {
+      final request = http.Request('HEAD', Uri.parse(url));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 6));
+      stopwatch.stop();
+      return _DownloadSourceProbe(
+        url: url,
+        reachable: response.statusCode >= 200 && response.statusCode < 400,
+        elapsed: stopwatch.elapsed,
+      );
+    } catch (_) {
+      stopwatch.stop();
+      return _DownloadSourceProbe(
+        url: url,
+        reachable: false,
+        elapsed: const Duration(days: 1),
+      );
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<_DownloadStatus> _downloadFromUrl({
+    required String url,
+    required String filePath,
+    required PlatformUpdate platformUpdate,
+    String sourceLabel = '',
+    DownloadProgressCallback? onProgress,
+    DownloadCancelToken? cancelToken,
+  }) async {
+    final client = http.Client();
+    cancelToken?._bind(client);
+    final file = File(filePath);
+    IOSink? sink;
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      // 下载文件（HEAD 预检已确认源可达，缩短连接超时）
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode != 200) {
+        debugPrint('Download failed from $url: ${response.statusCode}');
+        unawaited(
+          AppLog.warning(
+            'Update download failed: $sourceLabel HTTP ${response.statusCode}',
+            source: 'app_update',
+          ),
+        );
+        return _DownloadStatus.networkError;
+      }
+
+      sink = file.openWrite();
+      int received = 0;
+      final total = platformUpdate.size > 0
+          ? platformUpdate.size
+          : response.contentLength ?? 0;
+
+      await response.stream
+          .timeout(
+            const Duration(seconds: 45),
+            onTimeout: (controller) {
+              controller.addError(
+                TimeoutException('Download stalled for 45 seconds'),
+              );
+              controller.close();
+            },
+          )
+          .forEach((chunk) {
+            if (cancelToken?.isCancelled ?? false) {
+              throw StateError('Download cancelled');
+            }
+            sink!.add(chunk);
+            received += chunk.length;
+            onProgress?.call(received, total, sourceLabel);
+          })
+          .timeout(const Duration(minutes: 20));
+
+      await sink.close();
+      sink = null;
+
+      // 校验 sha256
+      final isValid = await verifySha256(filePath, platformUpdate.sha256);
+      if (!isValid) {
+        debugPrint('SHA256 verification failed for $url');
+        unawaited(
+          AppLog.error(
+            'Update SHA256 verification failed: $sourceLabel',
+            source: 'app_update',
+          ),
+        );
+        await file.delete();
+        return _DownloadStatus.verificationFailed;
+      }
+
+      unawaited(
+        AppLog.info(
+          'Update download completed: $sourceLabel',
+          source: 'app_update',
+        ),
+      );
+      return _DownloadStatus.success;
+    } on StateError catch (e) {
+      debugPrint('Download cancelled: $e');
+      unawaited(
+        AppLog.info(
+          'Update download cancelled: $sourceLabel error=$e',
+          source: 'app_update',
+        ),
+      );
+      try {
+        await sink?.close();
+      } catch (_) {}
+      if (await file.exists()) {
+        await file.delete();
+      }
+      return _DownloadStatus.cancelled;
+    } catch (e) {
+      debugPrint('Download error from $url: $e');
+      unawaited(
+        AppLog.warning(
+          'Update download error: $sourceLabel',
+          source: 'app_update',
+          error: e,
+        ),
+      );
+      try {
+        await sink?.close();
+      } catch (_) {}
+      if (await file.exists()) {
+        await file.delete();
+      }
+      return _DownloadStatus.networkError;
+    } finally {
+      cancelToken?._unbind(client);
+      client.close();
+    }
+  }
+
+  /// 启动系统默认安装流程。
+  ///
+  /// Android 会打开 APK 安装确认，Windows 会启动 EXE 安装器，macOS 会打开 DMG。
+  Future<bool> openInstaller(String filePath) async {
+    if (kIsWeb) return false;
+    final result = await OpenFilex.open(filePath);
+    return result.type == ResultType.done;
+  }
+
+  /// 校验文件的 SHA256
+  Future<bool> verifySha256(String filePath, String expectedSha256) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return false;
+
+      final digest = await sha256.bind(file.openRead()).first;
+      final actualSha256 = digest.toString();
+
+      debugPrint('Expected SHA256: $expectedSha256');
+      debugPrint('Actual SHA256: $actualSha256');
+
+      return actualSha256.toLowerCase() == expectedSha256.toLowerCase();
+    } catch (e) {
+      debugPrint('SHA256 verification error: $e');
+      return false;
+    }
+  }
+
+  /// 获取文件扩展名
+  String _getFileExtension() {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'apk';
+    }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return 'exe';
+    }
+    if (defaultTargetPlatform == TargetPlatform.linux) {
+      return 'AppImage';
+    }
+    return 'dmg'; // macOS / iOS
+  }
+
+  /// 比较版本号
+  bool _isNewerVersion({
+    required String remoteVersion,
+    required int remoteBuildNumber,
+    required String localVersion,
+    required int localBuildNumber,
+  }) {
+    final versionCompare = _compareVersion(remoteVersion, localVersion);
+    if (versionCompare > 0) return true;
+    if (versionCompare < 0) return false;
+    return remoteBuildNumber > localBuildNumber;
+  }
+
+  bool _isVersionGreater(String remote, String local) {
+    return _compareVersion(remote, local) > 0;
+  }
+
+  int _compareVersion(String remote, String local) {
+    final remoteParts = remote
+        .replaceAll('v', '')
+        .split('.')
+        .map(int.tryParse)
+        .toList();
+    final localParts = local
+        .replaceAll('v', '')
+        .split('.')
+        .map(int.tryParse)
+        .toList();
+
+    for (var i = 0; i < 3; i++) {
+      final r = i < remoteParts.length ? (remoteParts[i] ?? 0) : 0;
+      final l = i < localParts.length ? (localParts[i] ?? 0) : 0;
+      if (r > l) return 1;
+      if (r < l) return -1;
+    }
+
+    return 0;
+  }
+
+  /// 格式化文件大小
+  static String formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+}
+
+/// 下载状态内部枚举
+enum _DownloadStatus { success, networkError, verificationFailed, cancelled }
+
+class _DownloadSourceProbe {
+  const _DownloadSourceProbe({
+    required this.url,
+    required this.reachable,
+    required this.elapsed,
+  });
+
+  final String url;
+  final bool reachable;
+  final Duration elapsed;
+}
