@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:mianshi_zhilian/generated/app_version.g.dart';
@@ -32,7 +33,16 @@ class AppVersionService {
       final version = info.version.trim();
       final buildNumber = int.tryParse(info.buildNumber.trim());
       if (version.isNotEmpty && buildNumber != null) {
-        return AppBuildInfo(version: version, buildNumber: buildNumber);
+        return AppBuildInfo(
+          version: version,
+          buildNumber: normalizePackageBuildNumber(
+            packageVersion: version,
+            packageBuildNumber: buildNumber,
+            compileTime: AppBuildInfo.compileTime,
+            isAndroid:
+                !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+          ),
+        );
       }
       if (version.isNotEmpty) {
         return AppBuildInfo(
@@ -45,5 +55,24 @@ class AppVersionService {
     }
 
     return AppBuildInfo.compileTime;
+  }
+
+  @visibleForTesting
+  static int normalizePackageBuildNumber({
+    required String packageVersion,
+    required int packageBuildNumber,
+    required AppBuildInfo compileTime,
+    required bool isAndroid,
+  }) {
+    if (!isAndroid || packageVersion != compileTime.version) {
+      return packageBuildNumber;
+    }
+
+    final offset = packageBuildNumber - compileTime.buildNumber;
+    if (offset >= 1000 && offset % 1000 == 0) {
+      return compileTime.buildNumber;
+    }
+
+    return packageBuildNumber;
   }
 }
