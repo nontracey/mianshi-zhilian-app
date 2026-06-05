@@ -81,30 +81,34 @@ class _OnDeviceModelManagementPageState
     if (runtimeConfig != null) {
       final ready = await ModelDownloader.isRuntimeReady(runtimeConfig);
       final size = await ModelDownloader.getRuntimeSize(runtimeConfig.id);
-      final dir = await ModelDownloader.getRuntimeDir(runtimeConfig.id);
-      entries.add(_ModelEntry(
-        id: runtimeConfig.id,
-        name: runtimeConfig.displayName,
-        type: 'runtime',
-        ready: ready,
-        sizeBytes: size,
-        path: dir.path,
-      ));
+      final dir = await ModelDownloader.getRuntimeDirectory(runtimeConfig.id);
+      entries.add(
+        _ModelEntry(
+          id: runtimeConfig.id,
+          name: runtimeConfig.displayName,
+          type: 'runtime',
+          ready: ready,
+          sizeBytes: size,
+          path: dir.path,
+        ),
+      );
     }
 
     // All known models
     for (final config in KnownModels.all) {
       final ready = await ModelDownloader.isModelReady(config);
       final size = await ModelDownloader.getModelSize(config.id);
-      final dir = await ModelDownloader.getModelDir(config.id);
-      entries.add(_ModelEntry(
-        id: config.id,
-        name: config.displayName,
-        type: 'model',
-        ready: ready,
-        sizeBytes: size,
-        path: dir.path,
-      ));
+      final dir = await ModelDownloader.getModelDirectory(config.id);
+      entries.add(
+        _ModelEntry(
+          id: config.id,
+          name: config.displayName,
+          type: 'model',
+          ready: ready,
+          sizeBytes: size,
+          path: dir.path,
+        ),
+      );
     }
 
     return entries;
@@ -133,10 +137,7 @@ class _OnDeviceModelManagementPageState
           final subDir = sub as Directory;
           final subName = subDir.uri.pathSegments.last;
           if (!knownIds.contains(subName)) {
-            orphans.add(_OrphanDir(
-              path: subDir.path,
-              name: subName,
-            ));
+            orphans.add(_OrphanDir(path: subDir.path, name: subName));
           }
         }
         continue;
@@ -145,10 +146,7 @@ class _OnDeviceModelManagementPageState
       if (!knownIds.contains(name) &&
           name != 'runtimes' &&
           !name.startsWith('.')) {
-        orphans.add(_OrphanDir(
-          path: dir.path,
-          name: name,
-        ));
+        orphans.add(_OrphanDir(path: dir.path, name: name));
       }
     }
     return orphans;
@@ -180,11 +178,13 @@ class _OnDeviceModelManagementPageState
               ? l10n.get('confirm_delete_runtime_title')
               : l10n.get('confirm_delete_model_title'),
         ),
-        content: Text(entry.type == 'runtime'
-            ? l10n.get('confirm_delete_runtime_desc')
-            : l10n.getp('confirm_delete_model_item_desc', {
-                'name': entry.name,
-              })),
+        content: Text(
+          entry.type == 'runtime'
+              ? l10n.get('confirm_delete_runtime_desc')
+              : l10n.getp('confirm_delete_model_item_desc', {
+                  'name': entry.name,
+                }),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -230,17 +230,21 @@ class _OnDeviceModelManagementPageState
     final l10n = context.read<LocalizationProvider>();
 
     // 二次确认：构建当前所有有效模型/runtime ID 集合，跳过误拦截
-    final validIds = <String>{
-      ...KnownModels.all.map((c) => c.id),
-    };
+    final validIds = <String>{...KnownModels.all.map((c) => c.id)};
+    final validRuntimeIds = <String>{};
     final runtimeConfig = KnownRuntimes.current();
     if (runtimeConfig != null) {
       validIds.add(runtimeConfig.id);
+      validRuntimeIds.add(runtimeConfig.id);
     }
 
     int cleaned = 0;
     for (final orphan in _orphanDirs) {
       if (validIds.contains(orphan.name)) continue;
+      if (_isUnderRuntimesDir(orphan.path) &&
+          validRuntimeIds.contains(orphan.name)) {
+        continue;
+      }
       try {
         await Directory(orphan.path).delete(recursive: true);
         cleaned++;
@@ -249,11 +253,17 @@ class _OnDeviceModelManagementPageState
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.getp('orphan_dirs_cleaned', {'count': '$cleaned'})),
+          content: Text(
+            l10n.getp('orphan_dirs_cleaned', {'count': '$cleaned'}),
+          ),
         ),
       );
       _load();
     }
+  }
+
+  bool _isUnderRuntimesDir(String path) {
+    return path.split(Platform.pathSeparator).contains('runtimes');
   }
 
   Future<void> _downloadEntry(_ModelEntry entry) async {
@@ -289,8 +299,10 @@ class _OnDeviceModelManagementPageState
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('${l10n.get('download_failed')}: '
-                    'No runtime config for this platform'),
+                content: Text(
+                  '${l10n.get('download_failed')}: '
+                  'No runtime config for this platform',
+                ),
               ),
             );
           }
@@ -321,8 +333,10 @@ class _OnDeviceModelManagementPageState
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('${l10n.get('download_failed')}: '
-                    'Unknown model "${entry.id}"'),
+                content: Text(
+                  '${l10n.get('download_failed')}: '
+                  'Unknown model "${entry.id}"',
+                ),
               ),
             );
           }
@@ -350,9 +364,9 @@ class _OnDeviceModelManagementPageState
     } on ResourceDownloadStopped catch (_) {
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('download_paused'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.get('download_paused'))));
       }
     } catch (e) {
       if (mounted) {
@@ -374,16 +388,14 @@ class _OnDeviceModelManagementPageState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text('$_error'))
-              : _buildContent(l10n, theme),
+          ? Center(child: Text('$_error'))
+          : _buildContent(l10n, theme),
     );
   }
 
   Widget _buildContent(LocalizationProvider l10n, ThemeData theme) {
-    final runtimeEntries =
-        _entries.where((e) => e.type == 'runtime').toList();
-    final modelEntries =
-        _entries.where((e) => e.type == 'model').toList();
+    final runtimeEntries = _entries.where((e) => e.type == 'runtime').toList();
+    final modelEntries = _entries.where((e) => e.type == 'model').toList();
     final hasRuntime = runtimeEntries.isNotEmpty;
 
     return ListView(
@@ -402,11 +414,10 @@ class _OnDeviceModelManagementPageState
         // ── 运行时 ──
         if (hasRuntime) ...[
           WorkPanel(
-            title: '${l10n.get('model_management_others_runtime')} (${runtimeEntries.first.name})',
+            title:
+                '${l10n.get('model_management_others_runtime')} (${runtimeEntries.first.name})',
             icon: Icons.memory_outlined,
-            children: [
-              _buildEntryTile(runtimeEntries.first, l10n, theme),
-            ],
+            children: [_buildEntryTile(runtimeEntries.first, l10n, theme)],
           ),
           const SizedBox(height: 24),
         ],
@@ -429,7 +440,9 @@ class _OnDeviceModelManagementPageState
                     ),
                   ),
                 ]
-              : modelEntries.map((e) => _buildEntryTile(e, l10n, theme)).toList(),
+              : modelEntries
+                    .map((e) => _buildEntryTile(e, l10n, theme))
+                    .toList(),
         ),
         const SizedBox(height: 24),
 
@@ -515,7 +528,11 @@ class _OnDeviceModelManagementPageState
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.folder_outlined, size: 20, color: theme.colorScheme.primary),
+            Icon(
+              Icons.folder_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -543,7 +560,11 @@ class _OnDeviceModelManagementPageState
     );
   }
 
-  Widget _buildEntryTile(_ModelEntry entry, LocalizationProvider l10n, ThemeData theme) {
+  Widget _buildEntryTile(
+    _ModelEntry entry,
+    LocalizationProvider l10n,
+    ThemeData theme,
+  ) {
     final statusColor = entry.ready ? Colors.green : theme.colorScheme.error;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -604,11 +625,7 @@ class _OnDeviceModelManagementPageState
               ],
 
               // Path row
-              _infoRow(
-                Icons.folder_outlined,
-                entry.path,
-                theme,
-              ),
+              _infoRow(Icons.folder_outlined, entry.path, theme),
               const SizedBox(height: 8),
 
               // Action buttons row
@@ -689,8 +706,11 @@ class _OnDeviceModelManagementPageState
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    size: 16, color: Colors.orange),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 16,
+                  color: Colors.orange,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -738,10 +758,7 @@ class _ModelEntry {
 }
 
 class _OrphanDir {
-  const _OrphanDir({
-    required this.path,
-    required this.name,
-  });
+  const _OrphanDir({required this.path, required this.name});
 
   final String path;
   final String name;

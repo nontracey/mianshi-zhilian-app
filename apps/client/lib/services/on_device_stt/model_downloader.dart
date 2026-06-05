@@ -40,9 +40,11 @@ class OnDeviceModelConfig {
 
   /// 下载所需的最小磁盘空间（archive 解压后约 2x 空间）
   int get requiredDiskBytes {
-    final archive = archiveSizeBytes ?? (estimatedSizeMb != null
-        ? estimatedSizeMb! * 1024 * 1024
-        : 100 * 1024 * 1024);
+    final archive =
+        archiveSizeBytes ??
+        (estimatedSizeMb != null
+            ? estimatedSizeMb! * 1024 * 1024
+            : 100 * 1024 * 1024);
     // archive + decompressed (保守估计 3x)
     return archive * 3;
   }
@@ -59,10 +61,7 @@ class KnownModels {
     archiveUrl:
         'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2',
     archiveSizeBytes: 163_002_883,
-    files: const [
-      ModelFile('model.int8.onnx'),
-      ModelFile('tokens.txt'),
-    ],
+    files: const [ModelFile('model.int8.onnx'), ModelFile('tokens.txt')],
   );
 
   static final whisperBase = OnDeviceModelConfig(
@@ -128,10 +127,7 @@ class KnownModels {
     archiveUrl:
         'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2',
     archiveSizeBytes: 77_920_048,
-    files: const [
-      ModelFile('model.int8.onnx'),
-      ModelFile('tokens.txt'),
-    ],
+    files: const [ModelFile('model.int8.onnx'), ModelFile('tokens.txt')],
   );
 
   /// 所有已知模型配置列表（用于管理页、孤立目录检测等）
@@ -147,7 +143,10 @@ class KnownModels {
   /// 根据引擎名和 Whisper 模型大小返回对应的模型配置
   ///
   /// 这是整个项目中唯一的引擎→模型映射入口，所有消费方必须通过此方法获取配置。
-  static OnDeviceModelConfig? forEngine(String engine, {String whisperSize = 'base'}) {
+  static OnDeviceModelConfig? forEngine(
+    String engine, {
+    String whisperSize = 'base',
+  }) {
     return switch (engine) {
       'sense_voice' => senseVoice,
       'whisper' => switch (whisperSize) {
@@ -257,7 +256,8 @@ class KnownRuntimes {
   KnownRuntimes._();
 
   static const version = 'v1.13.2';
-  static const _baseUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/$version';
+  static const _baseUrl =
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/$version';
 
   static OnDeviceRuntimeConfig? current() {
     if (Platform.isMacOS) {
@@ -337,8 +337,7 @@ class ModelDownloader {
 
   /// 获取指定模型配置的存储目录
   static Future<Directory> getModelDir(String modelId) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/$modelId');
+    final dir = await getModelDirectory(modelId);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
@@ -346,18 +345,28 @@ class ModelDownloader {
   }
 
   static Future<Directory> getRuntimeDir(String runtimeId) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/runtimes/$runtimeId');
+    final dir = await getRuntimeDirectory(runtimeId);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
     return dir;
   }
 
+  /// Returns the canonical model directory without creating it.
+  static Future<Directory> getModelDirectory(String modelId) async {
+    final root = await getStorageDir();
+    return Directory('${root.path}/$modelId');
+  }
+
+  /// Returns the canonical runtime directory without creating it.
+  static Future<Directory> getRuntimeDirectory(String runtimeId) async {
+    final root = await getStorageDir();
+    return Directory('${root.path}/runtimes/$runtimeId');
+  }
+
   /// 检查模型是否已下载完整
   static Future<bool> isModelReady(OnDeviceModelConfig config) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/${config.id}');
+    final dir = await getModelDirectory(config.id);
     if (!await dir.exists()) return false;
     for (final file in config.files) {
       final f = File('${dir.path}/${file.relativePath}');
@@ -372,9 +381,11 @@ class ModelDownloader {
   }
 
   static Future<bool> isRuntimeReady(OnDeviceRuntimeConfig config) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/runtimes/${config.id}');
+    final dir = await getRuntimeDirectory(config.id);
     if (!await dir.exists()) return false;
+    if (Platform.isAndroid) {
+      await _keepOnlyCurrentAndroidAbi(dir);
+    }
     final searchDir = await _runtimeSearchDir(dir);
     for (final file in config.files) {
       final found = await _findFile(searchDir, file.fileName);
@@ -386,19 +397,26 @@ class ModelDownloader {
   static Future<bool> isOnDeviceReady(OnDeviceModelConfig modelConfig) async {
     final runtimeConfig = KnownRuntimes.current();
     if (runtimeConfig == null) return false;
-    return await isRuntimeReady(runtimeConfig) && await isModelReady(modelConfig);
+    return await isRuntimeReady(runtimeConfig) &&
+        await isModelReady(modelConfig);
   }
 
-  static Future<String?> getRuntimeLibraryDir(OnDeviceRuntimeConfig config) async {
-    final dir = await getRuntimeDir(config.id);
+  static Future<String?> getRuntimeLibraryDir(
+    OnDeviceRuntimeConfig config,
+  ) async {
+    final dir = await getRuntimeDirectory(config.id);
     final firstFile = config.files.isEmpty ? null : config.files.first.fileName;
     if (firstFile == null) return null;
+    if (Platform.isAndroid) {
+      await _keepOnlyCurrentAndroidAbi(dir);
+    }
     final searchDir = await _runtimeSearchDir(dir);
     final first = await _findFile(searchDir, firstFile);
     return first?.parent.path;
   }
 
-  static Future<int?> getRuntimeSize(String runtimeId) => getResourceSize('runtimes/$runtimeId');
+  static Future<int?> getRuntimeSize(String runtimeId) =>
+      getResourceSize('runtimes/$runtimeId');
 
   /// 获取已下载模型的文件大小（字节），null 表示未下载
   static Future<int?> getModelSize(String modelId) async {
@@ -421,8 +439,7 @@ class ModelDownloader {
 
   /// 删除整个模型
   static Future<void> deleteModel(String modelId) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/$modelId');
+    final dir = await getModelDirectory(modelId);
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
@@ -430,8 +447,7 @@ class ModelDownloader {
   }
 
   static Future<void> deleteRuntime(String runtimeId) async {
-    final root = await getStorageDir();
-    final dir = Directory('${root.path}/runtimes/$runtimeId');
+    final dir = await getRuntimeDirectory(runtimeId);
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
@@ -444,12 +460,12 @@ class ModelDownloader {
       throw StateError('No runtime config available for current platform');
     }
     if (!await isRuntimeReady(runtimeConfig)) {
-      final dir = await getRuntimeDir(runtimeConfig.id);
+      final dir = await getRuntimeDirectory(runtimeConfig.id);
       throw StateError('Runtime not ready: ${runtimeConfig.id} at ${dir.path}');
     }
     final runtimeDir = await getRuntimeLibraryDir(runtimeConfig);
     if (runtimeDir == null) {
-      final dir = await getRuntimeDir(runtimeConfig.id);
+      final dir = await getRuntimeDirectory(runtimeConfig.id);
       throw StateError('Runtime library not found in ${dir.path}');
     }
     return runtimeDir;
@@ -459,9 +475,7 @@ class ModelDownloader {
   ///
   /// ghfast.top 在国内可直接访问 GitHub release 资源。
   /// 如果 ghfast.top 失效，可在此追加新的镜像地址。
-  static const _mirrorPrefixes = [
-    'https://ghfast.top',
-  ];
+  static const _mirrorPrefixes = ['https://ghfast.top'];
 
   /// 下载指定模型（下载 .tar.bz2 存档并解压到模型目录）
   ///
@@ -513,13 +527,15 @@ class ModelDownloader {
     try {
       // 2. 切换到提取阶段，保持最近一次下载进度值（进度条不归零）
       onProgress?.call(downloadTotal, downloadTotal);
-      onDetailedProgress?.call(DownloadProgress(
-        received: downloadTotal,
-        total: downloadTotal,
-        sourceLabel: downloadSource,
-        bytesPerSecond: 0,
-        extracting: true,
-      ));
+      onDetailedProgress?.call(
+        DownloadProgress(
+          received: downloadTotal,
+          total: downloadTotal,
+          sourceLabel: downloadSource,
+          bytesPerSecond: 0,
+          extracting: true,
+        ),
+      );
 
       final archiveBytes = await tempFile.readAsBytes();
 
@@ -562,7 +578,8 @@ class ModelDownloader {
 
         int extractedCount = 0;
         for (final entry in fileEntries) {
-          final relativeName = (commonTopPrefix != null &&
+          final relativeName =
+              (commonTopPrefix != null &&
                   entry.name.startsWith('$commonTopPrefix/'))
               ? entry.name.substring(commonTopPrefix.length + 1)
               : entry.name;
@@ -588,12 +605,14 @@ class ModelDownloader {
 
         // 提取完成 → 报告 100%
         onProgress?.call(downloadTotal, downloadTotal);
-        onDetailedProgress?.call(DownloadProgress(
-          received: downloadTotal,
-          total: downloadTotal,
-          sourceLabel: downloadSource,
-          bytesPerSecond: 0,
-        ));
+        onDetailedProgress?.call(
+          DownloadProgress(
+            received: downloadTotal,
+            total: downloadTotal,
+            sourceLabel: downloadSource,
+            bytesPerSecond: 0,
+          ),
+        );
       } catch (e) {
         // 清理可能部分解压的文件
         if (await modelDir.exists()) {
@@ -642,13 +661,15 @@ class ModelDownloader {
     );
 
     try {
-      onProgress?.call(DownloadProgress(
-        received: downloadTotal,
-        total: downloadTotal,
-        sourceLabel: downloadSource,
-        bytesPerSecond: 0,
-        extracting: true,
-      ));
+      onProgress?.call(
+        DownloadProgress(
+          received: downloadTotal,
+          total: downloadTotal,
+          sourceLabel: downloadSource,
+          bytesPerSecond: 0,
+          extracting: true,
+        ),
+      );
       await _extractArchive(tempFile, runtimeDir);
 
       // Android 归档包含多 ABI .so 文件（arm64-v8a/ 等），
@@ -665,12 +686,14 @@ class ModelDownloader {
         }
       }
       // 提取完成 → 报告 100%
-      onProgress?.call(DownloadProgress(
-        received: downloadTotal,
-        total: downloadTotal,
-        sourceLabel: downloadSource,
-        bytesPerSecond: 0,
-      ));
+      onProgress?.call(
+        DownloadProgress(
+          received: downloadTotal,
+          total: downloadTotal,
+          sourceLabel: downloadSource,
+          bytesPerSecond: 0,
+        ),
+      );
     } catch (e) {
       if (await runtimeDir.exists()) {
         await runtimeDir.delete(recursive: true);
@@ -743,8 +766,9 @@ class ModelDownloader {
           final sink = tempFile.openWrite(mode: FileMode.append);
           try {
             int received = existingBytes;
-            await for (final chunk
-                in response.stream.timeout(const Duration(seconds: 30))) {
+            await for (final chunk in response.stream.timeout(
+              const Duration(seconds: 30),
+            )) {
               _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;
@@ -754,16 +778,19 @@ class ModelDownloader {
                 speedBaseBytes,
                 speedBaseElapsed,
               );
-              if (stopwatch.elapsed - speedBaseElapsed > const Duration(seconds: 1)) {
+              if (stopwatch.elapsed - speedBaseElapsed >
+                  const Duration(seconds: 1)) {
                 speedBaseBytes = received;
                 speedBaseElapsed = stopwatch.elapsed;
               }
-              onProgress?.call(DownloadProgress(
-                received: received,
-                total: archiveSizeBytes ?? response.contentLength ?? received,
-                sourceLabel: sourceLabel,
-                bytesPerSecond: speed,
-              ));
+              onProgress?.call(
+                DownloadProgress(
+                  received: received,
+                  total: archiveSizeBytes ?? response.contentLength ?? received,
+                  sourceLabel: sourceLabel,
+                  bytesPerSecond: speed,
+                ),
+              );
             }
           } finally {
             await sink.close();
@@ -780,8 +807,9 @@ class ModelDownloader {
           final sink = tempFile.openWrite();
           try {
             int received = 0;
-            await for (final chunk
-                in response.stream.timeout(const Duration(seconds: 30))) {
+            await for (final chunk in response.stream.timeout(
+              const Duration(seconds: 30),
+            )) {
               _throwIfStopped(controller, identifier);
               sink.add(chunk);
               received += chunk.length;
@@ -791,16 +819,19 @@ class ModelDownloader {
                 speedBaseBytes,
                 speedBaseElapsed,
               );
-              if (stopwatch.elapsed - speedBaseElapsed > const Duration(seconds: 1)) {
+              if (stopwatch.elapsed - speedBaseElapsed >
+                  const Duration(seconds: 1)) {
                 speedBaseBytes = received;
                 speedBaseElapsed = stopwatch.elapsed;
               }
-              onProgress?.call(DownloadProgress(
-                received: received,
-                total: archiveSizeBytes ?? response.contentLength ?? received,
-                sourceLabel: sourceLabel,
-                bytesPerSecond: speed,
-              ));
+              onProgress?.call(
+                DownloadProgress(
+                  received: received,
+                  total: archiveSizeBytes ?? response.contentLength ?? received,
+                  sourceLabel: sourceLabel,
+                  bytesPerSecond: speed,
+                ),
+              );
             }
           } finally {
             await sink.close();
@@ -809,9 +840,7 @@ class ModelDownloader {
           }
           return tempFile;
         } else {
-          lastError = HttpException(
-            'HTTP ${response.statusCode} from $url',
-          );
+          lastError = HttpException('HTTP ${response.statusCode} from $url');
           controller?._unbind(client);
           client.close();
           continue;
@@ -819,9 +848,7 @@ class ModelDownloader {
       } on ResourceDownloadStopped {
         rethrow;
       } catch (e) {
-        lastError = e is HttpException
-            ? e
-            : HttpException('$e');
+        lastError = e is HttpException ? e : HttpException('$e');
         // 保留部分文件，下次重试可续传
         if (await tempFile.exists()) {
           existingBytes = await tempFile.length();
@@ -831,8 +858,7 @@ class ModelDownloader {
       }
     }
 
-    throw lastError ??
-        HttpException('All download attempts failed');
+    throw lastError ?? HttpException('All download attempts failed');
   }
 
   static List<String> _buildDownloadCandidates(
@@ -865,23 +891,28 @@ class ModelDownloader {
     return urls;
   }
 
-  static Future<List<String>> _orderCandidatesByProbeLatency(List<String> urls) async {
+  static Future<List<String>> _orderCandidatesByProbeLatency(
+    List<String> urls,
+  ) async {
     if (urls.length <= 1) return urls;
     final probes = await Future.wait(urls.map(_probeDownloadCandidate));
     final byUrl = {for (final probe in probes) probe.url: probe};
-    final ordered = [...urls]..sort((a, b) {
-      final pa = byUrl[a]!;
-      final pb = byUrl[b]!;
-      if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
-      if (!pa.reachable && !pb.reachable) {
-        return urls.indexOf(a).compareTo(urls.indexOf(b));
-      }
-      return pa.elapsed.compareTo(pb.elapsed);
-    });
+    final ordered = [...urls]
+      ..sort((a, b) {
+        final pa = byUrl[a]!;
+        final pb = byUrl[b]!;
+        if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
+        if (!pa.reachable && !pb.reachable) {
+          return urls.indexOf(a).compareTo(urls.indexOf(b));
+        }
+        return pa.elapsed.compareTo(pb.elapsed);
+      });
     return ordered;
   }
 
-  static Future<_DownloadCandidateProbe> _probeDownloadCandidate(String url) async {
+  static Future<_DownloadCandidateProbe> _probeDownloadCandidate(
+    String url,
+  ) async {
     final client = http.Client();
     final stopwatch = Stopwatch()..start();
     try {
@@ -967,9 +998,8 @@ class ModelDownloader {
 
   /// 返回运行时库文件应搜索的目录。
   ///
-  /// Android 归档包含按 ABI 分层的子目录（arm64-v8a/ 等），
-  /// 先尝试当前设备 ABI 子目录；不存在时回退到整个运行时目录
-  /// （兼容旧版提取的扁平结构）。
+  /// Android 运行时统一规范化到 `<runtime>/<abi>/`，加载动态库时只
+  /// 使用当前设备 ABI 目录，避免递归搜索命中其他架构的 `.so`。
   static Future<Directory> _runtimeSearchDir(Directory runtimeDir) async {
     if (!Platform.isAndroid) return runtimeDir;
     final abi = currentSherpaOnnxRuntimeArch();
@@ -978,42 +1008,29 @@ class ModelDownloader {
     return runtimeDir;
   }
 
-  /// Android 归档提取后，只保留当前设备 ABI 的 .so 文件，
-  /// 删除其他架构的文件以节省磁盘空间，并确保搜索时不会定位到错误的 .so。
+  /// Android 归档提取后，只保留当前设备 ABI 的 .so 文件。
+  ///
+  /// sherpa-onnx Android 包可能是 `jniLibs/<abi>/`、`<abi>/`，也可能
+  /// 外面还有一层版本目录。这里先在整个运行时目录中定位当前 ABI 目录，
+  /// 再统一移动到 `<runtime>/<abi>/`，最后删除其他 ABI 与残留顶层目录。
   static Future<void> _keepOnlyCurrentAndroidAbi(Directory runtimeDir) async {
     if (!Platform.isAndroid) return;
     final abi = currentSherpaOnnxRuntimeArch();
-    // 归档可能包含 jniLibs/{abi}/ 或直接 {abi}/ 两种结构
-    for (final candidate in [
-      Directory('${runtimeDir.path}/jniLibs/$abi'),
-      Directory('${runtimeDir.path}/$abi'),
-    ]) {
-      if (await candidate.exists()) {
-        // 把当前 ABI 的文件移到 runtimeDir 根目录
-        await for (final entity in candidate.list()) {
-          if (entity is File) {
-            await entity.rename('${runtimeDir.path}/${entity.uri.pathSegments.last}');
-          } else if (entity is Directory) {
-            // 递归移动子目录内容
-            await _moveDirectoryContents(entity, runtimeDir);
-          }
-        }
-        break;
+    final canonicalAbiDir = Directory('${runtimeDir.path}/$abi');
+    final sourceAbiDir = await _findAndroidAbiDir(runtimeDir, abi);
+
+    if (sourceAbiDir != null) {
+      if (!await canonicalAbiDir.exists()) {
+        await canonicalAbiDir.create(recursive: true);
       }
-    }
-    // 删除所有非当前 ABI 的子目录（jniLibs/armeabi-v7a/, x86 等）
-    await for (final entity in runtimeDir.list()) {
-      if (entity is Directory) {
-        final dirName = entity.uri.pathSegments.last;
-        if (dirName != abi && _isKnownAndroidAbi(dirName)) {
-          await entity.delete(recursive: true);
-        }
-        // 清理 jniLibs 空壳目录
-        if (dirName == 'jniLibs') {
-          await entity.delete(recursive: true);
-        }
+      if (sourceAbiDir.path != canonicalAbiDir.path) {
+        await _moveDirectoryContents(sourceAbiDir, canonicalAbiDir);
       }
+    } else {
+      await _moveRootAndroidLibraries(runtimeDir, canonicalAbiDir);
     }
+
+    await _deleteAndroidRuntimeResidue(runtimeDir, canonicalAbiDir, abi);
   }
 
   static bool _isKnownAndroidAbi(String name) {
@@ -1023,7 +1040,10 @@ class ModelDownloader {
         name == 'x86';
   }
 
-  static Future<void> _moveDirectoryContents(Directory src, Directory dst) async {
+  static Future<void> _moveDirectoryContents(
+    Directory src,
+    Directory dst,
+  ) async {
     await for (final entity in src.list()) {
       if (entity is File) {
         await entity.rename('${dst.path}/${entity.uri.pathSegments.last}');
@@ -1037,6 +1057,90 @@ class ModelDownloader {
     }
   }
 
+  static Future<void> _moveRootAndroidLibraries(
+    Directory runtimeDir,
+    Directory canonicalAbiDir,
+  ) async {
+    if (!await runtimeDir.exists()) return;
+    await for (final entity in runtimeDir.list()) {
+      if (entity is! File) continue;
+      final name = entity.uri.pathSegments.last;
+      if (!name.endsWith('.so')) continue;
+      if (!await canonicalAbiDir.exists()) {
+        await canonicalAbiDir.create(recursive: true);
+      }
+      await entity.rename('${canonicalAbiDir.path}/$name');
+    }
+  }
+
+  static Future<Directory?> _findAndroidAbiDir(
+    Directory runtimeDir,
+    String abi,
+  ) async {
+    if (!await runtimeDir.exists()) return null;
+    Directory? fallback;
+    await for (final entity in runtimeDir.list(recursive: true)) {
+      if (entity is! Directory) continue;
+      final name = entity.uri.pathSegments.last;
+      if (name != abi) continue;
+      if (entity.parent.uri.pathSegments.last == 'jniLibs') {
+        return entity;
+      }
+      fallback ??= entity;
+    }
+    return fallback;
+  }
+
+  static Future<void> _deleteAndroidRuntimeResidue(
+    Directory runtimeDir,
+    Directory canonicalAbiDir,
+    String abi,
+  ) async {
+    if (!await runtimeDir.exists()) return;
+    await for (final entity in runtimeDir.list()) {
+      final name = entity.uri.pathSegments.last;
+      if (entity is File) {
+        if (name.endsWith('.so')) {
+          await entity.delete();
+        }
+        continue;
+      }
+      if (entity is! Directory) continue;
+      if (entity.path == canonicalAbiDir.path) continue;
+      if (name == 'jniLibs' || _isKnownAndroidAbi(name)) {
+        await entity.delete(recursive: true);
+        continue;
+      }
+      final containsCurrentAbi = await _containsAndroidAbiDir(entity, abi);
+      final containsAnyAbi =
+          containsCurrentAbi || await _containsAnyAndroidAbiDir(entity);
+      if (containsAnyAbi) {
+        await entity.delete(recursive: true);
+      }
+    }
+  }
+
+  static Future<bool> _containsAndroidAbiDir(Directory dir, String abi) async {
+    if (!await dir.exists()) return false;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is Directory && entity.uri.pathSegments.last == abi) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Future<bool> _containsAnyAndroidAbiDir(Directory dir) async {
+    if (!await dir.exists()) return false;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is Directory &&
+          _isKnownAndroidAbi(entity.uri.pathSegments.last)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static Future<File?> _findFile(Directory dir, String fileName) async {
     if (!await dir.exists()) return null;
     await for (final entity in dir.list(recursive: true)) {
@@ -1047,7 +1151,10 @@ class ModelDownloader {
     return null;
   }
 
-  static Future<void> _extractArchive(File archiveFile, Directory targetDir) async {
+  static Future<void> _extractArchive(
+    File archiveFile,
+    Directory targetDir,
+  ) async {
     final bytes = await archiveFile.readAsBytes();
     List<int> archiveBytes = bytes;
     if (archiveFile.path.endsWith('.bz2') || _looksLikeBzip2(bytes)) {
@@ -1060,7 +1167,9 @@ class ModelDownloader {
       final name = entry.name.replaceAll('\\', '/');
       if (name.contains('..')) continue;
       final destPath = '${targetDir.path}/$name';
-      final destDir = Directory(destPath.substring(0, destPath.lastIndexOf('/')));
+      final destDir = Directory(
+        destPath.substring(0, destPath.lastIndexOf('/')),
+      );
       if (!await destDir.exists()) {
         await destDir.create(recursive: true);
       }

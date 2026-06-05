@@ -61,6 +61,8 @@ git log origin/main..HEAD --oneline
 - **使用中文**
 - **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
 - 类型通常用 `chore`（构建/配置变更）
+- 标题行格式：`chore: 构建号 {旧}→{新} — {一句话总结变更}`
+- 正文（详细说明）保持不变，描述具体变更内容
 
 ```bash
 git add apps/client/pubspec.yaml
@@ -71,11 +73,15 @@ git add -A  # 包含其他伴随变更（release.yml、l10n、代码等）
 
 提交信息示例：
 ```
-chore: 构建号 112→113
+chore: 构建号 112→113 — 修复登录页键盘弹起按钮遮挡
+
+更新 auth_provider.dart 状态同步逻辑
 ```
 或（多区域）：
 ```
-chore: app 构建号 112→113，API 构建号 5→6
+chore: app 构建号 112→113，API 构建号 5→6 — 新增用户数据导出接口
+
+添加 /api/export 端点和 CSV 生成
 ```
 
 ### 4. 推送策略
