@@ -18,8 +18,10 @@ keywords: [发布新版本, 推送新版本, 发布新版, release new version, 
 ## 工作流概览
 
 ```
-检测变更 → 递增版本号 + 重置构建号 → 提交(中文gitmessage) → 推送main → 打新版本 tag → 推送 tag
+检测变更 → 提交功能变更(feat/fix)并推送main → 递增版本号+重置构建号(chore) → 推送 → 打新版本 tag → 推送 tag
 ```
+
+> **关键：功能变更和版本号递增必须分开提交。** 功能变更先推上去，再单独一个 `chore:` 提交版本号递增。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
 
 ## 前置检查
 
@@ -70,34 +72,47 @@ git log origin/main..HEAD --oneline
 - 示例：`0.1.0` → `0.1.1`
 - 如果 API **无变更** → 保持不动
 
-### 3. 提交
+### 3. 提交功能变更（先推送）
+
+先把代码变更（feat/fix/refactor 等）提交并推送到 main，**此时不递增版本号**。
 
 提交说明必须：
 - **使用中文**
 - **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
-- 类型通常用 `feat`（新功能发布）或 `chore`（纯版本号变更）
+- 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
 - 标题行包含一句话总结变更
 
 ```bash
-# 修改版本号文件
-# 编辑 apps/client/pubspec.yaml 中的 version 字段
-# 编辑 workers/api/package.json 中的 "version" 字段（如需要）
+# 只提交代码变更，不碰 pubspec.yaml 的版本号
+git add -A
+git commit -m "feat: 新增关于页推广入口、隐私政策与 OG 图片"
+git push origin main
+```
+
+### 4. 递增版本号 + 重置构建号 + 推送
+
+功能变更推送后，单独提交版本号递增：
+
+```bash
+# 编辑 apps/client/pubspec.yaml：patch +1，buildNumber 重置为 100
+# 示例：0.1.3+112 → 0.1.4+100
+# 如果 API 有变更：同步递增 workers/api/package.json
 
 git add apps/client/pubspec.yaml
 git add workers/api/package.json  # 如需要
-git add -A  # 包含所有伴随变更
 ```
 
-提交信息示例：
+提交信息格式：
 ```
-feat: 发布 v0.1.4 — 掌握度看板支持按月筛选
-```
-或
-```
-chore: 版本号 0.1.3→0.1.4，构建号重置为 100 — 更新依赖和 CI 配置
+chore: 版本号 0.1.3→0.1.4，构建号重置为 100
 ```
 
-### 4. 打新版本 tag
+```bash
+git commit -m "chore: 版本号 0.1.3→0.1.4，构建号重置为 100"
+git push origin main
+```
+
+### 5. 打新版本 tag
 
 Tag 名称：`v` + 版本号（不含 `+buildNumber`）
 
@@ -110,7 +125,7 @@ git tag -a v{x.x.x} -m "Release v{x.x.x}"
 git tag -a v0.1.4 -m "Release v0.1.4"
 ```
 
-### 5. 推送策略
+### 6. 推送策略
 
 #### 推荐方式：PR 合并
 ```bash
@@ -138,7 +153,7 @@ git push origin v{newVersion}
 > `v0.1.4` 是**新 tag**，GitHub 上不存在，所以用 `git push origin v0.1.4`（非 force-push）。
 > 不需要覆盖旧 tag。
 
-### 6. 验证
+### 7. 验证
 
 推送后，GitHub Actions Release workflow 自动触发：
 - CI 验证 tag `v0.1.4` 与 `pubspec.yaml` 中 `0.1.4+100` 的版本部分一致
