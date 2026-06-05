@@ -1,3 +1,5 @@
+import 'dart:math';
+
 class TopicProgress {
   final String topicId;
   final int score;
@@ -340,9 +342,17 @@ class LocalProfile {
     this.wechatBound = false,
   });
 
+  /// 创建一个随机种子默认头像的本地用户配置。
+  /// 新访客每次启动会得到不同的 DiceBear 头像。
+  factory LocalProfile.defaultProfile() {
+    final random = Random();
+    final seed = 'guest_${random.nextInt(1000000)}';
+    return LocalProfile(avatarSeed: seed);
+  }
+
   factory LocalProfile.fromJson(Map<String, dynamic> json) => LocalProfile(
     nickname: json['nickname'] as String? ?? '本地用户',
-    avatarSeed: json['avatarSeed'] as String? ?? 'local',
+    avatarSeed: json['avatarSeed'] as String? ?? 'guest_${Random().nextInt(1000000)}',
     avatarUrl: json['avatarUrl'] as String?,
     email: json['email'] as String? ?? '',
     emailBound: json['emailBound'] as bool? ?? false,

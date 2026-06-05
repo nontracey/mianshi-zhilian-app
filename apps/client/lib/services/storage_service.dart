@@ -153,7 +153,11 @@ class StorageService {
 
   Future<LocalProfile> loadLocalProfile() async {
     final data = await load('local_profile');
-    if (data == null) return const LocalProfile();
+    if (data == null) {
+      final profile = LocalProfile.defaultProfile();
+      await saveLocalProfile(profile);
+      return profile;
+    }
     return LocalProfile.fromJson(data as Map<String, dynamic>);
   }
 

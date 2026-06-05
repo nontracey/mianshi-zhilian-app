@@ -13,7 +13,7 @@ class ProgressProvider extends ChangeNotifier {
   List<PracticeAttempt> _attempts = [];
   List<MockInterviewSession> _mockSessions = [];
   PrepPlan _prepPlan = PrepPlan.empty();
-  LocalProfile _localProfile = const LocalProfile();
+  LocalProfile _localProfile = LocalProfile.defaultProfile();
   SyncSettings _syncSettings = const SyncSettings();
 
   Map<String, TopicProgress> get progressMap => _progressMap;
