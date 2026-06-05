@@ -35,13 +35,12 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Get previous tag via GitHub Releases API
+      - name: Get previous tag from git
         id: prev_tag
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          # 当前 release 可能已存在（force-push 重跑），取第二个
-          PREV_TAG=$(gh release list --json tagName --jq '.[1].tagName // ""' --limit 2)
+          # 按版本排序找上一个 tag，不依赖 GitHub API，避免 draft/release 状态干扰
+          CURRENT_TAG=${GITHUB_REF_NAME}
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
           if [ -z "$PREV_TAG" ]; then
             # 第一个 release，从 root commit 开始
             echo "tag=$(git rev-list --max-parents=0 HEAD)" >> $GITHUB_OUTPUT
@@ -399,12 +398,9 @@ jobs:
           cache: true
       - name: Extract release notes from git log
         id: notes
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          # 使用 GitHub Releases API 获取上一个 release 的 tag（不受 force-push 影响）
-          # 当前 release 已存在，limit=2 并取第二个
-          PREV_TAG=$(gh release list --json tagName --jq '.[1].tagName // ""' --limit 2)
+          # 按版本排序找上一个 tag，与 prepare-release job 保持一致
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1)
           if [ -z "$PREV_TAG" ]; then
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
