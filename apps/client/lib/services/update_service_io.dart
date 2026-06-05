@@ -227,8 +227,14 @@ class UpdateService {
 
       final data = json.decode(response.body) as Map<String, dynamic>;
       final remoteVersion = data['version'] as String? ?? '';
-
       final remoteBuildNumber = data['buildNumber'] as int? ?? 0;
+      unawaited(
+        AppLog.info(
+          'Update check local=${currentVersion.fullVersion} '
+          'remote=$remoteVersion+$remoteBuildNumber',
+          source: 'app_update',
+        ),
+      );
       if (_isNewerVersion(
         remoteVersion: remoteVersion,
         remoteBuildNumber: remoteBuildNumber,

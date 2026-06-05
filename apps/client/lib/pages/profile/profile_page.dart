@@ -469,6 +469,7 @@ class _ContentSourcePage extends StatelessWidget {
             );
           },
           onTestUrlChanged: settingsProvider.setCustomTestContentUrl,
+          onDraftUrlChanged: settingsProvider.setCustomDraftContentUrl,
           onProdUrlChanged: settingsProvider.setCustomProdContentUrl,
           onApplyChanged: () async {
             final contentProvider = context.read<ContentProvider>();
@@ -1518,6 +1519,7 @@ class _ContentEnvPanel extends StatelessWidget {
     required this.userRole,
     required this.onEnvChanged,
     required this.onTestUrlChanged,
+    required this.onDraftUrlChanged,
     required this.onProdUrlChanged,
     required this.onApplyChanged,
   });
@@ -1526,6 +1528,7 @@ class _ContentEnvPanel extends StatelessWidget {
   final UserRole userRole;
   final ValueChanged<ContentEnv> onEnvChanged;
   final ValueChanged<String?> onTestUrlChanged;
+  final ValueChanged<String?> onDraftUrlChanged;
   final ValueChanged<String?> onProdUrlChanged;
   final VoidCallback onApplyChanged;
 
@@ -1534,6 +1537,9 @@ class _ContentEnvPanel extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
     final testController = TextEditingController(
       text: settings.customTestContentUrl ?? '',
+    );
+    final draftController = TextEditingController(
+      text: settings.customDraftContentUrl ?? '',
     );
     final prodController = TextEditingController(
       text: settings.customProdContentUrl ?? '',
@@ -1583,6 +1589,8 @@ class _ContentEnvPanel extends StatelessWidget {
               Icon(
                 settings.contentEnv == ContentEnv.test
                     ? Icons.science_outlined
+                    : settings.contentEnv == ContentEnv.draft
+                    ? Icons.edit_note_outlined
                     : Icons.verified_outlined,
                 size: 18,
                 color: Theme.of(context).colorScheme.primary,
@@ -1633,6 +1641,34 @@ class _ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        // 草稿版自定义 URL
+        Text(
+          l10n.get('draft_version_address_retain_empty_use_default'),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${AppSettings.defaultWorkerApiUrl}/content/draft / ${RouteResolver.appApiBackup}/content/draft',
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: draftController,
+          decoration: InputDecoration(
+            hintText: l10n.get('custom_draft_version_url'),
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => onDraftUrlChanged(value.isEmpty ? null : value),
+        ),
+        const SizedBox(height: 16),
+
         // 发布版自定义 URL
         Text(
           l10n.get('publish_version_address_retain_empty_use_default'),
@@ -1671,9 +1707,13 @@ class _ContentEnvPanel extends StatelessWidget {
         settings.customProdContentUrl?.isNotEmpty == true) {
       return '${settings.customProdContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
-    if (settings.contentEnv != ContentEnv.production &&
+    if (settings.contentEnv == ContentEnv.test &&
         settings.customTestContentUrl?.isNotEmpty == true) {
       return '${settings.customTestContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
+    }
+    if (settings.contentEnv == ContentEnv.draft &&
+        settings.customDraftContentUrl?.isNotEmpty == true) {
+      return '${settings.customDraftContentUrl} (${l10n.get('custom_content_source_no_official_fallback')})';
     }
     if (settings.contentEnv == ContentEnv.production) {
       return '${RouteResolver.contentPrimary} / ${RouteResolver.contentBackup}';
@@ -3539,8 +3579,13 @@ class _AboutPanelState extends State<_AboutPanel> {
     });
 
     try {
+      final currentVersion = await const AppVersionService().load();
+      if (!mounted) return;
+      setState(() {
+        _currentVersion = currentVersion;
+      });
       final updateService = _updateService;
-      final result = await updateService.checkForUpdate(_currentVersion);
+      final result = await updateService.checkForUpdate(currentVersion);
 
       if (!mounted) return;
       setState(() {

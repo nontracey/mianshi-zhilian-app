@@ -7,6 +7,8 @@ import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/app_log_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/model_downloader_io.dart';
+import 'package:mianshi_zhilian/services/route_state_store.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
@@ -125,11 +127,6 @@ class _OnDeviceModelManagementPageState
     if (!await root.exists()) return [];
 
     final knownModelIds = KnownModels.all.map((c) => c.id).toSet();
-    final knownRuntimeIds = <String>{};
-    final runtimeConfig = KnownRuntimes.current();
-    if (runtimeConfig != null) {
-      knownRuntimeIds.add(runtimeConfig.id);
-    }
 
     final orphans = <_OrphanDir>[];
     final subDirs = root.list().where((e) => e is Directory);
@@ -137,20 +134,10 @@ class _OnDeviceModelManagementPageState
       final dir = entity as Directory;
       final name = dir.uri.pathSegments.last;
 
-      // Skip "runtimes/" and known runtime dirs within it
+      // Runtime resources are managed by the runtime entry above. They are not
+      // model directories, so do not report platform/runtime variants as
+      // orphaned model folders.
       if (name == 'runtimes') {
-        // Check runtimes subdirs
-        await for (final sub in dir.list().where((e) => e is Directory)) {
-          final subDir = sub as Directory;
-          final subName = subDir.uri.pathSegments.last;
-          final isEmpty = await _isDirectoryEmpty(subDir);
-          if (knownRuntimeIds.contains(subName) && !isEmpty) {
-            continue;
-          }
-          orphans.add(
-            _OrphanDir(path: subDir.path, name: subName, isEmpty: isEmpty),
-          );
-        }
         continue;
       }
 
@@ -322,6 +309,10 @@ class _OnDeviceModelManagementPageState
     // 获取镜像配置
     final settings = context.read<SettingsProvider>().settings;
     final mirrorBaseUrl = settings.customGithubMirror;
+    final downloadSourceMode = await RouteStateStore(
+      StorageService(),
+    ).loadDownloadSourceMode();
+    if (!mounted) return;
 
     // 进度对话框
     final progressNotifier = ValueNotifier<double>(0);
@@ -368,6 +359,7 @@ class _OnDeviceModelManagementPageState
         await ModelDownloader.downloadRuntime(
           config: runtimeConfig,
           mirrorBaseUrl: mirrorBaseUrl,
+          downloadSourceMode: downloadSourceMode,
           onProgress: (progress) {
             progressNotifier.value = progress.fraction ?? 0;
             sourceNotifier.value = progress.sourceLabel;
@@ -407,6 +399,7 @@ class _OnDeviceModelManagementPageState
         await ModelDownloader.downloadModel(
           config: config,
           mirrorBaseUrl: mirrorBaseUrl,
+          downloadSourceMode: downloadSourceMode,
           onDetailedProgress: (progress) {
             progressNotifier.value = progress.fraction ?? 0;
             sourceNotifier.value = progress.sourceLabel;

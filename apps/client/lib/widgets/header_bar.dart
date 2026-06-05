@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -23,7 +25,7 @@ class HeaderBar extends StatefulWidget {
   final String title;
   final VoidCallback onProfile;
   final ValueChanged<String>? onTopicTap;
-  final ValueChanged<String>? onContentStageChanged;
+  final ValueChanged<ContentEnv>? onContentStageChanged;
   final int sectionIndex;
 
   @override
@@ -387,6 +389,7 @@ class _HeaderBarState extends State<HeaderBar> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final aiProvider = context.watch<AiProvider>();
     final authProvider = context.watch<AuthProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
 
     // 获取当前使用的AI模型名称
     final currentModelName = aiProvider.defaultConfig?.name ??
@@ -412,6 +415,7 @@ class _HeaderBarState extends State<HeaderBar> {
             // 左侧：内容阶段切换 + AI 模型选择
             _ContentStageSelector(
               isDark: isDark,
+              currentEnv: settingsProvider.settings.contentEnv,
               userRole: authProvider.userRole,
               onStageChanged: widget.onContentStageChanged,
             ),
@@ -665,13 +669,15 @@ class _AiModelSelector extends StatelessWidget {
 class _ContentStageSelector extends StatefulWidget {
   const _ContentStageSelector({
     required this.isDark,
+    required this.currentEnv,
     this.userRole = UserRole.guest,
     this.onStageChanged,
   });
 
   final bool isDark;
+  final ContentEnv currentEnv;
   final UserRole userRole;
-  final ValueChanged<String>? onStageChanged;
+  final ValueChanged<ContentEnv>? onStageChanged;
 
   @override
   State<_ContentStageSelector> createState() => _ContentStageSelectorState();
@@ -679,16 +685,27 @@ class _ContentStageSelector extends StatefulWidget {
 
 class _ContentStageSelectorState extends State<_ContentStageSelector> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
-  String _currentStage = 'published';
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final allowedEnvs = widget.userRole.allowedContentEnvs;
     final stages = [
-      ('published', l10n.get('content_published'), true),
-      ('testing', l10n.get('content_testing'), allowedEnvs.contains('testing')),
-      ('draft', l10n.get('content_draft'), allowedEnvs.contains('draft')),
+      (
+        ContentEnv.production,
+        l10n.get('content_published'),
+        allowedEnvs.contains(ContentEnv.production.key),
+      ),
+      (
+        ContentEnv.test,
+        l10n.get('content_testing'),
+        allowedEnvs.contains(ContentEnv.test.key),
+      ),
+      (
+        ContentEnv.draft,
+        l10n.get('content_draft'),
+        allowedEnvs.contains(ContentEnv.draft.key),
+      ),
     ];
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= 600;
@@ -714,13 +731,12 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
             padding: const EdgeInsets.all(2),
             child: Row(
               children: stages.map((stage) {
-                final isSelected = stage.$1 == _currentStage;
+                final isSelected = stage.$1 == widget.currentEnv;
                 final isEnabled = stage.$3;
 
                 return GestureDetector(
                   onTap: isEnabled
                       ? () {
-                          setState(() => _currentStage = stage.$1);
                           widget.onStageChanged?.call(stage.$1);
                         }
                       : () {
@@ -787,10 +803,9 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
       );
     }
 
-    return PopupMenuButton<String>(
+    return PopupMenuButton<ContentEnv>(
       offset: const Offset(0, 40),
       onSelected: (stage) {
-        setState(() => _currentStage = stage);
         widget.onStageChanged?.call(stage);
       },
       child: Container(
@@ -805,7 +820,7 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              stages.firstWhere((s) => s.$1 == _currentStage).$2,
+              stages.firstWhere((s) => s.$1 == widget.currentEnv).$2,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -823,7 +838,7 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
       ),
       itemBuilder: (context) => stages.map((stage) {
         final isEnabled = stage.$3;
-        return PopupMenuItem<String>(
+        return PopupMenuItem<ContentEnv>(
           enabled: isEnabled,
           value: stage.$1,
           child: Row(
@@ -833,7 +848,7 @@ class _ContentStageSelectorState extends State<_ContentStageSelector> {
                 stage.$2,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: stage.$1 == _currentStage
+                  fontWeight: stage.$1 == widget.currentEnv
                       ? FontWeight.w600
                       : FontWeight.normal,
                   color: !isEnabled

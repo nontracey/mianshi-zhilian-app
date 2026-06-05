@@ -168,7 +168,7 @@ jobs:
           echo "ANDROID_RELEASE_STORE_PASSWORD=${ANDROID_RELEASE_STORE_PASSWORD}" >> "$GITHUB_ENV"
           echo "ANDROID_RELEASE_KEY_ALIAS=${ANDROID_RELEASE_KEY_ALIAS}" >> "$GITHUB_ENV"
           echo "ANDROID_RELEASE_KEY_PASSWORD=${ANDROID_RELEASE_KEY_PASSWORD}" >> "$GITHUB_ENV"
-      - run: flutter build apk --release --split-per-abi --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build apk --release --split-per-abi --build-name=${{ needs.prepare-release.outputs.app_version }} --build-number=${{ needs.prepare-release.outputs.app_build_number }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - run: |
           for f in build/app/outputs/flutter-apk/app-*-release.apk; do
             abi=$(echo "$f" | sed 's/.*app-\(.*\)-release.apk/\1/')
@@ -268,7 +268,7 @@ jobs:
           echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
           echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
           echo '}' >> lib/generated/release_notes.dart
-      - run: flutter build windows --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build windows --release --build-name=${{ needs.prepare-release.outputs.app_version }} --build-number=${{ needs.prepare-release.outputs.app_build_number }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup -y
@@ -360,7 +360,7 @@ jobs:
           echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
           echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
           echo '}' >> lib/generated/release_notes.dart
-      - run: flutter build macos --release --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
+      - run: flutter build macos --release --build-name=${{ needs.prepare-release.outputs.app_version }} --build-number=${{ needs.prepare-release.outputs.app_build_number }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Build drag-install DMG
         run: |
           rm -rf dmg-root

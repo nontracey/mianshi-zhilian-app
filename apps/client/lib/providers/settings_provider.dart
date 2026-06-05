@@ -180,6 +180,15 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 设置自定义草稿版内容 URL（传空字符串恢复默认）
+  Future<void> setCustomDraftContentUrl(String? url) async {
+    _settings = _settings.copyWith(
+      customDraftContentUrl: (url != null && url.isEmpty) ? null : url,
+    );
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
   /// 设置自定义发布版内容 URL（传空字符串恢复默认）
   Future<void> setCustomProdContentUrl(String? url) async {
     _settings = _settings.copyWith(

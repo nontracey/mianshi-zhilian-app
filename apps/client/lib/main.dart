@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 
 import 'l10n/l10n.dart';
 
-import 'models/app_settings.dart';
 import 'models/user.dart';
 import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -313,11 +312,11 @@ class _LearningShellState extends State<LearningShell> {
                     _selectedTopicId = topicId;
                     _selectedTopicInitialTab = 0;
                   }),
-                  onContentStageChanged: (stage) async {
+                  onContentStageChanged: (contentEnv) async {
                     // 检查权限
                     final authProvider = context.read<AuthProvider>();
                     final userRole = authProvider.userRole;
-                    if (!userRole.allowedContentEnvs.contains(stage)) {
+                    if (!userRole.allowedContentEnvs.contains(contentEnv.key)) {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -337,7 +336,6 @@ class _LearningShellState extends State<LearningShell> {
                     }
 
                     // 切换内容环境
-                    final contentEnv = ContentEnv.fromKey(stage);
                     await settings.setContentEnv(contentEnv);
                     if (!context.mounted) return;
                     final contentProvider = context.read<ContentProvider>();

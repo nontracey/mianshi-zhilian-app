@@ -10,7 +10,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart';
 
 import '../app_log_service.dart';
 import '../route_resolver.dart';
-import 'runtime_platform.dart';
+import 'runtime_platform.dart' as runtime_platform;
 
 /// 模型文件定义（仅用于 isModelReady 检查）
 class ModelFile {
@@ -264,7 +264,7 @@ class KnownRuntimes {
 
   static OnDeviceRuntimeConfig? current() {
     if (Platform.isMacOS) {
-      final arch = currentSherpaOnnxRuntimeArch();
+      final arch = runtime_platform.currentSherpaOnnxRuntimeArch();
       return OnDeviceRuntimeConfig(
         id: 'sherpa-onnx-$version-osx-$arch',
         displayName: 'Sherpa ONNX Runtime $version macOS $arch',
@@ -293,7 +293,7 @@ class KnownRuntimes {
       );
     }
     if (Platform.isLinux) {
-      final arch = currentSherpaOnnxRuntimeArch();
+      final arch = runtime_platform.currentSherpaOnnxRuntimeArch();
       return OnDeviceRuntimeConfig(
         id: 'sherpa-onnx-$version-linux-$arch',
         displayName: 'Sherpa ONNX Runtime $version Linux $arch',
@@ -388,6 +388,7 @@ class ModelDownloader {
     if (!await dir.exists()) return false;
     if (Platform.isAndroid) {
       await _keepOnlyCurrentAndroidAbi(dir);
+      if (!await _hasCurrentAndroidRuntimeAbi(dir)) return false;
     }
     final searchDir = await _runtimeSearchDir(dir);
     for (final file in config.files) {
@@ -460,6 +461,7 @@ class ModelDownloader {
     if (firstFile == null) return null;
     if (Platform.isAndroid) {
       await _keepOnlyCurrentAndroidAbi(dir);
+      if (!await _hasCurrentAndroidRuntimeAbi(dir)) return null;
     }
     final searchDir = await _runtimeSearchDir(dir);
     final first = await _findFile(searchDir, firstFile);
@@ -1053,7 +1055,8 @@ class ModelDownloader {
   /// 使用当前设备 ABI 目录，避免递归搜索命中其他架构的 `.so`。
   static Future<Directory> _runtimeSearchDir(Directory runtimeDir) async {
     if (!Platform.isAndroid) return runtimeDir;
-    final abi = currentSherpaOnnxRuntimeArch();
+    final abi = await _selectCurrentAndroidAbi(runtimeDir);
+    if (abi == null) return runtimeDir;
     final abiDir = Directory('${runtimeDir.path}/$abi');
     if (await abiDir.exists()) return abiDir;
     return runtimeDir;
@@ -1066,7 +1069,16 @@ class ModelDownloader {
   /// 再统一移动到 `<runtime>/<abi>/`，最后删除其他 ABI 与残留顶层目录。
   static Future<void> _keepOnlyCurrentAndroidAbi(Directory runtimeDir) async {
     if (!Platform.isAndroid) return;
-    final abi = currentSherpaOnnxRuntimeArch();
+    final abi = await _selectCurrentAndroidAbi(runtimeDir);
+    if (abi == null) {
+      unawaited(
+        AppLog.warning(
+          'Android sherpa-onnx runtime ABI does not match current process',
+          source: 'on_device_stt',
+        ),
+      );
+      return;
+    }
     final canonicalAbiDir = Directory('${runtimeDir.path}/$abi');
     final sourceAbiDir = await _findAndroidAbiDir(runtimeDir, abi);
 
@@ -1082,6 +1094,106 @@ class ModelDownloader {
     }
 
     await _deleteAndroidRuntimeResidue(runtimeDir, canonicalAbiDir, abi);
+  }
+
+  static Future<bool> _hasCurrentAndroidRuntimeAbi(Directory runtimeDir) async {
+    final abi = await _selectCurrentAndroidAbi(runtimeDir);
+    if (abi == null) return false;
+    final abiDir = Directory('${runtimeDir.path}/$abi');
+    if (!await abiDir.exists()) return false;
+    final runtimeInfo = await runtime_platform.currentAndroidRuntimeInfo();
+    if (runtimeInfo == null) return true;
+    final lib = await _findFile(abiDir, 'libonnxruntime.so');
+    if (lib == null) return true;
+    final elfClass = await _readElfClass(lib);
+    if (elfClass == null) return true;
+    return elfClass == (runtimeInfo.is64Bit ? _elfClass64 : _elfClass32);
+  }
+
+  static Future<String?> _selectCurrentAndroidAbi(Directory runtimeDir) async {
+    final abiDirs = await _findAndroidAbiDirs(runtimeDir);
+    final availableAbis = abiDirs.keys.toSet();
+    final runtimeInfo = await runtime_platform.currentAndroidRuntimeInfo();
+
+    if (runtimeInfo != null && availableAbis.isNotEmpty) {
+      final processAbis = runtimeInfo.is64Bit
+          ? runtimeInfo.supported64BitAbis
+          : runtimeInfo.supported32BitAbis;
+      for (final abi in processAbis) {
+        if (availableAbis.contains(abi)) return abi;
+      }
+      for (final abi in runtimeInfo.supportedAbis) {
+        if (availableAbis.contains(abi) &&
+            _isAbi64Bit(abi) == runtimeInfo.is64Bit) {
+          return abi;
+        }
+      }
+      final elfMatch = await _findAndroidAbiByElfClass(
+        abiDirs,
+        runtimeInfo.is64Bit,
+      );
+      if (elfMatch != null) return elfMatch;
+      return null;
+    }
+
+    final currentAbi = runtime_platform.currentSherpaOnnxRuntimeArch();
+    if (availableAbis.contains(currentAbi)) return currentAbi;
+
+    final currentIs64Bit = _isAbi64Bit(currentAbi);
+    final elfMatch = await _findAndroidAbiByElfClass(abiDirs, currentIs64Bit);
+    if (elfMatch != null) return elfMatch;
+
+    return currentAbi;
+  }
+
+  static bool _isAbi64Bit(String abi) {
+    return abi == 'arm64-v8a' || abi == 'x86_64';
+  }
+
+  static Future<String?> _findAndroidAbiByElfClass(
+    Map<String, Directory> abiDirs,
+    bool is64Bit,
+  ) async {
+    for (final abi in _androidAbiPreferenceOrder) {
+      final dir = abiDirs[abi];
+      if (dir == null) continue;
+      final lib = await _findFile(dir, 'libonnxruntime.so');
+      if (lib == null) continue;
+      final elfClass = await _readElfClass(lib);
+      if (elfClass == null) continue;
+      if (elfClass == (is64Bit ? _elfClass64 : _elfClass32)) {
+        return abi;
+      }
+    }
+    return null;
+  }
+
+  static const _elfClass32 = 1;
+  static const _elfClass64 = 2;
+  static const _androidAbiPreferenceOrder = [
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86_64',
+    'x86',
+  ];
+
+  static Future<int?> _readElfClass(File file) async {
+    try {
+      final stream = file.openRead(0, 5);
+      final chunks = await stream.toList();
+      if (chunks.isEmpty) return null;
+      final header = chunks.expand((chunk) => chunk).toList();
+      if (header.length < 5) return null;
+      if (header[0] != 0x7f ||
+          header[1] != 0x45 ||
+          header[2] != 0x4c ||
+          header[3] != 0x46) {
+        return null;
+      }
+      return header[4];
+    } catch (_) {
+      return null;
+    }
   }
 
   static bool _isKnownAndroidAbi(String name) {
@@ -1140,6 +1252,24 @@ class ModelDownloader {
       fallback ??= entity;
     }
     return fallback;
+  }
+
+  static Future<Map<String, Directory>> _findAndroidAbiDirs(
+    Directory runtimeDir,
+  ) async {
+    final result = <String, Directory>{};
+    if (!await runtimeDir.exists()) return result;
+    await for (final entity in runtimeDir.list(recursive: true)) {
+      if (entity is! Directory) continue;
+      final name = entity.uri.pathSegments.last;
+      if (!_isKnownAndroidAbi(name)) continue;
+      final existing = result[name];
+      if (existing == null ||
+          entity.parent.uri.pathSegments.last == 'jniLibs') {
+        result[name] = entity;
+      }
+    }
+    return result;
   }
 
   static Future<void> _deleteAndroidRuntimeResidue(

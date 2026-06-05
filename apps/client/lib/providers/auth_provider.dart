@@ -16,6 +16,7 @@ import '../services/storage_service.dart';
 const _refreshInterval = Duration(hours: 12);
 const _refreshRetryInterval = Duration(minutes: 5);
 const _refreshExpiryGuard = Duration(minutes: 5);
+const _profileSyncInterval = Duration(hours: 12);
 
 class AuthProvider extends ChangeNotifier {
   final StorageService _storage;
@@ -142,9 +143,10 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(userData);
         _token = await _storage.load('auth_token') as String?;
         _refreshToken = await _storage.load('auth_refresh_token') as String?;
+        var refreshed = false;
 
         if (_refreshToken != null && _shouldRefreshNow(_token)) {
-          final refreshed = await _refreshLogin();
+          refreshed = await _refreshLogin();
           if (refreshed) {
             _startRefreshTimer();
           }
@@ -157,6 +159,11 @@ class AuthProvider extends ChangeNotifier {
           }
         } else if (_refreshToken != null) {
           _startRefreshTimer();
+        }
+        if (!refreshed &&
+            _isTokenStillUsable(_token) &&
+            await _shouldSyncCurrentUser()) {
+          await _syncCurrentUser();
         }
         notifyListeners();
       }
@@ -355,6 +362,44 @@ class AuthProvider extends ChangeNotifier {
     await _storage.save('auth_user', _user?.toJson());
     await _storage.save('auth_token', _token);
     await _storage.save('auth_refresh_token', _refreshToken);
+  }
+
+  Future<bool> _shouldSyncCurrentUser() async {
+    final lastSyncedAt = await _storage.load('auth_user_synced_at') as int?;
+    if (lastSyncedAt == null) return true;
+    final lastSync = DateTime.fromMillisecondsSinceEpoch(lastSyncedAt);
+    return DateTime.now().difference(lastSync) >= _profileSyncInterval;
+  }
+
+  Future<void> _syncCurrentUser() async {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
+    try {
+      final response = await _routeClient.request(
+        RouteService.appApi,
+        'GET',
+        '/auth/me',
+        headers: await ApiHeaders.build(_storage, token: token),
+        timeout: const Duration(seconds: 8),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true && data['user'] is Map<String, dynamic>) {
+          _user = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUser();
+          await _storage.save(
+            'auth_user_synced_at',
+            DateTime.now().millisecondsSinceEpoch,
+          );
+        }
+        return;
+      }
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        await _clearSavedUser();
+      }
+    } catch (e) {
+      debugPrint('Sync current user failed: $e');
+    }
   }
 
   Future<void> _clearSavedUser() async {

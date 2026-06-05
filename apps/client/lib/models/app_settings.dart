@@ -134,15 +134,18 @@ class AppSettings {
   final String cardDensity;
 
   // 语音识别配置
-  final String sttMode; // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'sherpa_onnx'
+  // 'auto' | 'follow_current_ai' | 'fixed_ai_config' | 'system' | 'sherpa_onnx'
+  final String sttMode;
   final String? sttAiConfigId;
   // 本机语音识别（sherpa_onnx）配置
   final String onDeviceEngine; // 'sense_voice' | 'whisper' | 'paraformer'
-  final String whisperModel; // 'tiny' | 'base' | 'small' | 'medium'（仅引擎为 whisper 时生效）
+  // 'tiny' | 'base' | 'small' | 'medium'（仅引擎为 whisper 时生效）
+  final String whisperModel;
 
   // 知识源配置
   final ContentEnv contentEnv;
   final String? customTestContentUrl;
+  final String? customDraftContentUrl;
   final String? customProdContentUrl;
 
   // 更新下载配置
@@ -174,6 +177,7 @@ class AppSettings {
     this.whisperModel = 'base',
     this.contentEnv = ContentEnv.production,
     this.customTestContentUrl,
+    this.customDraftContentUrl,
     this.customProdContentUrl,
     this.customGithubMirror,
   });
@@ -192,8 +196,8 @@ class AppSettings {
           : '$defaultWorkerApiUrl/content/test';
     }
     if (contentEnv == ContentEnv.draft) {
-      return customTestContentUrl?.isNotEmpty == true
-          ? customTestContentUrl!
+      return customDraftContentUrl?.isNotEmpty == true
+          ? customDraftContentUrl!
           : '$defaultWorkerApiUrl/content/draft';
     }
     return customProdContentUrl?.isNotEmpty == true
@@ -205,6 +209,12 @@ class AppSettings {
   String get effectiveTestContentUrl => customTestContentUrl?.isNotEmpty == true
       ? customTestContentUrl!
       : '$defaultWorkerApiUrl/content/test';
+
+  /// 草稿版 URL（显示用）
+  String get effectiveDraftContentUrl =>
+      customDraftContentUrl?.isNotEmpty == true
+      ? customDraftContentUrl!
+      : '$defaultWorkerApiUrl/content/draft';
 
   /// 发布版 URL（显示用）
   String get effectiveProdContentUrl => customProdContentUrl?.isNotEmpty == true
@@ -237,6 +247,7 @@ class AppSettings {
     String? whisperModel,
     ContentEnv? contentEnv,
     Object? customTestContentUrl = _unset,
+    Object? customDraftContentUrl = _unset,
     Object? customProdContentUrl = _unset,
     Object? customGithubMirror = _unset,
   }) => AppSettings(
@@ -271,6 +282,9 @@ class AppSettings {
     customTestContentUrl: customTestContentUrl == _unset
         ? this.customTestContentUrl
         : customTestContentUrl as String?,
+    customDraftContentUrl: customDraftContentUrl == _unset
+        ? this.customDraftContentUrl
+        : customDraftContentUrl as String?,
     customProdContentUrl: customProdContentUrl == _unset
         ? this.customProdContentUrl
         : customProdContentUrl as String?,
@@ -346,6 +360,7 @@ class AppSettings {
       json['contentEnv'] as String? ?? 'production',
     ),
     customTestContentUrl: json['customTestContentUrl'] as String?,
+    customDraftContentUrl: json['customDraftContentUrl'] as String?,
     customProdContentUrl: json['customProdContentUrl'] as String?,
     customGithubMirror: json['customGithubMirror'] as String?,
   );
@@ -376,6 +391,7 @@ class AppSettings {
     'whisperModel': whisperModel,
     'contentEnv': contentEnv.key,
     'customTestContentUrl': customTestContentUrl,
+    'customDraftContentUrl': customDraftContentUrl,
     'customProdContentUrl': customProdContentUrl,
     'customGithubMirror': customGithubMirror,
   };
