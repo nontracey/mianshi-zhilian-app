@@ -59,6 +59,25 @@ void main(List<String> args) {
           .toList()
         ..sort((left, right) => left.path.compareTo(right.path));
 
+  /// 为单个文件构建平台条目（url/assetPath/mirrors/sha256/size）
+  Map<String, Object?> _buildAssetEntry(File file, String name) {
+    final githubUrl =
+        'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
+    final assetPath = '/releases/latest/download/$name';
+    final mirrors = <String>[];
+    mirrors.add('https://ghfast.top/$githubUrl');
+    if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
+      mirrors.add('$ghMirrorPrefix/$githubUrl');
+    }
+    return {
+      'url': githubUrl,
+      'assetPath': assetPath,
+      'mirrors': mirrors,
+      'sha256': sha256sum(file),
+      'size': file.lengthSync(),
+    };
+  }
+
   /// 返回 Android ABI 特有平台条目，同时保留一个 fallback `android` 条目。
   ///
   /// 扫描所有匹配 `-android-{abi}.apk` 的文件，如 arm64-v8a/armeabi-v7a/x86_64/x86。
@@ -81,25 +100,6 @@ void main(List<String> args) {
       result['android'] = result['android-arm64-v8a'] ?? result.values.first;
     }
     return result;
-  }
-
-  /// 为单个文件构建平台条目（url/assetPath/mirrors/sha256/size）
-  Map<String, Object?> _buildAssetEntry(File file, String name) {
-    final githubUrl =
-        'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
-    final assetPath = '/releases/latest/download/$name';
-    final mirrors = <String>[];
-    mirrors.add('https://ghfast.top/$githubUrl');
-    if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
-      mirrors.add('$ghMirrorPrefix/$githubUrl');
-    }
-    return {
-      'url': githubUrl,
-      'assetPath': assetPath,
-      'mirrors': mirrors,
-      'sha256': sha256sum(file),
-      'size': file.lengthSync(),
-    };
   }
 
   /// 非 Android 平台的单一条目生成（windows/macos/web）。
