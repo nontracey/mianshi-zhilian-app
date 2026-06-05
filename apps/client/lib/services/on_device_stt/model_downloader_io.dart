@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart';
@@ -590,70 +590,10 @@ class ModelDownloader {
         ),
       );
 
-      final archiveBytes = await tempFile.readAsBytes();
-
-      // 3. BZip2 解压
-      final List<int> tarBytes;
       try {
-        tarBytes = BZip2Decoder().decodeBytes(archiveBytes);
-      } catch (e) {
-        throw HttpException('BZip2 decompression failed: $e');
-      }
-
-      // 4. Tar 解压到模型目录
-      //
-      // sherpa-onnx 存档总是包含一个版本号子目录（如
-      // sherpa-onnx-sense-voice-...-int8-2024-07-17/），
-      // 提取时需要剥离公共顶层目录，使文件直接放在模型根目录。
-      try {
-        final archive = TarDecoder().decodeBytes(tarBytes);
-        final fileEntries = archive.where((e) => e.isFile).toList();
-        if (fileEntries.isEmpty) {
-          throw HttpException('Archive is empty or contains no files');
-        }
-
-        // 检测所有文件条目的公共顶层目录前缀
-        String? commonTopPrefix;
-        for (final entry in fileEntries) {
-          final slashPos = entry.name.indexOf('/');
-          if (slashPos == -1) {
-            commonTopPrefix = null;
-            break;
-          }
-          final prefix = entry.name.substring(0, slashPos);
-          if (commonTopPrefix == null) {
-            commonTopPrefix = prefix;
-          } else if (commonTopPrefix != prefix) {
-            commonTopPrefix = null;
-            break;
-          }
-        }
-
-        int extractedCount = 0;
-        for (final entry in fileEntries) {
-          final relativeName =
-              (commonTopPrefix != null &&
-                  entry.name.startsWith('$commonTopPrefix/'))
-              ? entry.name.substring(commonTopPrefix.length + 1)
-              : entry.name;
-          if (relativeName.isEmpty) continue;
-
-          final destPath = '${modelDir.path}/$relativeName';
-          final destDir = Directory(
-            destPath.substring(0, destPath.lastIndexOf('/')),
-          );
-          if (!await destDir.exists()) {
-            await destDir.create(recursive: true);
-          }
-          await File(destPath).writeAsBytes(
-            entry.content is Uint8List
-                ? entry.content as Uint8List
-                : Uint8List.fromList(entry.content),
-          );
-          extractedCount++;
-        }
-        if (extractedCount == 0) {
-          throw HttpException('No files extracted from archive');
+        await _extractModelTarBz2Archive(tempFile, modelDir, config.id);
+        if (!await isModelReady(config)) {
+          throw HttpException('Model files missing after extraction');
         }
 
         // 提取完成 → 报告 100%
@@ -729,6 +669,9 @@ class ModelDownloader {
       // 清理其他 ABI 只保留当前设备的，避免 _findFile 找到错误架构。
       if (Platform.isAndroid) {
         await _keepOnlyCurrentAndroidAbi(runtimeDir);
+        if (!await _hasCurrentAndroidRuntimeAbi(runtimeDir)) {
+          throw HttpException('Runtime ABI does not match current process');
+        }
       }
 
       for (final file in config.files) {
@@ -1049,6 +992,88 @@ class ModelDownloader {
     }
   }
 
+  static Future<void> _extractModelTarBz2Archive(
+    File archiveFile,
+    Directory modelDir,
+    String identifier,
+  ) async {
+    final tempDir = await getTemporaryDirectory();
+    final tarFile = File('${tempDir.path}/model_${identifier}_extract.tar');
+    InputFileStream? input;
+    OutputFileStream? output;
+    InputFileStream? tarInput;
+    try {
+      input = InputFileStream(archiveFile.path);
+      output = OutputFileStream(tarFile.path);
+      BZip2Decoder().decodeBuffer(input, output: output);
+      input.closeSync();
+      output.closeSync();
+      input = null;
+      output = null;
+
+      tarInput = InputFileStream(tarFile.path);
+      final archive = TarDecoder().decodeBuffer(tarInput);
+      final fileEntries = archive.where((entry) => entry.isFile).toList();
+      if (fileEntries.isEmpty) {
+        throw HttpException('Archive is empty or contains no files');
+      }
+
+      final commonTopPrefix = _commonTopLevelPrefix(fileEntries);
+      var extractedCount = 0;
+      for (final entry in fileEntries) {
+        final relativeName =
+            (commonTopPrefix != null &&
+                entry.name.startsWith('$commonTopPrefix/'))
+            ? entry.name.substring(commonTopPrefix.length + 1)
+            : entry.name;
+        if (relativeName.isEmpty || relativeName.contains('..')) continue;
+
+        final destPath = '${modelDir.path}/$relativeName';
+        final destDir = Directory(
+          destPath.substring(0, destPath.lastIndexOf('/')),
+        );
+        if (!await destDir.exists()) {
+          await destDir.create(recursive: true);
+        }
+        final fileOutput = OutputFileStream(destPath);
+        try {
+          entry.writeContent(fileOutput);
+        } finally {
+          fileOutput.closeSync();
+        }
+        extractedCount++;
+      }
+      if (extractedCount == 0) {
+        throw HttpException('No files extracted from archive');
+      }
+    } catch (e) {
+      if (e is HttpException) rethrow;
+      throw HttpException('Model archive extraction failed: $e');
+    } finally {
+      input?.closeSync();
+      output?.closeSync();
+      tarInput?.closeSync();
+      if (await tarFile.exists()) {
+        await tarFile.delete();
+      }
+    }
+  }
+
+  static String? _commonTopLevelPrefix(List<ArchiveFile> fileEntries) {
+    String? commonTopPrefix;
+    for (final entry in fileEntries) {
+      final slashPos = entry.name.indexOf('/');
+      if (slashPos == -1) return null;
+      final prefix = entry.name.substring(0, slashPos);
+      if (commonTopPrefix == null) {
+        commonTopPrefix = prefix;
+      } else if (commonTopPrefix != prefix) {
+        return null;
+      }
+    }
+    return commonTopPrefix;
+  }
+
   /// 返回运行时库文件应搜索的目录。
   ///
   /// Android 运行时统一规范化到 `<runtime>/<abi>/`，加载动态库时只
@@ -1209,9 +1234,9 @@ class ModelDownloader {
   ) async {
     await for (final entity in src.list()) {
       if (entity is File) {
-        await entity.rename('${dst.path}/${entity.uri.pathSegments.last}');
+        await entity.rename('${dst.path}/${_entityName(entity)}');
       } else if (entity is Directory) {
-        final subDst = Directory('${dst.path}/${entity.uri.pathSegments.last}');
+        final subDst = Directory('${dst.path}/${_entityName(entity)}');
         if (!await subDst.exists()) {
           await subDst.create(recursive: true);
         }
@@ -1227,7 +1252,7 @@ class ModelDownloader {
     if (!await runtimeDir.exists()) return;
     await for (final entity in runtimeDir.list()) {
       if (entity is! File) continue;
-      final name = entity.uri.pathSegments.last;
+      final name = _entityName(entity);
       if (!name.endsWith('.so')) continue;
       if (!await canonicalAbiDir.exists()) {
         await canonicalAbiDir.create(recursive: true);
@@ -1244,9 +1269,9 @@ class ModelDownloader {
     Directory? fallback;
     await for (final entity in runtimeDir.list(recursive: true)) {
       if (entity is! Directory) continue;
-      final name = entity.uri.pathSegments.last;
+      final name = _entityName(entity);
       if (name != abi) continue;
-      if (entity.parent.uri.pathSegments.last == 'jniLibs') {
+      if (_entityName(entity.parent) == 'jniLibs') {
         return entity;
       }
       fallback ??= entity;
@@ -1261,11 +1286,10 @@ class ModelDownloader {
     if (!await runtimeDir.exists()) return result;
     await for (final entity in runtimeDir.list(recursive: true)) {
       if (entity is! Directory) continue;
-      final name = entity.uri.pathSegments.last;
+      final name = _entityName(entity);
       if (!_isKnownAndroidAbi(name)) continue;
       final existing = result[name];
-      if (existing == null ||
-          entity.parent.uri.pathSegments.last == 'jniLibs') {
+      if (existing == null || _entityName(entity.parent) == 'jniLibs') {
         result[name] = entity;
       }
     }
@@ -1279,7 +1303,7 @@ class ModelDownloader {
   ) async {
     if (!await runtimeDir.exists()) return;
     await for (final entity in runtimeDir.list()) {
-      final name = entity.uri.pathSegments.last;
+      final name = _entityName(entity);
       if (entity is File) {
         if (name.endsWith('.so')) {
           await entity.delete();
@@ -1304,7 +1328,7 @@ class ModelDownloader {
   static Future<bool> _containsAndroidAbiDir(Directory dir, String abi) async {
     if (!await dir.exists()) return false;
     await for (final entity in dir.list(recursive: true)) {
-      if (entity is Directory && entity.uri.pathSegments.last == abi) {
+      if (entity is Directory && _entityName(entity) == abi) {
         return true;
       }
     }
@@ -1314,8 +1338,7 @@ class ModelDownloader {
   static Future<bool> _containsAnyAndroidAbiDir(Directory dir) async {
     if (!await dir.exists()) return false;
     await for (final entity in dir.list(recursive: true)) {
-      if (entity is Directory &&
-          _isKnownAndroidAbi(entity.uri.pathSegments.last)) {
+      if (entity is Directory && _isKnownAndroidAbi(_entityName(entity))) {
         return true;
       }
     }
@@ -1325,11 +1348,18 @@ class ModelDownloader {
   static Future<File?> _findFile(Directory dir, String fileName) async {
     if (!await dir.exists()) return null;
     await for (final entity in dir.list(recursive: true)) {
-      if (entity is File && entity.uri.pathSegments.last == fileName) {
+      if (entity is File && _entityName(entity) == fileName) {
         return entity;
       }
     }
     return null;
+  }
+
+  static String _entityName(FileSystemEntity entity) {
+    return entity.path
+        .split(Platform.pathSeparator)
+        .where((part) => part.isNotEmpty)
+        .last;
   }
 
   static Future<void> _extractArchive(

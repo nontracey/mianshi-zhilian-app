@@ -1800,11 +1800,14 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
   double _onDeviceRuntimeProgress = 0.0;
   String _onDeviceSource = '';
   String _onDeviceRuntimeSource = '';
+  String _onDevicePhaseKey = '';
+  String _onDeviceRuntimePhaseKey = '';
   double _onDeviceSpeed = 0;
   double _onDeviceRuntimeSpeed = 0;
   String? _onDeviceError;
   ResourceDownloadController? _modelDownloadController;
   ResourceDownloadController? _runtimeDownloadController;
+  int _onDeviceStatusEpoch = 0;
 
   @override
   void initState() {
@@ -1812,13 +1815,24 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     _checkOnDeviceStatus();
   }
 
+  @override
+  void didUpdateWidget(covariant _SttConfigPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.settings.onDeviceEngine != widget.settings.onDeviceEngine ||
+        oldWidget.settings.whisperModel != widget.settings.whisperModel) {
+      _checkOnDeviceStatus(settings: widget.settings);
+    }
+  }
+
   AppSettings get _settings => widget.settings;
 
-  Future<void> _checkOnDeviceStatus() async {
+  Future<void> _checkOnDeviceStatus({AppSettings? settings}) async {
+    final epoch = ++_onDeviceStatusEpoch;
+    final activeSettings = settings ?? _settings;
     // 使用动态导入避免 web 端编译失败
     // 实际上 sherpa_onnx 包在 web 端不可用，但 kIsWeb 检查在 service 层
     if (kIsWeb) {
-      if (mounted) {
+      if (mounted && epoch == _onDeviceStatusEpoch) {
         setState(() {
           _onDeviceChecking = false;
           _onDeviceReady = false;
@@ -1827,15 +1841,15 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       return;
     }
 
-    final engine = _settings.onDeviceEngine;
+    final engine = activeSettings.onDeviceEngine;
     final onDeviceModelConfig = _modelConfigForEngine(
       engine,
-      _settings.whisperModel,
+      activeSettings.whisperModel,
     );
     final runtimeConfig = KnownRuntimes.current();
 
     if (onDeviceModelConfig == null || runtimeConfig == null) {
-      if (mounted) {
+      if (mounted && epoch == _onDeviceStatusEpoch) {
         setState(() {
           _onDeviceChecking = false;
           _onDeviceReady = false;
@@ -1855,7 +1869,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       final runtimeSize = await ModelDownloader.getRuntimeSize(
         runtimeConfig.id,
       );
-      if (mounted) {
+      if (mounted && epoch == _onDeviceStatusEpoch) {
         setState(() {
           _onDeviceChecking = false;
           _onDeviceReady = modelReady && runtimeReady;
@@ -1866,10 +1880,12 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && epoch == _onDeviceStatusEpoch) {
         setState(() {
           _onDeviceChecking = false;
           _onDeviceReady = false;
+          _onDeviceModelReady = false;
+          _onDeviceRuntimeReady = false;
           _onDeviceError = '$e';
         });
       }
@@ -2056,14 +2072,13 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
             }).toList(),
             onChanged: (engine) {
               if (engine != null) {
-                widget.onSettingsChanged(
-                  _settings.copyWith(onDeviceEngine: engine),
-                );
+                final nextSettings = _settings.copyWith(onDeviceEngine: engine);
+                widget.onSettingsChanged(nextSettings);
                 setState(() {
                   _onDeviceChecking = true;
                   _onDeviceReady = false;
                 });
-                _checkOnDeviceStatus();
+                _checkOnDeviceStatus(settings: nextSettings);
               }
             },
           ),
@@ -2085,14 +2100,13 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
               }).toList(),
               onChanged: (size) {
                 if (size != null) {
-                  widget.onSettingsChanged(
-                    _settings.copyWith(whisperModel: size),
-                  );
+                  final nextSettings = _settings.copyWith(whisperModel: size);
+                  widget.onSettingsChanged(nextSettings);
                   setState(() {
                     _onDeviceChecking = true;
                     _onDeviceReady = false;
                   });
-                  _checkOnDeviceStatus();
+                  _checkOnDeviceStatus(settings: nextSettings);
                 }
               },
             ),
@@ -2220,6 +2234,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       progress: _onDeviceRuntimeProgress,
       source: _onDeviceRuntimeSource,
       speed: _onDeviceRuntimeSpeed,
+      phaseKey: _onDeviceRuntimePhaseKey,
       onDownload: () => _downloadRuntime(config, l10n),
       onPause: () => _runtimeDownloadController?.pause(),
       onCancel: () => _runtimeDownloadController?.cancel(),
@@ -2247,6 +2262,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       progress: _onDeviceProgress,
       source: _onDeviceSource,
       speed: _onDeviceSpeed,
+      phaseKey: _onDevicePhaseKey,
       onDownload: () => _downloadModel(modelConfig, l10n),
       onPause: () => _modelDownloadController?.pause(),
       onCancel: () => _modelDownloadController?.cancel(),
@@ -2270,6 +2286,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       _onDeviceDownloading = true;
       _onDeviceProgress = 0.0;
       _onDeviceSource = '';
+      _onDevicePhaseKey = 'resource_status_downloading';
       _onDeviceSpeed = 0;
       _onDeviceError = null;
     });
@@ -2286,10 +2303,16 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
               _onDeviceProgress = progress.fraction ?? _onDeviceProgress;
               _onDeviceSource = progress.sourceLabel;
               _onDeviceSpeed = progress.bytesPerSecond;
+              _onDevicePhaseKey = progress.extracting
+                  ? 'resource_status_extracting'
+                  : 'resource_status_downloading';
             });
           }
         },
       );
+      if (mounted) {
+        setState(() => _onDevicePhaseKey = 'resource_status_verifying');
+      }
       await _checkOnDeviceStatus();
       unawaited(
         AppLog.info(
@@ -2321,7 +2344,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       }
     } finally {
       if (mounted) {
-        setState(() => _onDeviceDownloading = false);
+        setState(() {
+          _onDeviceDownloading = false;
+          _onDevicePhaseKey = '';
+        });
       }
       if (_modelDownloadController == controller) {
         _modelDownloadController = null;
@@ -2362,6 +2388,7 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       _onDeviceRuntimeDownloading = true;
       _onDeviceRuntimeProgress = 0.0;
       _onDeviceRuntimeSource = '';
+      _onDeviceRuntimePhaseKey = 'resource_status_downloading';
       _onDeviceRuntimeSpeed = 0;
       _onDeviceError = null;
     });
@@ -2379,10 +2406,16 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
                   progress.fraction ?? _onDeviceRuntimeProgress;
               _onDeviceRuntimeSource = progress.sourceLabel;
               _onDeviceRuntimeSpeed = progress.bytesPerSecond;
+              _onDeviceRuntimePhaseKey = progress.extracting
+                  ? 'resource_status_extracting'
+                  : 'resource_status_downloading';
             });
           }
         },
       );
+      if (mounted) {
+        setState(() => _onDeviceRuntimePhaseKey = 'resource_status_verifying');
+      }
       await _checkOnDeviceStatus();
       unawaited(
         AppLog.info(
@@ -2414,7 +2447,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       }
     } finally {
       if (mounted) {
-        setState(() => _onDeviceRuntimeDownloading = false);
+        setState(() {
+          _onDeviceRuntimeDownloading = false;
+          _onDeviceRuntimePhaseKey = '';
+        });
       }
       if (_runtimeDownloadController == controller) {
         _runtimeDownloadController = null;
@@ -2538,6 +2574,7 @@ class _ResourceStatusBlock extends StatelessWidget {
     required this.progress,
     required this.source,
     required this.speed,
+    required this.phaseKey,
     required this.onDownload,
     required this.onPause,
     required this.onCancel,
@@ -2554,6 +2591,7 @@ class _ResourceStatusBlock extends StatelessWidget {
   final double progress;
   final String source;
   final double speed;
+  final String phaseKey;
   final VoidCallback onDownload;
   final VoidCallback onPause;
   final VoidCallback onCancel;
@@ -2604,6 +2642,17 @@ class _ResourceStatusBlock extends StatelessWidget {
               const SizedBox(height: 8),
               LinearProgressIndicator(value: progress > 0 ? progress : null),
               const SizedBox(height: 6),
+              if (phaseKey.isNotEmpty) ...[
+                Text(
+                  l10n.get(phaseKey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
                 _downloadDetailText(l10n),
                 style: TextStyle(

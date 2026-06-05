@@ -164,6 +164,7 @@ class ProgressProvider extends ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return _progressMap.values.where((p) {
+      if (!_topicBelongsToDomain(p.topicId, domainId)) return false;
       if (p.nextReviewAt == null) return false;
       final reviewDate = DateTime(
         p.nextReviewAt!.year,
@@ -172,6 +173,10 @@ class ProgressProvider extends ChangeNotifier {
       );
       return !reviewDate.isAfter(today);
     }).length;
+  }
+
+  bool _topicBelongsToDomain(String topicId, String domainId) {
+    return topicId == domainId || topicId.startsWith('$domainId.');
   }
 
   List<Topic> getRecommendedTopics(

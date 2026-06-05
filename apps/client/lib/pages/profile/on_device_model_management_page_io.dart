@@ -132,7 +132,7 @@ class _OnDeviceModelManagementPageState
     final subDirs = root.list().where((e) => e is Directory);
     await for (final entity in subDirs) {
       final dir = entity as Directory;
-      final name = dir.uri.pathSegments.last;
+      final name = _entityName(dir);
 
       // Runtime resources are managed by the runtime entry above. They are not
       // model directories, so do not report platform/runtime variants as
@@ -302,6 +302,13 @@ class _OnDeviceModelManagementPageState
     return path.split(Platform.pathSeparator).contains('runtimes');
   }
 
+  String _entityName(FileSystemEntity entity) {
+    return entity.path
+        .split(Platform.pathSeparator)
+        .where((part) => part.isNotEmpty)
+        .last;
+  }
+
   Future<void> _downloadEntry(_ModelEntry entry) async {
     final l10n = context.read<LocalizationProvider>();
     if (!mounted) return;
@@ -318,6 +325,7 @@ class _OnDeviceModelManagementPageState
     final progressNotifier = ValueNotifier<double>(0);
     final sourceNotifier = ValueNotifier<String>('');
     final speedNotifier = ValueNotifier<double>(0);
+    final phaseNotifier = ValueNotifier<String>('resource_status_downloading');
 
     showDialog(
       context: context,
@@ -327,6 +335,7 @@ class _OnDeviceModelManagementPageState
         progressNotifier: progressNotifier,
         sourceNotifier: sourceNotifier,
         speedNotifier: speedNotifier,
+        phaseNotifier: phaseNotifier,
       ),
     );
 
@@ -364,6 +373,9 @@ class _OnDeviceModelManagementPageState
             progressNotifier.value = progress.fraction ?? 0;
             sourceNotifier.value = progress.sourceLabel;
             speedNotifier.value = progress.bytesPerSecond;
+            phaseNotifier.value = progress.extracting
+                ? 'resource_status_extracting'
+                : 'resource_status_downloading';
           },
         );
       } else {
@@ -404,10 +416,14 @@ class _OnDeviceModelManagementPageState
             progressNotifier.value = progress.fraction ?? 0;
             sourceNotifier.value = progress.sourceLabel;
             speedNotifier.value = progress.bytesPerSecond;
+            phaseNotifier.value = progress.extracting
+                ? 'resource_status_extracting'
+                : 'resource_status_downloading';
           },
         );
       }
 
+      phaseNotifier.value = 'resource_status_verifying';
       await AppLog.info(
         'Download completed: ${entry.type} ${entry.id}',
         source: 'model_management',
@@ -951,12 +967,14 @@ class _DownloadProgressDialog extends StatelessWidget {
     required this.progressNotifier,
     required this.sourceNotifier,
     required this.speedNotifier,
+    required this.phaseNotifier,
   });
 
   final String entryName;
   final ValueNotifier<double> progressNotifier;
   final ValueNotifier<String> sourceNotifier;
   final ValueNotifier<double> speedNotifier;
+  final ValueNotifier<String> phaseNotifier;
 
   @override
   Widget build(BuildContext context) {
@@ -968,8 +986,29 @@ class _DownloadProgressDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const LinearProgressIndicator(),
+          ValueListenableBuilder<double>(
+            valueListenable: progressNotifier,
+            builder: (_, progress, _) =>
+                LinearProgressIndicator(value: progress > 0 ? progress : null),
+          ),
           const SizedBox(height: 12),
+          ValueListenableBuilder<String>(
+            valueListenable: phaseNotifier,
+            builder: (_, phaseKey, _) {
+              if (phaseKey.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  context.read<LocalizationProvider>().get(phaseKey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              );
+            },
+          ),
           ValueListenableBuilder<double>(
             valueListenable: progressNotifier,
             builder: (_, progress, _) {
