@@ -59,6 +59,50 @@ void main(List<String> args) {
           .toList()
         ..sort((left, right) => left.path.compareTo(right.path));
 
+  /// 返回 Android ABI 特有平台条目，同时保留一个 fallback `android` 条目。
+  ///
+  /// 扫描所有匹配 `-android-{abi}.apk` 的文件，如 arm64-v8a/armeabi-v7a/x86_64/x86。
+  /// 旧客户端只看 `android` key 仍能拿到 arm64-v8a APK（主要 ABI）。
+  Map<String, Map<String, Object?>> _androidAbiAssets() {
+    final result = <String, Map<String, Object?>>{};
+    File? primaryFile;
+    for (final file in assets.whereType<File>()) {
+      final name = file.uri.pathSegments.last;
+      final match = RegExp(r'-android-(arm64-v8a|armeabi-v7a|x86_64|x86)\.apk$')
+          .firstMatch(name);
+      if (match == null) continue;
+      final abi = match.group(1)!;
+      final key = 'android-$abi';
+      result[key] = _buildAssetEntry(file, name);
+      if (primaryFile == null) primaryFile = file;
+    }
+    // fallback：arm64-v8a（如果没有找到任何 APK，用 platformAsset 原逻辑兜底）
+    if (primaryFile != null) {
+      result['android'] = result['android-arm64-v8a'] ?? result.values.first;
+    }
+    return result;
+  }
+
+  /// 为单个文件构建平台条目（url/assetPath/mirrors/sha256/size）
+  Map<String, Object?> _buildAssetEntry(File file, String name) {
+    final githubUrl =
+        'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
+    final assetPath = '/releases/latest/download/$name';
+    final mirrors = <String>[];
+    mirrors.add('https://ghfast.top/$githubUrl');
+    if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
+      mirrors.add('$ghMirrorPrefix/$githubUrl');
+    }
+    return {
+      'url': githubUrl,
+      'assetPath': assetPath,
+      'mirrors': mirrors,
+      'sha256': sha256sum(file),
+      'size': file.lengthSync(),
+    };
+  }
+
+  /// 非 Android 平台的单一条目生成（windows/macos/web）。
   Map<String, Object?> platformAsset(String platform) {
     final file = assets.cast<File?>().firstWhere(
       (item) => item!.path.toLowerCase().contains(platform),
@@ -73,23 +117,7 @@ void main(List<String> args) {
       };
     }
     final name = file.uri.pathSegments.last;
-    final githubUrl =
-        'https://github.com/nontracey/mianshi-zhilian-app/releases/download/$tag/$name';
-    final assetPath = '/releases/latest/download/$name';
-    final mirrors = <String>[];
-    // 备用镜像：ghfast.top 加速
-    mirrors.add('https://ghfast.top/$githubUrl');
-    // 自定义镜像站前缀（CI 环境变量 GH_MIRROR_PREFIX 可覆盖默认镜像）
-    if (ghMirrorPrefix != null && ghMirrorPrefix.isNotEmpty) {
-      mirrors.add('$ghMirrorPrefix/$githubUrl');
-    }
-    return {
-      'url': githubUrl,
-      'assetPath': assetPath,
-      'mirrors': mirrors,
-      'sha256': sha256sum(file),
-      'size': file.lengthSync(),
-    };
+    return _buildAssetEntry(file, name);
   }
 
   final manifest = <String, Object?>{
@@ -104,7 +132,8 @@ void main(List<String> args) {
               .toList()
         : ['版本更新'],
     'platforms': {
-      'android': platformAsset('android'),
+      // Android 优先使用 ABI 特化条目，fallback android 兼容旧客户端
+      ..._androidAbiAssets(),
       'windows': platformAsset('windows'),
       'macos': platformAsset('macos'),
       'web': platformAsset('web'),

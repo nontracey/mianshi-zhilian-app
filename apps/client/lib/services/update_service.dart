@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_version_service.dart';
 import 'endpoint_fallback_client.dart';
+import 'on_device_stt/runtime_platform.dart';
 import 'route_resolver.dart';
 import 'route_state_store.dart';
 import 'storage_service.dart';
@@ -250,7 +251,11 @@ class UpdateService {
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return updateInfo.platforms['android'];
+      // 优先按 ABI 特化条目下载（如 android-arm64-v8a），
+      // 回退到通用 android 条目兼容旧 update.json
+      final abi = currentSherpaOnnxRuntimeArch();
+      final abiKey = 'android-$abi';
+      return updateInfo.platforms[abiKey] ?? updateInfo.platforms['android'];
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return updateInfo.platforms['macos']; // iOS 暂用 macOS 包
