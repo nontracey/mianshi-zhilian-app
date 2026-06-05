@@ -27,6 +27,7 @@ class _OnDeviceModelManagementPageState
   bool _loading = true;
   final List<_ModelEntry> _entries = [];
   final List<_OrphanDir> _orphanDirs = [];
+  final Set<String> _downloadingEntryIds = {};
   int? _totalSizeBytes;
   String? _storagePath;
   String? _error;
@@ -310,36 +311,42 @@ class _OnDeviceModelManagementPageState
   }
 
   Future<void> _downloadEntry(_ModelEntry entry) async {
+    if (!_downloadingEntryIds.add('${entry.type}:${entry.id}')) return;
     final l10n = context.read<LocalizationProvider>();
-    if (!mounted) return;
+    if (!mounted) {
+      _downloadingEntryIds.remove('${entry.type}:${entry.id}');
+      return;
+    }
 
     // 获取镜像配置
     final settings = context.read<SettingsProvider>().settings;
     final mirrorBaseUrl = settings.customGithubMirror;
-    final downloadSourceMode = await RouteStateStore(
-      StorageService(),
-    ).loadDownloadSourceMode();
-    if (!mounted) return;
-
-    // 进度对话框
-    final progressNotifier = ValueNotifier<double>(0);
-    final sourceNotifier = ValueNotifier<String>('');
-    final speedNotifier = ValueNotifier<double>(0);
-    final phaseNotifier = ValueNotifier<String>('resource_status_downloading');
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _DownloadProgressDialog(
-        entryName: entry.name,
-        progressNotifier: progressNotifier,
-        sourceNotifier: sourceNotifier,
-        speedNotifier: speedNotifier,
-        phaseNotifier: phaseNotifier,
-      ),
-    );
-
     try {
+      final downloadSourceMode = await RouteStateStore(
+        StorageService(),
+      ).loadDownloadSourceMode();
+      if (!mounted) return;
+
+      // 进度对话框
+      final progressNotifier = ValueNotifier<double>(0);
+      final sourceNotifier = ValueNotifier<String>('');
+      final speedNotifier = ValueNotifier<double>(0);
+      final phaseNotifier = ValueNotifier<String>(
+        'resource_status_downloading',
+      );
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => _DownloadProgressDialog(
+          entryName: entry.name,
+          progressNotifier: progressNotifier,
+          sourceNotifier: sourceNotifier,
+          speedNotifier: speedNotifier,
+          phaseNotifier: phaseNotifier,
+        ),
+      );
+
       await AppLog.info(
         'Download started: ${entry.type} ${entry.id}',
         source: 'model_management',
@@ -458,6 +465,8 @@ class _OnDeviceModelManagementPageState
           SnackBar(content: Text('${l10n.get('download_failed')}: $e')),
         );
       }
+    } finally {
+      _downloadingEntryIds.remove('${entry.type}:${entry.id}');
     }
   }
 

@@ -328,6 +328,8 @@ class KnownRuntimes {
 class ModelDownloader {
   ModelDownloader._();
 
+  static final Set<String> _activeResourceDownloads = {};
+
   /// 获取模型存储根目录
   static Future<Directory> getStorageDir() async {
     final appDir = await getApplicationSupportDirectory();
@@ -549,6 +551,32 @@ class ModelDownloader {
     ResourceDownloadController? controller,
     OnResourceDownloadProgress? onDetailedProgress,
   }) async {
+    final lockId = 'model:${config.id}';
+    if (!_activeResourceDownloads.add(lockId)) {
+      throw StateError('Resource download already running: ${config.id}');
+    }
+    try {
+      await _downloadModelLocked(
+        config: config,
+        onProgress: onProgress,
+        mirrorBaseUrl: mirrorBaseUrl,
+        downloadSourceMode: downloadSourceMode,
+        controller: controller,
+        onDetailedProgress: onDetailedProgress,
+      );
+    } finally {
+      _activeResourceDownloads.remove(lockId);
+    }
+  }
+
+  static Future<void> _downloadModelLocked({
+    required OnDeviceModelConfig config,
+    OnDownloadProgress? onProgress,
+    String? mirrorBaseUrl,
+    DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
+    ResourceDownloadController? controller,
+    OnResourceDownloadProgress? onDetailedProgress,
+  }) async {
     final modelDir = await getModelDir(config.id);
 
     // 清理已有文件（修复旧版本提取到子目录的损坏状态）
@@ -623,6 +651,30 @@ class ModelDownloader {
   }
 
   static Future<void> downloadRuntime({
+    required OnDeviceRuntimeConfig config,
+    String? mirrorBaseUrl,
+    DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
+    ResourceDownloadController? controller,
+    OnResourceDownloadProgress? onProgress,
+  }) async {
+    final lockId = 'runtime:${config.id}';
+    if (!_activeResourceDownloads.add(lockId)) {
+      throw StateError('Resource download already running: ${config.id}');
+    }
+    try {
+      await _downloadRuntimeLocked(
+        config: config,
+        mirrorBaseUrl: mirrorBaseUrl,
+        downloadSourceMode: downloadSourceMode,
+        controller: controller,
+        onProgress: onProgress,
+      );
+    } finally {
+      _activeResourceDownloads.remove(lockId);
+    }
+  }
+
+  static Future<void> _downloadRuntimeLocked({
     required OnDeviceRuntimeConfig config,
     String? mirrorBaseUrl,
     DownloadSourceMode downloadSourceMode = DownloadSourceMode.auto,
@@ -715,14 +767,33 @@ class ModelDownloader {
     int? archiveSizeBytes,
     ResourceDownloadController? controller,
     OnResourceDownloadProgress? onProgress,
+    bool allowRangeReset = true,
   }) async {
     final tempDir = await getTemporaryDirectory();
     final tempFile = File('${tempDir.path}/model_${identifier}_download.part');
+    final tempMetaFile = File(
+      '${tempDir.path}/model_${identifier}_download.url',
+    );
 
     // 检查是否有部分下载
     int existingBytes = 0;
     if (await tempFile.exists()) {
+      final previousArchiveUrl = await tempMetaFile.exists()
+          ? (await tempMetaFile.readAsString()).trim()
+          : '';
+      if (previousArchiveUrl.isNotEmpty && previousArchiveUrl != archiveUrl) {
+        await tempFile.delete();
+        existingBytes = 0;
+      }
+    }
+    await tempMetaFile.writeAsString(archiveUrl);
+
+    if (await tempFile.exists()) {
       existingBytes = await tempFile.length();
+      if (archiveSizeBytes != null && existingBytes >= archiveSizeBytes) {
+        await tempFile.delete();
+        existingBytes = 0;
+      }
     }
 
     var candidates = _buildDownloadCandidates(
@@ -747,13 +818,14 @@ class ModelDownloader {
       final stopwatch = Stopwatch()..start();
       int speedBaseBytes = existingBytes;
       var speedBaseElapsed = Duration.zero;
+      http.Client? client;
       try {
         final request = http.Request('GET', Uri.parse(url));
         if (existingBytes > 0) {
           request.headers['Range'] = 'bytes=$existingBytes-';
         }
 
-        final client = http.Client();
+        client = http.Client();
         controller?._bind(client);
         final response = await client.send(request);
 
@@ -762,6 +834,11 @@ class ModelDownloader {
           final sink = tempFile.openWrite(mode: FileMode.append);
           try {
             int received = existingBytes;
+            final total =
+                archiveSizeBytes ??
+                (response.contentLength != null
+                    ? existingBytes + response.contentLength!
+                    : received);
             await for (final chunk in response.stream.timeout(
               const Duration(seconds: 30),
             )) {
@@ -782,7 +859,7 @@ class ModelDownloader {
               onProgress?.call(
                 DownloadProgress(
                   received: received,
-                  total: archiveSizeBytes ?? response.contentLength ?? received,
+                  total: total,
                   sourceLabel: sourceLabel,
                   bytesPerSecond: speed,
                 ),
@@ -792,14 +869,38 @@ class ModelDownloader {
             await sink.close();
             controller?._unbind(client);
             client.close();
+            client = null;
           }
           return tempFile;
+        } else if (response.statusCode == 416 &&
+            existingBytes > 0 &&
+            allowRangeReset) {
+          // 本地断点超出远端文件范围，通常是旧 .part 文件或源切换造成。
+          // 删除分片后重新从当前候选列表无 Range 下载，避免用户看到 416。
+          controller?._unbind(client);
+          client.close();
+          client = null;
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+          return _downloadArchiveToTemp(
+            archiveUrl: archiveUrl,
+            identifier: identifier,
+            mirrorBaseUrl: mirrorBaseUrl,
+            downloadSourceMode: downloadSourceMode,
+            archiveSizeBytes: archiveSizeBytes,
+            controller: controller,
+            onProgress: onProgress,
+            allowRangeReset: false,
+          );
         } else if (response.statusCode == 200) {
           // 服务器不支持 Range 或文件有变化，从头下载
           if (existingBytes > 0) {
             await tempFile.delete();
             existingBytes = 0;
           }
+          speedBaseBytes = 0;
+          speedBaseElapsed = Duration.zero;
           final sink = tempFile.openWrite();
           try {
             int received = 0;
@@ -833,17 +934,27 @@ class ModelDownloader {
             await sink.close();
             controller?._unbind(client);
             client.close();
+            client = null;
           }
           return tempFile;
         } else {
           lastError = HttpException('HTTP ${response.statusCode} from $url');
           controller?._unbind(client);
           client.close();
+          client = null;
           continue;
         }
       } on ResourceDownloadStopped {
+        if (client != null) {
+          controller?._unbind(client);
+          client.close();
+        }
         rethrow;
       } catch (e) {
+        if (client != null) {
+          controller?._unbind(client);
+          client.close();
+        }
         lastError = e is HttpException ? e : HttpException('$e');
         // 保留部分文件，下次重试可续传
         if (await tempFile.exists()) {
@@ -987,8 +1098,14 @@ class ModelDownloader {
   static Future<void> _deleteTempFile(String identifier) async {
     final tempDir = await getTemporaryDirectory();
     final tempFile = File('${tempDir.path}/model_${identifier}_download.part');
+    final tempMetaFile = File(
+      '${tempDir.path}/model_${identifier}_download.url',
+    );
     if (await tempFile.exists()) {
       await tempFile.delete();
+    }
+    if (await tempMetaFile.exists()) {
+      await tempMetaFile.delete();
     }
   }
 

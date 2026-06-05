@@ -2189,9 +2189,9 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
         if (!_onDeviceReady) ...[
           const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed: (_onDeviceDownloading || _onDeviceRuntimeDownloading)
-                ? null
-                : () => _downloadMissingOnDeviceResources(l10n),
+            onPressed: _canStartMissingOnDeviceDownloads
+                ? () => _downloadMissingOnDeviceResources(l10n)
+                : null,
             icon: const Icon(Icons.download, size: 16),
             label: Text(l10n.get('download_required_resources')),
           ),
@@ -2213,6 +2213,11 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
           ),
       ],
     );
+  }
+
+  bool get _canStartMissingOnDeviceDownloads {
+    return (!_onDeviceRuntimeReady && !_onDeviceRuntimeDownloading) ||
+        (!_onDeviceModelReady && !_onDeviceDownloading);
   }
 
   Widget _buildRuntimeResourceStatus(
@@ -2276,10 +2281,8 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     LocalizationProvider l10n,
   ) async {
     if (!mounted) return;
+    if (_onDeviceDownloading) return;
     final settings = context.read<SettingsProvider>().settings;
-    final downloadSourceMode = await RouteStateStore(
-      StorageService(),
-    ).loadDownloadSourceMode();
     final controller = ResourceDownloadController();
     _modelDownloadController = controller;
     setState(() {
@@ -2292,6 +2295,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     });
 
     try {
+      final downloadSourceMode = await RouteStateStore(
+        StorageService(),
+      ).loadDownloadSourceMode();
+      if (!mounted) return;
       await ModelDownloader.downloadModel(
         config: config,
         mirrorBaseUrl: settings.customGithubMirror,
@@ -2364,13 +2371,15 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
       _settings.whisperModel,
     );
     if (runtimeConfig == null || modelConfig == null) return;
-    if (!_onDeviceRuntimeReady) {
-      await _downloadRuntime(runtimeConfig, l10n);
-      if (!mounted || !_onDeviceRuntimeReady) return;
+    final tasks = <Future<void>>[];
+    if (!_onDeviceRuntimeReady && !_onDeviceRuntimeDownloading) {
+      tasks.add(_downloadRuntime(runtimeConfig, l10n));
     }
-    if (!_onDeviceModelReady) {
-      await _downloadModel(modelConfig, l10n);
+    if (!_onDeviceModelReady && !_onDeviceDownloading) {
+      tasks.add(_downloadModel(modelConfig, l10n));
     }
+    if (tasks.isEmpty) return;
+    await Future.wait(tasks);
   }
 
   Future<void> _downloadRuntime(
@@ -2378,10 +2387,8 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     LocalizationProvider l10n,
   ) async {
     if (!mounted) return;
+    if (_onDeviceRuntimeDownloading) return;
     final settings = context.read<SettingsProvider>().settings;
-    final downloadSourceMode = await RouteStateStore(
-      StorageService(),
-    ).loadDownloadSourceMode();
     final controller = ResourceDownloadController();
     _runtimeDownloadController = controller;
     setState(() {
@@ -2394,6 +2401,10 @@ class _SttConfigPanelState extends State<_SttConfigPanel> {
     });
 
     try {
+      final downloadSourceMode = await RouteStateStore(
+        StorageService(),
+      ).loadDownloadSourceMode();
+      if (!mounted) return;
       await ModelDownloader.downloadRuntime(
         config: config,
         mirrorBaseUrl: settings.customGithubMirror,
