@@ -33,6 +33,7 @@ import 'package:mianshi_zhilian/pages/auth/login_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_config_page.dart';
 import 'package:mianshi_zhilian/pages/profile/log_management_page.dart';
 import 'package:mianshi_zhilian/pages/profile/on_device_model_management_page.dart';
+import 'package:mianshi_zhilian/widgets/onboarding_screen.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/widgets/voice_diagnostic_sheet.dart';
 
@@ -4119,6 +4120,21 @@ class _AboutPanelState extends State<_AboutPanel> {
           url:
               'https://github.com/nontracey/mianshi-zhilian-app/blob/main/docs/sponsor.md',
         ),
+        _LinkTile(
+          icon: Icons.replay_outlined,
+          title: l10n.get('re_view_onboarding'),
+          subtitle: '',
+          onTap: () async {
+            await context.read<SettingsProvider>().resetOnboarding();
+            if (context.mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => const OnboardingScreen(),
+                ),
+              );
+            }
+          },
+        ),
       ],
     );
   }
@@ -4280,18 +4296,20 @@ class _LinkTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.url,
+    this.url,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final String url;
+  final String? url;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _launchUrl(context),
+      onTap: onTap ?? (url != null ? () => _launchUrl(context) : null),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
@@ -4329,8 +4347,8 @@ class _LinkTile extends StatelessWidget {
   }
 
   void _launchUrl(BuildContext context) {
-    // 使用 url_launcher 或默认浏览器打开
-    final uri = Uri.tryParse(url);
+    if (url == null) return;
+    final uri = Uri.tryParse(url!);
     if (uri == null) return;
     // ignore: deprecated_member_use
     launchUrl(uri, mode: LaunchMode.externalApplication);

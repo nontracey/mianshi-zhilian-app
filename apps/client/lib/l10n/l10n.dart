@@ -1590,7 +1590,7 @@ class L10n {
     'onboarding_privacy_bullet_1': '游客也能使用核心学习和练习功能',
     'onboarding_privacy_bullet_2': 'API Key 不上传到面试智练服务器',
     'onboarding_privacy_bullet_3': '可选 WebDAV、GitHub、Gitee 或文件同步',
-    'about_about': '关于',
+    'about_about': '关于项目',
     'about_homepage': '项目主页',
     'about_homepage_desc': '了解功能介绍、使用指南和最新更新',
     'about_github': 'GitHub 仓库',
@@ -1598,6 +1598,7 @@ class L10n {
     'about_sponsor': '支持项目',
     'about_sponsor_desc': '如果这个项目对你有帮助，欢迎请作者喝杯咖啡',
     'about_share_friends': '分享给朋友',
+    're_view_onboarding': '重新查看引导页',
   };
 
   static const _en = {
@@ -3393,6 +3394,7 @@ class L10n {
     'about_sponsor': 'Sponsor',
     'about_sponsor_desc': 'If this project helps you, buy the author a coffee',
     'about_share_friends': 'Share with friends',
+    're_view_onboarding': 'Replay Onboarding',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {
