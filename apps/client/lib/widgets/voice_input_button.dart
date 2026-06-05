@@ -225,29 +225,17 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     unawaited(_runAiChunkLoop(config));
   }
 
-  /// 双缓冲流水线：录制下一块的同时转写上一块，用户可连续说话不停顿。
+  /// 生产者循环：不间断录制音频块，每块转写异步派发不阻塞收音。
   Future<void> _runAiChunkLoop(AiConfig config) async {
     final aiProvider = context.read<AiProvider>();
     try {
-      // 录制第一块
-      var recordingFuture = _recordNextChunk();
-
       while (_running) {
         _setStateKind(VoiceInputState.recording);
         _setStatusMessage('voice_recording_hint');
-
-        // 等待当前录音块完成
-        final chunkPath = await recordingFuture;
+        final chunkPath = await _recordVadChunk();
         if (chunkPath == null || !_running) break;
-
-        // 启动转写，同时立刻开始录制下一块（流水线）
-        final transcribeFuture = _transcribeAiChunk(aiProvider, config, chunkPath);
-        recordingFuture = _recordNextChunk();
-
-        // 等待转写结果（录制下一块在后台静默进行）
-        final text = await transcribeFuture;
-        if (!_running) break;
-        if (text.isNotEmpty) _emitText(text);
+        // 异步转写：检查 _running，停止后静默丢弃不追加
+        unawaited(_transcribeAiAndEmitIfRunning(aiProvider, config, chunkPath));
       }
     } catch (e) {
       _showError(_messageKeyForError(e));
@@ -259,10 +247,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
-  /// 录制一个 2 秒的音频块，返回文件路径（受 _running 保护）。
-  Future<String?> _recordNextChunk() async {
-    if (!_running) return null;
-    return _recordChunk(const Duration(seconds: 2));
+  /// 转写一个音频块，若用户已停止则静默丢弃结果。
+  Future<void> _transcribeAiAndEmitIfRunning(
+    AiProvider aiProvider,
+    AiConfig config,
+    String chunkPath,
+  ) async {
+    final text = await _transcribeAiChunk(aiProvider, config, chunkPath);
+    if (!_running) return;
+    if (text.isNotEmpty) _emitText(text);
   }
 
   /// 读取音频块 → 调用 AI 转写 → 返回文本。
@@ -279,11 +272,17 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     return aiProvider.transcribeAudio(config: config, audioBytes: bytes);
   }
 
-  Future<String?> _recordChunk(Duration duration) async {
+  /// 使用 VAD 语音活动检测录制音频块，返回临时文件路径。
+  /// 当检测到持续静音（>1.5s）或达到最大时长（30s）时自动停止。
+  /// 返回 null 表示无有效语音输入或录制失败。
+  Future<String?> _recordVadChunk() async {
     try {
+      if (!_running) return null;
+
       final tempDir = await getTemporaryDirectory();
       final chunkPath =
           '${tempDir.path}/voice_chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
+
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
@@ -292,13 +291,36 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
         ),
         path: chunkPath,
       );
-      await Future.delayed(duration);
+
+      // VAD: monitor amplitude, stop on sustained silence
+      int silentChecks = 0;
+      const maxSilentChecks = 15; // ~1.5s of silence (100ms × 15)
+      const maxChunkDurationSeconds = 30;
+      final maxTotalChecks = maxChunkDurationSeconds * 10; // 100ms per check
+      int totalChecks = 0;
+
+      while (_running) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        final amplitude = await _recorder.getAmplitude();
+
+        // 低阈值 0.01 兼容 iOS 对数归一化与 Android 线性映射差异
+        if (amplitude.current < 0.01) {
+          silentChecks++;
+          if (silentChecks >= maxSilentChecks) break;
+        } else {
+          silentChecks = 0;
+        }
+
+        totalChecks++;
+        if (totalChecks >= maxTotalChecks) break;
+      }
+
       final path = await _recorder.stop();
       return (path != null && path.isNotEmpty) ? path : null;
     } catch (e) {
       unawaited(
         AppLog.warning(
-          'Voice chunk recording failed',
+          'Voice VAD chunk recording failed',
           source: 'voice',
           error: e,
         ),
@@ -358,28 +380,16 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     unawaited(_runSherpaOnnxChunkLoop());
   }
 
-  /// 双缓冲流水线：录制下一块的同时转写上一块（本机离线引擎）。
+  /// 生产者循环：不间断录制音频块，每块转写异步派发（本机离线引擎）。
   Future<void> _runSherpaOnnxChunkLoop() async {
     try {
-      // 录制第一块
-      var recordingFuture = _recordNextSherpaChunk();
-
       while (_running) {
         _setStateKind(VoiceInputState.recording);
         _setStatusMessage('voice_recording_hint');
-
-        // 等待当前录音块完成
-        final chunkPath = await recordingFuture;
+        final chunkPath = await _recordVadChunk();
         if (chunkPath == null || !_running) break;
-
-        // 启动转写，同时立刻开始录制下一块（流水线）
-        final transcribeFuture = _transcribeSherpaChunk(chunkPath);
-        recordingFuture = _recordNextSherpaChunk();
-
-        // 等待转写结果（录制下一块在后台静默进行）
-        final text = await transcribeFuture;
-        if (!_running) break;
-        if (text.isNotEmpty) _emitText(text);
+        // 异步转写：检查 _running，停止后静默丢弃不追加
+        unawaited(_transcribeSherpaAndEmitIfRunning(chunkPath));
       }
     } catch (e) {
       _showError('voice_recognize_failed');
@@ -392,10 +402,11 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
-  /// 录制一个 3 秒的 sherpa-onnx 音频块，返回文件路径。
-  Future<String?> _recordNextSherpaChunk() async {
-    if (!_running) return null;
-    return _recordChunk(const Duration(seconds: 3));
+  /// 转写一个 sherpa-onnx 音频块，若用户已停止则静默丢弃结果。
+  Future<void> _transcribeSherpaAndEmitIfRunning(String chunkPath) async {
+    final text = await _transcribeSherpaChunk(chunkPath);
+    if (!_running) return;
+    if (text.isNotEmpty) _emitText(text);
   }
 
   /// 读取音频块 → 调用 sherpa-onnx 转写 → 返回文本。
