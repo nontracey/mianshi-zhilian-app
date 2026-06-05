@@ -124,10 +124,11 @@ class _OnDeviceModelManagementPageState
     final root = await ModelDownloader.getStorageDir();
     if (!await root.exists()) return [];
 
-    final knownIds = KnownModels.all.map((c) => c.id).toSet();
+    final knownModelIds = KnownModels.all.map((c) => c.id).toSet();
+    final knownRuntimeIds = <String>{};
     final runtimeConfig = KnownRuntimes.current();
     if (runtimeConfig != null) {
-      knownIds.add(runtimeConfig.id);
+      knownRuntimeIds.add(runtimeConfig.id);
     }
 
     final orphans = <_OrphanDir>[];
@@ -142,20 +143,38 @@ class _OnDeviceModelManagementPageState
         await for (final sub in dir.list().where((e) => e is Directory)) {
           final subDir = sub as Directory;
           final subName = subDir.uri.pathSegments.last;
-          if (!knownIds.contains(subName)) {
-            orphans.add(_OrphanDir(path: subDir.path, name: subName));
+          final isEmpty = await _isDirectoryEmpty(subDir);
+          if (knownRuntimeIds.contains(subName) && !isEmpty) {
+            continue;
           }
+          orphans.add(
+            _OrphanDir(path: subDir.path, name: subName, isEmpty: isEmpty),
+          );
         }
         continue;
       }
 
-      if (!knownIds.contains(name) &&
-          name != 'runtimes' &&
-          !name.startsWith('.')) {
-        orphans.add(_OrphanDir(path: dir.path, name: name));
+      if (name == 'runtimes' || name.startsWith('.')) continue;
+
+      final isEmpty = await _isDirectoryEmpty(dir);
+      if (knownModelIds.contains(name) && !isEmpty) {
+        continue;
       }
+      orphans.add(_OrphanDir(path: dir.path, name: name, isEmpty: isEmpty));
     }
     return orphans;
+  }
+
+  /// 检查目录是否空（没有任何文件或子目录）。
+  Future<bool> _isDirectoryEmpty(Directory dir) async {
+    try {
+      await for (final _ in dir.list()) {
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<int> _calcTotalSize() async {
@@ -244,20 +263,25 @@ class _OnDeviceModelManagementPageState
   Future<void> _cleanOrphanDirs() async {
     final l10n = context.read<LocalizationProvider>();
 
-    // 二次确认：构建当前所有有效模型/runtime ID 集合，跳过误拦截
-    final validIds = <String>{...KnownModels.all.map((c) => c.id)};
+    // 二次确认：非空的当前模型/runtime 目录跳过，空目录视为残留可清理。
+    final validModelIds = <String>{...KnownModels.all.map((c) => c.id)};
     final validRuntimeIds = <String>{};
     final runtimeConfig = KnownRuntimes.current();
     if (runtimeConfig != null) {
-      validIds.add(runtimeConfig.id);
       validRuntimeIds.add(runtimeConfig.id);
     }
 
     int cleaned = 0;
     for (final orphan in _orphanDirs) {
-      if (validIds.contains(orphan.name)) continue;
+      final isEmpty = await _isDirectoryEmpty(Directory(orphan.path));
+      if (!isEmpty &&
+          !_isUnderRuntimesDir(orphan.path) &&
+          validModelIds.contains(orphan.name)) {
+        continue;
+      }
       if (_isUnderRuntimesDir(orphan.path) &&
-          validRuntimeIds.contains(orphan.name)) {
+          validRuntimeIds.contains(orphan.name) &&
+          !isEmpty) {
         continue;
       }
       try {
@@ -752,40 +776,144 @@ class _OnDeviceModelManagementPageState
         ),
         ...(_orphanDirs.map(
           (o) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 16,
-                  color: Colors.orange,
+            padding: const EdgeInsets.only(bottom: 6),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    o.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontFamily: 'monospace',
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: Colors.orange,
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            o.name.isNotEmpty
+                                ? o.name
+                                : l10n.get('unnamed_directory'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          if (o.isEmpty) ...[
+                            Text(
+                              l10n.get('empty_directory'),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(
+                            o.path,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         )),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        // 清理按钮（带确认弹窗）
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton.tonalIcon(
-            onPressed: _cleanOrphanDirs,
+            onPressed: () => _confirmCleanOrphanDirs(l10n),
             icon: const Icon(Icons.cleaning_services, size: 16),
             label: Text(l10n.get('clean_orphan_dirs')),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmCleanOrphanDirs(LocalizationProvider l10n) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('clean_orphan_dirs')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.getp('orphan_dirs_clean_confirm', {
+                'count': '${_orphanDirs.length}',
+              }),
+            ),
+            const SizedBox(height: 12),
+            ...(_orphanDirs
+                .take(10)
+                .map(
+                  (o) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.folder_off_outlined, size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            o.displayName(l10n),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+            if (_orphanDirs.length > 10)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '...${l10n.getp('and_more_items', {'count': '${_orphanDirs.length - 10}'})}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _cleanOrphanDirs();
   }
 }
 
@@ -808,10 +936,19 @@ class _ModelEntry {
 }
 
 class _OrphanDir {
-  const _OrphanDir({required this.path, required this.name});
+  const _OrphanDir({
+    required this.path,
+    required this.name,
+    required this.isEmpty,
+  });
 
   final String path;
   final String name;
+  final bool isEmpty;
+
+  String displayName(LocalizationProvider l10n) {
+    return name.isNotEmpty ? name : l10n.get('unnamed_directory');
+  }
 }
 
 /// 下载进度对话框
