@@ -67,7 +67,7 @@ class AiProvider extends ChangeNotifier {
         id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
         name: oldModel != null && oldModel.isNotEmpty
             ? 'Whisper ($oldModel)'
-            : L10n.get('whisper_default_name', 'zh'),
+            : L10n.get('whisper_default_name', L10n.currentLanguage),
         baseUrl: oldBaseUrl,
         apiKey: oldApiKey ?? '',
         model: oldModel ?? 'whisper-1',
@@ -161,9 +161,9 @@ class AiProvider extends ChangeNotifier {
 
     try {
       final result = await testCapability(id, AiCapability.text);
-      _testResult = L10n.get(result.messageKey, 'zh');
+      _testResult = L10n.get(result.messageKey, L10n.currentLanguage);
     } catch (e) {
-      _testResult = L10n.getp('connection_failed_with_error', 'zh', {
+      _testResult = L10n.getp('connection_failed_with_error', L10n.currentLanguage, {
         'error': '$e',
       });
     }
@@ -266,12 +266,12 @@ class AiProvider extends ChangeNotifier {
       return {
         'score': null,
         'level': 'local',
-        'summary': L10n.get('ai_not_configured_summary', 'zh'),
+        'summary': L10n.get('ai_not_configured_summary', L10n.currentLanguage),
         'missedPoints': <String>[],
         'wrongPoints': <String>[],
         'errorPoints': <String>[],
         'improvedAnswer': '',
-        'nextAction': L10n.get('ai_not_configured_action', 'zh'),
+        'nextAction': L10n.get('ai_not_configured_action', L10n.currentLanguage),
         'aiUnavailable': true,
       };
     }
@@ -305,12 +305,12 @@ class AiProvider extends ChangeNotifier {
       final result = Future.value({
         'score': null,
         'level': 'local',
-        'summary': L10n.get('ai_not_configured_summary', 'zh'),
+        'summary': L10n.get('ai_not_configured_summary', L10n.currentLanguage),
         'missedPoints': <String>[],
         'wrongPoints': <String>[],
         'errorPoints': <String>[],
         'improvedAnswer': '',
-        'nextAction': L10n.get('ai_not_configured_action', 'zh'),
+        'nextAction': L10n.get('ai_not_configured_action', L10n.currentLanguage),
         'aiUnavailable': true,
       });
       return (stream: const Stream.empty(), result: result);
@@ -431,11 +431,11 @@ class AiProvider extends ChangeNotifier {
       'level': 'local',
       'summary': content.isNotEmpty
           ? content
-          : L10n.get('evaluation_parse_failed', 'zh'),
+          : L10n.get('evaluation_parse_failed', L10n.currentLanguage),
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
-      'nextAction': L10n.get('retry', 'zh'),
+      'nextAction': L10n.get('retry', L10n.currentLanguage),
       'aiUnavailable': true,
     };
   }
@@ -490,7 +490,7 @@ class AiProvider extends ChangeNotifier {
         _configs.firstWhere(
           (c) => c.enabled,
           orElse: () =>
-              throw Exception(L10n.get('no_ai_config_available', 'zh')),
+              throw Exception(L10n.get('no_ai_config_available', L10n.currentLanguage)),
         );
     return _aiService.sendMessageStream(
       config: config,

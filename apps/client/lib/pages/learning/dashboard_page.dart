@@ -2184,7 +2184,8 @@ class _RouteSelectorDialog extends StatefulWidget {
 
 class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
-  late List<LearningRoute> _routes;
+  List<LearningRoute> _customRoutes = [];
+  late List<LearningRoute> _displayRoutes;
   final _storage = StorageService();
 
   @override
@@ -2194,37 +2195,48 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
   }
 
   Future<void> _loadRoutes() async {
-    // 加载自定义路线
     final customData = await _storage.loadJsonList('custom_routes');
-    final customRoutes = customData
+    _customRoutes = customData
         .map((e) => LearningRoute.fromJson(e))
         .toList();
 
     setState(() {
-      _routes = [...widget.routes, ...customRoutes];
+      _displayRoutes = [...widget.routes, ..._customRoutes];
     });
   }
 
   Future<void> _saveCustomRoutes() async {
-    final customRoutes = _routes.where((r) => !r.isDefault).toList();
     await _storage.saveJsonList(
       'custom_routes',
-      customRoutes.map((r) => r.toJson()).toList(),
+      _customRoutes.map((r) => r.toJson()).toList(),
     );
   }
 
   void _addCustomRoute(LearningRoute route) {
-    setState(() => _routes.add(route));
+    setState(() {
+      _customRoutes.add(route);
+      _displayRoutes = [...widget.routes, ..._customRoutes];
+    });
     _saveCustomRoutes();
   }
 
-  void _updateRoute(int index, LearningRoute route) {
-    setState(() => _routes[index] = route);
-    _saveCustomRoutes();
+  void _updateRoute(int displayIndex, LearningRoute route) {
+    final target = _displayRoutes[displayIndex];
+    final customIndex = _customRoutes.indexWhere((r) => r.id == target.id);
+    if (customIndex >= 0) {
+      setState(() {
+        _customRoutes[customIndex] = route;
+        _displayRoutes[displayIndex] = route;
+      });
+      _saveCustomRoutes();
+    }
   }
 
   void _deleteRoute(String routeId) {
-    setState(() => _routes.removeWhere((r) => r.id == routeId));
+    setState(() {
+      _customRoutes.removeWhere((r) => r.id == routeId);
+      _displayRoutes = [...widget.routes, ..._customRoutes];
+    });
     _saveCustomRoutes();
   }
 
@@ -2264,11 +2276,12 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
               height: 300,
               child: SingleChildScrollView(
                 child: Column(
-                  children: _routes.asMap().entries.map((entry) {
+                  children: _displayRoutes.asMap().entries.map((entry) {
                     final l10n = context.watch<LocalizationProvider>();
                     final index = entry.key;
                     final route = entry.value;
                     final isSelected = route.id == widget.currentRouteId;
+                    final isCustom = _customRoutes.any((r) => r.id == route.id);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
@@ -2309,7 +2322,7 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                                 : null,
                                           ),
                                         ),
-                                        if (!route.isDefault) ...[
+                                        if (isCustom) ...[
                                           const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
@@ -2349,42 +2362,43 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                   ],
                                 ),
                               ),
-                              // 编辑按钮
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                color: isDark ? Colors.white54 : Colors.grey,
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  final enabledDomains = widget.availableDomains
-                                      .where(
-                                        (d) => !widget.disabledDomainIds
-                                            .contains(d.id),
-                                      )
-                                      .toList();
-                                  showDialog(
-                                    context: context,
-                                    builder: (ctx) => RouteEditorDialog(
-                                      availableDomains: enabledDomains
-                                          .map(
-                                            (d) => DomainItem(
-                                              id: d.id,
-                                              title: d.title,
-                                            ),
-                                          )
-                                          .toList(),
-                                      existingRoute: route,
-                                      onSave: (updatedRoute) {
-                                        _updateRoute(index, updatedRoute);
-                                        if (route.id == widget.currentRouteId) {
-                                          widget.onRouteSelected(updatedRoute);
-                                        }
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
+                              // 编辑按钮（仅自定义路线）
+                              if (isCustom)
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  color: isDark ? Colors.white54 : Colors.grey,
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    final enabledDomains = widget.availableDomains
+                                        .where(
+                                          (d) => !widget.disabledDomainIds
+                                              .contains(d.id),
+                                        )
+                                        .toList();
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => RouteEditorDialog(
+                                        availableDomains: enabledDomains
+                                            .map(
+                                              (d) => DomainItem(
+                                                id: d.id,
+                                                title: d.title,
+                                              ),
+                                            )
+                                            .toList(),
+                                        existingRoute: route,
+                                        onSave: (updatedRoute) {
+                                          _updateRoute(index, updatedRoute);
+                                          if (route.id == widget.currentRouteId) {
+                                            widget.onRouteSelected(updatedRoute);
+                                          }
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
                               // 删除按钮（仅自定义路线）
-                              if (!route.isDefault)
+                              if (isCustom)
                                 IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,

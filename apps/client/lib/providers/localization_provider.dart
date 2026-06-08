@@ -13,6 +13,7 @@ class LocalizationProvider extends ChangeNotifier {
     final resolvedLanguage = L10n.resolveLanguage(lang);
     if (_language == resolvedLanguage) return;
     _language = resolvedLanguage;
+    L10n.currentLanguage = _language;
     notifyListeners();
   }
 
