@@ -96,9 +96,25 @@ $domainList
       return searchText.split(RegExp(r'[\s,，、；;]+')).any((w) => w.length >= 2 && text.contains(w));
     }).toList();
 
-    return matched.isNotEmpty
-        ? matched.map((d) => d.id).toList()
-        : _allDomains.map((d) => d.id).toList();
+    final matchedIds = matched.map((d) => d.id).toSet();
+
+    // 无AI时：包含匹配领域的前置知识领域（如Agent需要Java）
+    for (final domain in matched) {
+      for (final cat in domain.categories) {
+        // 通过分类信息推断前置领域
+        final text = '${cat.title} ${cat.description}'.toLowerCase();
+        for (final d in _allDomains) {
+          if (!matchedIds.contains(d.id)) {
+            final domainText = '${d.title} ${d.description} ${d.categories.map((c) => c.title).join(' ')}'.toLowerCase();
+            if (text.contains(d.id) || text.split(' ').any((w) => w.length >= 2 && domainText.contains(w))) {
+              matchedIds.add(d.id);
+            }
+          }
+        }
+      }
+    }
+
+    return matchedIds.toList();
   }
 
   Future<LearningRoute?> _aiGenerateRoute(
