@@ -1,22 +1,26 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../models/domain.dart';
 import '../models/learning_route.dart';
 import '../models/topic.dart';
 import '../models/user_progress.dart';
+import '../providers/content_provider.dart';
+import '../providers/progress_provider.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
-import '../providers/progress_provider.dart';
 
 class AiRouteGenerator {
   final StorageService _storage;
+  final List<Domain> _allDomains;
 
-  AiRouteGenerator(this._storage);
+  AiRouteGenerator(this._storage, this._allDomains);
 
   Future<LearningRoute> generateRoute({
     required PrepPlan plan,
     required List<Topic> allTopics,
     required ProgressProvider progressProvider,
     required AiService aiService,
+    required ContentProvider contentProvider,
     bool forceRegenerate = false,
   }) async {
     if (!forceRegenerate) {
@@ -26,7 +30,12 @@ class AiRouteGenerator {
 
     if (await aiService.isAvailable()) {
       try {
-        final route = await _aiGenerateRoute(plan, allTopics, progressProvider, aiService);
+        final selectedDomainIds = await _selectDomains(plan, aiService);
+        await contentProvider.ensureTopicsLoaded(selectedDomainIds);
+        final scopedTopics = contentProvider.topics.values
+            .where((t) => selectedDomainIds.contains(t.domainId))
+            .toList();
+        final route = await _aiGenerateRoute(plan, scopedTopics, progressProvider, aiService);
         if (route != null) {
           await _cacheRoute(plan, route);
           return route;
@@ -39,6 +48,57 @@ class AiRouteGenerator {
     final route = _generateFallbackRoute(plan, allTopics, progressProvider);
     await _cacheRoute(plan, route);
     return route;
+  }
+
+  Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService) async {
+    if (await aiService.isAvailable()) {
+      final domainList = _allDomains.map((d) =>
+          '${d.id}: ${d.title}（${d.categories.map((c) => c.title).join('、')}）').join('\n');
+
+      final prompt = '''
+用户目标：${plan.targetRole} / ${plan.techStack}
+${plan.jobDescription.isNotEmpty ? 'JD概要：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
+
+可选领域：
+$domainList
+
+请按以下要求选择领域：
+1. 选出与用户目标相关的领域，按相关度从高到低排序
+2. 包含用户目标所需的"前置知识"领域（如Agent开发需要Python/Java基础）
+3. 不相关的领域不要包含
+
+返回 JSON 数组，每个元素包含领域ID和理由。只输出JSON。
+示例格式：["java", "architecture", "agent"]
+''';
+
+      try {
+        final response = await aiService.sendMessage(prompt);
+        final start = response.indexOf('[');
+        final end = response.lastIndexOf(']');
+        if (start != -1 && end > start) {
+          return (json.decode(response.substring(start, end + 1)) as List)
+              .cast<String>();
+        }
+      } catch (_) {}
+    }
+
+    // 降级：本地关键词匹配
+    return _matchDomainsLocally(plan);
+  }
+
+  List<String> _matchDomainsLocally(PrepPlan plan) {
+    final searchText =
+        '${plan.targetRole} ${plan.techStack} ${plan.jobDescription}'.toLowerCase();
+    if (searchText.length < 3) return _allDomains.map((d) => d.id).toList();
+
+    final matched = _allDomains.where((d) {
+      final text = '${d.title} ${d.description} ${d.categories.map((c) => '${c.title} ${c.id}').join(' ')}'.toLowerCase();
+      return searchText.split(RegExp(r'[\s,，、；;]+')).any((w) => w.length >= 2 && text.contains(w));
+    }).toList();
+
+    return matched.isNotEmpty
+        ? matched.map((d) => d.id).toList()
+        : _allDomains.map((d) => d.id).toList();
   }
 
   Future<LearningRoute?> _aiGenerateRoute(
@@ -60,13 +120,16 @@ class AiRouteGenerator {
 当前掌握度评分（-1 表示未学习，0-100 表示学习评分）：
 $topicLines
 
-用户的 JD 分析关键词：${plan.jobDescription.isNotEmpty ? plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 200)) : '无'}
+${plan.jobDescription.isNotEmpty ? '用户的JD：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
 
-请生成一个学习路线，要求：
-1. 按 PHASE 划分，每阶段 3-8 个知识点
-2. 未掌握(score<60) + 高频(high_frequency) + 面试常考(interview_frequency=high) 的知识点优先
-3. 考虑前置依赖关系
-4. 最后阶段为模拟面试(type=mock)
+请生成一个学习路线：
+1. 从以下知识点中筛选出与用户目标真正相关的知识点加入路线
+2. 对于前置依赖知识点（如JD涉及Agent但需要Java基础），如果用户未掌握也应加入
+3. 按 PHASE 划分，每阶段 3-8 个知识点
+4. 未掌握(score<60) + 高频 + 面试常考的知识点优先
+5. 考虑前置依赖关系
+6. 最后阶段为模拟面试(type=mock)
+7. 每个 phase 的 topicIds 只包含实际要学的内容，不相关的知识点不要加入
 
 输出 JSON：
 {

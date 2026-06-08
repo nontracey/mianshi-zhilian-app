@@ -10,11 +10,10 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
-import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
-import 'package:mianshi_zhilian/providers/ai_provider.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -731,21 +730,16 @@ class _RouteTabContentState extends State<_RouteTabContent> {
   Future<void> _generateAiRoute() async {
     final plan = widget.progress.prepPlan;
     final l10n = context.read<LocalizationProvider>();
-
-    // 只加载和面试目标相关的领域，避免全量加载
-    final allDomains = widget.content.domains;
-    final relatedDomainIds = _matchDomainsForPlan(plan, allDomains);
-    await widget.content.ensureTopicsLoaded(relatedDomainIds);
-    final allTopics = widget.content.topics.values.toList();
-
     final aiProvider = context.read<AiProvider>();
-    final generator = AiRouteGenerator(_storage);
+    final allDomains = widget.content.domains;
+    final generator = AiRouteGenerator(_storage, allDomains);
     try {
       final route = await generator.generateRoute(
         plan: plan,
-        allTopics: allTopics,
+        allTopics: widget.content.topics.values.toList(),
         progressProvider: widget.progress,
         aiService: aiProvider.aiService,
+        contentProvider: widget.content,
         forceRegenerate: true,
       );
 
@@ -765,24 +759,6 @@ class _RouteTabContentState extends State<_RouteTabContent> {
   }
 
   /// 根据面试目标筛选相关领域，避免全量加载
-  List<String> _matchDomainsForPlan(PrepPlan plan, List<Domain> domains) {
-    if (!plan.hasTarget) return domains.map((d) => d.id).toList();
-    final searchText =
-        '${plan.targetRole} ${plan.techStack} ${plan.jobDescription}'
-            .toLowerCase();
-    if (searchText.length < 3) return domains.map((d) => d.id).toList();
-
-    final matched = domains.where((d) {
-      final domainText = '${d.title} ${d.description} ${d.categories.map((c) => '${c.title} ${c.id}').join(' ')}'.toLowerCase();
-      return searchText.split(RegExp(r'[\s,，、；;]+')).any((word) =>
-          word.length >= 2 && domainText.contains(word));
-    }).toList();
-
-    return matched.isNotEmpty
-        ? matched.map((d) => d.id).toList()
-        : domains.map((d) => d.id).toList();
-  }
-
   Color _scoreColor(int score) {
     if (score >= 85) return AppColors.success;
     if (score >= 60) return AppColors.warning;
