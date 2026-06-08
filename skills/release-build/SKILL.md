@@ -18,10 +18,10 @@ keywords: [发布构建, 推送构建, 推送构建号, 重新打 tag, release b
 ## 工作流概览
 
 ```
-检测变更 → 提交功能变更(feat/fix)并推送main → 递增构建号(chore) → 推送 → 重新打当前版本 tag → 强制推送 tag
+检测变更 → 创建发布分支 → 提交功能变更(feat/fix) + 递增构建号(chore) → 创建 PR → 合并到 main → 切回 main 同步 → 重新打当前版本 tag → 强制推送 tag
 ```
 
-> **关键：功能变更和版本号递增必须分开提交。** 功能变更先推上去，再单独一个 `chore:` 提交构建号递增。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
+> **关键：功能变更和版本号递增必须分开提交，但放在同一个分支上。** 功能变更一个 commit，构建号递增单独一个 `chore:` commit。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
 
 ## 前置检查
 
@@ -68,70 +68,54 @@ git log origin/main..HEAD --oneline
 - `0.1.3+112` → `0.1.3+113`
 - 多个区域有变更 → 各自 +1，commit message 中并列说明。
 
-### 3. 提交功能变更（先推送）
+### 3. 创建发布分支 + 提交变更
 
-先把代码变更（feat/fix/refactor 等）提交并推送到 main，**此时不递增构建号**。
-
-提交说明必须：
-- **使用中文**
-- **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
-- 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
+在单独的分支上工作，功能变更和构建号递增分两次 commit：
 
 ```bash
-# 只提交代码变更，不碰 pubspec.yaml 的版本号
+# 从 main 创建发布分支
+git checkout -b release/build-{newBuildNumber}
+
+# 先提交代码变更（不碰 pubspec.yaml 版本号）
 git add -A
 git commit -m "feat: 修复登录页键盘弹起按钮遮挡
 
 更新 auth_provider.dart 状态同步逻辑"
-git push origin main
-```
 
-### 4. 递增构建号 + 推送
-
-功能变更推送后，单独提交构建号递增：
-
-```bash
-# 编辑 apps/client/pubspec.yaml 中的 version 字段（buildNumber +1）
+# 再编辑构建号：apps/client/pubspec.yaml 中 version 字段（buildNumber +1）
 # 如果 API 也有变更且使用 buildNumber：同步递增 workers/api/package.json
 
 git add apps/client/pubspec.yaml
 # 如果 API 也有变更：
 git add workers/api/package.json
-```
 
-提交信息格式：
-```
-chore: 构建号 {旧}→{新}
-```
-
-```bash
 git commit -m "chore: 构建号 112→113"
-git push origin main
 ```
 
-### 5. 打 tag + 推送
+提交说明必须：
+- **使用中文**
+- **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
+- 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
+- 构建号递增用 `chore:` 类型
 
-#### 推荐方式：PR 合并
+### 4. 推送分支 → 创建 PR → 合并
+
 ```bash
-# 创建临时分支
-git checkout -b release/build-{newBuildNumber}
-
-# 推送到远端
+# 推送分支
 git push origin release/build-{newBuildNumber}
 
-# → 在 GitHub 创建 PR → 合并到 main
-# → 合并后切回 main 并更新
+# 在 GitHub 创建 PR（base: main, head: release/build-{newBuildNumber}）
+# PR 通过 CI + 至少 1 人 review 后合并到 main
+
+# 合并后切回 main 并同步
 git checkout main
 git pull origin main
-
-# 重新打当前版本 tag（覆盖旧 tag）
-git tag -f v{version}
-git push origin v{version} --force
 ```
 
-#### 管理员快捷方式（跳过 PR）
+### 5. 重新打 tag + 推送
+
 ```bash
-git push origin main
+# 重新打当前版本 tag（覆盖旧 tag）
 git tag -f v{version}
 git push origin v{version} --force
 ```

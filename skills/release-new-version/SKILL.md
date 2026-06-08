@@ -18,10 +18,10 @@ keywords: [发布新版本, 推送新版本, 发布新版, release new version, 
 ## 工作流概览
 
 ```
-检测变更 → 提交功能变更(feat/fix)并推送main → 递增版本号+构建号(chore) → 推送 → 打新版本 tag → 推送 tag
+检测变更 → 创建发布分支 → 提交功能变更(feat/fix) + 递增版本号+构建号(chore) → 创建 PR → 合并到 main → 切回 main 同步 → 打新版本 tag → 推送 tag
 ```
 
-> **关键：功能变更和版本号递增必须分开提交。** 功能变更先推上去，再单独一个 `chore:` 提交版本号递增。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
+> **关键：功能变更和版本号递增必须分开提交，但放在同一个分支上。** 功能变更一个 commit，版本号递增单独一个 `chore:` commit。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
 
 ## 前置检查
 
@@ -72,44 +72,47 @@ git log origin/main..HEAD --oneline
 - 示例：`0.1.0` → `0.1.1`
 - 如果 API **无变更** → 保持不动
 
-### 3. 提交功能变更（先推送）
+### 3. 创建发布分支 + 提交变更
 
-先把代码变更（feat/fix/refactor 等）提交并推送到 main，**此时不递增版本号**。
-
-提交说明必须：
-- **使用中文**
-- **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
-- 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
-- 标题行包含一句话总结变更
+在单独的分支上工作，功能变更和版本号递增分两次 commit：
 
 ```bash
-# 只提交代码变更，不碰 pubspec.yaml 的版本号
+# 从 main 创建发布分支
+git checkout -b release/v{newVersion}
+
+# 先提交代码变更（不碰 pubspec.yaml 版本号）
 git add -A
 git commit -m "feat: 新增关于页推广入口、隐私政策与 OG 图片"
-git push origin main
-```
 
-### 4. 递增版本号 + 构建号递增 + 推送
-
-功能变更推送后，单独提交版本号递增：
-
-```bash
-# 编辑 apps/client/pubspec.yaml：patch +1，buildNumber +1
+# 再编辑版本号：apps/client/pubspec.yaml — patch +1，buildNumber +1
 # 示例：0.1.3+112 → 0.1.4+113
 # 如果 API 有变更：同步递增 workers/api/package.json
 
 git add apps/client/pubspec.yaml
 git add workers/api/package.json  # 如需要
+
+git commit -m "chore: 版本号 0.1.3→0.1.4，构建号 112→113"
 ```
 
-提交信息格式：
-```
-chore: 版本号 0.1.3→0.1.4，构建号 112→113
-```
+提交说明必须：
+- **使用中文**
+- **遵循 `.gitmessage` 格式**：`<type>: <中文描述>`
+- 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
+- 版本号递增用 `chore:` 类型
+- 标题行包含一句话总结变更
+
+### 4. 推送分支 → 创建 PR → 合并
 
 ```bash
-git commit -m "chore: 版本号 0.1.3→0.1.4，构建号 112→113"
-git push origin main
+# 推送分支
+git push origin release/v{newVersion}
+
+# 在 GitHub 创建 PR（base: main, head: release/v{newVersion}）
+# PR 通过 CI + 至少 1 人 review 后合并到 main
+
+# 合并后切回 main 并同步
+git checkout main
+git pull origin main
 ```
 
 ### 5. 打新版本 tag
@@ -125,28 +128,9 @@ git tag -a v{x.x.x} -m "Release v{x.x.x}"
 git tag -a v0.1.4 -m "Release v0.1.4"
 ```
 
-### 6. 推送策略
+### 6. 推送 tag
 
-#### 推荐方式：PR 合并
 ```bash
-# 创建临时分支
-git checkout -b release/v{newVersion}
-
-# 推送到远端
-git push origin release/v{newVersion}
-
-# → 在 GitHub 创建 PR → 合并到 main
-# → 合并后切回 main 并更新
-git checkout main
-git pull origin main
-
-# 推送新 tag
-git push origin v{newVersion}
-```
-
-#### 管理员快捷方式（跳过 PR）
-```bash
-git push origin main
 git push origin v{newVersion}
 ```
 
