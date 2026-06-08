@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:collection/collection.dart';
 import '../models/domain.dart';
 import '../models/learning_route.dart';
 import '../models/topic.dart';
@@ -32,20 +33,22 @@ class AiRouteGenerator {
       try {
         final selectedDomainIds = await _selectDomains(plan, aiService);
         await contentProvider.ensureTopicsLoaded(selectedDomainIds);
-        final scopedTopics = contentProvider.topics.values
-            .where((t) => selectedDomainIds.contains(t.domainId))
-            .toList();
-        final route = await _aiGenerateRoute(plan, scopedTopics, progressProvider, aiService);
-        if (route != null) {
-          await _cacheRoute(plan, route);
-          return route;
-        }
+
+        final relevantTopicIds = await _selectTopics(
+          plan, selectedDomainIds, contentProvider, progressProvider, aiService,
+        );
+
+        final route = _buildStructuredRoute(
+          plan, selectedDomainIds, relevantTopicIds, contentProvider, progressProvider,
+        );
+        await _cacheRoute(plan, route);
+        return route;
       } catch (e) {
         debugPrint('AI route generation failed, using fallback: $e');
       }
     }
 
-    final route = _generateFallbackRoute(plan, allTopics, progressProvider);
+    final route = _generateFallbackRoute(plan, allTopics, progressProvider, contentProvider);
     await _cacheRoute(plan, route);
     return route;
   }
@@ -117,189 +120,118 @@ $domainList
     return matchedIds.toList();
   }
 
-  Future<LearningRoute?> _aiGenerateRoute(
+  Future<Set<String>> _selectTopics(
     PrepPlan plan,
-    List<Topic> allTopics,
+    List<String> domainIds,
+    ContentProvider contentProvider,
     ProgressProvider progressProvider,
     AiService aiService,
   ) async {
-    final topicLines = allTopics.map((t) {
+    final topics = contentProvider.topics.values
+        .where((t) => domainIds.contains(t.domainId))
+        .toList();
+    if (topics.isEmpty) return {};
+
+    final topicLines = topics.map((t) {
       final score = progressProvider.getProgress(t.id)?.score ?? -1;
-      return '${t.id} | ${t.title} | ${t.category} | ${t.difficulty} | ${t.interviewFrequency} | ${t.prerequisites.join(',')} | $score';
+      return '${t.id} | ${t.title} | ${t.domainId} | ${t.difficulty} | ${t.interviewFrequency} | $score';
     }).join('\n');
 
     final prompt = '''
-你是一个面试备考规划师。用户的目标岗位是 ${plan.targetRole}，
-技术栈是 ${plan.techStack}，${plan.interviewDate != null ? '距离面试还有 ${plan.interviewDate!.difference(DateTime.now()).inDays} 天' : '暂无面试日期'}，
-每天可用 ${plan.dailyMinutes} 分钟。
+用户目标：${plan.targetRole} / ${plan.techStack}
+${plan.jobDescription.isNotEmpty ? 'JD：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
 
-当前掌握度评分（-1 表示未学习，0-100 表示学习评分）：
+相关领域的知识点（格式: id | 名称 | 领域 | 难度 | 面试频率 | 掌握度）：
 $topicLines
 
-${plan.jobDescription.isNotEmpty ? '用户的JD：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
+从以上知识点中选出与用户目标直接相关的知识点，只返回被选中的 id 组成的 JSON 数组。
+示例：["java-jvm", "java-collections", "agent-intro"]
+只输出 JSON 数组，不要额外文字。''';
 
-请生成一个学习路线：
-1. 从以下知识点中筛选出与用户目标真正相关的知识点加入路线
-2. 对于前置依赖知识点（如JD涉及Agent但需要Java基础），如果用户未掌握也应加入
-3. 按 PHASE 划分，每阶段 3-8 个知识点
-4. 未掌握(score<60) + 高频 + 面试常考的知识点优先
-5. 考虑前置依赖关系
-6. 最后阶段为模拟面试(type=mock)
-7. 每个 phase 的 topicIds 只包含实际要学的内容，不相关的知识点不要加入
-
-输出 JSON：
-{
-  "name": "路线名称",
-  "description": "路线描述",
-  "domainIds": ["涉及的领域ID"],
-  "phases": [
-    {
-      "id": "phase_1",
-      "focus": "阶段焦点",
-      "description": "阶段描述",
-      "topicIds": ["topic-id-1", "topic-id-2"],
-      "estimatedHours": 4,
-      "type": "learn"
-    }
-  ]
-}
-只输出 JSON，不要额外文字。
-''';
-
-    final response = await aiService.sendMessage(prompt);
-    return _parseRouteResponse(response, allTopics);
-  }
-
-  LearningRoute? _parseRouteResponse(String response, List<Topic> allTopics) {
     try {
-      final json = _extractJson(response);
-      if (json == null) return null;
+      final response = await aiService.sendMessage(prompt);
+      final start = response.indexOf('[');
+      final end = response.lastIndexOf(']');
+      if (start != -1 && end > start) {
+        final ids = (json.decode(response.substring(start, end + 1)) as List)
+            .cast<String>();
+        return ids.toSet();
+      }
+    } catch (_) {}
 
-      final phases = (json['phases'] as List?)?.map((p) {
-        final pMap = p as Map<String, dynamic>;
-        return RoutePhase(
-          id: pMap['id'] as String? ?? 'phase_${DateTime.now().millisecondsSinceEpoch}',
-          focus: pMap['focus'] as String? ?? '',
-          description: pMap['description'] as String?,
-          topicIds: (pMap['topicIds'] as List?)?.cast<String>() ?? [],
-          estimatedHours: (pMap['estimatedHours'] as num?)?.toInt() ?? 0,
-          type: pMap['type'] as String? ?? 'learn',
-        );
-      }).toList();
+    // 降级：返回所有 topic ID
+    return topics.map((t) => t.id).toSet();
+  }
 
-      return LearningRoute(
-        id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
-        name: json['name'] as String? ?? 'AI 推荐路线',
-        description: json['description'] as String? ?? '',
-        domainIds: (json['domainIds'] as List?)?.cast<String>() ?? allTopics.map((t) => t.domainId).toSet().toList(),
-        phases: phases,
-        source: 'ai',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-    } catch (e) {
-      debugPrint('Parse route response failed: $e');
-      return null;
+  LearningRoute _buildStructuredRoute(
+    PrepPlan plan,
+    List<String> domainIds,
+    Set<String> relevantTopicIds,
+    ContentProvider contentProvider,
+    ProgressProvider progressProvider,
+  ) {
+    final phases = <RoutePhase>[];
+    final now = DateTime.now();
+    final allTopics = contentProvider.topics;
+
+    for (final domainId in domainIds) {
+      final domain = _allDomains.firstWhereOrNull((d) => d.id == domainId);
+      if (domain == null || domain.learningPaths.isEmpty) continue;
+
+      for (final lp in domain.learningPaths) {
+        for (var i = 0; i < lp.steps.length; i++) {
+          final step = lp.steps[i];
+          final stepTopics = <String>[];
+          for (final catId in step.categoryIds) {
+            final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
+            if (category != null) {
+              for (final topicFile in category.topics) {
+                final tid = topicFile.split('/').last.replaceAll('.json', '');
+                // 只包含 AI 选中且已掌握度低于 85 的
+                final score = progressProvider.getTopicProgress(tid)?.score ?? 0;
+                if (relevantTopicIds.contains(tid) && score < 85) {
+                  stepTopics.add(tid);
+                }
+              }
+            }
+          }
+          if (stepTopics.isNotEmpty) {
+            phases.add(RoutePhase(
+              id: '${domainId}_lp${lp.id}_s$i',
+              focus: step.title.isNotEmpty ? step.title : '${domain.title} ${lp.title} 第${i + 1}阶段',
+              description: step.description,
+              topicIds: stepTopics,
+              categoryIds: step.categoryIds,
+              prerequisiteSteps: step.prerequisiteSteps,
+              estimatedHours: step.estimatedHours,
+              type: i == lp.steps.length - 1 ? 'practice' : 'learn',
+            ));
+          }
+        }
+      }
     }
-  }
 
-  Map<String, dynamic>? _extractJson(String text) {
-    final start = text.indexOf('{');
-    final end = text.lastIndexOf('}');
-    if (start == -1 || end == -1 || end <= start) return null;
-    return json.decode(text.substring(start, end + 1)) as Map<String, dynamic>?;
+    return LearningRoute(
+      id: 'ai_${now.millisecondsSinceEpoch}',
+      name: plan.targetRole.isNotEmpty ? '${plan.targetRole} 备考路线' : 'AI 个性化路线',
+      description: plan.techStack.isNotEmpty ? '目标：${plan.techStack}' : '',
+      domainIds: domainIds,
+      phases: phases,
+      source: 'ai',
+      createdAt: now,
+      updatedAt: now,
+    );
   }
-
   LearningRoute _generateFallbackRoute(
     PrepPlan plan,
     List<Topic> allTopics,
     ProgressProvider progressProvider,
+    ContentProvider contentProvider,
   ) {
-    final topicScores = <String, int>{};
-    for (final topic in allTopics) {
-      final score = progressProvider.getProgress(topic.id)?.score ?? -1;
-      var priority = 0;
-      if (topic.highFrequency || topic.interviewFrequency == 'high') priority += 500;
-      if (score < 0 || score < 60) priority += 300;
-      if (score >= 85) priority -= 200;
-      priority += (100 - score.clamp(0, 100));
-      topicScores[topic.id] = priority;
-    }
-
-    final sorted = List<Topic>.from(allTopics)
-      ..sort((a, b) => (topicScores[b.id] ?? 0).compareTo(topicScores[a.id] ?? 0));
-
-    final placed = <String>{};
-    final phases = <RoutePhase>[];
-    var phaseIdx = 0;
-
-    final independent = sorted.where((t) {
-      return t.prerequisites.every((p) => !allTopics.any((at) => at.id == p));
-    }).toList();
-
-    if (independent.isNotEmpty) {
-      phases.add(RoutePhase(
-        id: 'phase_${++phaseIdx}',
-        focus: '基础巩固',
-        description: '掌握基础知识，建立核心概念体系',
-        topicIds: independent.map((t) => t.id).toList(),
-        estimatedHours: (independent.length * 1.5).round(),
-        type: 'learn',
-      ));
-      placed.addAll(independent.map((t) => t.id));
-    }
-
-    final remaining = sorted.where((t) => !placed.contains(t.id)).toList();
-    final byCategory = <String, List<Topic>>{};
-    for (final topic in remaining) {
-      byCategory.putIfAbsent(topic.category, () => []);
-      byCategory[topic.category]!.add(topic);
-    }
-
-    for (final entry in byCategory.entries) {
-      final topics = entry.value;
-      for (var i = 0; i < topics.length; i += 6) {
-        final chunk = topics.sublist(i, (i + 6).clamp(0, topics.length));
-        final type = phaseIdx < 3 ? 'learn' : 'practice';
-        phases.add(RoutePhase(
-          id: 'phase_${++phaseIdx}_${entry.key.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}',
-          focus: '${entry.key}进阶',
-          description: '深入学习 ${entry.key} 领域的高频面试题',
-          topicIds: chunk.map((t) => t.id).toList(),
-          estimatedHours: chunk.length * 2,
-          type: type,
-        ));
-        placed.addAll(chunk.map((t) => t.id));
-      }
-    }
-
-    final mockTopics = allTopics
-        .where((t) => t.highFrequency || t.interviewFrequency == 'high')
-        .take(5)
-        .map((t) => t.id)
-        .toList();
-    if (mockTopics.isNotEmpty) {
-      phases.add(RoutePhase(
-        id: 'phase_mock',
-        focus: '模拟面试',
-        description: '综合模拟面试，检验学习成果',
-        topicIds: mockTopics,
-        estimatedHours: 2,
-        type: 'mock',
-      ));
-    }
-
-    return LearningRoute(
-      id: 'fallback_${DateTime.now().millisecondsSinceEpoch}',
-      name: '备选学习路线',
-      description: plan.targetRole.isNotEmpty
-          ? '针对 ${plan.targetRole} 岗位的备选学习方案'
-          : '基于知识点优先级自动生成的备选路线',
-      domainIds: allTopics.map((t) => t.domainId).toSet().toList(),
-      phases: phases,
-      source: 'fallback',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+    final domainIds = _matchDomainsLocally(plan);
+    final relevantIds = allTopics.map((t) => t.id).toSet();
+    return _buildStructuredRoute(
+      plan, domainIds, relevantIds, contentProvider, progressProvider,
     );
   }
 
