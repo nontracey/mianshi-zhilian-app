@@ -36,18 +36,18 @@ void main() {
 
   test('active lane changes auto ordering', () {
     final candidates = const RouteResolver().resolveCandidates(
-      RouteService.studioApi,
+      RouteService.appApi,
       '/admin/users',
       activeLane: RouteLane.backup,
     );
 
     expect(
       candidates.first.url.host,
-      Uri.parse(RouteResolver.studioApiBackup).host,
+      Uri.parse(RouteResolver.appApiBackup).host,
     );
     expect(
       candidates.last.url.host,
-      Uri.parse(RouteResolver.studioApiPrimary).host,
+      Uri.parse(RouteResolver.appApiPrimary).host,
     );
   });
 }

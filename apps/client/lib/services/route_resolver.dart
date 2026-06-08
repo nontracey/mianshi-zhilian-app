@@ -1,4 +1,4 @@
-enum RouteService { appApi, appWeb, content, studioApi, studioWeb }
+enum RouteService { appApi, content }
 
 enum RouteLane { primary, backup }
 
@@ -43,18 +43,9 @@ class RouteCandidate {
 class RouteResolver {
   static const appApiPrimary = 'https://mianshi-zhilian-api.pages.dev';
   static const appApiBackup = 'https://mianshizhilian-api.nontracey.de5.net';
-  static const appWebPrimary = 'https://mianshi-zhilian-app.pages.dev';
-  static const appWebBackup = 'https://mianshizhilian-app.nontracey.de5.net';
   static const contentPrimary = 'https://mianshi-zhilian-content.pages.dev';
   static const contentBackup =
       'https://mianshizhilian-content.nontracey.de5.net';
-  static const studioApiPrimary =
-      'https://mianshi-zhilian-studio-api.pages.dev';
-  static const studioApiBackup =
-      'https://mianshizhilian-studio-api.nontracey.de5.net';
-  static const studioWebPrimary = 'https://mianshi-zhilian-studio.pages.dev';
-  static const studioWebBackup =
-      'https://mianshizhilian-studio.nontracey.de5.net';
 
   const RouteResolver();
 
@@ -108,14 +99,8 @@ class RouteResolver {
     final baseUrl = switch ((service, lane)) {
       (RouteService.appApi, RouteLane.primary) => appApiPrimary,
       (RouteService.appApi, RouteLane.backup) => appApiBackup,
-      (RouteService.appWeb, RouteLane.primary) => appWebPrimary,
-      (RouteService.appWeb, RouteLane.backup) => appWebBackup,
       (RouteService.content, RouteLane.primary) => contentPrimary,
       (RouteService.content, RouteLane.backup) => contentBackup,
-      (RouteService.studioApi, RouteLane.primary) => studioApiPrimary,
-      (RouteService.studioApi, RouteLane.backup) => studioApiBackup,
-      (RouteService.studioWeb, RouteLane.primary) => studioWebPrimary,
-      (RouteService.studioWeb, RouteLane.backup) => studioWebBackup,
     };
     return RouteEndpoint(service: service, lane: lane, baseUrl: baseUrl);
   }

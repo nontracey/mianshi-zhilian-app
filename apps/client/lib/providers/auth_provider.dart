@@ -407,7 +407,7 @@ class AuthProvider extends ChangeNotifier {
     _token = null;
     _refreshToken = null;
     _stopRefreshTimer();
-    autoLogoutReason.value = '登录已过期，可继续学习，但云端同步等账号功能将不可用';
+    autoLogoutReason.value = L10n.get('session_expired_warning', L10n.currentLanguage);
     await _storage.save('auth_user', null);
     await _storage.save('auth_token', null);
     await _storage.save('auth_refresh_token', null);
@@ -431,36 +431,39 @@ class AuthProvider extends ChangeNotifier {
     final refreshToken = _refreshToken;
     if (refreshToken == null) return false;
 
+    http.Response? lastResponse;
     try {
-      final response = await _routeClient.request(
+      lastResponse = await _routeClient.request(
         RouteService.appApi,
         'POST',
         '/auth/refresh',
         headers: await ApiHeaders.build(_storage),
         body: json.encode({'refreshToken': refreshToken}),
+        fallbackOnAllHttpErrors: true,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
+      if (lastResponse.statusCode == 200) {
+        final data = json.decode(lastResponse.body) as Map<String, dynamic>;
         if (data['success'] == true) {
           _user = User.fromJson(data['user'] as Map<String, dynamic>);
           _token = data['token'] as String;
           _refreshToken = data['refreshToken'] as String?;
           await _saveUser();
           _bindDevice();
-          _startRefreshTimer(); // 刷新成功后重置计时器
+          _startRefreshTimer();
           notifyListeners();
           return true;
         }
-      }
-
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        autoLogoutReason.value = L10n.get('session_expired_warning', L10n.currentLanguage);
       }
       return false;
     } catch (e) {
       debugPrint('Refresh login failed: $e');
       return false;
+    } finally {
+      if (lastResponse != null &&
+          (lastResponse.statusCode == 401 || lastResponse.statusCode == 403)) {
+        await _clearSavedUser();
+      }
     }
   }
 

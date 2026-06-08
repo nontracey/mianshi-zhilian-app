@@ -1946,23 +1946,17 @@ class _CenterPanelState extends State<_CenterPanel> {
         .toList();
   }
 
-  // 从内容仓库的 learningPaths 生成学习路线
   List<LearningRoute> _generateRoutesFromContent() {
-    final routes = <LearningRoute>[];
-    for (final domain in widget.allDomains) {
-      for (final path in domain.learningPaths) {
-        routes.add(
-          LearningRoute(
-            id: '${domain.id}_${path.id}',
-            name: path.title,
-            description: path.description,
-            domainIds: [domain.id],
-            isDefault: false,
-          ),
-        );
-      }
-    }
-    return routes;
+    if (widget.allDomains.isEmpty) return [];
+    return [
+      LearningRoute(
+        id: 'all_content',
+        name: l10n.get('all_topics'),
+        description: '',
+        domainIds: widget.allDomains.map((d) => d.id).toList(),
+        isDefault: false,
+      ),
+    ];
   }
 
   @override
@@ -2368,7 +2362,6 @@ class _RouteSelectorDialogState extends State<_RouteSelectorDialog> {
                                   icon: const Icon(Icons.edit_outlined, size: 18),
                                   color: isDark ? Colors.white54 : Colors.grey,
                                   onPressed: () {
-                                    Navigator.pop(context);
                                     final enabledDomains = widget.availableDomains
                                         .where(
                                           (d) => !widget.disabledDomainIds

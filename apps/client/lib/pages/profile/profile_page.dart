@@ -122,7 +122,7 @@ class ProfilePage extends StatelessWidget {
             _ProfileSectionItem(
               icon: Icons.model_training_outlined,
               title: l10n.get('on_device_model_management'),
-              subtitle: '查看已下载的模型和运行时',
+              subtitle: l10n.get('model_management_subtitle'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const OnDeviceModelManagementPage(),
@@ -131,16 +131,16 @@ class ProfilePage extends StatelessWidget {
             ),
             _ProfileSectionItem(
               icon: Icons.route_outlined,
-              title: '线路诊断',
-              subtitle: '自动 / pages.dev / de5.net',
+              title: l10n.get('route_diagnosis'),
+              subtitle: l10n.get('route_diagnostics_subtitle'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const _RoutePreferencePage()),
               ),
             ),
             _ProfileSectionItem(
               icon: Icons.article_outlined,
-              title: '日志管理',
-              subtitle: '查看、复制和清理诊断日志',
+              title: l10n.get('log_management'),
+              subtitle: l10n.get('log_management_subtitle'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const LogManagementPage()),
               ),
@@ -957,7 +957,7 @@ class _AccountPanel extends StatelessWidget {
         return u.username;
       }
     }
-    return '本地用户';
+    return 'local_user';
   }
 
   // 种子头像调色板

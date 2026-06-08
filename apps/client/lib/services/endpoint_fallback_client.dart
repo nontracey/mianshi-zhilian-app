@@ -27,6 +27,7 @@ class EndpointFallbackClient {
     Map<String, String>? headers,
     Object? body,
     Duration timeout = const Duration(seconds: 5),
+    bool fallbackOnAllHttpErrors = false,
   }) async {
     final mode = await _stateStore.loadMode(service);
     final activeLane = await _stateStore.loadActiveLane(service);
@@ -48,7 +49,7 @@ class EndpointFallbackClient {
           body: body,
         ).timeout(timeout);
         if (i < candidates.length - 1 &&
-            _canReplayOnHttpStatus(method, response.statusCode)) {
+            _canReplayOnHttpStatus(method, response.statusCode, fallbackOnAllHttpErrors)) {
           lastError = 'HTTP ${response.statusCode} from ${candidate.url.host}';
           unawaited(
             AppLog.debug(
@@ -182,7 +183,8 @@ class EndpointFallbackClient {
     return http.Response.fromStream(await _httpClient.send(request));
   }
 
-  bool _canReplayOnHttpStatus(String method, int statusCode) {
+  bool _canReplayOnHttpStatus(String method, int statusCode, [bool fallbackAll = false]) {
+    if (fallbackAll) return statusCode >= 400;
     final normalized = method.toUpperCase();
     return (normalized == 'GET' || normalized == 'HEAD') && statusCode >= 500;
   }

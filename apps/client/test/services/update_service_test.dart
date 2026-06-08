@@ -59,11 +59,11 @@ void main() {
       expect(urls, contains('https://mirror.example.test/android.apk'));
       // 不应包含 Pages CDN 域名
       expect(
-        urls.any((u) => u.startsWith(RouteResolver.appWebPrimary)),
+        urls.any((u) => u.startsWith('https://mianshi-zhilian-app.pages.dev')),
         isFalse,
       );
       expect(
-        urls.any((u) => u.startsWith(RouteResolver.appWebBackup)),
+        urls.any((u) => u.startsWith('https://mianshizhilian-app.nontracey.de5.net')),
         isFalse,
       );
     },
@@ -72,7 +72,7 @@ void main() {
   test('URL pointing directly to any host is used as-is in the list', () {
     const update = PlatformUpdate(
       url:
-          '${RouteResolver.appWebBackup}/releases/latest/download/mianshi-zhilian-v0.1.3-macos.dmg',
+          'https://mianshizhilian-app.nontracey.de5.net/releases/latest/download/mianshi-zhilian-v0.1.3-macos.dmg',
       sha256: 'abc',
       size: 42,
     );

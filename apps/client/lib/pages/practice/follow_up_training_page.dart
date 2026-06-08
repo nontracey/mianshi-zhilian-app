@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -204,7 +205,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         'isFollowUp': _currentFollowUpIndex >= 0,
         'followUpIndex': _currentFollowUpIndex,
       });
-      _evaluationResult = {'local': true, 'message': '已保存为本地练习'};
+      _evaluationResult = {'local': true, 'message': L10n.get('saved_as_local_practice', L10n.currentLanguage)};
     });
   }
 
