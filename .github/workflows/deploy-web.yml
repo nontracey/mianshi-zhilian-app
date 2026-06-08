@@ -7,6 +7,15 @@ on:
     paths:
       - "apps/client/**"
       - ".github/workflows/deploy-web.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "apps/client/**"
+      - ".github/workflows/deploy-web.yml"
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -35,13 +44,34 @@ jobs:
           echo "APP_BUILD_NUMBER=${FULL_VERSION##*+}" >> "$GITHUB_ENV"
       - run: flutter build web --release --dart-define=APP_VERSION=${{ env.APP_VERSION }} --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
       - name: Deploy to Cloudflare Pages
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy build/web --project-name=mianshi-zhilian-app --commit-dirty=true --commit-message="deploy ${{ github.sha }}"
+          command: pages deploy build/web --project-name=mianshi-zhilian-app --branch=${{ github.head_ref || github.ref_name }} --commit-dirty=true --commit-message="deploy ${{ github.sha }}"
           workingDirectory: apps/client
-      - name: Verify primary and backup web routes
+
+      - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: deployments } = await github.rest.repos.listPagesDeployments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const deployUrl = `https://${{ github.head_ref }}.mianshi-zhilian-app.pages.dev`;
+            const body = `## 🚀 预览部署完成\n\n[预览地址](${deployUrl})`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Verify production routes
+        if: github.ref_name == 'main'
         run: |
           set -euo pipefail
           for base in \

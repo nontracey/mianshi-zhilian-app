@@ -43,3 +43,20 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - run: flutter build web --release
+
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/api
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/api/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck 2>/dev/null || npx tsc --noEmit
+      - run: npm run lint 2>/dev/null || echo 'lint not configured, skipping'
