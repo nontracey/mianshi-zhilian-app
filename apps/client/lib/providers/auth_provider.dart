@@ -455,11 +455,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (response.statusCode == 401 || response.statusCode == 403) {
-        _refreshToken = null;
-        _stopRefreshTimer();
-    autoLogoutReason.value = L10n.get('session_expired_warning', L10n.currentLanguage);
-        await _storage.save('auth_refresh_token', null);
-        notifyListeners();
+        autoLogoutReason.value = L10n.get('session_expired_warning', L10n.currentLanguage);
       }
       return false;
     } catch (e) {

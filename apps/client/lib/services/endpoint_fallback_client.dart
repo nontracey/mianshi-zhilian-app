@@ -51,7 +51,7 @@ class EndpointFallbackClient {
             _canReplayOnHttpStatus(method, response.statusCode)) {
           lastError = 'HTTP ${response.statusCode} from ${candidate.url.host}';
           unawaited(
-            AppLog.warning(
+            AppLog.debug(
               'Route fallback after HTTP ${response.statusCode}: '
               '${service.name} ${method.toUpperCase()} ${candidate.url.host}',
               source: 'route',
@@ -76,36 +76,66 @@ class EndpointFallbackClient {
           }
         }
         return response;
-      } on TimeoutException catch (e) {
+      }       on TimeoutException catch (e) {
         lastError = e;
-        unawaited(
-          AppLog.warning(
-            'Route timeout: ${service.name} ${method.toUpperCase()} '
-            '${candidate.url.host}',
-            source: 'route',
-            error: e,
-          ),
-        );
+        if (i < candidates.length - 1) {
+          unawaited(
+            AppLog.debug(
+              'Route timeout, try next: ${service.name} ${method.toUpperCase()} '
+              '${candidate.url.host}',
+              source: 'route',
+            ),
+          );
+        } else {
+          unawaited(
+            AppLog.warning(
+              'Route timeout (last candidate): ${service.name} '
+              '${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+              error: e,
+            ),
+          );
+        }
       } on http.ClientException catch (e) {
         lastError = e;
-        unawaited(
-          AppLog.warning(
-            'Route client error: ${service.name} ${method.toUpperCase()} '
-            '${candidate.url.host}',
-            source: 'route',
-            error: e,
-          ),
-        );
+        if (i < candidates.length - 1) {
+          unawaited(
+            AppLog.debug(
+              'Route client error, try next: ${service.name} '
+              '${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+            ),
+          );
+        } else {
+          unawaited(
+            AppLog.warning(
+              'Route client error (last candidate): ${service.name} '
+              '${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+              error: e,
+            ),
+          );
+        }
       } catch (e) {
         lastError = e;
-        unawaited(
-          AppLog.warning(
-            'Route request failed: ${service.name} ${method.toUpperCase()} '
-            '${candidate.url.host}',
-            source: 'route',
-            error: e,
-          ),
-        );
+        if (i < candidates.length - 1) {
+          unawaited(
+            AppLog.debug(
+              'Route request failed, try next: ${service.name} '
+              '${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+            ),
+          );
+        } else {
+          unawaited(
+            AppLog.warning(
+              'Route request failed (last candidate): ${service.name} '
+              '${method.toUpperCase()} ${candidate.url.host}',
+              source: 'route',
+              error: e,
+            ),
+          );
+        }
       }
     }
 
