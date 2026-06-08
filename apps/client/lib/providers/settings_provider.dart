@@ -56,7 +56,7 @@ class SettingsProvider extends ChangeNotifier {
       final alreadyMigrated = existingConfigs.any(
         (c) =>
             c.baseUrl == oldBaseUrl &&
-            c.name.contains(L10n.get('whisper_default_name', 'zh')),
+            c.name.contains(L10n.get('whisper_default_name', L10n.currentLanguage)),
       );
       if (alreadyMigrated) return;
 
@@ -65,7 +65,7 @@ class SettingsProvider extends ChangeNotifier {
         id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
         name: oldModel != null && oldModel.isNotEmpty
             ? 'Whisper ($oldModel)'
-            : L10n.get('whisper_default_name', 'zh'),
+            : L10n.get('whisper_default_name', L10n.currentLanguage),
         baseUrl: oldBaseUrl,
         apiKey: oldApiKey ?? '',
         model: oldModel ?? 'whisper-1',

@@ -548,11 +548,11 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
       'level': 'local',
       'summary': content.isNotEmpty
           ? content
-          : L10n.get('evaluation_parse_failed', 'zh'),
+          : L10n.get('evaluation_parse_failed', L10n.currentLanguage),
       'missedPoints': <String>[],
       'wrongPoints': <String>[],
       'improvedAnswer': '',
-      'nextAction': L10n.get('retry', 'zh'),
+      'nextAction': L10n.get('retry', L10n.currentLanguage),
       'aiUnavailable': true,
     };
   }

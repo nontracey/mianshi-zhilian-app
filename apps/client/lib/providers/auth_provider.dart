@@ -210,13 +210,13 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? L10n.get('register_failed', 'zh');
+        _error = data['error'] as String? ?? L10n.get('register_failed', L10n.currentLanguage);
         _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
+      _error = L10n.getp('network_error', L10n.currentLanguage, {'error': '$e'});
       _isLoading = false;
       notifyListeners();
       return false;
@@ -309,20 +309,20 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? L10n.get('login_failed', 'zh');
+        _error = data['error'] as String? ?? L10n.get('login_failed', L10n.currentLanguage);
         _isLoading = false;
         notifyListeners();
         return false;
       }
     } on TimeoutException {
       debugPrint('Login: timeout');
-      _error = L10n.get('network_timeout', 'zh');
+      _error = L10n.get('network_timeout', L10n.currentLanguage);
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
       debugPrint('Login error: $e');
-      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
+      _error = L10n.getp('network_error', L10n.currentLanguage, {'error': '$e'});
       _isLoading = false;
       notifyListeners();
       return false;
@@ -395,7 +395,7 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
       if (response.statusCode == 401 || response.statusCode == 403) {
-        await _clearSavedUser();
+        debugPrint('Sync current user failed: token expired');
       }
     } catch (e) {
       debugPrint('Sync current user failed: $e');
@@ -455,7 +455,11 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (response.statusCode == 401 || response.statusCode == 403) {
-        await _clearSavedUser();
+        _refreshToken = null;
+        _stopRefreshTimer();
+    autoLogoutReason.value = L10n.get('session_expired_warning', L10n.currentLanguage);
+        await _storage.save('auth_refresh_token', null);
+        notifyListeners();
       }
       return false;
     } catch (e) {
@@ -509,7 +513,7 @@ class AuthProvider extends ChangeNotifier {
     required String newPassword,
   }) async {
     if (!isLoggedIn) {
-      _error = L10n.get('please_login_first', 'zh');
+      _error = L10n.get('please_login_first', L10n.currentLanguage);
       notifyListeners();
       return false;
     }
@@ -528,12 +532,12 @@ class AuthProvider extends ChangeNotifier {
         return true;
       } else {
         final data = json.decode(response.body);
-        _error = data['error'] ?? L10n.get('change_password_failed', 'zh');
+        _error = data['error'] ?? L10n.get('change_password_failed', L10n.currentLanguage);
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = L10n.getp('network_error', 'zh', {'error': '$e'});
+      _error = L10n.getp('network_error', L10n.currentLanguage, {'error': '$e'});
       notifyListeners();
       return false;
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class L10n {
   static const defaultLanguage = 'zh';
+  static String currentLanguage = defaultLanguage;
 
   static const _zh = {
     // Original entries
@@ -336,6 +337,7 @@ class L10n {
     'please_enter_username': '请输入用户名',
     'please_fill_webdav_credentials': '请先填写 WebDAV 地址、用户名和应用密码。',
     'please_login_first': '请先登录',
+    'session_expired_warning': '登录已过期，可继续学习，但云端同步等账号功能将不可用',
     'please_select_at_least_one_domain': '请至少选择一个领域',
     'practice_again_round': '再练一轮',
     'practice_expression': '4. 练习表达',
@@ -1913,6 +1915,7 @@ class L10n {
     'please_fill_webdav_credentials':
         'Please fill in WebDAV URL, username, and app password.',
     'please_login_first': 'Please log in first',
+    'session_expired_warning': 'Session expired. You can continue learning, but cloud features like sync may be unavailable.',
     'please_select_at_least_one_domain': 'Please select at least one domain',
     'practice_again_round': 'Practice Another Round',
     'practice_expression': '4. Practice expression',
