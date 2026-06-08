@@ -81,8 +81,6 @@ class SyncBackupPage extends StatelessWidget {
       progressProvider.syncSettings,
     );
     await progressProvider.loadProgress();
-    await settingsProvider.loadSettings();
-    await aiProvider.loadConfigs();
     if (context.mounted) {
       context.read<LocalizationProvider>().setLanguage(
         settingsProvider.settings.language,

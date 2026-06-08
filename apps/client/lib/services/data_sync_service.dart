@@ -455,8 +455,9 @@ class DataSyncService {
     final response = await http.get(uri).timeout(_timeout);
     if (response.statusCode == 404) return null;
     _ensureSuccess(response, 'Gitee 下载失败');
-    final body = json.decode(response.body) as Map<String, dynamic>;
-    final content = (body['content'] as String).replaceAll('\n', '');
+    final raw = json.decode(response.body);
+    if (raw is! Map<String, dynamic>) return null;
+    final content = (raw['content'] as String).replaceAll('\n', '');
     return json.decode(utf8.decode(base64Decode(content)))
         as Map<String, dynamic>;
   }
@@ -488,9 +489,10 @@ class DataSyncService {
         .timeout(_timeout);
     String? sha;
     if (existing.statusCode >= 200 && existing.statusCode < 300) {
-      sha =
-          (json.decode(existing.body) as Map<String, dynamic>)['sha']
-              as String?;
+      final body = json.decode(existing.body);
+      if (body is Map<String, dynamic>) {
+        sha = body['sha'] as String?;
+      }
     } else if (existing.statusCode != 404) {
       _ensureSuccess(existing, 'Gitee 读取远端版本失败');
     }
