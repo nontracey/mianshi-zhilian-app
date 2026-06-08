@@ -41,11 +41,10 @@ class RouteCandidate {
 }
 
 class RouteResolver {
-  static const appApiPrimary = 'https://mianshi-zhilian-api.pages.dev';
-  static const appApiBackup = 'https://mianshizhilian-api.nontracey.de5.net';
-  static const contentPrimary = 'https://mianshi-zhilian-content.pages.dev';
-  static const contentBackup =
-      'https://mianshizhilian-content.nontracey.de5.net';
+  static const appApiPrimary = 'https://mianshizhilian-api.nontracey.de5.net';
+  static const appApiBackup = 'https://mianshi-zhilian-api.pages.dev';
+  static const contentPrimary = 'https://mianshizhilian-content.nontracey.de5.net';
+  static const contentBackup = 'https://mianshi-zhilian-content.pages.dev';
 
   const RouteResolver();
 
@@ -108,8 +107,8 @@ class RouteResolver {
   static RouteLane? laneFromUrl(String url) {
     final host = Uri.tryParse(url)?.host;
     if (host == null) return null;
-    if (host.endsWith('nontracey.de5.net')) return RouteLane.backup;
-    if (host.endsWith('pages.dev')) return RouteLane.primary;
+    if (host.endsWith('nontracey.de5.net')) return RouteLane.primary;
+    if (host.endsWith('pages.dev')) return RouteLane.backup;
     return null;
   }
 
@@ -120,8 +119,8 @@ class RouteResolver {
 
   static RouteLane? _laneFromEntranceHost() {
     final host = Uri.base.host;
-    if (host.endsWith('nontracey.de5.net')) return RouteLane.backup;
-    if (host.endsWith('pages.dev')) return RouteLane.primary;
+    if (host.endsWith('nontracey.de5.net')) return RouteLane.primary;
+    if (host.endsWith('pages.dev')) return RouteLane.backup;
     return null;
   }
 }
