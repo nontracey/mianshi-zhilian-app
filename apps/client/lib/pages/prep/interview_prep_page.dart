@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:collection/collection.dart';
 
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
+import 'package:mianshi_zhilian/pages/learning/topic_detail_page.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
+import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
+import 'package:mianshi_zhilian/pages/learning/dashboard_widgets.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -21,11 +26,17 @@ class InterviewPrepPage extends StatelessWidget {
     required this.currentDomainId,
     required this.onStartPractice,
     required this.onStartMock,
+    this.routeTopicIds,
+    this.routeModeEnabled = false,
+    this.onRouteModeChanged,
   });
 
   final String currentDomainId;
   final VoidCallback onStartPractice;
   final VoidCallback onStartMock;
+  final List<String>? routeTopicIds;
+  final bool routeModeEnabled;
+  final VoidCallback? onRouteModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -305,76 +316,11 @@ class InterviewPrepPage extends StatelessWidget {
     required ProgressProvider progress,
     required List<Topic> topics,
   }) {
-    final l10n = context.watch<LocalizationProvider>();
-    final mockCount = progress.mockSessions.length;
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        WorkPanel(
-          title: '模拟面试',
-          children: [
-            const SizedBox(height: 8),
-            Center(
-              child: Icon(
-                Icons.record_voice_over_outlined,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.get('mock_interview_description'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onStartMock,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(l10n.get('start_mock_interview')),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
-            if (mockCount > 0) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.history),
-                label: Text(l10n.getp('view_history_count', {'count': mockCount})),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _MockOptionChip(
-                  icon: Icons.timer_outlined,
-                  label: '15 min',
-                  selected: true,
-                ),
-                _MockOptionChip(
-                  icon: Icons.psychology_outlined,
-                  label: '技术面',
-                  selected: true,
-                ),
-                _MockOptionChip(
-                  icon: Icons.groups_outlined,
-                  label: '综合面',
-                  selected: false,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
+    return _MockTabContent(
+      progress: progress,
+      topics: topics,
+      routeTopicIds: routeTopicIds,
+      routeModeEnabled: routeModeEnabled,
     );
   }
 
@@ -702,6 +648,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
   final _storage = StorageService();
   LearningRoute? _selectedRoute;
   bool _isLoading = true;
+  bool _isGenerating = false;
 
   @override
   void initState() {
@@ -733,6 +680,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
     final aiProvider = context.read<AiProvider>();
     final allDomains = widget.content.domains;
     final generator = AiRouteGenerator(_storage, allDomains);
+    setState(() => _isGenerating = true);
     try {
       final route = await generator.generateRoute(
         plan: plan,
@@ -755,6 +703,8 @@ class _RouteTabContentState extends State<_RouteTabContent> {
           SnackBar(content: Text(l10n.getp('route_gen_fail', {'error': '$e'}))),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 
@@ -768,7 +718,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading || _isGenerating) return const Center(child: CircularProgressIndicator());
     if (_selectedRoute == null) return _buildNoRouteView(context, l10n);
     return _buildRouteView(context, l10n);
   }
@@ -907,47 +857,8 @@ class _RouteTabContentState extends State<_RouteTabContent> {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
-          ...phases.map((phase) {
-            final phaseTopics = phase.topicIds
-                .map((id) => allTopics[id])
-                .whereType<Topic>()
-                .toList();
-            final total = phaseTopics.length;
-            final mastered = phaseTopics.where((t) {
-              final score = widget.progress.getTopicProgress(t.id)?.score ?? 0;
-              return score >= 85;
-            }).length;
-            final inProgress = phaseTopics.where((t) {
-              final tp = widget.progress.getTopicProgress(t.id);
-              return tp != null && tp.score > 0;
-            }).length;
-
-            String statusText;
-            Color statusColor;
-            IconData statusIcon;
-            if (mastered == total && total > 0) {
-              statusText = '已完成';
-              statusColor = AppColors.success;
-              statusIcon = Icons.check_circle;
-            } else if (inProgress > 0) {
-              statusText = '进行中';
-              statusColor = AppColors.warning;
-              statusIcon = Icons.trending_up;
-            } else {
-              statusText = '未开始';
-              statusColor = AppColors.textTertiary;
-              statusIcon = Icons.radio_button_unchecked;
-            }
-
-            return _PhaseCard(
-              name: phase.focus.isNotEmpty ? phase.focus : phase.id,
-              totalTopics: total,
-              masteredTopics: mastered,
-              statusText: statusText,
-              statusColor: statusColor,
-              statusIcon: statusIcon,
-            );
-          }),
+          // 按领域分组展示路线阶段
+          ..._groupPhasesByDomain(context, route, widget.content, widget.progress, allTopics, l10n),
         ],
         const SizedBox(height: 16),
         Center(
@@ -959,6 +870,62 @@ class _RouteTabContentState extends State<_RouteTabContent> {
         ),
       ],
     );
+  }
+
+  void _navigateToTopic(BuildContext context, String? topicId) {
+    if (topicId == null) return;
+    final topic = widget.content.topics[topicId];
+    if (topic == null) return;
+    context.push('/topic', extra: TopicDetailPage(topic: topic, onBack: () => context.pop()));
+  }
+
+  List<Widget> _groupPhasesByDomain(BuildContext ctx, LearningRoute route,
+      ContentProvider content, ProgressProvider progress,
+      Map<String, Topic> topics, LocalizationProvider l10n) {
+    final phases = route.phases ?? [];
+    final byDomain = <String, List<RoutePhase>>{};
+    for (final p in phases) {
+      final did = p.topicIds.isNotEmpty
+          ? (topics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
+          : (route.domainIds.firstOrNull ?? '');
+      byDomain.putIfAbsent(did, () => []).add(p);
+    }
+    return byDomain.entries.expand((e) {
+      final domain = content.domains.firstWhereOrNull((d) => d.id == e.key);
+      final title = domain?.title ?? e.key;
+      return [
+        Padding(
+          padding: const EdgeInsets.only(top: 14, bottom: 4),
+          child: Text(title,
+              style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(ctx).colorScheme.primary, fontWeight: FontWeight.w700)),
+        ),
+        ...e.value.map((p) {
+          final pids = p.topicIds.toSet().toList();
+          final ptitles = <String, String>{};
+          var mastered = 0; var practiced = 0;
+          for (final id in pids) {
+            final t = topics[id]; if (t != null) ptitles[id] = t.title;
+            final s = progress.getTopicProgress(id)?.score ?? 0;
+            if (s >= 85) mastered++;
+            if (s > 0) practiced++;
+          }
+          final allDone = mastered == pids.length && pids.isNotEmpty;
+          final inProgress = practiced > 0 && !allDone;
+          return PhaseCard(
+            name: p.focus.isNotEmpty ? p.focus : p.id,
+            totalTopics: pids.length,
+            masteredTopics: mastered,
+            statusText: allDone ? l10n.get('skilled_training') : (inProgress ? l10n.get('progress_action_in') : l10n.get('un_start')),
+            statusColor: allDone ? AppColors.success : (inProgress ? AppColors.warning : AppColors.textTertiary),
+            statusIcon: allDone ? Icons.check_circle : (inProgress ? Icons.trending_up : Icons.radio_button_unchecked),
+            isCurrent: inProgress,
+            topicIds: pids, topicTitles: ptitles,
+            onTopicTap: (id) => _navigateToTopic(ctx, id),
+          );
+        }),
+      ];
+    }).toList();
   }
 }
 
@@ -1034,108 +1001,178 @@ class InfoLine extends StatelessWidget {
   }
 }
 
-class _PhaseCard extends StatelessWidget {
-  const _PhaseCard({
-    required this.name,
-    required this.totalTopics,
-    required this.masteredTopics,
-    required this.statusText,
-    required this.statusColor,
-    required this.statusIcon,
+class _MockTabContent extends StatefulWidget {
+  const _MockTabContent({
+    required this.progress,
+    required this.topics,
+    required this.routeTopicIds,
+    required this.routeModeEnabled,
   });
 
-  final String name;
-  final int totalTopics;
-  final int masteredTopics;
-  final String statusText;
-  final Color statusColor;
-  final IconData statusIcon;
+  final ProgressProvider progress;
+  final List<Topic> topics;
+  final List<String>? routeTopicIds;
+  final bool routeModeEnabled;
 
   @override
-  Widget build(BuildContext context) {
-    final fraction = totalTopics > 0 ? masteredTopics / totalTopics : 0.0;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: fraction,
-                    minHeight: 6,
-                    backgroundColor:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$masteredTopics/$totalTopics',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(statusIcon, size: 14, color: statusColor),
-                const SizedBox(width: 4),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: statusColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<_MockTabContent> createState() => _MockTabContentState();
 }
 
-class _MockOptionChip extends StatelessWidget {
-  const _MockOptionChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
-  });
+class _MockTabContentState extends State<_MockTabContent> {
+  String _scenario = 'tech';
+  int _duration = 15;
+  String? _scope;
 
-  final IconData icon;
-  final String label;
-  final bool selected;
+  @override
+  void initState() {
+    super.initState();
+    _scope = widget.routeModeEnabled && widget.routeTopicIds?.isNotEmpty == true
+        ? 'route'
+        : null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
+    final l10n = context.watch<LocalizationProvider>();
+    final mockCount = widget.progress.mockSessions.length;
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        WorkPanel(
+          title: '模拟面试',
+          children: [
+            const SizedBox(height: 8),
+            Center(
+              child: Icon(
+                Icons.record_voice_over_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.get('mock_interview_description'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 面试场景
+            Text(l10n.get('mock_scenario'), style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildScenarioChip('tech', l10n.get('tech_interview'), Icons.psychology_outlined),
+                _buildScenarioChip('comprehensive', l10n.get('comprehensive_interview'), Icons.groups_outlined),
+                _buildScenarioChip('behavioral', l10n.get('behavioral_interview'), Icons.emoji_people_outlined),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // 时长选择
+            Text(l10n.get('duration'), style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _buildDurationChip(15, '15 min'),
+                _buildDurationChip(30, '30 min'),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // 题目范围
+            if (widget.routeTopicIds != null && widget.routeTopicIds!.isNotEmpty) ...[
+              Text(l10n.get('question_scope'), style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _buildScopeChip('route', l10n.get('by_current_route')),
+                  _buildScopeChip('domain', l10n.get('by_current_domain')),
+                  _buildScopeChip('all', l10n.get('all_topics')),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () {
+                final content = context.read<ContentProvider>();
+                List<String> topicIds;
+                if (_scope == 'route' &&
+                    widget.routeTopicIds != null &&
+                    widget.routeTopicIds!.isNotEmpty) {
+                  topicIds = List<String>.from(widget.routeTopicIds!)..shuffle();
+                } else if (_scope == 'domain') {
+                  final domainTopics = content.getTopicsByDomain(
+                    context.read<SettingsProvider>().settings.currentDomain,
+                  );
+                  topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+                } else {
+                  topicIds = content.topics.keys.toList()..shuffle();
+                }
+                context.push(
+                  '/practice/mock-interview',
+                  extra: MockInterviewPage(topicIds: topicIds.take(_duration).toList()),
+                );
+              },
+              icon: const Icon(Icons.play_arrow),
+              label: Text(l10n.get('start_mock_interview')),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+            if (mockCount > 0) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.history),
+                label: Text(l10n.getp('view_history_count', {'count': mockCount})),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScenarioChip(String value, String label, IconData icon) {
+    final selected = _scenario == value;
+    return ChoiceChip(
       avatar: Icon(icon, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
-      onSelected: (_) {},
+      onSelected: (_) => setState(() => _scenario = value),
+    );
+  }
+
+  Widget _buildDurationChip(int value, String label) {
+    final selected = _duration == value;
+    return ChoiceChip(
+      avatar: const Icon(Icons.timer_outlined, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) => setState(() => _duration = value),
+    );
+  }
+
+  Widget _buildScopeChip(String value, String label) {
+    final selected = _scope == value;
+    return ChoiceChip(
+      avatar: const Icon(Icons.tune, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) => setState(() => _scope = value),
     );
   }
 }

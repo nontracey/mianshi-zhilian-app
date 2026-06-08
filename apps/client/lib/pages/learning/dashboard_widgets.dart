@@ -1323,6 +1323,132 @@ class LineChartPainter extends CustomPainter {
 
 // ── 练习记录项目组件 ──
 
+// ── 路线阶段卡片（公用） ──
+
+class PhaseCard extends StatelessWidget {
+  const PhaseCard({
+    super.key,
+    required this.name,
+    required this.totalTopics,
+    required this.masteredTopics,
+    required this.statusText,
+    required this.statusColor,
+    required this.statusIcon,
+    this.isCurrent = false,
+    this.topicIds,
+    this.topicTitles,
+    this.onTopicTap,
+    this.onPractice,
+  });
+
+  final String name;
+  final int totalTopics;
+  final int masteredTopics;
+  final String statusText;
+  final Color statusColor;
+  final IconData statusIcon;
+  final bool isCurrent;
+  final List<String>? topicIds;
+  final Map<String, String>? topicTitles;
+  final void Function(String?)? onTopicTap;
+  final VoidCallback? onPractice;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = totalTopics > 0 ? masteredTopics / totalTopics : 0.0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isCurrent
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.04)
+            : null,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isCurrent
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+              : Theme.of(context).dividerColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(statusIcon, size: 16, color: statusColor),
+              const SizedBox(width: 6),
+              Text(statusText,
+                  style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+              if (isCurrent) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text('当前', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                ),
+              ],
+              const Spacer(),
+              Text('$masteredTopics/$totalTopics', style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+          ),
+          if (topicIds != null && topicTitles != null && topicIds!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 2,
+              children: topicIds!.take(6).map((id) => InkWell(
+                onTap: onTopicTap != null ? () => onTopicTap!(id) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    topicTitles![id] ?? id,
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
+                  ),
+                ),
+              )).toList(),
+            ),
+            if (topicIds!.length > 6)
+              Text('+${topicIds!.length - 6} 更多', style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+          ],
+          if (onPractice != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onPractice,
+                icon: const Icon(Icons.play_arrow, size: 16),
+                label: const Text('开始练习'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class PracticeRecordItem extends StatelessWidget {
   const PracticeRecordItem({
     super.key,

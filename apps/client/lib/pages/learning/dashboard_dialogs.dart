@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -124,6 +125,36 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
     _saveCustomRoutes();
   }
 
+  (int mastered, int total) _getPhaseProgress(LearningRoute route) {
+    if (route.phases == null || route.phases!.isEmpty) {
+      final progress = context.read<ProgressProvider>();
+      final topics = context.read<ContentProvider>().topics;
+      var mastered = 0;
+      var total = 0;
+      for (final id in route.domainIds) {
+        for (final t in topics.values) {
+          if (t.domainId == id) {
+            total++;
+            if ((progress.getTopicProgress(t.id)?.score ?? 0) >= 85) mastered++;
+          }
+        }
+      }
+      return total > 0 ? (mastered, total) : (0, 0);
+    }
+    final progress = context.read<ProgressProvider>();
+    var mastered = 0;
+    final total = route.phases!.length;
+    for (final phase in route.phases!) {
+      if (phase.topicIds.isEmpty) { mastered++; continue; }
+      var pm = 0;
+      for (final tid in phase.topicIds) {
+        if ((progress.getTopicProgress(tid)?.score ?? 0) >= 85) pm++;
+      }
+      if (pm == phase.topicIds.length) mastered++;
+    }
+    return (mastered, total);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -165,15 +196,20 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                     // 官方路线
                     if (_officialRoutes.isNotEmpty) ...[
                       _SectionHeader(label: '官方路线'),
-                      ..._officialRoutes.map((route) => _RouteTile(
-                        route: route,
-                        isSelected: route.id == widget.currentRouteId,
-                        isDark: isDark,
-                        onTap: () {
-                          widget.onRouteSelected(route);
-                          Navigator.pop(context);
-                        },
-                      )),
+                      ..._officialRoutes.map((route) {
+                        final (m, t) = _getPhaseProgress(route);
+                        return _RouteTile(
+                          route: route,
+                          isSelected: route.id == widget.currentRouteId,
+                          isDark: isDark,
+                          phaseProgress: t > 0 ? m : null,
+                          phaseTotal: t > 0 ? t : null,
+                          onTap: () {
+                            widget.onRouteSelected(route);
+                            Navigator.pop(context);
+                          },
+                        );
+                      }),
                       const SizedBox(height: 8),
                     ],
 
@@ -182,10 +218,13 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                       _SectionHeader(label: 'AI 个性化'),
                       ..._aiRoutes.asMap().entries.map((entry) {
                         final route = entry.value;
+                        final (m, t) = _getPhaseProgress(route);
                         return _RouteTile(
                           route: route,
                           isSelected: route.id == widget.currentRouteId,
                           isDark: isDark,
+                          phaseProgress: t > 0 ? m : null,
+                          phaseTotal: t > 0 ? t : null,
                           badge: const Text('AI', style: TextStyle(fontSize: 9, color: AppColors.accent)),
                           onTap: () {
                             widget.onRouteSelected(route);
@@ -222,10 +261,13 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                       _SectionHeader(label: l10n.get('custom')),
                       ..._customRoutes.asMap().entries.map((entry) {
                         final route = entry.value;
+                        final (m, t) = _getPhaseProgress(route);
                         return _RouteTile(
                           route: route,
                           isSelected: route.id == widget.currentRouteId,
                           isDark: isDark,
+                          phaseProgress: t > 0 ? m : null,
+                          phaseTotal: t > 0 ? t : null,
                           badge: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
@@ -375,6 +417,8 @@ class _RouteTile extends StatelessWidget {
     this.badge,
     this.onEdit,
     this.onDelete,
+    this.phaseProgress,
+    this.phaseTotal,
   });
 
   final LearningRoute route;
@@ -384,6 +428,8 @@ class _RouteTile extends StatelessWidget {
   final Widget? badge;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final int? phaseProgress;
+  final int? phaseTotal;
 
   @override
   Widget build(BuildContext context) {
@@ -439,6 +485,37 @@ class _RouteTile extends StatelessWidget {
                           ),
                         ),
                       ),
+                    if (phaseProgress != null &&
+                        phaseTotal != null &&
+                        phaseTotal! > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: phaseProgress! / phaseTotal!,
+                                minHeight: 4,
+                                backgroundColor: isDark
+                                    ? AppColors.borderMidnight
+                                    : const Color(0xFFE8E8E8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$phaseProgress/$phaseTotal',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.white54
+                                  : AppColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

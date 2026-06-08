@@ -19,6 +19,9 @@ class DashboardPage extends StatelessWidget {
     this.onReview,
     this.onMockInterview,
     this.routeTopicIds,
+    this.routeModeEnabled = false,
+    this.onRouteModeChanged,
+    this.onPrepNavigation,
   });
 
   final String currentDomainId;
@@ -28,7 +31,10 @@ class DashboardPage extends StatelessWidget {
   final ValueChanged<String> onViewDomainCatalog;
   final VoidCallback? onReview;
   final VoidCallback? onMockInterview;
+  final VoidCallback? onPrepNavigation;
   final List<String>? routeTopicIds;
+  final bool routeModeEnabled;
+  final VoidCallback? onRouteModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +203,8 @@ class DashboardPage extends StatelessWidget {
                         topicCount: topicCount,
                         readiness: readiness,
                         streakDays: progressProvider.streakDays,
+                        routeModeEnabled: routeModeEnabled,
+                        onRouteModeChanged: onRouteModeChanged,
                         onDomainChanged: onDomainChanged,
                         onTopicTap: onTopicTap,
                         onViewDomainCatalog: onViewDomainCatalog,
@@ -264,6 +272,8 @@ class DashboardPage extends StatelessWidget {
                             topicCount: topicCount,
                             readiness: readiness,
                             streakDays: progressProvider.streakDays,
+                            routeModeEnabled: routeModeEnabled,
+                            onRouteModeChanged: onRouteModeChanged,
                             onDomainChanged: onDomainChanged,
                             onTopicTap: onTopicTap,
                             onViewDomainCatalog: onViewDomainCatalog,
@@ -316,6 +326,8 @@ class DashboardPage extends StatelessWidget {
                     topicCount: topicCount,
                     readiness: readiness,
                     streakDays: progressProvider.streakDays,
+                    routeModeEnabled: routeModeEnabled,
+                    onRouteModeChanged: onRouteModeChanged,
                     onDomainChanged: onDomainChanged,
                     onTopicTap: onTopicTap,
                     onViewDomainCatalog: onViewDomainCatalog,
@@ -359,7 +371,9 @@ class DashboardPage extends StatelessWidget {
         ? interviewDate.difference(DateTime.now()).inDays + 1
         : null;
 
-    return Container(
+    return GestureDetector(
+      onTap: onPrepNavigation,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -423,6 +437,7 @@ class DashboardPage extends StatelessWidget {
             ),
         ],
       ),
+    ),
     );
   }
 }

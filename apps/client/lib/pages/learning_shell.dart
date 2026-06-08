@@ -42,6 +42,10 @@ class _LearningShellState extends State<LearningShell> {
   bool _isSidebarCollapsed = false;
   late AuthProvider _auth;
   List<String>? _routeTopicIds;
+  List<String>? _routeDomainIds;
+  List<RoutePhase>? _routePhases;
+  bool _routeModeEnabled = true;
+  String? _activeRouteId;
   final _storage = StorageService();
 
   @override
@@ -53,7 +57,12 @@ class _LearningShellState extends State<LearningShell> {
   Future<void> _loadRouteTopicIds() async {
     final routeId = await _storage.load('selected_route_id');
     if (routeId == null || routeId == 'all') {
-      if (mounted) setState(() => _routeTopicIds = null);
+      if (mounted) setState(() {
+        _routeTopicIds = null;
+        _routeDomainIds = null;
+        _activeRouteId = null;
+        _routeModeEnabled = false;
+      });
       return;
     }
     final customData = await _storage.loadJsonList('custom_routes');
@@ -61,11 +70,28 @@ class _LearningShellState extends State<LearningShell> {
       final route = LearningRoute.fromJson(data);
       if (route.id == routeId) {
         final ids = route.allTopicIds;
-        if (mounted) setState(() => _routeTopicIds = ids.isEmpty ? null : ids);
+        if (mounted) setState(() {
+          _routeTopicIds = ids.isEmpty ? null : ids;
+          _routeDomainIds = route.domainIds;
+          _routePhases = route.phases;
+          _activeRouteId = routeId;
+          _routeModeEnabled = true;
+        });
+        // 确保路线涉及的领域知识已加载
+        try {
+          final content = context.read<ContentProvider>();
+          await content.ensureTopicsLoaded(route.domainIds);
+        } catch (_) {}
         return;
       }
     }
-    if (mounted) setState(() => _routeTopicIds = null);
+    if (mounted) setState(() {
+      _routeTopicIds = null;
+      _routeDomainIds = null;
+      _routePhases = null;
+      _activeRouteId = null;
+      _routeModeEnabled = false;
+    });
   }
 
   @override
@@ -238,6 +264,8 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.dashboard => DashboardPage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
+        routeModeEnabled: _routeModeEnabled,
+        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) {
           settings.updateSettings(settings.settings.copyWith(currentDomain: id));
           if (content.getLoadedTopicCount(id) == 0) {
@@ -260,9 +288,15 @@ class _LearningShellState extends State<LearningShell> {
         },
         onReview: () => _setSection(AppSection.practice),
         onMockInterview: () => _setSection(AppSection.practice),
+        onPrepNavigation: () => _setSection(AppSection.prep),
       ),
       AppSection.catalog => CatalogPage(
         currentDomainId: settings.settings.currentDomain,
+        routeTopicIds: _routeTopicIds,
+        routeDomainIds: _routeDomainIds,
+        routePhases: _routePhases,
+        routeModeEnabled: _routeModeEnabled,
+        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) {
           settings.updateSettings(settings.settings.copyWith(currentDomain: id));
           if (content.getLoadedTopicCount(id) == 0) {
@@ -317,12 +351,21 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.prep => InterviewPrepPage(
         currentDomainId: settings.settings.currentDomain,
+        routeTopicIds: _routeTopicIds,
+        routeModeEnabled: _routeModeEnabled,
+        onRouteModeChanged: _toggleRouteMode,
         onStartPractice: () => _setSection(AppSection.practice),
         onStartMock: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          final routeIds = _routeTopicIds;
+          List<String> topicIds;
+          if (routeIds != null && routeIds.isNotEmpty) {
+            topicIds = List.from(routeIds)..shuffle();
+          } else {
+            final domainTopics = content.getTopicsByDomain(
+              settings.settings.currentDomain,
+            );
+            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          }
           context.push(
             '/practice/mock-interview',
             extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
@@ -331,6 +374,9 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.mastery => MasteryPage(
         currentDomainId: settings.settings.currentDomain,
+        routeTopicIds: _routeTopicIds,
+        routeModeEnabled: _routeModeEnabled,
+        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) => settings.updateSettings(
           settings.settings.copyWith(currentDomain: id),
         ),
@@ -351,10 +397,18 @@ class _LearningShellState extends State<LearningShell> {
 
   void _setSection(AppSection value) {
     context.read<AnalyticsService>().recordSection(value.name);
+    if (value == AppSection.dashboard || value == AppSection.catalog) {
+      _loadRouteTopicIds();
+    }
     setState(() {
       _section = value;
       _selectedTopicId = null;
     });
+  }
+
+  void _toggleRouteMode() {
+    if (_activeRouteId == null) return;
+    setState(() => _routeModeEnabled = !_routeModeEnabled);
   }
 
   String _sectionTitle(AppSection section, LocalizationProvider l10n) =>
