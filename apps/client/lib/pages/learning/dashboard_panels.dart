@@ -595,7 +595,7 @@ class CenterPanelState extends State<CenterPanel> {
                     ),
                     ButtonSegment(
                       value: false,
-                      label: const Text('自由探索', style: TextStyle(fontSize: 12)),
+                      label: Text(l10n.get('free_explore'), style: const TextStyle(fontSize: 12)),
                       icon: const Icon(Icons.explore_outlined, size: 16),
                     ),
                   ],
@@ -778,7 +778,7 @@ class CenterPanelState extends State<CenterPanel> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${l10n.getp('count_knowledge_point_2', {'count': topicIds.length})} · ${phases.length} 阶段',
+                    '${l10n.getp('count_knowledge_point_2', {'count': topicIds.length})} ${l10n.get('route_info_separator')} ${phases.length} ${l10n.get('phases_suffix')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -803,7 +803,7 @@ class CenterPanelState extends State<CenterPanel> {
         ...phaseWidgets.take(6),
         if (phases.length > 6)
           Text(
-            '${l10n.get('and_more')} ${phases.length - 6} 阶段',
+            '${l10n.get('and_more')} ${phases.length - 6} ${l10n.get('phases_suffix')}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
       ],

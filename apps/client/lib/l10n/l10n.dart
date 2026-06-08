@@ -1629,6 +1629,21 @@ class L10n {
     'about_sponsor_desc': '如果这个项目对你有帮助，欢迎请作者喝杯咖啡',
     'about_share_friends': '分享给朋友',
     're_view_onboarding': '重新查看引导页',
+    'and_more': '还有',
+    'free_explore': '自由探索',
+    'current_phase': '当前',
+    'more_count': '+{count} 更多',
+    'start_phase_practice': '开始练习',
+    'mock_scenario': '面试场景',
+    'tech_interview': '技术面',
+    'comprehensive_interview': '综合面',
+    'behavioral_interview': '行为面',
+    'duration': '时长',
+    'question_scope': '题目范围',
+    'by_current_route': '按当前路线',
+    'by_current_domain': '按当前领域',
+    'phases_suffix': '阶段',
+    'route_info_separator': '·',
   };
 
   static const _en = {
@@ -3454,6 +3469,21 @@ class L10n {
     'about_sponsor_desc': 'If this project helps you, buy the author a coffee',
     'about_share_friends': 'Share with friends',
     're_view_onboarding': 'Replay Onboarding',
+    'and_more': 'and more',
+    'free_explore': 'Free Explore',
+    'current_phase': 'Current',
+    'more_count': '+{count} more',
+    'start_phase_practice': 'Start Practice',
+    'mock_scenario': 'Interview Scenario',
+    'tech_interview': 'Tech Interview',
+    'comprehensive_interview': 'Comprehensive',
+    'behavioral_interview': 'Behavioral',
+    'duration': 'Duration',
+    'question_scope': 'Question Scope',
+    'by_current_route': 'By Current Route',
+    'by_current_domain': 'By Current Domain',
+    'phases_suffix': 'Phases',
+    'route_info_separator': '·',
   };
 
   static const Map<String, Map<String, String>> _localizedValues = {

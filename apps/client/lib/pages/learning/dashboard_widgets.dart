@@ -1355,6 +1355,7 @@ class PhaseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     final fraction = totalTopics > 0 ? masteredTopics / totalTopics : 0.0;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1387,7 +1388,7 @@ class PhaseCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text('当前', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                  child: Text(l10n.get('current_phase'), style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
                 ),
               ],
               const Spacer(),
@@ -1426,7 +1427,7 @@ class PhaseCard extends StatelessWidget {
               )).toList(),
             ),
             if (topicIds!.length > 6)
-              Text('+${topicIds!.length - 6} 更多', style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+              Text(l10n.getp('more_count', {'count': topicIds!.length - 6}), style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
           ],
           if (onPractice != null) ...[
             const SizedBox(height: 8),
@@ -1435,7 +1436,7 @@ class PhaseCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onPractice,
                 icon: const Icon(Icons.play_arrow, size: 16),
-                label: const Text('开始练习'),
+                label: Text(l10n.get('start_phase_practice')),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   visualDensity: VisualDensity.compact,
