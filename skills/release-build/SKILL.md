@@ -18,7 +18,7 @@ keywords: [发布构建, 推送构建, 推送构建号, 重新打 tag, release b
 ## 工作流概览
 
 ```
-检测变更 → 创建发布分支 → 提交功能变更(feat/fix) + 递增构建号(chore) → 创建 PR → 合并到 main → 切回 main 同步 → 重新打当前版本 tag → 强制推送 tag
+检测变更 → 创建发布分支 → 提交功能变更(feat/fix) + 递增构建号(chore) → 推送分支 → auto-release.sh 自动创建 PR + 等待 CI → 管理员合并 → 强制重打 tag
 ```
 
 > **关键：功能变更和版本号递增必须分开提交，但放在同一个分支上。** 功能变更一个 commit，构建号递增单独一个 `chore:` commit。这样 release notes 的 git log 范围里只会有 `feat`/`fix`，不会出现 `chore: 构建号` 混入的问题。
@@ -98,31 +98,19 @@ git commit -m "chore: 构建号 112→113"
 - 类型根据实际变更选择（`feat`/`fix`/`refactor`/`docs` 等）
 - 构建号递增用 `chore:` 类型
 
-### 4. 推送分支 → 创建 PR → 合并
+### 4. 推送并自动发布
 
 ```bash
-# 推送分支
+# 推送分支后运行自动化脚本
 git push origin release/build-{newBuildNumber}
-
-# 在 GitHub 创建 PR（base: main, head: release/build-{newBuildNumber}）
-# PR 通过 CI + 至少 1 人 review 后合并到 main
-
-# 合并后切回 main 并同步
-git checkout main
-git pull origin main
+bash scripts/auto-release.sh build {newBuildNumber} {version}
 ```
 
-### 5. 重新打 tag + 推送
+该脚本自动完成：创建 PR → 等待 CI 通过 → 管理员权限合并 → 切回 main 同步 → 强制重打当前版本 tag 并推送。
 
-```bash
-# 重新打当前版本 tag（覆盖旧 tag）
-git tag -f v{version}
-git push origin v{version} --force
-```
+> `{version}` 取自 `pubspec.yaml` 的版本号（不含 `+buildNumber`），如 `0.1.3`。
 
-> 注意：`v{version}` 取自 `pubspec.yaml` 的版本号（不含 `+buildNumber`），如 `v0.1.3`。无论是否强制推送，该 tag 始终指向当前发布的 commit。
-
-### 6. 验证
+### 5. 验证
 
 推送后，GitHub Actions Release workflow 自动触发：
 - CI 在 `prepare-release` job 中验证 tag 与 pubspec 版本一致
