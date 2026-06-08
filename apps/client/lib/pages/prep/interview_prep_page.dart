@@ -692,6 +692,8 @@ class _RouteTabContentState extends State<_RouteTabContent> {
       );
 
       final customData = await _storage.loadJsonList('custom_routes');
+      // 移除旧 AI 路线，防止积压
+      customData.removeWhere((e) => e['source'] == 'ai');
       customData.add(route.toJson());
       await _storage.saveJsonList('custom_routes', customData);
       await _storage.save('selected_route_id', route.id);
@@ -913,7 +915,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
           final allDone = mastered == pids.length && pids.isNotEmpty;
           final inProgress = practiced > 0 && !allDone;
           return PhaseCard(
-            name: p.focus.isNotEmpty ? p.focus : p.id,
+            name: p.focus.isNotEmpty ? p.focus : '$title 阶段 ${e.value.indexOf(p) + 1}',
             totalTopics: pids.length,
             masteredTopics: mastered,
             statusText: allDone ? l10n.get('skilled_training') : (inProgress ? l10n.get('progress_action_in') : l10n.get('un_start')),
@@ -921,6 +923,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
             statusIcon: allDone ? Icons.check_circle : (inProgress ? Icons.trending_up : Icons.radio_button_unchecked),
             isCurrent: inProgress,
             topicIds: pids, topicTitles: ptitles,
+            onTap: pids.isNotEmpty ? () => _navigateToTopic(ctx, pids.first) : null,
             onTopicTap: (id) => _navigateToTopic(ctx, id),
           );
         }),

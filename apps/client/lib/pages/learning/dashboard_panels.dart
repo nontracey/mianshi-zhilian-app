@@ -855,7 +855,7 @@ class CenterPanelState extends State<CenterPanel> {
           final allDone = mastered == pids.length && pids.isNotEmpty;
           final inProgress = practiced > 0 && !allDone;
           return PhaseCard(
-            name: p.focus.isNotEmpty ? p.focus : p.id,
+            name: p.focus.isNotEmpty ? p.focus : '${domainTitle} ${l10n.get('phases_suffix')} ${e.value.indexOf(p) + 1}',
             totalTopics: pids.length,
             masteredTopics: mastered,
             statusText: allDone
@@ -870,6 +870,9 @@ class CenterPanelState extends State<CenterPanel> {
             isCurrent: inProgress,
             topicIds: pids,
             topicTitles: ptitles,
+            onTap: pids.isNotEmpty
+                ? () => widget.onTopicTap(pids.first)
+                : null,
             onTopicTap: (id) {
               if (id != null) widget.onTopicTap(id);
             },

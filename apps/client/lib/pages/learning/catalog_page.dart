@@ -959,7 +959,7 @@ class _CatalogPageState extends State<CatalogPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            phase.focus.isNotEmpty ? phase.focus : phase.id,
+                            phase.focus.isNotEmpty ? phase.focus : '${l10n.get('phases_suffix')} ${index + 1}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,

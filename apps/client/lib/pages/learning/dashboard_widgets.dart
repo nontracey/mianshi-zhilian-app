@@ -1339,6 +1339,7 @@ class PhaseCard extends StatelessWidget {
     this.topicTitles,
     this.onTopicTap,
     this.onPractice,
+    this.onTap,
   });
 
   final String name;
@@ -1352,12 +1353,13 @@ class PhaseCard extends StatelessWidget {
   final Map<String, String>? topicTitles;
   final void Function(String?)? onTopicTap;
   final VoidCallback? onPractice;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final fraction = totalTopics > 0 ? masteredTopics / totalTopics : 0.0;
-    return Container(
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1420,7 +1422,7 @@ class PhaseCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    topicTitles![id] ?? id,
+                    (topicTitles![id]?.isNotEmpty == true) ? topicTitles![id]! : '知识点',
                     style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
@@ -1447,6 +1449,14 @@ class PhaseCard extends StatelessWidget {
         ],
       ),
     );
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: card,
+      );
+    }
+    return card;
   }
 }
 
