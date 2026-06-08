@@ -729,9 +729,14 @@ class _RouteTabContentState extends State<_RouteTabContent> {
 
   Future<void> _generateAiRoute() async {
     final plan = widget.progress.prepPlan;
-    final allTopics = widget.content.topics.values.toList();
-    final aiProvider = context.read<AiProvider>();
     final l10n = context.read<LocalizationProvider>();
+
+    // 先生成所有领域的 topics
+    final allDomainIds = widget.content.domains.map((d) => d.id).toList();
+    await widget.content.ensureTopicsLoaded(allDomainIds);
+    final allTopics = widget.content.topics.values.toList();
+
+    final aiProvider = context.read<AiProvider>();
     final generator = AiRouteGenerator(_storage);
     try {
       final route = await generator.generateRoute(
