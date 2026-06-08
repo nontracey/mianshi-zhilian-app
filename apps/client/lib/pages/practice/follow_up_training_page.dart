@@ -11,11 +11,9 @@ class FollowUpTrainingPage extends StatefulWidget {
   const FollowUpTrainingPage({
     super.key,
     required this.topicIds,
-    this.domainId,
   });
 
   final List<String> topicIds;
-  final String? domainId;
 
   @override
   State<FollowUpTrainingPage> createState() => _FollowUpTrainingPageState();

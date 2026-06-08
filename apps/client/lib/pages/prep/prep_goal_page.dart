@@ -25,34 +25,6 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
   final List<String> _selectedTechStack = [];
   bool _isLoading = true;
 
-  final List<String> _techStackOptions = [
-    'Java',
-    'Python',
-    'Go',
-    'JavaScript',
-    'TypeScript',
-    'React',
-    'Vue',
-    'Angular',
-    'Spring',
-    'Node.js',
-    'MySQL',
-    'Redis',
-    'MongoDB',
-    'Kafka',
-    'RabbitMQ',
-    'Docker',
-    'Kubernetes',
-    'AWS',
-    'microservice',
-    'distributed',
-    'algorithm',
-    'system_design',
-    'data_structure',
-    'network',
-    'operating_system',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -651,10 +623,18 @@ class _PrepGoalPageState extends State<PrepGoalPage> {
   }
 
   Widget _buildTechStackSelector(bool isDark) {
+    const options = [
+      'Java', 'Python', 'Go', 'JavaScript', 'TypeScript',
+      'React', 'Vue', 'Angular', 'Spring', 'Node.js',
+      'MySQL', 'Redis', 'MongoDB', 'Kafka', 'RabbitMQ',
+      'Docker', 'Kubernetes', 'AWS',
+      'microservice', 'distributed', 'algorithm',
+      'system_design', 'data_structure', 'network', 'operating_system',
+    ];
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _techStackOptions.map((tech) {
+      children: options.map((tech) {
         final isSelected = _selectedTechStack.contains(tech);
         return FilterChip(
           selected: isSelected,

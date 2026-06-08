@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -23,7 +24,6 @@ class InterviewPrepPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
     final topics = content.getTopicsByDomain(currentDomainId);
@@ -35,7 +35,62 @@ class InterviewPrepPage extends StatelessWidget {
       final topicProgress = progress.getTopicProgress(topic.id);
       return topic.highFrequency && (topicProgress?.score ?? 0) < 85;
     }).length;
+    final domainProgress = progress.getDomainProgress(currentDomainId, topics);
 
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          TabBar(
+            tabs: const [
+              Tab(text: '工作台'),
+              Tab(text: '路线'),
+              Tab(text: '模拟面试'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildDashboardTab(
+                  context,
+                  plan: plan,
+                  readiness: readiness,
+                  reviewCount: reviewCount,
+                  highFrequencyUnmastered: highFrequencyUnmastered,
+                  lowScoreCount: lowScoreCount,
+                  topics: topics,
+                  progress: progress,
+                  content: content,
+                  domainProgress: domainProgress,
+                ),
+                _buildRouteTab(
+                  context,
+                  topics: topics,
+                  progress: progress,
+                  domainProgress: domainProgress,
+                ),
+                _buildMockTab(context, progress: progress, topics: topics),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardTab(
+    BuildContext context, {
+    required PrepPlan plan,
+    required int readiness,
+    required int reviewCount,
+    required int highFrequencyUnmastered,
+    required int lowScoreCount,
+    required List<Topic> topics,
+    required ProgressProvider progress,
+    required ContentProvider content,
+    required ({int masteryPercent, int topicCount}) domainProgress,
+  }) {
+    final l10n = context.watch<LocalizationProvider>();
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -131,6 +186,8 @@ class InterviewPrepPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        _buildCompactProgress(context, domainProgress),
+        const SizedBox(height: 16),
         if (plan.jobDescription.trim().isNotEmpty) ...[
           _JdAnalysisSection(
             jobDescription: plan.jobDescription,
@@ -139,6 +196,8 @@ class InterviewPrepPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
+        _buildProjectDigButton(context, progress, topics),
+        const SizedBox(height: 16),
         WorkPanel(
           title: l10n.get('next_step_suggestion'),
           children: _buildActions(
@@ -173,6 +232,324 @@ class InterviewPrepPage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildCompactProgress(
+    BuildContext context,
+    ({int masteryPercent, int topicCount}) domainProgress,
+  ) {
+    final l10n = context.watch<LocalizationProvider>();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.get('schedule_overall_goal'),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: domainProgress.masteryPercent / 100,
+                    minHeight: 8,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Text(
+            '${domainProgress.masteryPercent}%',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: _scoreColor(domainProgress.masteryPercent),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${domainProgress.topicCount} ${l10n.get('item')}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteTab(
+    BuildContext context, {
+    required List<Topic> topics,
+    required ProgressProvider progress,
+    required ({int masteryPercent, int topicCount}) domainProgress,
+  }) {
+    final l10n = context.watch<LocalizationProvider>();
+
+    final phaseGroups = <String, List<Topic>>{};
+    for (final topic in topics) {
+      final phaseName = topic.phase ?? topic.category;
+      phaseGroups.putIfAbsent(phaseName, () => []).add(topic);
+    }
+
+    final phaseNames = phaseGroups.keys.toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        WorkPanel(
+          title: '整体进度',
+          children: [
+            Row(
+              children: [
+                Text(
+                  '${domainProgress.masteryPercent}%',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: _scoreColor(domainProgress.masteryPercent),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: domainProgress.masteryPercent / 100,
+                          minHeight: 10,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${domainProgress.topicCount} ${l10n.get('item')}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          '学习阶段',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        ...phaseNames.map((phase) {
+          final phaseTopics = phaseGroups[phase]!;
+          final mastered = phaseTopics.where((t) {
+            final mastery = ProgressProvider.computeMastery(
+              t.id,
+              progressMap: progress.progressMap,
+              attempts: progress.attempts,
+            );
+            return mastery == MasteryStatus.skilled;
+          }).length;
+          final inProgress = phaseTopics.where((t) {
+            final tp = progress.getTopicProgress(t.id);
+            return tp != null && tp.score > 0;
+          }).length;
+
+          String statusText;
+          Color statusColor;
+          IconData statusIcon;
+          if (mastered == phaseTopics.length && phaseTopics.isNotEmpty) {
+            statusText = '已完成';
+            statusColor = AppColors.success;
+            statusIcon = Icons.check_circle;
+          } else if (inProgress > 0) {
+            statusText = '进行中';
+            statusColor = AppColors.warning;
+            statusIcon = Icons.trending_up;
+          } else {
+            statusText = '未开始';
+            statusColor = AppColors.textTertiary;
+            statusIcon = Icons.radio_button_unchecked;
+          }
+
+          return _PhaseCard(
+            name: phase,
+            totalTopics: phaseTopics.length,
+            masteredTopics: mastered,
+            statusText: statusText,
+            statusColor: statusColor,
+            statusIcon: statusIcon,
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildMockTab(
+    BuildContext context, {
+    required ProgressProvider progress,
+    required List<Topic> topics,
+  }) {
+    final mockCount = progress.mockSessions.length;
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        WorkPanel(
+          title: '模拟面试',
+          children: [
+            const SizedBox(height: 8),
+            Center(
+              child: Icon(
+                Icons.record_voice_over_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '模拟真实面试场景，检验你的准备程度',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onStartMock,
+              icon: const Icon(Icons.play_arrow),
+              label: Text('开始模拟面试'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+            if (mockCount > 0) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.history),
+                label: Text('查看历史记录 ($mockCount)'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MockOptionChip(
+                  icon: Icons.timer_outlined,
+                  label: '15 min',
+                  selected: true,
+                ),
+                _MockOptionChip(
+                  icon: Icons.psychology_outlined,
+                  label: '技术面',
+                  selected: true,
+                ),
+                _MockOptionChip(
+                  icon: Icons.groups_outlined,
+                  label: '综合面',
+                  selected: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProjectDigButton(
+    BuildContext context,
+    ProgressProvider progress,
+    List<Topic> topics,
+  ) {
+    final l10n = context.watch<LocalizationProvider>();
+    final plan = progress.prepPlan;
+    final keywords =
+        plan.jobDescription.trim().isNotEmpty
+            ? _extractTechKeywords(plan.jobDescription, topics)
+            : <String>[];
+
+    return WorkPanel(
+      title: '项目深挖',
+      children: [
+        InfoLine(
+          icon: Icons.work_outline,
+          text: '使用 STAR 法则梳理项目经验，准备深挖追问',
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.of(context)
+                .push(
+                  MaterialPageRoute(
+                    builder: (_) => ProjectDigPage(
+                      initialTechStack: keywords,
+                    ),
+                  ),
+                )
+                .then((result) {
+                  if (result != null && result is Map<String, dynamic>) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${l10n.get('save_success')}: ${result['name']}',
+                        ),
+                      ),
+                    );
+                  }
+                });
+          },
+          icon: const Icon(Icons.menu_book_outlined),
+          label: Text('开始项目深挖'),
+        ),
+        if (keywords.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            '已从 JD 识别 ${keywords.length} 个技术关键词，将预填到项目技术栈',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static List<String> _extractTechKeywords(String jd, List<Topic> topics) {
+    final jdLower = jd.toLowerCase();
+    final result = <String>{};
+    for (final topic in topics) {
+      for (final tag in topic.tags) {
+        if (tag.isNotEmpty && jdLower.contains(tag.toLowerCase())) {
+          result.add(tag);
+        }
+      }
+      if (topic.category.isNotEmpty &&
+          jdLower.contains(topic.category.toLowerCase())) {
+        result.add(topic.category);
+      }
+    }
+    return result.toList()..sort();
   }
 
   List<Widget> _buildActions(
@@ -478,6 +855,112 @@ class InfoLine extends StatelessWidget {
   }
 }
 
+class _PhaseCard extends StatelessWidget {
+  const _PhaseCard({
+    required this.name,
+    required this.totalTopics,
+    required this.masteredTopics,
+    required this.statusText,
+    required this.statusColor,
+    required this.statusIcon,
+  });
+
+  final String name;
+  final int totalTopics;
+  final int masteredTopics;
+  final String statusText;
+  final Color statusColor;
+  final IconData statusIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = totalTopics > 0 ? masteredTopics / totalTopics : 0.0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: 6,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$masteredTopics/$totalTopics',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(statusIcon, size: 14, color: statusColor),
+                const SizedBox(width: 4),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MockOptionChip extends StatelessWidget {
+  const _MockOptionChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) {},
+    );
+  }
+}
+
 class _JdAnalysisSection extends StatelessWidget {
   const _JdAnalysisSection({
     required this.jobDescription,
@@ -488,98 +971,6 @@ class _JdAnalysisSection extends StatelessWidget {
   final String jobDescription;
   final List<Topic> topics;
   final ProgressProvider progress;
-
-  static List<String> _techKeywords(LocalizationProvider l10n) => [
-    'java',
-    'python',
-    'go',
-    'golang',
-    'rust',
-    'c++',
-    'javascript',
-    'typescript',
-    'spring',
-    'springboot',
-    'spring cloud',
-    'mybatis',
-    'hibernate',
-    'redis',
-    'mysql',
-    'postgresql',
-    'mongodb',
-    'elasticsearch',
-    'es',
-    'kafka',
-    'rabbitmq',
-    'rocketmq',
-    'mq',
-    'docker',
-    'kubernetes',
-    'k8s',
-    'linux',
-    'nginx',
-    l10n.get('microservice'),
-    l10n.get('distributed'),
-    l10n.get('high_concurrent'),
-    l10n.get('ha'),
-    l10n.get('cache'),
-    l10n.get('message_queue'),
-    l10n.get('design_pattern'),
-    l10n.get('data_structure'),
-    l10n.get('algorithm'),
-    l10n.get('system_design'),
-    l10n.get('architecture'),
-    'jvm',
-    'gc',
-    l10n.get('concurrent'),
-    l10n.get('multi_thread'),
-    l10n.get('thread_pool'),
-    l10n.get('lock'),
-    l10n.get('network'),
-    'tcp',
-    'http',
-    'https',
-    'rpc',
-    'grpc',
-    l10n.get('database'),
-    l10n.get('index'),
-    l10n.get('transaction'),
-    'mvcc',
-    l10n.get('b_tree'),
-    l10n.get('collect_combine'),
-    'hashmap',
-    'arraylist',
-    l10n.get('chain_surface'),
-    l10n.get('tree'),
-    l10n.get('graph'),
-    l10n.get('sort'),
-    l10n.get('two_score'),
-    l10n.get('dynamic_state_plan'),
-    l10n.get('greedy_core'),
-    l10n.get('back_trace'),
-    'react',
-    'vue',
-    'flutter',
-    'android',
-    'ios',
-    l10n.get('machine_device_study'),
-    l10n.get('depth_study'),
-    'llm',
-    'rag',
-    'prompt',
-    'ci/cd',
-    'git',
-    'jenkins',
-    'devops',
-    l10n.get('project'),
-    l10n.get('actual_practice'),
-    l10n.get('experience'),
-  ];
-
-  List<String> _extractKeywords(String jd, LocalizationProvider l10n) {
-    final lower = jd.toLowerCase();
-    return _techKeywords(l10n).where((kw) => lower.contains(kw)).toList();
-  }
 
   List<Topic> _matchTopics(List<String> keywords) {
     if (keywords.isEmpty) return [];
@@ -600,13 +991,29 @@ class _JdAnalysisSection extends StatelessWidget {
     return matched.values.toList();
   }
 
+  static List<String> _extractKeywords(String jd, List<Topic> topics) {
+    final jdLower = jd.toLowerCase();
+    final result = <String>{};
+    for (final topic in topics) {
+      for (final tag in topic.tags) {
+        if (tag.isNotEmpty && jdLower.contains(tag.toLowerCase())) {
+          result.add(tag);
+        }
+      }
+      if (topic.category.isNotEmpty &&
+          jdLower.contains(topic.category.toLowerCase())) {
+        result.add(topic.category);
+      }
+    }
+    return result.toList()..sort();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final keywords = _extractKeywords(jobDescription, l10n);
+    final keywords = _extractKeywords(jobDescription, topics);
     final matchedTopics = _matchTopics(keywords);
 
-    // 按掌握度排序：未掌握优先
     matchedTopics.sort((a, b) {
       final scoreA = progress.getTopicProgress(a.id)?.score ?? 0;
       final scoreB = progress.getTopicProgress(b.id)?.score ?? 0;

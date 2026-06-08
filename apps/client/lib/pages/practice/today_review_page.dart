@@ -12,16 +12,24 @@ import 'recall_page.dart';
 import 'today_review_widgets.dart';
 
 class TodayReviewPage extends StatelessWidget {
-  const TodayReviewPage({super.key, required this.currentDomainId});
+  const TodayReviewPage({
+    super.key,
+    required this.currentDomainId,
+    this.routeTopicIds,
+  });
 
   final String currentDomainId;
+  final List<String>? routeTopicIds;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
-    final topics = content.getTopicsByDomain(currentDomainId);
+    var topics = content.getTopicsByDomain(currentDomainId);
+    if (routeTopicIds != null) {
+      topics = topics.where((t) => routeTopicIds!.contains(t.id)).toList();
+    }
     final dueTopics = progress.getTodayReviewTopics(topics);
     final lowScoreTopicIds = progress.lowScoreAttempts
         .map((a) => a.topicId)
@@ -71,6 +79,31 @@ class TodayReviewPage extends StatelessWidget {
                 : () => _startRecall(context, uniqueQueue),
           ),
           const SizedBox(height: 20),
+
+          // ── 路线范围提示 ──
+          if (routeTopicIds != null) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.route_outlined, size: 16, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${l10n.get('route_scope')}: ${uniqueQueue.length} ${l10n.get('knowledge_points_count')}',
+                    style: TextStyle(fontSize: 12, color: AppColors.accent),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // ── 到期与逾期 ──
           ReviewGroup(
@@ -311,9 +344,14 @@ class TodayReviewPage extends StatelessWidget {
   }
 
   void _startRecall(BuildContext context, List<Topic> topics) {
+    var topicIds = topics.map((t) => t.id).toList();
+    if (routeTopicIds != null) {
+      topicIds = topicIds.where((id) => routeTopicIds!.contains(id)).toList();
+    }
+    if (topicIds.isEmpty) return;
     context.push(
       '/practice/recall',
-      extra: RecallPage(topicIds: topics.map((t) => t.id).toList()),
+      extra: RecallPage(topicIds: topicIds),
     );
   }
 }

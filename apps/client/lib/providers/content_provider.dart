@@ -317,6 +317,16 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
+  /// 确保指定领域列表的 topics 都已加载
+  Future<void> ensureTopicsLoaded(List<String> domainIds) async {
+    for (final id in domainIds) {
+      final hasTopics = _topics.values.any((t) => t.domainId == id);
+      if (!hasTopics) {
+        await loadDomainTopics(id);
+      }
+    }
+  }
+
   /// 清除指定领域的缓存
   Future<void> clearDomainCache(String domainId) async {
     await _storage.save(_domainCacheKey(domainId), null);
