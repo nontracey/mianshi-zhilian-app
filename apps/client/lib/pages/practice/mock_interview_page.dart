@@ -14,10 +14,18 @@ import 'package:mianshi_zhilian/pages/practice/mock_interview_widgets.dart';
 enum _InterviewStage { main, followUp, clarify, summary }
 
 class MockInterviewPage extends StatefulWidget {
-  const MockInterviewPage({super.key, required this.topicIds, this.sourceRouteId});
+  const MockInterviewPage({
+    super.key,
+    required this.topicIds,
+    this.sourceRouteId,
+    this.interviewScenario,
+    this.timeLimitMinutes,
+  });
 
   final List<String> topicIds;
   final String? sourceRouteId;
+  final String? interviewScenario;
+  final int? timeLimitMinutes;
 
   @override
   State<MockInterviewPage> createState() => _MockInterviewPageState();
@@ -34,7 +42,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   bool _formalMode = false;
   bool _savedSession = false;
   bool _isVoiceListening = false;
-  String _scenario = 'mixed';
+  String _scenario = '';
   late final DateTime _startedAt = DateTime.now();
 
   // 追问流状态
@@ -53,21 +61,26 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     return widget.topicIds.where((id) {
       final topic = contentProvider.findTopic(id);
       if (topic == null) return true;
-      switch (_scenario) {
-        case 'foundation':
-          return topic.category == 'jvm' || topic.category == 'concurrency' ||
-                 topic.category == 'collections' || topic.leetcodeUrl == null;
-        case 'systemDesign':
-          return topic.tags.any((t) => t.toLowerCase().contains('system-design') || t.contains('系统设计')) ||
-                 topic.category == 'system-design';
-        case 'code':
-          return topic.leetcodeUrl != null || topic.category == 'algorithm';
-        case 'project':
-          return topic.tags.any((t) => t.contains('项目') || t.contains('实战'));
-        default:
-          return true;
-      }
+      return _topicMatchesScenario(topic, _scenario);
     }).toList();
+  }
+
+  bool _topicMatchesScenario(Topic topic, String scenario) {
+    switch (scenario) {
+      case 'foundation':
+        return topic.leetcodeUrl == null && topic.interviewFrequency != 'low';
+      case 'systemDesign':
+        return topic.tags.any((t) => t.toLowerCase() == 'system-design') ||
+               topic.category.toLowerCase() == 'system-design' ||
+               topic.category.toLowerCase() == '架构';
+      case 'code':
+        return topic.leetcodeUrl != null ||
+               topic.category.toLowerCase() == 'algorithm';
+      case 'project':
+        return false;
+      default:
+        return true;
+    }
   }
 
   void _onScenarioChanged(String value) {
@@ -123,6 +136,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   @override
   void initState() {
     super.initState();
+    _scenario = widget.interviewScenario ?? 'mixed';
     _questionStartTime = DateTime.now();
   }
 

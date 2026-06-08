@@ -208,8 +208,14 @@ class PracticePage extends StatelessWidget {
   }
 
   void _startFollowUpTraining(BuildContext context, List domainTopics) {
+    var scopedDomainTopics = domainTopics;
+    if (routeTopicIds != null) {
+      scopedDomainTopics = domainTopics
+          .where((t) => routeTopicIds!.contains(t.id))
+          .toList();
+    }
     // 筛选有追问的知识点
-    final topicsWithFollowUps = domainTopics
+    final topicsWithFollowUps = scopedDomainTopics
         .where((topic) => topic.followUps.isNotEmpty)
         .toList();
 
@@ -249,8 +255,14 @@ class PracticePage extends StatelessWidget {
   }
 
   void _startHighFrequencyTraining(BuildContext context, List domainTopics) {
+    var scopedDomainTopics = domainTopics;
+    if (routeTopicIds != null) {
+      scopedDomainTopics = domainTopics
+          .where((t) => routeTopicIds!.contains(t.id))
+          .toList();
+    }
     // 筛选高频知识点
-    final highFrequencyTopics = domainTopics
+    final highFrequencyTopics = scopedDomainTopics
         .where((topic) => topic.highFrequency)
         .toList();
 

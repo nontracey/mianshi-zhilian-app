@@ -324,6 +324,7 @@ class LeftPanel extends StatelessWidget {
     required this.onTopicTap,
     required this.onReview,
     required this.progressProvider,
+    this.routeTopicIds,
   });
 
   final List<Topic> dueTopics;
@@ -331,11 +332,22 @@ class LeftPanel extends StatelessWidget {
   final ValueChanged<String> onTopicTap;
   final VoidCallback? onReview;
   final ProgressProvider progressProvider;
+  final List<String>? routeTopicIds;
+
+  List<Topic> get _filteredDueTopics => routeTopicIds != null
+      ? dueTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
+      : dueTopics;
+
+  List<Topic> get _filteredWeakTopics => routeTopicIds != null
+      ? weakTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
+      : weakTopics;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filteredDueTopics = _filteredDueTopics;
+    final filteredWeakTopics = _filteredWeakTopics;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,7 +356,7 @@ class LeftPanel extends StatelessWidget {
         PanelCard(
           title: l10n.get('today_day_review_queue'),
           icon: Icons.replay_outlined,
-          trailing: '${dueTopics.length}',
+          trailing: '${filteredDueTopics.length}',
           headerTrailing: Text(
             l10n.get('to_day_time'),
             style: TextStyle(
@@ -354,10 +366,10 @@ class LeftPanel extends StatelessWidget {
           ),
           child: Column(
             children: [
-              if (dueTopics.isEmpty)
+              if (filteredDueTopics.isEmpty)
                 EmptyState(message: l10n.get('temporary_no_to_day_content'))
               else
-                ...dueTopics.take(5).map((topic) {
+                ...filteredDueTopics.take(5).map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
                   final score = progress?.score ?? 0;
                   final nextReviewAt = progress?.nextReviewAt;
@@ -368,11 +380,11 @@ class LeftPanel extends StatelessWidget {
                     onTap: () => onTopicTap(topic.id),
                   );
                 }),
-              if (dueTopics.length > 5)
-                TextButton(
-                  onPressed: onReview,
-                  child: Text(l10n.get('check_view_all_review')),
-                ),
+                if (filteredDueTopics.length > 5)
+                  TextButton(
+                    onPressed: onReview,
+                    child: Text(l10n.get('check_view_all_review')),
+                  ),
             ],
           ),
         ),
@@ -381,13 +393,13 @@ class LeftPanel extends StatelessWidget {
         PanelCard(
           title: l10n.get('weak_knowledge_point_top_5'),
           icon: Icons.trending_down_outlined,
-          trailing: '${weakTopics.length}',
+          trailing: '${filteredWeakTopics.length}',
           child: Column(
             children: [
-              if (weakTopics.isEmpty)
+              if (filteredWeakTopics.isEmpty)
                 EmptyState(message: l10n.get('temporary_no_weak_item'))
               else
-                ...weakTopics.map((topic) {
+                ...filteredWeakTopics.map((topic) {
                   final progress = progressProvider.getTopicProgress(topic.id);
                   final score = progress?.score ?? 0;
                   return WeakTopicItem(

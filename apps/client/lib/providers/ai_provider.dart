@@ -15,6 +15,8 @@ class AiProvider extends ChangeNotifier {
 
   AiProvider(this._aiService, this._storage);
 
+  AiService get aiService => _aiService;
+
   List<AiConfig> _configs = [];
   AiConfig? _defaultConfig;
   bool _isTesting = false;

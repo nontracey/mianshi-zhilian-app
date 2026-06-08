@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:collection/collection.dart';
 
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
@@ -9,6 +10,10 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/services/ai_route_generator.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
+import 'package:mianshi_zhilian/providers/ai_provider.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -63,12 +68,7 @@ class InterviewPrepPage extends StatelessWidget {
                   content: content,
                   domainProgress: domainProgress,
                 ),
-                _buildRouteTab(
-                  context,
-                  topics: topics,
-                  progress: progress,
-                  domainProgress: domainProgress,
-                ),
+                _buildRouteTab(context, progress: progress),
                 _buildMockTab(context, progress: progress, topics: topics),
               ],
             ),
@@ -291,120 +291,12 @@ class InterviewPrepPage extends StatelessWidget {
 
   Widget _buildRouteTab(
     BuildContext context, {
-    required List<Topic> topics,
     required ProgressProvider progress,
-    required ({int masteryPercent, int topicCount}) domainProgress,
   }) {
-    final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
-
-    // 构建分类 ID → 标题的映射
-    final categoryTitles = <String, String>{};
-    for (final domain in content.domains) {
-      for (final cat in domain.categories) {
-        categoryTitles[cat.id] = cat.title;
-      }
-    }
-
-    final phaseGroups = <String, List<Topic>>{};
-    for (final topic in topics) {
-      final phaseName = topic.phase ?? categoryTitles[topic.category] ?? topic.category;
-      phaseGroups.putIfAbsent(phaseName, () => []).add(topic);
-    }
-
-    final phaseNames = phaseGroups.keys.toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        WorkPanel(
-          title: '整体进度',
-          children: [
-            Row(
-              children: [
-                Text(
-                  '${domainProgress.masteryPercent}%',
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    color: _scoreColor(domainProgress.masteryPercent),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: domainProgress.masteryPercent / 100,
-                          minHeight: 10,
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${domainProgress.topicCount} ${l10n.get('item')}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          l10n.get('learning_phase'),
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        ...phaseNames.map((phase) {
-          final phaseTopics = phaseGroups[phase]!;
-          final mastered = phaseTopics.where((t) {
-            final mastery = ProgressProvider.computeMastery(
-              t.id,
-              progressMap: progress.progressMap,
-              attempts: progress.attempts,
-            );
-            return mastery == MasteryStatus.skilled;
-          }).length;
-          final inProgress = phaseTopics.where((t) {
-            final tp = progress.getTopicProgress(t.id);
-            return tp != null && tp.score > 0;
-          }).length;
-
-          String statusText;
-          Color statusColor;
-          IconData statusIcon;
-          if (mastered == phaseTopics.length && phaseTopics.isNotEmpty) {
-            statusText = '已完成';
-            statusColor = AppColors.success;
-            statusIcon = Icons.check_circle;
-          } else if (inProgress > 0) {
-            statusText = '进行中';
-            statusColor = AppColors.warning;
-            statusIcon = Icons.trending_up;
-          } else {
-            statusText = '未开始';
-            statusColor = AppColors.textTertiary;
-            statusIcon = Icons.radio_button_unchecked;
-          }
-
-          return _PhaseCard(
-            name: phase,
-            totalTopics: phaseTopics.length,
-            masteredTopics: mastered,
-            statusText: statusText,
-            statusColor: statusColor,
-            statusIcon: statusIcon,
-          );
-        }),
-      ],
+    return _RouteTabContent(
+      progress: progress,
+      content: content,
     );
   }
 
@@ -789,6 +681,280 @@ class InterviewPrepPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RouteTabContent extends StatefulWidget {
+  final ProgressProvider progress;
+  final ContentProvider content;
+
+  const _RouteTabContent({
+    required this.progress,
+    required this.content,
+  });
+
+  @override
+  State<_RouteTabContent> createState() => _RouteTabContentState();
+}
+
+class _RouteTabContentState extends State<_RouteTabContent> {
+  final _storage = StorageService();
+  LearningRoute? _selectedRoute;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSelectedRoute();
+  }
+
+  Future<void> _loadSelectedRoute() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId != null) {
+      final customData = await _storage.loadJsonList('custom_routes');
+      final route = customData
+          .map((e) => LearningRoute.fromJson(e))
+          .firstWhereOrNull((r) => r.id == routeId);
+      if (route != null && mounted) {
+        setState(() {
+          _selectedRoute = route;
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _generateAiRoute() async {
+    final plan = widget.progress.prepPlan;
+    final allTopics = widget.content.topics.values.toList();
+    final aiProvider = context.read<AiProvider>();
+    final generator = AiRouteGenerator(_storage);
+    try {
+      final route = await generator.generateRoute(
+        plan: plan,
+        allTopics: allTopics,
+        progressProvider: widget.progress,
+        aiService: aiProvider.aiService,
+        forceRegenerate: true,
+      );
+
+      final customData = await _storage.loadJsonList('custom_routes');
+      customData.add(route.toJson());
+      await _storage.saveJsonList('custom_routes', customData);
+      await _storage.save('selected_route_id', route.id);
+
+      if (mounted) setState(() => _selectedRoute = route);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('路线生成失败: $e')),
+        );
+      }
+    }
+  }
+
+  Color _scoreColor(int score) {
+    if (score >= 85) return AppColors.success;
+    if (score >= 60) return AppColors.warning;
+    return AppColors.danger;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_selectedRoute == null) return _buildNoRouteView(context, l10n);
+    return _buildRouteView(context, l10n);
+  }
+
+  Widget _buildNoRouteView(BuildContext context, LocalizationProvider l10n) {
+    final plan = widget.progress.prepPlan;
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        WorkPanel(
+          title: plan.hasTarget ? '暂无路线' : '请先设置面试目标',
+          children: [
+            const SizedBox(height: 8),
+            Icon(
+              plan.hasTarget ? Icons.route : Icons.flag_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              plan.hasTarget
+                  ? '暂未生成学习路线，点击下方按钮生成 AI 个性化路线'
+                  : '请先在"工作台"中设置面试目标，然后可以生成个性化学习路线',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (plan.hasTarget)
+              FilledButton.icon(
+                onPressed: _generateAiRoute,
+                icon: const Icon(Icons.auto_awesome),
+                label: Text('AI 生成路线'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRouteView(BuildContext context, LocalizationProvider l10n) {
+    final route = _selectedRoute!;
+    final phases = route.phases ?? [];
+    final allTopics = widget.content.topics;
+
+    int totalMastered = 0;
+    int totalTopics = 0;
+    for (final phase in phases) {
+      for (final topicId in phase.topicIds) {
+        totalTopics++;
+        final topic = allTopics[topicId];
+        if (topic != null) {
+          final score = widget.progress.getTopicProgress(topic.id)?.score ?? 0;
+          if (score >= 85) totalMastered++;
+        }
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        WorkPanel(
+          title: route.name,
+          trailing: Text(
+            '${phases.length} 阶段',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          children: [
+            Row(
+              children: [
+                Text(
+                  '$totalMastered/$totalTopics',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: _scoreColor(
+                      totalTopics > 0 ? (totalMastered * 100 ~/ totalTopics) : 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: totalTopics > 0 ? totalMastered / totalTopics : 0,
+                          minHeight: 10,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$totalTopics ${l10n.get('item')}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (route.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                route.description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (phases.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                '该路线暂无阶段',
+                style: TextStyle(color: AppColors.textTertiary),
+              ),
+            ),
+          )
+        else ...[
+          Text(
+            l10n.get('learning_phase'),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          ...phases.map((phase) {
+            final phaseTopics = phase.topicIds
+                .map((id) => allTopics[id])
+                .whereType<Topic>()
+                .toList();
+            final total = phaseTopics.length;
+            final mastered = phaseTopics.where((t) {
+              final score = widget.progress.getTopicProgress(t.id)?.score ?? 0;
+              return score >= 85;
+            }).length;
+            final inProgress = phaseTopics.where((t) {
+              final tp = widget.progress.getTopicProgress(t.id);
+              return tp != null && tp.score > 0;
+            }).length;
+
+            String statusText;
+            Color statusColor;
+            IconData statusIcon;
+            if (mastered == total && total > 0) {
+              statusText = '已完成';
+              statusColor = AppColors.success;
+              statusIcon = Icons.check_circle;
+            } else if (inProgress > 0) {
+              statusText = '进行中';
+              statusColor = AppColors.warning;
+              statusIcon = Icons.trending_up;
+            } else {
+              statusText = '未开始';
+              statusColor = AppColors.textTertiary;
+              statusIcon = Icons.radio_button_unchecked;
+            }
+
+            return _PhaseCard(
+              name: phase.focus.isNotEmpty ? phase.focus : phase.id,
+              totalTopics: total,
+              masteredTopics: mastered,
+              statusText: statusText,
+              statusColor: statusColor,
+              statusIcon: statusIcon,
+            );
+          }),
+        ],
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton.icon(
+            onPressed: _generateAiRoute,
+            icon: const Icon(Icons.auto_awesome),
+            label: Text('重新生成路线'),
+          ),
+        ),
+      ],
     );
   }
 }

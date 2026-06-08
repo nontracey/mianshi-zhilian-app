@@ -237,6 +237,7 @@ class _LearningShellState extends State<LearningShell> {
     return switch (_section) {
       AppSection.dashboard => DashboardPage(
         currentDomainId: settings.settings.currentDomain,
+        routeTopicIds: _routeTopicIds,
         onDomainChanged: (id) => settings.updateSettings(
           settings.settings.copyWith(currentDomain: id),
         ),
@@ -289,10 +290,16 @@ class _LearningShellState extends State<LearningShell> {
           );
         },
         onMockInterview: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          final routeIds = _routeTopicIds;
+          List<String> topicIds;
+          if (routeIds != null && routeIds.isNotEmpty) {
+            topicIds = List.from(routeIds)..shuffle();
+          } else {
+            final domainTopics = content.getTopicsByDomain(
+              settings.settings.currentDomain,
+            );
+            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          }
           context.push(
             '/practice/mock-interview',
             extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),

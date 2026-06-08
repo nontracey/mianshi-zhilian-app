@@ -18,6 +18,7 @@ class DashboardPage extends StatelessWidget {
     required this.onViewDomainCatalog,
     this.onReview,
     this.onMockInterview,
+    this.routeTopicIds,
   });
 
   final String currentDomainId;
@@ -27,6 +28,7 @@ class DashboardPage extends StatelessWidget {
   final ValueChanged<String> onViewDomainCatalog;
   final VoidCallback? onReview;
   final VoidCallback? onMockInterview;
+  final List<String>? routeTopicIds;
 
   @override
   Widget build(BuildContext context) {
@@ -122,15 +124,19 @@ class DashboardPage extends StatelessWidget {
       allowSkipLowFrequency: settingsProvider.settings.allowSkipLowFrequency,
     );
 
+    final plan = progressProvider.prepPlan;
+
+    // 路线范围过滤
+    final scopedTopics = routeTopicIds != null
+        ? domainTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
+        : domainTopics;
+
     // 薄弱知识点 Top 5
-    final weakTopics = progressProvider.getWeakTopics(domainTopics, limit: 5);
+    final weakTopics = progressProvider.getWeakTopics(scopedTopics, limit: 5);
     // 最近练习
     final recentAttempts = progressProvider.recentAttempts.take(5).toList();
     // 到期复习
-    final dueTopics = progressProvider.getTodayReviewTopics(domainTopics);
-
-    // 面试目标横幅
-    final plan = progressProvider.prepPlan;
+    final dueTopics = progressProvider.getTodayReviewTopics(scopedTopics);
 
     // 三栏工作台布局
     return Padding(
@@ -154,64 +160,65 @@ class DashboardPage extends StatelessWidget {
                 // 左侧栏：今日复习队列、薄弱知识点TOP5
                 Expanded(
                   flex: 2,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: LeftPanel(
-                      dueTopics: dueTopics,
-                      weakTopics: weakTopics,
-                      onTopicTap: onTopicTap,
-                      onReview: onReview,
-                      progressProvider: progressProvider,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: LeftPanel(
+                        dueTopics: dueTopics,
+                        weakTopics: weakTopics,
+                        routeTopicIds: routeTopicIds,
+                        onTopicTap: onTopicTap,
+                        onReview: onReview,
+                        progressProvider: progressProvider,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                // 中间栏：当前学习路线、领域知识卡片
-                Expanded(
-                  flex: 3,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: CenterPanel(
-                      currentDomain: currentDomain,
-                      allDomains: domains,
-                      currentDomainId: currentDomainId,
-                      recommendedTopics: recommendedTopics,
-                      masteryPercent: masteryPercent,
-                      topicCount: topicCount,
-                      readiness: readiness,
-                      streakDays: progressProvider.streakDays,
-                      onDomainChanged: onDomainChanged,
-                      onTopicTap: onTopicTap,
-                      onViewDomainCatalog: onViewDomainCatalog,
-                      onPractice: onPractice,
-                      onReview: onReview,
-                      onMockInterview: onMockInterview,
-                      contentProvider: contentProvider,
-                      progressProvider: progressProvider,
-                      settingsProvider: settingsProvider,
+                  const SizedBox(width: 16),
+                  // 中间栏：当前学习路线、领域知识卡片
+                  Expanded(
+                    flex: 3,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: CenterPanel(
+                        currentDomain: currentDomain,
+                        allDomains: domains,
+                        currentDomainId: currentDomainId,
+                        recommendedTopics: recommendedTopics,
+                        masteryPercent: masteryPercent,
+                        topicCount: topicCount,
+                        readiness: readiness,
+                        streakDays: progressProvider.streakDays,
+                        onDomainChanged: onDomainChanged,
+                        onTopicTap: onTopicTap,
+                        onViewDomainCatalog: onViewDomainCatalog,
+                        onPractice: onPractice,
+                        onReview: onReview,
+                        onMockInterview: onMockInterview,
+                        contentProvider: contentProvider,
+                        progressProvider: progressProvider,
+                        settingsProvider: settingsProvider,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                // 右侧栏：掌握度概览、下一步最佳行动、最近AI反馈
-                Expanded(
-                  flex: 2,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: RightPanel(
-                      currentDomainId: currentDomainId,
-                      domains: domains,
-                      masteryPercent: masteryPercent,
-                      readiness: readiness,
-                      weakTopics: weakTopics,
-                      recentAttempts: recentAttempts,
-                      onTopicTap: onTopicTap,
-                      onDomainChanged: onDomainChanged,
-                      progressProvider: progressProvider,
-                      contentProvider: contentProvider,
+                  const SizedBox(width: 16),
+                  // 右侧栏：掌握度概览、下一步最佳行动、最近AI反馈
+                  Expanded(
+                    flex: 2,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: RightPanel(
+                        currentDomainId: currentDomainId,
+                        domains: domains,
+                        masteryPercent: masteryPercent,
+                        readiness: readiness,
+                        weakTopics: weakTopics,
+                        recentAttempts: recentAttempts,
+                        onTopicTap: onTopicTap,
+                        onDomainChanged: onDomainChanged,
+                        progressProvider: progressProvider,
+                        contentProvider: contentProvider,
+                      ),
                     ),
                   ),
-                ),
               ],
             );
           } else if (isMedium) {
@@ -220,59 +227,60 @@ class DashboardPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: LeftPanel(
-                      dueTopics: dueTopics,
-                      weakTopics: weakTopics,
-                      onTopicTap: onTopicTap,
-                      onReview: onReview,
-                      progressProvider: progressProvider,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: LeftPanel(
+                        dueTopics: dueTopics,
+                        weakTopics: weakTopics,
+                        routeTopicIds: routeTopicIds,
+                        onTopicTap: onTopicTap,
+                        onReview: onReview,
+                        progressProvider: progressProvider,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Column(
-                      children: [
-                        CenterPanel(
-                          currentDomain: currentDomain,
-                          allDomains: domains,
-                          currentDomainId: currentDomainId,
-                          recommendedTopics: recommendedTopics,
-                          masteryPercent: masteryPercent,
-                          topicCount: topicCount,
-                          readiness: readiness,
-                          streakDays: progressProvider.streakDays,
-                          onDomainChanged: onDomainChanged,
-                          onTopicTap: onTopicTap,
-                          onViewDomainCatalog: onViewDomainCatalog,
-                          onPractice: onPractice,
-                          onReview: onReview,
-                          onMockInterview: onMockInterview,
-                          contentProvider: contentProvider,
-                          progressProvider: progressProvider,
-                          settingsProvider: settingsProvider,
-                        ),
-                        const SizedBox(height: 16),
-                        RightPanel(
-                          currentDomainId: currentDomainId,
-                          domains: domains,
-                          masteryPercent: masteryPercent,
-                          readiness: readiness,
-                          weakTopics: weakTopics,
-                          recentAttempts: recentAttempts,
-                          onTopicTap: onTopicTap,
-                          onDomainChanged: onDomainChanged,
-                          progressProvider: progressProvider,
-                          contentProvider: contentProvider,
-                        ),
-                      ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        children: [
+                          CenterPanel(
+                            currentDomain: currentDomain,
+                            allDomains: domains,
+                            currentDomainId: currentDomainId,
+                            recommendedTopics: recommendedTopics,
+                            masteryPercent: masteryPercent,
+                            topicCount: topicCount,
+                            readiness: readiness,
+                            streakDays: progressProvider.streakDays,
+                            onDomainChanged: onDomainChanged,
+                            onTopicTap: onTopicTap,
+                            onViewDomainCatalog: onViewDomainCatalog,
+                            onPractice: onPractice,
+                            onReview: onReview,
+                            onMockInterview: onMockInterview,
+                            contentProvider: contentProvider,
+                            progressProvider: progressProvider,
+                            settingsProvider: settingsProvider,
+                          ),
+                          const SizedBox(height: 16),
+                          RightPanel(
+                            currentDomainId: currentDomainId,
+                            domains: domains,
+                            masteryPercent: masteryPercent,
+                            readiness: readiness,
+                            weakTopics: weakTopics,
+                            recentAttempts: recentAttempts,
+                            onTopicTap: onTopicTap,
+                            onDomainChanged: onDomainChanged,
+                            progressProvider: progressProvider,
+                            contentProvider: contentProvider,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             );
           } else {
@@ -283,6 +291,7 @@ class DashboardPage extends StatelessWidget {
                   LeftPanel(
                     dueTopics: dueTopics,
                     weakTopics: weakTopics,
+                    routeTopicIds: routeTopicIds,
                     onTopicTap: onTopicTap,
                     onReview: onReview,
                     progressProvider: progressProvider,

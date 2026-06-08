@@ -7,6 +7,7 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -30,16 +31,37 @@ class _CatalogPageState extends State<CatalogPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _storage = StorageService();
   List<String> _disabledIds = [];
+  Set<String> _routeTopicIds = {};
+  bool _routeActive = false;
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
+    _loadSelectedRoute();
   }
 
   Future<void> _loadDisabled() async {
     final ids = await _storage.loadDisabledDomains();
     if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  Future<void> _loadSelectedRoute() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId == null) return;
+    final customData = await _storage.loadJsonList('custom_routes');
+    for (final data in customData) {
+      final route = LearningRoute.fromJson(data);
+      if (route.id == routeId && route.phases != null) {
+        if (mounted) {
+          setState(() {
+            _routeTopicIds = route.allTopicIds.toSet();
+            _routeActive = true;
+          });
+        }
+        return;
+      }
+    }
   }
 
   List<Domain> _filterDomains(List<Domain> all) {
@@ -163,15 +185,19 @@ class _CatalogPageState extends State<CatalogPage> {
       return Center(child: Text(l10n.get('please_select_one_domain')));
     }
 
-    final domainTopics = contentProvider.getTopicsByDomain(
+    final domainTopicsRaw = contentProvider.getTopicsByDomain(
       widget.currentDomainId,
     );
+    final domainTopics = _routeActive
+        ? domainTopicsRaw.where((t) => _routeTopicIds.contains(t.id)).toList()
+        : domainTopicsRaw;
+    final routeProgressTopics = _routeActive ? domainTopics : contentProvider.topics.values.toList();
     final domainProgress = progressProvider.getDomainProgress(
       widget.currentDomainId,
-      contentProvider.topics.values.toList(),
+      routeProgressTopics,
     );
     final masteryPercent = domainProgress.masteryPercent;
-    final totalTopics = currentDomain.topicCount;
+    final totalTopics = _routeActive ? domainTopics.length : currentDomain.topicCount;
 
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
@@ -205,6 +231,10 @@ class _CatalogPageState extends State<CatalogPage> {
             isDark,
           ),
           const SizedBox(height: 12),
+
+          // 路线范围提示
+          if (_routeActive) _buildRouteBanner(context, isDark),
+          if (_routeActive) const SizedBox(height: 12),
 
           // 筛选栏（可折叠）
           if (_showFilters) ...[
@@ -489,6 +519,40 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRouteBanner(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.route, size: 16, color: AppColors.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '路线模式',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.accent,
+              ),
+            ),
+          ),
+          Text(
+            '${_routeTopicIds.length} 个知识点',
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white54 : Colors.grey,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

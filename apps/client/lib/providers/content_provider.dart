@@ -363,6 +363,12 @@ class ContentProvider extends ChangeNotifier {
       });
   }
 
+  List<Topic> getTopicsByCategories(List<String> categoryIds) {
+    return _topics.values
+        .where((t) => categoryIds.contains(t.categoryId))
+        .toList();
+  }
+
   List<Topic> getTopicsByCategory(String domainId, String categoryId) {
     return _topics.values
         .where((t) => t.domainId == domainId && t.categoryId == categoryId)
