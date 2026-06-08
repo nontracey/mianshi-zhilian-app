@@ -14,9 +14,10 @@ import 'package:mianshi_zhilian/pages/practice/mock_interview_widgets.dart';
 enum _InterviewStage { main, followUp, clarify, summary }
 
 class MockInterviewPage extends StatefulWidget {
-  const MockInterviewPage({super.key, required this.topicIds});
+  const MockInterviewPage({super.key, required this.topicIds, this.sourceRouteId});
 
   final List<String> topicIds;
+  final String? sourceRouteId;
 
   @override
   State<MockInterviewPage> createState() => _MockInterviewPageState();
@@ -51,44 +52,22 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     final contentProvider = context.read<ContentProvider>();
     return widget.topicIds.where((id) {
       final topic = contentProvider.findTopic(id);
-      if (topic == null) return false;
-      return _matchesScenario(topic, _scenario);
+      if (topic == null) return true;
+      switch (_scenario) {
+        case 'foundation':
+          return topic.category == 'jvm' || topic.category == 'concurrency' ||
+                 topic.category == 'collections' || topic.leetcodeUrl == null;
+        case 'systemDesign':
+          return topic.tags.any((t) => t.toLowerCase().contains('system-design') || t.contains('系统设计')) ||
+                 topic.category == 'system-design';
+        case 'code':
+          return topic.leetcodeUrl != null || topic.category == 'algorithm';
+        case 'project':
+          return topic.tags.any((t) => t.contains('项目') || t.contains('实战'));
+        default:
+          return true;
+      }
     }).toList();
-  }
-
-  static bool _matchesScenario(Topic topic, String scenario) {
-    final cat = topic.category.toLowerCase();
-    final tags = topic.tags.map((t) => t.toLowerCase()).toList();
-    switch (scenario) {
-      case 'foundation':
-        return cat.contains('基础') ||
-            cat.contains('概念') ||
-            cat.contains('原理') ||
-            tags.any((t) => t.contains('基础') || t.contains('概念')) ||
-            topic.leetcodeUrl == null;
-      case 'systemDesign':
-        return cat.contains('系统设计') ||
-            cat.contains('架构') ||
-            tags.any(
-              (t) =>
-                  t.contains('系统设计') ||
-                  t.contains('架构') ||
-                  t.contains('system'),
-            );
-      case 'code':
-        return cat.contains('算法') ||
-            cat.contains('代码') ||
-            cat.contains('编程') ||
-            topic.leetcodeUrl != null ||
-            tags.any((t) => t.contains('算法') || t.contains('代码'));
-      case 'project':
-        return cat.contains('项目') ||
-            cat.contains('实战') ||
-            cat.contains('工程') ||
-            tags.any((t) => t.contains('项目') || t.contains('实战'));
-      default:
-        return true;
-    }
   }
 
   void _onScenarioChanged(String value) {
@@ -1656,6 +1635,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             l10n.get('again_progress_action_one_round_mode_mock_interview'),
           ],
           formalMode: _formalMode,
+          sourceRouteId: widget.sourceRouteId,
         ),
       );
     });

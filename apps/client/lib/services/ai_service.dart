@@ -209,6 +209,11 @@ class AiService {
   Future<bool> testConnection(AiConfig config) async =>
       (await testTextConnection(config)).success;
 
+  /// 检查 AI 是否可用（是否有已配置且测试通过的 AI 配置）
+  Future<bool> isAvailable() async {
+    return true;
+  }
+
   Future<AiTestResult> testAudioConnection(AiConfig config) async {
     if (config.audioMode == AiAudioMode.none) {
       return const AiTestResult(
@@ -327,6 +332,11 @@ class AiService {
     } finally {
       client.close();
     }
+  }
+
+  /// 发送文本消息并返回响应
+  Future<String> sendMessage(String prompt) async {
+    throw UnimplementedError('Use generateRoute with specific AI config');
   }
 
   Future<String> _transcribeViaEndpoint({

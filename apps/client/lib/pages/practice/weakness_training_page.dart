@@ -12,9 +12,11 @@ class WeaknessTrainingPage extends StatefulWidget {
   const WeaknessTrainingPage({
     super.key,
     required this.currentDomainId,
+    this.routeTopicIds,
   });
 
   final String currentDomainId;
+  final List<String>? routeTopicIds;
 
   @override
   State<WeaknessTrainingPage> createState() => _WeaknessTrainingPageState();
@@ -32,7 +34,12 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
     final progressProvider = context.watch<ProgressProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
+    var domainTopics = contentProvider.getTopicsByDomain(widget.currentDomainId);
+    if (widget.routeTopicIds != null) {
+      domainTopics = domainTopics
+          .where((t) => widget.routeTopicIds!.contains(t.id))
+          .toList();
+    }
     final weakTopics = _getWeakTopics(domainTopics, progressProvider);
     final categorizedWeakness = _categorizeWeakness(weakTopics, progressProvider);
 
@@ -551,9 +558,15 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
       return;
     }
 
+    var topicIds = topics.map((t) => t.id).toList();
+    if (widget.routeTopicIds != null) {
+      topicIds = topicIds.where((id) => widget.routeTopicIds!.contains(id)).toList();
+    }
+    if (topicIds.isEmpty) return;
+
     context.push(
       '/practice/recall',
-      extra: RecallPage(topicIds: topics.map((t) => t.id).toList()),
+      extra: RecallPage(topicIds: topicIds),
     );
   }
 

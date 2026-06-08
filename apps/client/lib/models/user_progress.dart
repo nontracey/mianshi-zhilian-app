@@ -212,6 +212,7 @@ class MockInterviewSession {
   final List<String> weakTopicIds;
   final List<String> nextActions;
   final bool formalMode;
+  final String? sourceRouteId;
 
   const MockInterviewSession({
     required this.id,
@@ -225,6 +226,7 @@ class MockInterviewSession {
     this.weakTopicIds = const [],
     this.nextActions = const [],
     this.formalMode = false,
+    this.sourceRouteId,
   });
 
   factory MockInterviewSession.fromJson(Map<String, dynamic> json) =>
@@ -260,6 +262,7 @@ class MockInterviewSession {
                 .toList() ??
             [],
         formalMode: json['formalMode'] as bool? ?? false,
+        sourceRouteId: json['sourceRouteId'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -274,7 +277,36 @@ class MockInterviewSession {
     'weakTopicIds': weakTopicIds,
     'nextActions': nextActions,
     'formalMode': formalMode,
+    if (sourceRouteId != null) 'sourceRouteId': sourceRouteId,
   };
+
+  MockInterviewSession copyWith({
+    String? id,
+    String? scenario,
+    DateTime? startedAt,
+    DateTime? completedAt,
+    List<String>? topicIds,
+    List<PracticeAttempt>? attempts,
+    int? averageScore,
+    String? reportSummary,
+    List<String>? weakTopicIds,
+    List<String>? nextActions,
+    bool? formalMode,
+    String? sourceRouteId,
+  }) => MockInterviewSession(
+    id: id ?? this.id,
+    scenario: scenario ?? this.scenario,
+    startedAt: startedAt ?? this.startedAt,
+    completedAt: completedAt ?? this.completedAt,
+    topicIds: topicIds ?? this.topicIds,
+    attempts: attempts ?? this.attempts,
+    averageScore: averageScore ?? this.averageScore,
+    reportSummary: reportSummary ?? this.reportSummary,
+    weakTopicIds: weakTopicIds ?? this.weakTopicIds,
+    nextActions: nextActions ?? this.nextActions,
+    formalMode: formalMode ?? this.formalMode,
+    sourceRouteId: sourceRouteId ?? this.sourceRouteId,
+  );
 }
 
 class PrepPlan {
@@ -283,6 +315,8 @@ class PrepPlan {
   final DateTime? interviewDate;
   final int dailyMinutes;
   final String jobDescription;
+  final String? company;
+  final String? currentLevel;
   final DateTime updatedAt;
 
   const PrepPlan({
@@ -291,6 +325,8 @@ class PrepPlan {
     this.interviewDate,
     this.dailyMinutes = 45,
     this.jobDescription = '',
+    this.company,
+    this.currentLevel,
     required this.updatedAt,
   });
 
@@ -298,7 +334,8 @@ class PrepPlan {
       targetRole.trim().isNotEmpty ||
       techStack.trim().isNotEmpty ||
       interviewDate != null ||
-      jobDescription.trim().isNotEmpty;
+      jobDescription.trim().isNotEmpty ||
+      (company ?? '').trim().isNotEmpty;
 
   factory PrepPlan.empty() => PrepPlan(updatedAt: DateTime.now());
 
@@ -310,6 +347,8 @@ class PrepPlan {
         : null,
     dailyMinutes: (json['dailyMinutes'] as num?)?.toInt() ?? 45,
     jobDescription: json['jobDescription'] as String? ?? '',
+    company: json['company'] as String?,
+    currentLevel: json['currentLevel'] as String?,
     updatedAt: DateTime.parse(
       json['updatedAt'] as String? ?? DateTime.now().toIso8601String(),
     ),
@@ -321,6 +360,8 @@ class PrepPlan {
     'interviewDate': interviewDate?.toIso8601String(),
     'dailyMinutes': dailyMinutes,
     'jobDescription': jobDescription,
+    if (company != null) 'company': company,
+    if (currentLevel != null) 'currentLevel': currentLevel,
     'updatedAt': updatedAt.toIso8601String(),
   };
 }

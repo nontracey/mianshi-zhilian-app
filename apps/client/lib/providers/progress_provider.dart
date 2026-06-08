@@ -3,6 +3,8 @@ import '../models/topic.dart';
 import '../models/user_progress.dart';
 import '../services/storage_service.dart';
 
+enum MasteryStatus { new_, learning, skilled }
+
 class ProgressProvider extends ChangeNotifier {
   final StorageService _storage;
 
@@ -50,10 +52,8 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   Future<void> updateTopicProgress(String topicId, {required int score}) async {
-    final status = score >= 85
-        ? 'mastered'
-        : (score >= 60 ? 'learning' : 'new');
-    await updateProgress(topicId, score, status);
+    final status = computeMastery(topicId, progressMap: _progressMap, attempts: _attempts);
+    await updateProgress(topicId, score, status.name);
   }
 
   DateTime _calculateNextReview(int score) {
@@ -411,31 +411,10 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   int readinessScore(List<Topic> topics) {
-    if (topics.isEmpty) return 0;
-    final hasScoredProgress = topics.any(
-      (topic) => (_progressMap[topic.id]?.score ?? 0) > 0,
+    return routeReadinessScore(
+      routeTopicIds: topics.map((t) => t.id).toList(),
+      allTopics: topics,
     );
-    if (!hasScoredProgress && _mockSessions.isEmpty) return 0;
-
-    final domainAverage =
-        topics
-            .map((t) => _progressMap[t.id]?.score ?? 0)
-            .fold<int>(0, (sum, score) => sum + score) ~/
-        topics.length;
-    final reviewPenalty = getTodayReviewTopics(topics).length.clamp(0, 10) * 2;
-    final mockAverage = _mockSessions.isEmpty
-        ? domainAverage
-        : _mockSessions
-                  .take(3)
-                  .map((s) => s.averageScore)
-                  .fold<int>(0, (a, b) => a + b) ~/
-              _mockSessions.take(3).length;
-    return ((domainAverage * 0.55 +
-                mockAverage * 0.35 +
-                practiceStreakDays * 2) -
-            reviewPenalty)
-        .round()
-        .clamp(0, 100);
   }
 
   /// 连续学习天数（别名）
@@ -512,6 +491,73 @@ class ProgressProvider extends ChangeNotifier {
     }
 
     return trend;
+  }
+
+  /// 统一掌握度判定：最近 2 次 >= 85 且间隔 > 1 小时为 skilled
+  static MasteryStatus computeMastery(
+    String topicId, {
+    required Map<String, TopicProgress> progressMap,
+    required List<PracticeAttempt> attempts,
+  }) {
+    final progress = progressMap[topicId];
+    if (progress == null) return MasteryStatus.new_;
+    if (progress.score < 60) return MasteryStatus.new_;
+
+    if (progress.score >= 85) {
+      final scoredAttempts = attempts
+          .where((a) => a.topicId == topicId && a.score != null)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      final highScoreAttempts = scoredAttempts
+          .where((a) => a.score! >= 85)
+          .toList();
+
+      if (highScoreAttempts.length >= 2) {
+        final gap = highScoreAttempts[0].createdAt
+            .difference(highScoreAttempts[1].createdAt);
+        if (gap.inHours >= 1) return MasteryStatus.skilled;
+      }
+      return MasteryStatus.learning;
+    }
+    return MasteryStatus.learning;
+  }
+
+  /// 路线限定范围内的准备度
+  int routeReadinessScore({
+    required List<String> routeTopicIds,
+    required List<Topic> allTopics,
+  }) {
+    final scopedTopics = allTopics.where((t) => routeTopicIds.contains(t.id)).toList();
+    if (scopedTopics.isEmpty) return 0;
+
+    final hasScored = scopedTopics.any(
+      (t) => (_progressMap[t.id]?.score ?? 0) > 0,
+    );
+    if (!hasScored && _mockSessions.isEmpty) return 0;
+
+    final avgScore = scopedTopics
+        .map((t) => _progressMap[t.id]?.score ?? 0)
+        .fold<int>(0, (sum, s) => sum + s) ~/
+        scopedTopics.length;
+
+    final relevantMocks = _mockSessions.where(
+      (s) => s.topicIds.any((id) => routeTopicIds.contains(id)),
+    ).toList();
+
+    final mockAvg = relevantMocks.isEmpty
+        ? avgScore.toDouble()
+        : relevantMocks
+              .take(3)
+              .map((s) => s.averageScore)
+              .fold<int>(0, (a, b) => a + b) ~/
+          relevantMocks.take(3).length;
+
+    final streakBonus = (practiceStreakDays.clamp(0, 14) * 1.5).round();
+    final reviewPenalty = (getTodayReviewTopics(scopedTopics).length.clamp(0, 10) * 2);
+
+    return ((avgScore * 0.50 + mockAvg * 0.35 + streakBonus) - reviewPenalty)
+        .round().clamp(0, 100);
   }
 
   /// 导出所有进度数据

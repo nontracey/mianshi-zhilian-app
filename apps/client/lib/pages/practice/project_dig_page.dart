@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class ProjectDigPage extends StatefulWidget {
-  const ProjectDigPage({super.key});
+  const ProjectDigPage({super.key, this.initialTechStack});
+
+  final List<String>? initialTechStack;
 
   @override
   State<ProjectDigPage> createState() => _ProjectDigPageState();
@@ -26,34 +29,6 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   final List<String> _selectedTechStack = [];
   final List<Map<String, dynamic>> _savedProjects = [];
 
-  final List<String> _techStackOptions = [
-    'Java',
-    'Python',
-    'Go',
-    'JavaScript',
-    'TypeScript',
-    'Spring',
-    'Spring Boot',
-    'MyBatis',
-    'React',
-    'Vue',
-    'MySQL',
-    'Redis',
-    'MongoDB',
-    'Kafka',
-    'RabbitMQ',
-    'Docker',
-    'Kubernetes',
-    'AWS',
-    'microservice',
-    'distributed',
-    'Elasticsearch',
-    'Nginx',
-    'Linux',
-    'Git',
-    'Jenkins',
-  ];
-
   List<({String code, String textKey})> get _starTemplate => [
     (code: 'Situation', textKey: 'star_situation_summary'),
     (code: 'Task', textKey: 'star_task_summary'),
@@ -64,6 +39,9 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialTechStack != null) {
+      _selectedTechStack.addAll(widget.initialTechStack!);
+    }
     _loadSavedProjects();
   }
 
@@ -129,6 +107,20 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
         ],
       ),
     );
+  }
+
+  List<String> _getTechStackOptions() {
+    final content = context.read<ContentProvider>();
+    final allTopics = content.topics.values.toList();
+    final options = <String>{};
+    for (final topic in allTopics) {
+      options.addAll(topic.tags.where((t) => t.isNotEmpty));
+      if (topic.category.isNotEmpty) {
+        options.add(topic.category);
+      }
+    }
+    final result = options.toList()..sort();
+    return result;
   }
 
   String _techStackLabel(String tech) {
@@ -318,7 +310,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _techStackOptions.map((tech) {
+            children: _getTechStackOptions().map((tech) {
               final isSelected = _selectedTechStack.contains(tech);
               return FilterChip(
                 label: Text(_techStackLabel(tech)),

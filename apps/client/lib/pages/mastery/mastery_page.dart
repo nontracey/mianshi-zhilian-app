@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -37,16 +38,33 @@ class _MasteryPageState extends State<MasteryPage> {
   String? _diagnosticFilter; // null / 'longUnreviewed' / 'regressed'
   final _storage = StorageService();
   List<String> _disabledIds = [];
+  bool _routeScopeOnly = false;
+  List<String> _routeTopicIds = [];
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
+    _loadRouteTopicIds();
   }
 
   Future<void> _loadDisabled() async {
     final ids = await _storage.loadDisabledDomains();
     if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  Future<void> _loadRouteTopicIds() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId == null || !mounted) return;
+
+    final customData = await _storage.loadJsonList('custom_routes');
+    final allCustom = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .toList();
+    final route = allCustom.where((r) => r.id == routeId).firstOrNull;
+    if (route != null && mounted) {
+      setState(() => _routeTopicIds = route.allTopicIds);
+    }
   }
 
   List<Domain> _filterDomains(List<Domain> all) {
@@ -73,24 +91,29 @@ class _MasteryPageState extends State<MasteryPage> {
     final domainTopics = contentProvider.getTopicsByDomain(
       widget.currentDomainId,
     );
+
+    // 路线范围过滤
+    final scopedTopics = _routeScopeOnly
+        ? domainTopics.where((t) => _getRouteTopicIds().contains(t.id)).toList()
+        : domainTopics;
     final domainProgress = progressProvider.getDomainProgress(
       widget.currentDomainId,
       contentProvider.topics.values.toList(),
     );
     final masteryPercent = domainProgress.masteryPercent;
-    final dueCount = progressProvider.getTodayReviewTopics(domainTopics).length;
-    final readiness = progressProvider.readinessScore(domainTopics);
-    final highFrequencyWeak = domainTopics.where((topic) {
+    final dueCount = progressProvider.getTodayReviewTopics(scopedTopics).length;
+    final readiness = progressProvider.readinessScore(scopedTopics);
+    final highFrequencyWeak = scopedTopics.where((topic) {
       final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
       return topic.highFrequency && score < 85;
     }).length;
     final longUnreviewedIds = progressProvider.getLongUnreviewedTopicIds(
-      domainTopics,
+      scopedTopics,
     );
-    final regressedIds = progressProvider.getRegressedTopicIds(domainTopics);
+    final regressedIds = progressProvider.getRegressedTopicIds(scopedTopics);
 
     var filteredTopics = _applyFilter(
-      domainTopics,
+      scopedTopics,
       progressProvider,
       settingsProvider.settings.contentEnv,
     );
@@ -389,6 +412,28 @@ class _MasteryPageState extends State<MasteryPage> {
           ),
         ),
         const SizedBox(width: 16),
+        // 路线范围切换
+        GestureDetector(
+          onTap: () => setState(() => _routeScopeOnly = !_routeScopeOnly),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _routeScopeOnly
+                  ? Theme.of(context).colorScheme.primary
+                  : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              _routeScopeOnly ? l10n.get('only_route') : l10n.get('all_topics'),
+              style: TextStyle(
+                fontSize: 12,
+                color: _routeScopeOnly ? Colors.white : null,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
         // 排序
         _buildSortChip(l10n.get('low_high'), MasterySort.scoreAsc, isDark),
         const SizedBox(width: 8),
@@ -621,6 +666,11 @@ class _MasteryPageState extends State<MasteryPage> {
         );
     }
     return sorted;
+  }
+
+  /// 获取当前选中路线的知识点 ID 列表
+  List<String> _getRouteTopicIds() {
+    return _routeTopicIds;
   }
 }
 

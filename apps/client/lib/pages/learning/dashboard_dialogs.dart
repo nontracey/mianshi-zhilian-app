@@ -4,6 +4,7 @@ import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
@@ -31,8 +32,9 @@ class RouteSelectorDialog extends StatefulWidget {
 
 class RouteSelectorDialogState extends State<RouteSelectorDialog> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+  List<LearningRoute> _aiRoutes = [];
   List<LearningRoute> _customRoutes = [];
-  late List<LearningRoute> _displayRoutes;
+  LearningRoute? _interviewRoute;
   final _storage = StorageService();
 
   @override
@@ -41,39 +43,74 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
     _loadRoutes();
   }
 
+  List<LearningRoute> get _officialRoutes =>
+      widget.routes.where((r) => r.source == 'official').toList();
+
   Future<void> _loadRoutes() async {
     final customData = await _storage.loadJsonList('custom_routes');
-    _customRoutes = customData
+    final allCustom = customData
         .map((e) => LearningRoute.fromJson(e))
         .toList();
 
+    final progress = context.read<ProgressProvider>();
+    final plan = progress.prepPlan;
+
+    LearningRoute? interviewRoute;
+    if (plan.hasTarget) {
+      final interviewDate = plan.interviewDate;
+      final days = interviewDate != null
+          ? interviewDate.difference(DateTime.now()).inDays + 1
+          : null;
+      interviewRoute = LearningRoute(
+        id: '__interview_target__',
+        name: plan.targetRole.isNotEmpty
+            ? '${plan.targetRole}${plan.techStack.isNotEmpty ? ' (${plan.techStack})' : ''}'
+            : '面试目标',
+        domainIds: [],
+        description: days != null
+            ? (days > 0 ? '距面试 $days 天' : '面试日已到')
+            : '已设置面试目标',
+        source: 'custom',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+
     setState(() {
-      _displayRoutes = [...widget.routes, ..._customRoutes];
+      _aiRoutes = allCustom.where((r) => r.source == 'ai').toList();
+      _customRoutes = allCustom.where((r) => r.source != 'ai').toList();
+      _interviewRoute = interviewRoute;
     });
   }
 
   Future<void> _saveCustomRoutes() async {
+    final all = [..._aiRoutes, ..._customRoutes];
     await _storage.saveJsonList(
       'custom_routes',
-      _customRoutes.map((r) => r.toJson()).toList(),
+      all.map((r) => r.toJson()).toList(),
     );
   }
 
   void _addCustomRoute(LearningRoute route) {
     setState(() {
       _customRoutes.add(route);
-      _displayRoutes = [...widget.routes, ..._customRoutes];
     });
     _saveCustomRoutes();
   }
 
-  void _updateRoute(int displayIndex, LearningRoute route) {
-    final target = _displayRoutes[displayIndex];
-    final customIndex = _customRoutes.indexWhere((r) => r.id == target.id);
+  void _updateRoute(String routeId, LearningRoute route) {
+    final aiIndex = _aiRoutes.indexWhere((r) => r.id == routeId);
+    if (aiIndex >= 0) {
+      setState(() {
+        _aiRoutes[aiIndex] = route;
+      });
+      _saveCustomRoutes();
+      return;
+    }
+    final customIndex = _customRoutes.indexWhere((r) => r.id == routeId);
     if (customIndex >= 0) {
       setState(() {
         _customRoutes[customIndex] = route;
-        _displayRoutes[displayIndex] = route;
       });
       _saveCustomRoutes();
     }
@@ -81,8 +118,8 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
 
   void _deleteRoute(String routeId) {
     setState(() {
+      _aiRoutes.removeWhere((r) => r.id == routeId);
       _customRoutes.removeWhere((r) => r.id == routeId);
-      _displayRoutes = [...widget.routes, ..._customRoutes];
     });
     _saveCustomRoutes();
   }
@@ -123,147 +160,119 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
               height: 300,
               child: SingleChildScrollView(
                 child: Column(
-                  children: _displayRoutes.asMap().entries.map((entry) {
-                    final l10n = context.watch<LocalizationProvider>();
-                    final index = entry.key;
-                    final route = entry.value;
-                    final isSelected = route.id == widget.currentRouteId;
-                    final isCustom = _customRoutes.any((r) => r.id == route.id);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: InkWell(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 官方路线
+                    if (_officialRoutes.isNotEmpty) ...[
+                      _SectionHeader(label: '官方路线'),
+                      ..._officialRoutes.map((route) => _RouteTile(
+                        route: route,
+                        isSelected: route.id == widget.currentRouteId,
+                        isDark: isDark,
                         onTap: () {
                           widget.onRouteSelected(route);
                           Navigator.pop(context);
                         },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.accent.withValues(alpha: 0.08)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.accent
-                                  : (isDark
-                                        ? AppColors.borderMidnight
-                                        : const Color(0xFFE0E0E0)),
+                      )),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // AI 个性化路线
+                    if (_aiRoutes.isNotEmpty) ...[
+                      _SectionHeader(label: 'AI 个性化'),
+                      ..._aiRoutes.asMap().entries.map((entry) {
+                        final route = entry.value;
+                        return _RouteTile(
+                          route: route,
+                          isSelected: route.id == widget.currentRouteId,
+                          isDark: isDark,
+                          badge: const Text('AI', style: TextStyle(fontSize: 9, color: AppColors.accent)),
+                          onTap: () {
+                            widget.onRouteSelected(route);
+                            Navigator.pop(context);
+                          },
+                          onEdit: () {
+                            final enabledDomains = widget.availableDomains
+                                .where((d) => !widget.disabledDomainIds.contains(d.id))
+                                .toList();
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => RouteEditorDialog(
+                                availableDomains: enabledDomains
+                                    .map((d) => DomainItem(id: d.id, title: d.title))
+                                    .toList(),
+                                existingRoute: route,
+                                onSave: (updatedRoute) {
+                                  _updateRoute(route.id, updatedRoute);
+                                  if (route.id == widget.currentRouteId) {
+                                    widget.onRouteSelected(updatedRoute);
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                          onDelete: () => _deleteRoute(route.id),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // 自定义路线
+                    if (_customRoutes.isNotEmpty) ...[
+                      _SectionHeader(label: l10n.get('custom')),
+                      ..._customRoutes.asMap().entries.map((entry) {
+                        final route = entry.value;
+                        return _RouteTile(
+                          route: route,
+                          isSelected: route.id == widget.currentRouteId,
+                          isDark: isDark,
+                          badge: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              l10n.get('custom'),
+                              style: const TextStyle(fontSize: 9, color: AppColors.accent),
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          route.name,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: isSelected
-                                                ? AppColors.accent
-                                                : null,
-                                          ),
-                                        ),
-                                        if (isCustom) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.accent
-                                                  .withValues(alpha: 0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(3),
-                                            ),
-                                            child: Text(
-                                              l10n.get('custom'),
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                color: AppColors.accent,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    if (route.description.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text(
-                                          route.description,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.white54
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                          onTap: () {
+                            widget.onRouteSelected(route);
+                            Navigator.pop(context);
+                          },
+                          onEdit: () {
+                            final enabledDomains = widget.availableDomains
+                                .where((d) => !widget.disabledDomainIds.contains(d.id))
+                                .toList();
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => RouteEditorDialog(
+                                availableDomains: enabledDomains
+                                    .map((d) => DomainItem(id: d.id, title: d.title))
+                                    .toList(),
+                                existingRoute: route,
+                                onSave: (updatedRoute) {
+                                  _updateRoute(route.id, updatedRoute);
+                                  if (route.id == widget.currentRouteId) {
+                                    widget.onRouteSelected(updatedRoute);
+                                  }
+                                },
                               ),
-                              // 编辑按钮（仅自定义路线）
-                              if (isCustom)
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18),
-                                  color: isDark ? Colors.white54 : Colors.grey,
-                                  onPressed: () {
-                                    final enabledDomains = widget.availableDomains
-                                        .where(
-                                          (d) => !widget.disabledDomainIds
-                                              .contains(d.id),
-                                        )
-                                        .toList();
-                                    showDialog(
-                                      context: context,
-                                      builder: (ctx) => RouteEditorDialog(
-                                        availableDomains: enabledDomains
-                                            .map(
-                                              (d) => DomainItem(
-                                                id: d.id,
-                                                title: d.title,
-                                              ),
-                                            )
-                                            .toList(),
-                                        existingRoute: route,
-                                        onSave: (updatedRoute) {
-                                          _updateRoute(index, updatedRoute);
-                                          if (route.id == widget.currentRouteId) {
-                                            widget.onRouteSelected(updatedRoute);
-                                          }
-                                        },
-                                      ),
-                                    );
-                                  },
-                                ),
-                              // 删除按钮（仅自定义路线）
-                              if (isCustom)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
-                                  color: Colors.red.shade300,
-                                  onPressed: () => _deleteRoute(route.id),
-                                ),
-                              if (isSelected)
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: AppColors.accent,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                            );
+                          },
+                          onDelete: () => _deleteRoute(route.id),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // 面试目标路线
+                    if (_interviewRoute != null) ...[
+                      _SectionHeader(label: '面试目标'),
+                      _buildInterviewRouteTile(_interviewRoute!, isDark),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -296,6 +305,159 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInterviewRouteTile(LearningRoute route, bool isDark) {
+    final plan = context.watch<ProgressProvider>().prepPlan;
+    final interviewDate = plan.interviewDate;
+    final days = interviewDate != null
+        ? interviewDate.difference(DateTime.now()).inDays + 1
+        : null;
+
+    return _RouteTile(
+      route: route,
+      isSelected: route.id == widget.currentRouteId,
+      isDark: isDark,
+      badge: days != null
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: (days > 0 ? AppColors.warning : AppColors.danger).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                days > 0 ? '倒计时 $days 天' : '已到期',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: days > 0 ? AppColors.warning : AppColors.danger,
+                ),
+              ),
+            )
+          : null,
+      onTap: () {
+        widget.onRouteSelected(route);
+        Navigator.pop(context);
+      },
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteTile extends StatelessWidget {
+  const _RouteTile({
+    required this.route,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+    this.badge,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  final LearningRoute route;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback onTap;
+  final Widget? badge;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.accent.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.accent
+                  : (isDark
+                        ? AppColors.borderMidnight
+                        : const Color(0xFFE0E0E0)),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          route.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? AppColors.accent : null,
+                          ),
+                        ),
+                        if (badge != null) ...[
+                          const SizedBox(width: 6),
+                          badge!,
+                        ],
+                      ],
+                    ),
+                    if (route.description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          route.description,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white54 : Colors.grey,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (onEdit != null)
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: isDark ? Colors.white54 : Colors.grey,
+                  onPressed: onEdit,
+                ),
+              if (onDelete != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: Colors.red.shade300,
+                  onPressed: onDelete,
+                ),
+              if (isSelected)
+                const Icon(Icons.check_circle, color: AppColors.accent),
+            ],
+          ),
         ),
       ),
     );

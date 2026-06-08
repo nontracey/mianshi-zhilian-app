@@ -18,6 +18,8 @@ import 'package:mianshi_zhilian/pages/practice/practice_page.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
 import 'package:mianshi_zhilian/pages/practice/today_review_page.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/pages/prep/interview_prep_page.dart';
 import 'package:mianshi_zhilian/pages/mastery/mastery_page.dart';
 import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
@@ -39,6 +41,32 @@ class _LearningShellState extends State<LearningShell> {
   int _selectedTopicInitialTab = 0;
   bool _isSidebarCollapsed = false;
   late AuthProvider _auth;
+  List<String>? _routeTopicIds;
+  final _storage = StorageService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRouteTopicIds();
+  }
+
+  Future<void> _loadRouteTopicIds() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId == null || routeId == 'all') {
+      if (mounted) setState(() => _routeTopicIds = null);
+      return;
+    }
+    final customData = await _storage.loadJsonList('custom_routes');
+    for (final data in customData) {
+      final route = LearningRoute.fromJson(data);
+      if (route.id == routeId) {
+        final ids = route.allTopicIds;
+        if (mounted) setState(() => _routeTopicIds = ids.isEmpty ? null : ids);
+        return;
+      }
+    }
+    if (mounted) setState(() => _routeTopicIds = null);
+  }
 
   @override
   void didChangeDependencies() {
@@ -242,11 +270,13 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.practice => PracticePage(
         currentDomainId: settings.settings.currentDomain,
+        routeTopicIds: _routeTopicIds,
         onDailyReview: () {
           context.push(
             '/practice/today-review',
             extra: TodayReviewPage(
               currentDomainId: settings.settings.currentDomain,
+              routeTopicIds: _routeTopicIds,
             ),
           );
         },

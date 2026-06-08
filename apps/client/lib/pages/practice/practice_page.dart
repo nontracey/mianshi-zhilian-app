@@ -20,12 +20,14 @@ class PracticePage extends StatelessWidget {
     required this.onDailyReview,
     required this.onRandomQuiz,
     required this.onMockInterview,
+    this.routeTopicIds,
   });
 
   final String currentDomainId;
   final VoidCallback onDailyReview;
   final ValueChanged<String> onRandomQuiz;
   final VoidCallback onMockInterview;
+  final List<String>? routeTopicIds;
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +241,10 @@ class PracticePage extends StatelessWidget {
   void _startWeaknessTraining(BuildContext context) {
     context.push(
       '/practice/weakness-training',
-      extra: WeaknessTrainingPage(currentDomainId: currentDomainId),
+      extra: WeaknessTrainingPage(
+        currentDomainId: currentDomainId,
+        routeTopicIds: routeTopicIds,
+      ),
     );
   }
 

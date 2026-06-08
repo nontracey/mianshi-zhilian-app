@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
@@ -476,45 +477,10 @@ class CenterPanelState extends State<CenterPanel> {
           .map((e) => LearningRoute.fromJson(e))
           .toList();
 
-      // 默认路线
-      final defaultRoutes = [
-        LearningRoute(
-          id: 'java',
-          name: l10n.get('java_backend_dev'),
-          description: l10n.get(
-            'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
-          ),
-          domainIds: [
-            'java',
-            'architecture',
-            'design-pattern',
-            'network',
-            'os',
-          ],
-          isDefault: true,
-        ),
-        LearningRoute(
-          id: 'frontend',
-          name: l10n.get('frontend_dev'),
-          description: l10n.get(
-            'javascript_typescript_react_vue_frontend_engineering_transform',
-          ),
-          domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
-          isDefault: true,
-        ),
-        LearningRoute(
-          id: 'agent',
-          name: l10n.get('agent_dev'),
-          description: l10n.get('ai_tech_stack_description'),
-          domainIds: ['agent', 'algorithm', 'architecture', 'network'],
-          isDefault: true,
-        ),
-      ];
+      // 从内容仓库动态生成官方路线
+      final defaultRoutes = _buildOfficialRoutes(widget.allDomains, l10n);
 
-      // 从内容仓库生成的学习路线
-      final contentRoutes = _generateRoutesFromContent();
-
-      final allRoutes = [...defaultRoutes, ...contentRoutes, ...customRoutes];
+      final allRoutes = [...defaultRoutes, ...customRoutes];
       final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
       if (route != null && mounted) {
         setState(() => _selectedRoute = route);
@@ -558,17 +524,72 @@ class CenterPanelState extends State<CenterPanel> {
         .toList();
   }
 
-  List<LearningRoute> _generateRoutesFromContent() {
-    if (widget.allDomains.isEmpty) return [];
-    return [
-      LearningRoute(
-        id: 'all_content',
-        name: l10n.get('all_topics'),
-        description: '',
-        domainIds: widget.allDomains.map((d) => d.id).toList(),
-        isDefault: false,
-      ),
-    ];
+  List<LearningRoute> _buildOfficialRoutes(List<Domain> domains, LocalizationProvider l10n) {
+    final routes = <LearningRoute>[];
+    for (final domain in domains) {
+      if (domain.learningPaths.isEmpty) {
+        routes.add(LearningRoute(
+          id: 'domain_${domain.id}',
+          name: domain.title,
+          description: domain.description,
+          domainIds: [domain.id],
+          phases: null,
+          source: 'official',
+          isDefault: routes.isEmpty,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        continue;
+      }
+      for (final lp in domain.learningPaths) {
+        final phases = lp.steps.map((step) {
+          final topicIds = <String>[];
+          for (final catId in step.categoryIds) {
+            final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
+            if (category != null) {
+              topicIds.addAll(category.topics.map((t) {
+                final parts = t.split('/');
+                return parts.last.replaceAll('.json', '');
+              }));
+            }
+          }
+          return RoutePhase(
+            id: 'official_${domain.id}_${lp.id}_${step.title.hashCode}',
+            focus: step.title,
+            description: step.description,
+            topicIds: topicIds,
+            categoryIds: step.categoryIds,
+            prerequisiteSteps: step.prerequisiteSteps,
+            estimatedHours: step.estimatedHours,
+            type: 'learn',
+          );
+        }).toList();
+        routes.add(LearningRoute(
+          id: 'official_${domain.id}_${lp.id}',
+          name: lp.title,
+          description: lp.description,
+          domainIds: [domain.id],
+          phases: phases,
+          source: 'official',
+          isDefault: routes.isEmpty,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+      }
+    }
+    // 全部题目路线
+    routes.add(LearningRoute(
+      id: 'all',
+      name: l10n.get('all_topics'),
+      description: '',
+      domainIds: domains.map((d) => d.id).toList(),
+      phases: null,
+      source: 'official',
+      isDefault: false,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ));
+    return routes;
   }
 
   @override
@@ -694,45 +715,22 @@ class CenterPanelState extends State<CenterPanel> {
     );
   }
 
-  void _showRouteSelector(BuildContext context) {
+  Future<void> _showRouteSelector(BuildContext context) async {
     final l10n = context.watch<LocalizationProvider>();
-    final defaultRoutes = [
-      LearningRoute(
-        id: 'java',
-        name: l10n.get('java_backend_dev'),
-        description: l10n.get(
-          'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
-        ),
-        domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
-        isDefault: true,
-      ),
-      LearningRoute(
-        id: 'frontend',
-        name: l10n.get('frontend_dev'),
-        description: l10n.get(
-          'javascript_typescript_react_vue_frontend_engineering_transform',
-        ),
-        domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
-        isDefault: true,
-      ),
-      LearningRoute(
-        id: 'agent',
-        name: l10n.get('agent_dev'),
-        description: l10n.get('ai_tech_stack_description'),
-        domainIds: ['agent', 'algorithm', 'architecture', 'network'],
-        isDefault: true,
-      ),
-    ];
+    final defaultRoutes = _buildOfficialRoutes(widget.allDomains, l10n);
 
-    // 从内容仓库生成的学习路线
-    final contentRoutes = _generateRoutesFromContent();
+    final customData = await _storage.loadJsonList('custom_routes');
+    final customRoutes = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .toList();
 
-    final routes = [...defaultRoutes, ...contentRoutes];
+    final allRoutes = [...defaultRoutes, ...customRoutes];
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => RouteSelectorDialog(
-        routes: routes,
+        routes: allRoutes,
         currentRouteId: _selectedRoute?.id,
         availableDomains: widget.allDomains,
         disabledDomainIds: _disabledIds,

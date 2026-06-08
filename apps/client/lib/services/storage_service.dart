@@ -29,8 +29,7 @@ class StorageService {
     'disabled_domains',
     'custom_routes',
     'selected_route_id',
-    'prep_goal',
-    'training_plan',
+
     'project_library',
     'project_dig_projects',
     'ai_configs',
@@ -744,11 +743,15 @@ class StorageService {
     }
     if (!syncSettings.syncPrivatePrepData &&
         (key == 'prep_plan' ||
-            key == 'prep_goal' ||
-            key == 'training_plan' ||
             key == 'project_library' ||
             key == 'project_dig_projects')) {
       return null;
+    }
+    if (key == 'local_profile' && value is Map<String, dynamic>) {
+      if (!syncSettings.syncPrivatePrepData) {
+        return {...value}..remove('avatarUrl');
+      }
+      return value;
     }
     return value;
   }
