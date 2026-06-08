@@ -438,6 +438,8 @@ class CenterPanel extends StatefulWidget {
     required this.contentProvider,
     required this.progressProvider,
     required this.settingsProvider,
+    this.routeModeEnabled = true,
+    this.onRouteModeChanged,
   });
 
   final Domain? currentDomain;
@@ -457,6 +459,8 @@ class CenterPanel extends StatefulWidget {
   final ContentProvider contentProvider;
   final ProgressProvider progressProvider;
   final SettingsProvider settingsProvider;
+  final bool routeModeEnabled;
+  final VoidCallback? onRouteModeChanged;
 
   @override
   State<CenterPanel> createState() => CenterPanelState();
@@ -473,6 +477,15 @@ class CenterPanelState extends State<CenterPanel> {
     super.initState();
     _loadDisabled();
     _loadSelectedRoute();
+  }
+
+  @override
+  void didUpdateWidget(CenterPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.routeModeEnabled != widget.routeModeEnabled ||
+        oldWidget.allDomains != widget.allDomains) {
+      _loadSelectedRoute();
+    }
   }
 
   Future<void> _loadDisabled() async {
@@ -514,8 +527,10 @@ class CenterPanelState extends State<CenterPanel> {
         .where((d) => !_disabledIds.contains(d.id))
         .toList();
 
-    // 如果选中了路线，按路线顺序过滤
-    if (_selectedRoute != null && _selectedRoute!.domainIds.isNotEmpty) {
+    // 路线模式 + 选中路线 → 按路线顺序过滤
+    if (widget.routeModeEnabled &&
+        _selectedRoute != null &&
+        _selectedRoute!.domainIds.isNotEmpty) {
       domains = domains
           .where((d) => _selectedRoute!.domainIds.contains(d.id))
           .toList();
@@ -537,71 +552,19 @@ class CenterPanelState extends State<CenterPanel> {
   }
 
   List<LearningRoute> _buildOfficialRoutes(List<Domain> domains, LocalizationProvider l10n) {
-    final routes = <LearningRoute>[];
-    for (final domain in domains) {
-      if (domain.learningPaths.isEmpty) {
-        routes.add(LearningRoute(
-          id: 'domain_${domain.id}',
-          name: domain.title,
-          description: domain.description,
-          domainIds: [domain.id],
-          phases: null,
-          source: 'official',
-          isDefault: routes.isEmpty,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        continue;
-      }
-      for (final lp in domain.learningPaths) {
-        final phases = lp.steps.map((step) {
-          final topicIds = <String>[];
-          for (final catId in step.categoryIds) {
-            final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
-            if (category != null) {
-              topicIds.addAll(category.topics.map((t) {
-                final parts = t.split('/');
-                return parts.last.replaceAll('.json', '');
-              }));
-            }
-          }
-          return RoutePhase(
-            id: 'official_${domain.id}_${lp.id}_${step.title.hashCode}',
-            focus: step.title,
-            description: step.description,
-            topicIds: topicIds,
-            categoryIds: step.categoryIds,
-            prerequisiteSteps: step.prerequisiteSteps,
-            estimatedHours: step.estimatedHours,
-            type: 'learn',
-          );
-        }).toList();
-        routes.add(LearningRoute(
-          id: 'official_${domain.id}_${lp.id}',
-          name: lp.title,
-          description: lp.description,
-          domainIds: [domain.id],
-          phases: phases,
-          source: 'official',
-          isDefault: routes.isEmpty,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-      }
-    }
-    // 全部题目路线
-    routes.add(LearningRoute(
-      id: 'all',
-      name: l10n.get('all_topics'),
-      description: '',
-      domainIds: domains.map((d) => d.id).toList(),
-      phases: null,
-      source: 'official',
-      isDefault: false,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ));
-    return routes;
+    return [
+      LearningRoute(
+        id: 'all',
+        name: l10n.get('all_topics'),
+        description: '',
+        domainIds: domains.map((d) => d.id).toList(),
+        phases: null,
+        source: 'official',
+        isDefault: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
   }
 
   @override
@@ -609,13 +572,46 @@ class CenterPanelState extends State<CenterPanel> {
     final l10n = context.watch<LocalizationProvider>();
     final domains = _domains;
     final allEnabledDomains = _allEnabledDomains;
+    final route = _selectedRoute;
+    final hasPhases = route != null &&
+        route.phases != null &&
+        route.phases!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 路线模式切换
+        if (_selectedRoute != null && widget.onRouteModeChanged != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                SegmentedButton<bool>(
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      label: Text(l10n.get('route_mode'), style: const TextStyle(fontSize: 12)),
+                      icon: const Icon(Icons.route, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: const Text('自由探索', style: TextStyle(fontSize: 12)),
+                      icon: const Icon(Icons.explore_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {widget.routeModeEnabled},
+                  onSelectionChanged: (_) => widget.onRouteModeChanged?.call(),
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          ),
         // 当前学习路线
         PanelCard(
-          title: l10n.get('current_study_route'),
+          title: route != null ? route.name : l10n.get('current_study_route'),
           icon: Icons.route_outlined,
           trailing: l10n.get('toggle_switch_route'),
           onTrailingTap: () => _showRouteSelector(context),
@@ -623,6 +619,8 @@ class CenterPanelState extends State<CenterPanel> {
             children: [
               if (domains.isEmpty)
                 EmptyState(message: l10n.get('temporary_no_study_route'))
+              else if (hasPhases)
+                _buildPhaseView(route!, l10n)
               else
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
@@ -677,10 +675,10 @@ class CenterPanelState extends State<CenterPanel> {
                     // 根据宽度决定每行几个卡片
                     final cardWidth = constraints.maxWidth > 900
                         ? (constraints.maxWidth - 36) /
-                              4 // 一行4个
+                               4 // 一行4个
                         : constraints.maxWidth > 600
                         ? (constraints.maxWidth - 24) /
-                              3 // 一行3个
+                               3 // 一行3个
                         : (constraints.maxWidth - 12) / 2; // 一行2个
 
                     return Wrap(
@@ -725,6 +723,169 @@ class CenterPanelState extends State<CenterPanel> {
         ),
       ],
     );
+  }
+
+  Widget _buildPhaseView(LearningRoute route, LocalizationProvider l10n) {
+    final allTopics = widget.contentProvider.topics;
+    final progress = widget.progressProvider;
+    final topicIds = route.allTopicIds;
+
+    int totalMastered = 0;
+    for (final tid in topicIds) {
+      final t = allTopics[tid];
+      if (t != null && (progress.getTopicProgress(tid)?.score ?? 0) >= 85) {
+        totalMastered++;
+      }
+    }
+
+    final phases = route.phases!;
+    final phaseWidgets = _buildPhaseCards(route, allTopics, progress, l10n);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 路线总进度
+        Row(
+          children: [
+            Text(
+              '$totalMastered/${topicIds.length}',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: topicIds.length > 0
+                    ? (totalMastered * 100 ~/ topicIds.length >= 85
+                        ? AppColors.success
+                        : totalMastered * 100 ~/ topicIds.length >= 50
+                            ? AppColors.warning
+                            : AppColors.textTertiary)
+                    : AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: topicIds.length > 0 ? totalMastered / topicIds.length : 0,
+                      minHeight: 8,
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${l10n.getp('count_knowledge_point_2', {'count': topicIds.length})} · ${phases.length} 阶段',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (route.description.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            route.description,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        const SizedBox(height: 12),
+        // 阶段卡片列表（最多展示 6 个，其余折叠）
+        ...phaseWidgets.take(6),
+        if (phases.length > 6)
+          Text(
+            '${l10n.get('and_more')} ${phases.length - 6} 阶段',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+      ],
+    );
+  }
+
+  List<Widget> _buildPhaseCards(
+    LearningRoute route,
+    Map<String, Topic> allTopics,
+    ProgressProvider progress,
+    LocalizationProvider l10n,
+  ) {
+    final phases = route.phases ?? [];
+    final byDomain = <String, List<RoutePhase>>{};
+    for (final p in phases) {
+      final did = p.topicIds.isNotEmpty
+          ? (allTopics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
+          : (route.domainIds.firstOrNull ?? '');
+      byDomain.putIfAbsent(did, () => []).add(p);
+    }
+
+    return byDomain.entries.expand((e) {
+      final domain = widget.allDomains.firstWhereOrNull((d) => d.id == e.key);
+      final domainTitle = domain?.title ?? e.key;
+      return [
+        Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 4),
+          child: Text(
+            domainTitle,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700),
+          ),
+        ),
+        ...e.value.map((p) {
+          final pids = p.topicIds.toSet().toList();
+          final ptitles = <String, String>{};
+          var mastered = 0;
+          var practiced = 0;
+          for (final id in pids) {
+            final t = allTopics[id];
+            if (t != null) ptitles[id] = t.title;
+            final s = progress.getTopicProgress(id)?.score ?? 0;
+            if (s >= 85) mastered++;
+            if (s > 0) practiced++;
+          }
+          final allDone = mastered == pids.length && pids.isNotEmpty;
+          final inProgress = practiced > 0 && !allDone;
+          return PhaseCard(
+            name: p.focus.isNotEmpty ? p.focus : p.id,
+            totalTopics: pids.length,
+            masteredTopics: mastered,
+            statusText: allDone
+                ? l10n.get('skilled_training')
+                : (inProgress ? l10n.get('progress_action_in') : l10n.get('un_start')),
+            statusColor: allDone
+                ? AppColors.success
+                : (inProgress ? AppColors.warning : AppColors.textTertiary),
+            statusIcon: allDone
+                ? Icons.check_circle
+                : (inProgress ? Icons.trending_up : Icons.radio_button_unchecked),
+            isCurrent: inProgress,
+            topicIds: pids,
+            topicTitles: ptitles,
+            onTopicTap: (id) {
+              if (id != null) widget.onTopicTap(id);
+            },
+            onPractice: inProgress
+                ? () {
+                    widget.onDomainChanged(
+                      allTopics[pids.first]?.domainId ?? route.domainIds.firstOrNull ?? '',
+                    );
+                    widget.onPractice();
+                  }
+                : null,
+          );
+        }),
+      ];
+    }).toList();
   }
 
   Future<void> _showRouteSelector(BuildContext context) async {

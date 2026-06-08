@@ -16,12 +16,22 @@ class CatalogPage extends StatefulWidget {
     required this.onDomainChanged,
     required this.onTopicLearn,
     required this.onTopicPractice,
+    this.routeTopicIds,
+    this.routeDomainIds,
+    this.routePhases,
+    this.routeModeEnabled = false,
+    this.onRouteModeChanged,
   });
 
   final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final ValueChanged<String> onTopicLearn;
   final ValueChanged<String> onTopicPractice;
+  final List<String>? routeTopicIds;
+  final List<String>? routeDomainIds;
+  final List<RoutePhase>? routePhases;
+  final bool routeModeEnabled;
+  final VoidCallback? onRouteModeChanged;
 
   @override
   State<CatalogPage> createState() => _CatalogPageState();
@@ -33,12 +43,40 @@ class _CatalogPageState extends State<CatalogPage> {
   List<String> _disabledIds = [];
   Set<String> _routeTopicIds = {};
   bool _routeActive = false;
+  bool _routeScopeOnly = true;
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
-    _loadSelectedRoute();
+    _syncRouteState();
+  }
+
+  @override
+  void didUpdateWidget(CatalogPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.routeTopicIds != widget.routeTopicIds ||
+        oldWidget.routeModeEnabled != widget.routeModeEnabled) {
+      _syncRouteState();
+    }
+  }
+
+  void _syncRouteState() {
+    final ids = widget.routeTopicIds;
+    final enabled = widget.routeModeEnabled;
+    if (ids != null && ids.isNotEmpty && enabled) {
+      setState(() {
+        _routeTopicIds = ids.toSet();
+        _routeActive = true;
+        _routeScopeOnly = true;
+      });
+    } else {
+      setState(() {
+        _routeTopicIds = {};
+        _routeActive = false;
+        _routeScopeOnly = false;
+      });
+    }
   }
 
   Future<void> _loadDisabled() async {
@@ -46,29 +84,12 @@ class _CatalogPageState extends State<CatalogPage> {
     if (mounted) setState(() => _disabledIds = ids);
   }
 
-  Future<void> _loadSelectedRoute() async {
-    final routeId = await _storage.load('selected_route_id');
-    if (routeId == null) return;
-    final customData = await _storage.loadJsonList('custom_routes');
-    for (final data in customData) {
-      final route = LearningRoute.fromJson(data);
-      if (route.id == routeId && route.phases != null) {
-        if (mounted) {
-          setState(() {
-            _routeTopicIds = route.allTopicIds.toSet();
-            _routeActive = true;
-          });
-        }
-        return;
-      }
-    }
-  }
-
   List<Domain> _filterDomains(List<Domain> all) {
     return all.where((d) => !_disabledIds.contains(d.id)).toList();
   }
 
   bool _roadmapView = true;
+  final Set<String> _collapsedPhases = {};
   String _searchQuery = '';
   final Set<int> _difficultyFilters = {};
   bool _highFrequencyOnly = false;
@@ -188,16 +209,17 @@ class _CatalogPageState extends State<CatalogPage> {
     final domainTopicsRaw = contentProvider.getTopicsByDomain(
       widget.currentDomainId,
     );
-    final domainTopics = _routeActive
+    final isRouteScoped = _routeActive && _routeScopeOnly;
+    final domainTopics = isRouteScoped
         ? domainTopicsRaw.where((t) => _routeTopicIds.contains(t.id)).toList()
         : domainTopicsRaw;
-    final routeProgressTopics = _routeActive ? domainTopics : contentProvider.topics.values.toList();
+    final routeProgressTopics = isRouteScoped ? domainTopics : contentProvider.topics.values.toList();
     final domainProgress = progressProvider.getDomainProgress(
       widget.currentDomainId,
       routeProgressTopics,
     );
     final masteryPercent = domainProgress.masteryPercent;
-    final totalTopics = _routeActive ? domainTopics.length : currentDomain.topicCount;
+    final totalTopics = isRouteScoped ? domainTopics.length : currentDomain.topicCount;
 
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
@@ -246,13 +268,23 @@ class _CatalogPageState extends State<CatalogPage> {
           Expanded(
             child: sortedTopics.isEmpty
                 ? _buildEmptyState(context)
-                : _buildTopicList(
-                    context,
-                    currentDomain,
-                    sortedTopics,
-                    progressProvider,
-                    isDark,
-                  ),
+                : (_routeActive &&
+                        widget.routePhases != null &&
+                        widget.routePhases!.isNotEmpty
+                    ? _buildPhasedTopicList(
+                        context,
+                        currentDomain,
+                        sortedTopics,
+                        progressProvider,
+                        isDark,
+                      )
+                    : _buildTopicList(
+                        context,
+                        currentDomain,
+                        sortedTopics,
+                        progressProvider,
+                        isDark,
+                      )),
           ),
         ],
       ),
@@ -364,6 +396,17 @@ class _CatalogPageState extends State<CatalogPage> {
     List<Domain> domains,
     ContentProvider contentProvider,
   ) {
+    // 路线模式下只显示路线中的领域
+    var displayDomains = domains;
+    if (_routeActive && widget.routeModeEnabled && widget.routeDomainIds != null) {
+      final routeSet = widget.routeDomainIds!.toSet();
+      displayDomains = domains.where((d) => routeSet.contains(d.id)).toList();
+      // 确保当前选中的领域始终在列表中
+      if (!routeSet.contains(widget.currentDomainId) &&
+          domains.any((d) => d.id == widget.currentDomainId)) {
+        displayDomains.add(domains.firstWhere((d) => d.id == widget.currentDomainId));
+      }
+    }
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 190),
       child: Container(
@@ -377,7 +420,7 @@ class _CatalogPageState extends State<CatalogPage> {
             value: widget.currentDomainId,
             isDense: true,
             isExpanded: true,
-            selectedItemBuilder: (_) => domains
+            selectedItemBuilder: (_) => displayDomains
                 .map(
                   (d) => Text(
                     d.title,
@@ -390,7 +433,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 )
                 .toList(),
-            items: domains
+            items: displayDomains
                 .map(
                   (d) => DropdownMenuItem(
                     value: d.id,
@@ -544,6 +587,23 @@ class _CatalogPageState extends State<CatalogPage> {
               ),
             ),
           ),
+          if (widget.onRouteModeChanged != null) ...[
+            Switch(
+              value: widget.routeModeEnabled,
+              onChanged: (_) {
+                _routeScopeOnly = true;
+                widget.onRouteModeChanged?.call();
+              },
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ] else ...[
+            Switch(
+              value: _routeScopeOnly,
+              onChanged: (v) => setState(() => _routeScopeOnly = v),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+          const SizedBox(width: 4),
           Text(
             l10n.getp('knowledge_points_in_route', {'count': _routeTopicIds.length}),
             style: TextStyle(
@@ -795,6 +855,172 @@ class _CatalogPageState extends State<CatalogPage> {
           topics[index],
           progressProvider,
           isDark,
+        );
+      },
+    );
+  }
+
+  Widget _buildPhasedTopicList(
+    BuildContext context,
+    Domain currentDomain,
+    List<Topic> topics,
+    ProgressProvider progressProvider,
+    bool isDark,
+  ) {
+    final phases = widget.routePhases!;
+    final topicSet = topics.map((t) => t.id).toSet();
+
+    // 只展示当前领域相关的阶段
+    final domainPhases = phases
+        .where((p) => p.topicIds.any((id) => topicSet.contains(id)))
+        .toList();
+
+    if (domainPhases.isEmpty) {
+      return _buildTopicList(
+        context, currentDomain, topics, progressProvider, isDark);
+    }
+
+    final allTopics = context.read<ContentProvider>().topics;
+
+    // 识别当前进行中的阶段
+    int? currentPhaseIndex;
+    for (var i = 0; i < domainPhases.length; i++) {
+      final p = domainPhases[i];
+      var allDone = true;
+      for (final tid in p.topicIds) {
+        if (topicSet.contains(tid)) {
+          if ((progressProvider.getTopicProgress(tid)?.score ?? 0) < 85) {
+            allDone = false;
+            break;
+          }
+        }
+      }
+      if (!allDone) {
+        currentPhaseIndex = i;
+        break;
+      }
+    }
+
+    return ListView.builder(
+      itemCount: domainPhases.length,
+      itemBuilder: (context, index) {
+        final phase = domainPhases[index];
+        final phaseTopicIds = phase.topicIds.where((id) => topicSet.contains(id)).toList();
+        final phaseTopics = phaseTopicIds
+            .map((id) => allTopics[id])
+            .where((t) => t != null)
+            .cast<Topic>()
+            .toList();
+
+        var mastered = 0;
+        for (final t in phaseTopics) {
+          if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85) mastered++;
+        }
+        final total = phaseTopicIds.length;
+        final allDone = mastered == total && total > 0;
+        final inProgress = mastered > 0 && !allDone;
+        final isCurrent = currentPhaseIndex == index;
+        final isCollapsed = _collapsedPhases.contains(phase.id);
+
+        return Column(
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  if (isCollapsed) {
+                    _collapsedPhases.remove(phase.id);
+                  } else {
+                    _collapsedPhases.add(phase.id);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
+                      : (isDark ? const Color(0xFF1A1D23) : const Color(0xFFF5F5F5)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: isCurrent
+                      ? Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2))
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                      size: 20,
+                      color: isDark ? Colors.white54 : AppColors.textTertiary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            phase.focus.isNotEmpty ? phase.focus : phase.id,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: isCurrent
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: total > 0 ? mastered / total : 0,
+                                  minHeight: 3,
+                                  backgroundColor: isDark
+                                      ? AppColors.borderMidnight
+                                      : const Color(0xFFE8E8E8),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$mastered/$total',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white54 : AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: allDone
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : inProgress
+                                ? AppColors.warning.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        allDone ? l10n.get('skilled_training') : inProgress ? l10n.get('progress_action_in') : '',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: allDone ? AppColors.success : AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (!isCollapsed)
+              ...phaseTopics.map((t) => _buildTopicCard(context, t, progressProvider, isDark)),
+          ],
         );
       },
     );

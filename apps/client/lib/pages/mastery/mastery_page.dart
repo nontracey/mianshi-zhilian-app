@@ -3,7 +3,6 @@ import 'package:collection/collection.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
-import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -22,11 +21,17 @@ class MasteryPage extends StatefulWidget {
     required this.currentDomainId,
     required this.onDomainChanged,
     this.onStartPractice,
+    this.routeTopicIds,
+    this.routeModeEnabled = false,
+    this.onRouteModeChanged,
   });
 
   final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final VoidCallback? onStartPractice;
+  final List<String>? routeTopicIds;
+  final bool routeModeEnabled;
+  final VoidCallback? onRouteModeChanged;
 
   @override
   State<MasteryPage> createState() => _MasteryPageState();
@@ -46,104 +51,34 @@ class _MasteryPageState extends State<MasteryPage> {
   void initState() {
     super.initState();
     _loadDisabled();
-    _loadRouteTopicIds();
+    _syncRouteState();
+  }
+
+  @override
+  void didUpdateWidget(MasteryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.routeTopicIds != widget.routeTopicIds ||
+        oldWidget.routeModeEnabled != widget.routeModeEnabled) {
+      _syncRouteState();
+    }
+  }
+
+  void _syncRouteState() {
+    final ids = widget.routeTopicIds;
+    final enabled = widget.routeModeEnabled;
+    if (ids != null && ids.isNotEmpty && enabled) {
+      _routeTopicIds = ids;
+      _routeScopeOnly = true;
+    } else {
+      _routeTopicIds = [];
+      _routeScopeOnly = false;
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadDisabled() async {
     final ids = await _storage.loadDisabledDomains();
     if (mounted) setState(() => _disabledIds = ids);
-  }
-
-  Future<void> _loadRouteTopicIds() async {
-    final routeId = await _storage.load('selected_route_id');
-    if (routeId == null || routeId == 'all' || !mounted) return;
-
-    // Check custom routes first
-    final customData = await _storage.loadJsonList('custom_routes');
-    final allCustom = customData
-        .map((e) => LearningRoute.fromJson(e))
-        .toList();
-    var route = allCustom.where((r) => r.id == routeId).firstOrNull;
-
-    // Fall back to official routes built from domains
-    if (route == null) {
-      final contentProvider = context.read<ContentProvider>();
-      final l10n = context.read<LocalizationProvider>();
-      route = _buildOfficialRoutes(contentProvider.domains, l10n)
-          .where((r) => r.id == routeId)
-          .firstOrNull;
-    }
-
-    if (route != null && mounted) {
-      setState(() => _routeTopicIds = route!.allTopicIds);
-    }
-  }
-
-  List<LearningRoute> _buildOfficialRoutes(List<Domain> domains, LocalizationProvider l10n) {
-    final routes = <LearningRoute>[];
-    for (final domain in domains) {
-      if (domain.learningPaths.isEmpty) {
-        routes.add(LearningRoute(
-          id: 'domain_${domain.id}',
-          name: domain.title,
-          description: domain.description,
-          domainIds: [domain.id],
-          phases: null,
-          source: 'official',
-          isDefault: routes.isEmpty,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        continue;
-      }
-      for (final lp in domain.learningPaths) {
-        final phases = lp.steps.map((step) {
-          final topicIds = <String>[];
-          for (final catId in step.categoryIds) {
-            final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
-            if (category != null) {
-              topicIds.addAll(category.topics.map((t) {
-                final parts = t.split('/');
-                return parts.last.replaceAll('.json', '');
-              }));
-            }
-          }
-          return RoutePhase(
-            id: 'official_${domain.id}_${lp.id}_${step.title.hashCode}',
-            focus: step.title,
-            description: step.description,
-            topicIds: topicIds,
-            categoryIds: step.categoryIds,
-            prerequisiteSteps: step.prerequisiteSteps,
-            estimatedHours: step.estimatedHours,
-            type: 'learn',
-          );
-        }).toList();
-        routes.add(LearningRoute(
-          id: 'official_${domain.id}_${lp.id}',
-          name: lp.title,
-          description: lp.description,
-          domainIds: [domain.id],
-          phases: phases,
-          source: 'official',
-          isDefault: routes.isEmpty,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-      }
-    }
-    routes.add(LearningRoute(
-      id: 'all',
-      name: l10n.get('all_topics'),
-      description: '',
-      domainIds: domains.map((d) => d.id).toList(),
-      phases: null,
-      source: 'official',
-      isDefault: false,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ));
-    return routes;
   }
 
   List<Domain> _filterDomains(List<Domain> all) {

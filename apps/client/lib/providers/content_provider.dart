@@ -317,13 +317,11 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
-  /// 确保指定领域列表的 topics 都已加载
+  /// 确保指定领域列表的 topics 都已加载。始终调 loadDomainTopics，
+  /// 由其内部按缓存和 pendingVersion 判断是否需要网络刷新。
   Future<void> ensureTopicsLoaded(List<String> domainIds) async {
     for (final id in domainIds) {
-      final hasTopics = _topics.values.any((t) => t.domainId == id);
-      if (!hasTopics) {
-        await loadDomainTopics(id);
-      }
+      await loadDomainTopics(id);
     }
   }
 
