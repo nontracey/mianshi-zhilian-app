@@ -7,6 +7,15 @@ on:
     paths:
       - "workers/api/**"
       - ".github/workflows/deploy-worker.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "workers/api/**"
+      - ".github/workflows/deploy-worker.yml"
+
+concurrency:
+  group: deploy-worker-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -23,24 +32,60 @@ jobs:
           cache-dependency-path: workers/api/package-lock.json
       - run: npm ci
 
-      - name: Inject D1 database ID
-        run: >
-          sed -i "s/PLACEHOLDER_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/"
-          wrangler.toml
-
-      - name: Inject KV namespace ID
-        run: >
-          sed -i "s/PLACEHOLDER_KV_NAMESPACE_ID/${{ secrets.KV_NAMESPACE_ID }}/"
-          wrangler.toml
+      - name: Prepare config
+        id: config
+        env:
+          D1_STAGING_ID: ${{ secrets.D1_STAGING_DATABASE_ID }}
+          KV_STAGING_ID: ${{ secrets.KV_STAGING_NAMESPACE_ID }}
+          D1_PROD_ID: ${{ secrets.D1_DATABASE_ID }}
+          KV_PROD_ID: ${{ secrets.KV_NAMESPACE_ID }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR 预览
+            cp wrangler-staging.toml wrangler.toml
+            if [ -n "$D1_STAGING_ID" ] && [ -n "$KV_STAGING_ID" ]; then
+              sed -i "s/PLACEHOLDER_D1_STAGING_DATABASE_ID/$D1_STAGING_ID/" wrangler.toml
+              sed -i "s/PLACEHOLDER_KV_STAGING_NAMESPACE_ID/$KV_STAGING_ID/" wrangler.toml
+              echo "has_staging=true" >> "$GITHUB_OUTPUT"
+              echo "Staging IDs injected"
+            else
+              echo "⚠️ No staging secrets configured. Set D1_STAGING_DATABASE_ID and KV_STAGING_NAMESPACE_ID in GitHub Secrets."
+              echo "has_staging=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            # 正式部署（main push）
+            sed -i "s/PLACEHOLDER_DATABASE_ID/$D1_PROD_ID/" wrangler.toml
+            sed -i "s/PLACEHOLDER_KV_NAMESPACE_ID/$KV_PROD_ID/" wrangler.toml
+            echo "has_staging=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Deploy to Cloudflare Pages
+        if: steps.config.outputs.has_staging == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy --project-name=mianshi-zhilian-api
+          command: pages deploy --project-name=mianshi-zhilian-api --branch=${{ github.head_ref || github.ref_name }}
           workingDirectory: workers/api
-      - name: Verify primary and backup API routes
+
+      - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request' && steps.config.outputs.has_staging == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ github.head_ref }}'.replace(/\//g, '-');
+            const deployUrl = `https://${branch}.mianshi-zhilian-api.pages.dev`;
+            const body = `## ⚡ Worker 预览部署完成\n\nAPI 预览地址：\`${deployUrl}/health\`\n\n分支 \`${{ github.head_ref }}\` 已部署。PR 合并或关闭后自动清理。`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Verify production routes
+        if: github.ref_name == 'main'
         run: |
           set -euo pipefail
           for base in \

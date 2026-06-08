@@ -1,0 +1,24 @@
+name = "mianshi-zhilian-api-staging"
+compatibility_date = "2026-05-27"
+pages_build_output_dir = "src"
+
+# 预发布环境配置，用于 PR 预览部署。
+# 创建预发布资源：
+#   npx wrangler d1 create mianshi-zhilian-db-staging --location apac
+#   npx wrangler kv:namespace create "mianshi-zhilian-kv-staging"
+# 然后分别在 GitHub Secrets 中配置：
+#   D1_STAGING_DATABASE_ID
+#   KV_STAGING_NAMESPACE_ID
+
+[[kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_KV_STAGING_NAMESPACE_ID"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mianshi-zhilian-db-staging"
+database_id = "PLACEHOLDER_D1_STAGING_DATABASE_ID"
+
+[vars]
+CONTENT_PRIMARY_BASE_URL = "https://mianshi-zhilian-content.pages.dev"
+CONTENT_BACKUP_BASE_URL = "https://mianshizhilian-content.nontracey.de5.net"

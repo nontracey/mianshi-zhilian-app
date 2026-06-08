@@ -8,39 +8,40 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete Cloudflare Pages preview by branch
+      - name: Delete web preview deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: ${{ github.head_ref }}
         run: |
           set -euo pipefail
-          # 列出该分支的所有部署
-          deployments=$(curl -s -X GET \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/mianshi-zhilian-app/deployments" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          
-          # 筛选出当前分支的 deployment ID
-          ids=$(echo "$deployments" | python3 -c "
-import json, sys
+          for project in mianshi-zhilian-app mianshi-zhilian-api; do
+            deployments=$(curl -s -X GET \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${project}/deployments" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json")
+
+            ids=$(echo "$deployments" | python3 -c "
+import json, sys, os
+branch = os.environ['BRANCH']
 data = json.load(sys.stdin)
 for d in data.get('result', []):
-    if d.get('deployment_trigger', {}).get('metadata', {}).get('branch', '') == '$BRANCH':
+    meta = d.get('deployment_trigger', {}).get('metadata', {})
+    if meta.get('branch', '') == branch:
         print(d['id'])
 ")
-          
-          if [ -z "$ids" ]; then
-            echo "No preview deployments found for branch: $BRANCH"
-            exit 0
-          fi
-          
-          # 逐个删除
-          for id in $ids; do
-            echo "Deleting deployment $id (branch: $BRANCH)"
-            curl -s -X DELETE \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/mianshi-zhilian-app/deployments/$id" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" > /dev/null
-            echo "Deleted: $id"
+
+            if [ -z "$ids" ]; then
+              echo "No preview deployments found for $project (branch: $BRANCH)"
+              continue
+            fi
+
+            for id in $ids; do
+              echo "Deleting $project deployment $id (branch: $BRANCH)"
+              curl -s -X DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${project}/deployments/$id" \
+                -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                -H "Content-Type: application/json" > /dev/null
+              echo "Deleted: $id"
+            done
           done
