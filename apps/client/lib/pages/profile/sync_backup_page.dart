@@ -76,7 +76,6 @@ class SyncBackupPage extends StatelessWidget {
     final l10n = context.read<LocalizationProvider>();
     final settingsProvider = context.read<SettingsProvider>();
     final progressProvider = context.read<ProgressProvider>();
-    final aiProvider = context.read<AiProvider>();
     final message = await settingsProvider.syncData(
       progressProvider.syncSettings,
     );

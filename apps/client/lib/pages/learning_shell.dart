@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/user.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/widgets/offline_banner.dart';
+import 'package:mianshi_zhilian/widgets/onboarding_screen.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -74,6 +75,10 @@ class _LearningShellState extends State<LearningShell> {
     final settings = context.watch<SettingsProvider>();
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
+
+    if (!settings.settings.onboardingCompleted) {
+      return const OnboardingScreen();
+    }
 
     return Scaffold(
       body: Column(

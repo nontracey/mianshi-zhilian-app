@@ -38,7 +38,6 @@ import 'pages/profile/appearance_language_page.dart';
 import 'pages/profile/content_source_page.dart';
 import 'pages/profile/route_preference_page.dart';
 import 'pages/profile/about_update_page.dart';
-import 'widgets/onboarding_screen.dart';
 import 'pages/learning_shell.dart';
 
 void main() async {
@@ -140,6 +139,119 @@ class MianshiZhilianApp extends StatefulWidget {
 
 class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   bool _contentLoaded = false;
+  late final GoRouter _router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const LearningShell(),
+      ),
+      GoRoute(
+        path: '/topic',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/recall',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/mock-interview',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/today-review',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/weakness-training',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/answer-versions',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/follow-up-training',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/high-frequency',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/system-design',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/practice/project-dig',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/auth/login',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const LoginPage(),
+      ),
+      GoRoute(
+        path: '/auth/change-password',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const ChangePasswordPage(),
+      ),
+      GoRoute(
+        path: '/auth/submit-ticket',
+        builder: (_, state) => state.extra as Widget,
+      ),
+      GoRoute(
+        path: '/profile/ai-config',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const AiConfigPage(),
+      ),
+      GoRoute(
+        path: '/profile/log-management',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const LogManagementPage(),
+      ),
+      GoRoute(
+        path: '/profile/model-management',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const OnDeviceModelManagementPage(),
+      ),
+      GoRoute(
+        path: '/profile/sync-backup',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const SyncBackupPage(),
+      ),
+      GoRoute(
+        path: '/profile/ai-voice-settings',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const AiVoiceSettingsPage(),
+      ),
+      GoRoute(
+        path: '/profile/learning-preferences',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const LearningPreferencesPage(),
+      ),
+      GoRoute(
+        path: '/profile/appearance-language',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const AppearanceLanguagePage(),
+      ),
+      GoRoute(
+        path: '/profile/content-source',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const ContentSourcePage(),
+      ),
+      GoRoute(
+        path: '/profile/route-preference',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const RoutePreferencePage(),
+      ),
+      GoRoute(
+        path: '/profile/about-update',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const AboutUpdatePage(),
+      ),
+    ],
+  );
 
   @override
   void dispose() {
@@ -228,122 +340,6 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             systemIsDark: systemIsDark,
           );
 
-          final router = GoRouter(
-            initialLocation: '/',
-            routes: [
-              GoRoute(
-                path: '/',
-                builder: (_, __) => settings.settings.onboardingCompleted
-                    ? const LearningShell()
-                    : const OnboardingScreen(),
-              ),
-              GoRoute(
-                path: '/topic',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/recall',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/mock-interview',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/today-review',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/weakness-training',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/answer-versions',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/follow-up-training',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/high-frequency',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/system-design',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/practice/project-dig',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/auth/login',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const LoginPage(),
-              ),
-              GoRoute(
-                path: '/auth/change-password',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const ChangePasswordPage(),
-              ),
-              GoRoute(
-                path: '/auth/submit-ticket',
-                builder: (_, state) => state.extra as Widget,
-              ),
-              GoRoute(
-                path: '/profile/ai-config',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const AiConfigPage(),
-              ),
-              GoRoute(
-                path: '/profile/log-management',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const LogManagementPage(),
-              ),
-              GoRoute(
-                path: '/profile/model-management',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const OnDeviceModelManagementPage(),
-              ),
-              GoRoute(
-                path: '/profile/sync-backup',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const SyncBackupPage(),
-              ),
-              GoRoute(
-                path: '/profile/ai-voice-settings',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const AiVoiceSettingsPage(),
-              ),
-              GoRoute(
-                path: '/profile/learning-preferences',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const LearningPreferencesPage(),
-              ),
-              GoRoute(
-                path: '/profile/appearance-language',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const AppearanceLanguagePage(),
-              ),
-              GoRoute(
-                path: '/profile/content-source',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const ContentSourcePage(),
-              ),
-              GoRoute(
-                path: '/profile/route-preference',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const RoutePreferencePage(),
-              ),
-              GoRoute(
-                path: '/profile/about-update',
-                builder: (_, state) =>
-                    state.extra as Widget? ?? const AboutUpdatePage(),
-              ),
-            ],
-          );
-
           return MaterialApp.router(
             title: l10n.get('interview_intelligence_training'),
             debugShowCheckedModeBanner: false,
@@ -356,7 +352,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             supportedLocales: L10n.supportedLocales,
             themeMode: settings.settings.themeMode,
             theme: appTheme,
-            routerConfig: router,
+            routerConfig: _router,
           );
         },
       ),
