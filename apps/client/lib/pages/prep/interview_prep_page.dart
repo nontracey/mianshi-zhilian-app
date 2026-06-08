@@ -731,6 +731,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
     final plan = widget.progress.prepPlan;
     final allTopics = widget.content.topics.values.toList();
     final aiProvider = context.read<AiProvider>();
+    final l10n = context.read<LocalizationProvider>();
     final generator = AiRouteGenerator(_storage);
     try {
       final route = await generator.generateRoute(
@@ -750,7 +751,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('路线生成失败: $e')),
+          SnackBar(content: Text(l10n.getp('route_gen_fail', {'error': '$e'}))),
         );
       }
     }
@@ -799,7 +800,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
               FilledButton.icon(
                 onPressed: _generateAiRoute,
                 icon: const Icon(Icons.auto_awesome),
-                label: Text('AI 生成路线'),
+                label: Text(l10n.get('ai_route_gen')),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -834,7 +835,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
         WorkPanel(
           title: route.name,
           trailing: Text(
-            '${phases.length} 阶段',
+            l10n.getp('phases_count', {'count': phases.length}),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           children: [
@@ -893,7 +894,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
             padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(
-                '该路线暂无阶段',
+                l10n.get('route_no_phases'),
                 style: TextStyle(color: AppColors.textTertiary),
               ),
             ),
@@ -951,7 +952,7 @@ class _RouteTabContentState extends State<_RouteTabContent> {
           child: TextButton.icon(
             onPressed: _generateAiRoute,
             icon: const Icon(Icons.auto_awesome),
-            label: Text('重新生成路线'),
+            label: Text(l10n.get('regenerate_route')),
           ),
         ),
       ],

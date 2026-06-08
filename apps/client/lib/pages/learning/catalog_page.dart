@@ -536,7 +536,7 @@ class _CatalogPageState extends State<CatalogPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '路线模式',
+              l10n.get('route_mode'),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -545,7 +545,7 @@ class _CatalogPageState extends State<CatalogPage> {
             ),
           ),
           Text(
-            '${_routeTopicIds.length} 个知识点',
+            l10n.getp('knowledge_points_in_route', {'count': _routeTopicIds.length}),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white54 : Colors.grey,
