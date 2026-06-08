@@ -176,6 +176,19 @@ class _CatalogPageState extends State<CatalogPage> {
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
 
+    if (contentProvider.isLoadingTopics) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(l10n.get('loading_latest_knowledge')),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(

@@ -7,6 +7,7 @@ import '../models/ai_config.dart';
 import '../models/topic.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/whisper_migration_helper.dart';
 
 class AiProvider extends ChangeNotifier {
   final AiService _aiService;
@@ -40,58 +41,10 @@ class AiProvider extends ChangeNotifier {
   }
 
   Future<void> loadConfigs() async {
-    await _migrateOldWhisperConfigIfNeeded();
+    await WhisperMigrationHelper.migrateIfNeeded(_storage, source: 'AiProvider');
     _configs = await _storage.loadAiConfigs();
     _defaultConfig = _configs.where((c) => c.isDefault).firstOrNull;
     notifyListeners();
-  }
-
-  Future<void> _migrateOldWhisperConfigIfNeeded() async {
-    try {
-      final rawData = await _storage.load('settings');
-      if (rawData is! Map<String, dynamic>) return;
-      final oldBaseUrl = rawData['whisperBaseUrl'] as String?;
-      final oldApiKey = rawData['whisperApiKey'] as String?;
-      final oldModel = rawData['whisperModel'] as String?;
-      if (oldBaseUrl == null || oldBaseUrl.trim().isEmpty) return;
-
-      final existingConfigs = await _storage.loadAiConfigs();
-      final alreadyMigrated = existingConfigs.any(
-        (c) =>
-            c.baseUrl == oldBaseUrl &&
-            c.audioMode == AiAudioMode.transcriptionEndpoint,
-      );
-      if (alreadyMigrated) return;
-
-      final migratedConfig = AiConfig(
-        id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
-        name: oldModel != null && oldModel.isNotEmpty
-            ? 'Whisper ($oldModel)'
-            : L10n.get('whisper_default_name', L10n.currentLanguage),
-        baseUrl: oldBaseUrl,
-        apiKey: oldApiKey ?? '',
-        model: oldModel ?? 'whisper-1',
-        isDefault: existingConfigs.isEmpty,
-        enabled: true,
-        supportsTextInput: false,
-        supportsImageInput: false,
-        supportsAudioInput: true,
-        supportsMultimodal: false,
-        supportsStreaming: false,
-        audioMode: AiAudioMode.transcriptionEndpoint,
-        usageTags: const ['stt'],
-        capabilityTests: {
-          AiCapability.audio.key: CapabilityTestRecord(
-            state: CapabilityTestState.untested,
-            testedAt: DateTime.now(),
-            message: 'migrated_from_old_settings',
-          ),
-        },
-      );
-      await _storage.saveAiConfigs([...existingConfigs, migratedConfig]);
-    } catch (e) {
-      debugPrint('AiProvider: whisper migration failed: $e');
-    }
   }
 
   Future<void> addConfig(AiConfig config) async {

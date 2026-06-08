@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
@@ -550,10 +551,9 @@ class _WeaknessTrainingPageState extends State<WeaknessTrainingPage> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RecallPage(topicIds: topics.map((t) => t.id).toList()),
-      ),
+    context.push(
+      '/practice/recall',
+      extra: RecallPage(topicIds: topics.map((t) => t.id).toList()),
     );
   }
 

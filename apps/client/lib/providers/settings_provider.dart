@@ -3,11 +3,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../l10n/l10n.dart';
-import '../models/ai_config.dart';
 import '../models/app_settings.dart';
 import '../models/user_progress.dart';
 import '../services/data_sync_service.dart';
 import '../services/storage_service.dart';
+import '../services/whisper_migration_helper.dart';
+import 'theme_provider.dart';
 
 // Web 端下载（条件导入）
 import 'web_download/web_download_stub.dart'
@@ -16,8 +17,9 @@ import 'web_download/web_download_stub.dart'
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
   final DataSyncService _dataSync;
+  final ThemeProvider _themeProvider;
 
-  SettingsProvider(this._storage, this._dataSync);
+  SettingsProvider(this._storage, this._dataSync, this._themeProvider);
 
   AppSettings _settings = const AppSettings();
   bool _isLoading = false;
@@ -32,69 +34,10 @@ class SettingsProvider extends ChangeNotifier {
     _settings = await _storage.loadSettings();
     _settings = _applyPlatformDefaults(_settings);
 
-    // 迁移旧版 Whisper API 配置 → AiConfig
-    await _migrateOldWhisperConfig();
+    await WhisperMigrationHelper.migrateIfNeeded(_storage, source: 'SettingsProvider');
 
     _isLoading = false;
     notifyListeners();
-  }
-
-  /// 检测并迁移旧版 AppSettings 中的 whisperBaseUrl/whisperApiKey/whisperModel
-  /// 到新的 AiConfig 体系，避免旧用户升级后配置静默丢失
-  Future<void> _migrateOldWhisperConfig() async {
-    try {
-      final rawData = await _storage.load('settings');
-      if (rawData == null) return;
-      final rawJson = rawData as Map<String, dynamic>;
-      final oldBaseUrl = rawJson['whisperBaseUrl'] as String?;
-      final oldApiKey = rawJson['whisperApiKey'] as String?;
-      final oldModel = rawJson['whisperModel'] as String?;
-      if (oldBaseUrl == null || oldBaseUrl.isEmpty) return;
-
-      // 检查是否已迁移过（通过标记或已有同名配置）
-      final existingConfigs = await _storage.loadAiConfigs();
-      final alreadyMigrated = existingConfigs.any(
-        (c) =>
-            c.baseUrl == oldBaseUrl &&
-            c.name.contains(L10n.get('whisper_default_name', L10n.currentLanguage)),
-      );
-      if (alreadyMigrated) return;
-
-      // 创建一个新 AiConfig
-      final migratedConfig = AiConfig(
-        id: 'whisper_migrated_${DateTime.now().millisecondsSinceEpoch}',
-        name: oldModel != null && oldModel.isNotEmpty
-            ? 'Whisper ($oldModel)'
-            : L10n.get('whisper_default_name', L10n.currentLanguage),
-        baseUrl: oldBaseUrl,
-        apiKey: oldApiKey ?? '',
-        model: oldModel ?? 'whisper-1',
-        isDefault: existingConfigs.isEmpty,
-        enabled: true,
-        supportsTextInput: false,
-        supportsImageInput: false,
-        supportsAudioInput: true,
-        supportsMultimodal: false,
-        supportsStreaming: true,
-        audioMode: AiAudioMode.transcriptionEndpoint,
-        usageTags: ['stt'],
-        capabilityTests: {
-          AiCapability.audio.key: CapabilityTestRecord(
-            state: CapabilityTestState.untested,
-            testedAt: DateTime.now(),
-            message: 'migrated_from_old_settings',
-          ),
-        },
-      );
-      final updatedConfigs = [...existingConfigs, migratedConfig];
-      await _storage.saveAiConfigs(updatedConfigs);
-
-      // 清除旧 whisper 字段（可选 — 不破坏其他设置）
-      // 但不对 settings 本身做写回，因为 fromJson 已忽略这些字段
-      debugPrint('SettingsProvider: migrated old whisper config to AiConfig');
-    } catch (e) {
-      debugPrint('SettingsProvider: whisper migration failed: $e');
-    }
   }
 
   AppSettings _applyPlatformDefaults(AppSettings s) {
@@ -105,6 +48,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> updateSettings(AppSettings settings) async {
     _settings = settings;
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 
@@ -143,24 +87,28 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setThemeType(AppThemeType themeType) async {
     _settings = _settings.copyWith(themeType: themeType);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 
   Future<void> setPrimaryColor(Color color) async {
     _settings = _settings.copyWith(primaryColor: color);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 
   Future<void> setAccentColor(Color color) async {
     _settings = _settings.copyWith(accentColor: color);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 
   Future<void> setLanguage(String language) async {
     _settings = _settings.copyWith(language: language);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateLanguage(language);
     notifyListeners();
   }
 
@@ -230,12 +178,14 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> updateFontScale(double scale) async {
     _settings = _settings.copyWith(fontScale: scale);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 
   Future<void> updateDensity(String density) async {
     _settings = _settings.copyWith(cardDensity: density);
     await _storage.saveSettings(_settings);
+    _themeProvider.updateFromSettings(_settings);
     notifyListeners();
   }
 

@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/domain.dart';
 import '../models/topic.dart';
+import 'api_response.dart';
 import 'endpoint_fallback_client.dart';
 import 'route_resolver.dart';
 
@@ -25,22 +25,26 @@ class ContentApiService {
 
   Future<Map<String, dynamic>> fetchManifest() async {
     final response = await _get('/manifest.json');
-    if (response.statusCode == 200) {
-      return json.decode(response.body) as Map<String, dynamic>;
+    final apiResp = ApiResponse.fromJson(response);
+    if (response.statusCode == 200 && apiResp.data != null) {
+      return apiResp.data!;
     }
-    throw Exception('Failed to load manifest: ${response.statusCode}');
+    throw ApiResponseException(
+      'Failed to load manifest: ${response.statusCode}',
+      response.statusCode,
+    );
   }
 
   Future<Domain> fetchDomain(String domainId, {String? entry}) async {
     final domainPath = _normalizeDomainPath(domainId, entry: entry);
     final response = await _get(domainPath);
-    if (response.statusCode == 200) {
-      return Domain.fromJson(
-        json.decode(response.body) as Map<String, dynamic>,
-      );
+    final apiResp = ApiResponse.fromJson(response);
+    if (response.statusCode == 200 && apiResp.data != null) {
+      return Domain.fromJson(apiResp.data!);
     }
-    throw Exception(
+    throw ApiResponseException(
       'Failed to load domain $domainPath: ${response.statusCode}',
+      response.statusCode,
     );
   }
 
@@ -48,10 +52,14 @@ class ContentApiService {
   /// 也兼容旧格式 "java/a" (不带 .json)。
   Future<Topic> fetchTopic(String topicPath) async {
     final response = await _get(_normalizeTopicPath(topicPath));
-    if (response.statusCode == 200) {
-      return Topic.fromJson(json.decode(response.body) as Map<String, dynamic>);
+    final apiResp = ApiResponse.fromJson(response);
+    if (response.statusCode == 200 && apiResp.data != null) {
+      return Topic.fromJson(apiResp.data!);
     }
-    throw Exception('Failed to load topic $topicPath: ${response.statusCode}');
+    throw ApiResponseException(
+      'Failed to load topic $topicPath: ${response.statusCode}',
+      response.statusCode,
+    );
   }
 
   /// 批量加载某个领域下的所有 topics

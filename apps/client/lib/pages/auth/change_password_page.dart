@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -186,12 +187,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                   FilledButton(
                                     onPressed: () {
                                       Navigator.pop(ctx);
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SubmitTicketPage(
-                                            type: 'password_reset',
-                                          ),
+                                      context.push(
+                                        '/auth/submit-ticket',
+                                        extra: const SubmitTicketPage(
+                                          type: 'password_reset',
                                         ),
                                       );
                                     },
@@ -209,11 +208,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         const SizedBox(width: 12),
                         OutlinedButton.icon(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SubmitTicketPage(
-                                  type: 'password_reset',
-                                ),
+                            context.push(
+                              '/auth/submit-ticket',
+                              extra: const SubmitTicketPage(
+                                type: 'password_reset',
                               ),
                             );
                           },

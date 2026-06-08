@@ -9,6 +9,7 @@ import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/widgets/score_badge.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/pages/practice/mock_interview_widgets.dart';
 
 enum _InterviewStage { main, followUp, clarify, summary }
 
@@ -900,31 +901,31 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _ScenarioChip(
+              ScenarioChip(
                 label: l10n.get('mix_combine'),
                 value: 'mixed',
                 selected: _scenario == 'mixed',
                 onSelected: _onScenarioChanged,
               ),
-              _ScenarioChip(
+              ScenarioChip(
                 label: l10n.get('basic_knowledge'),
                 value: 'foundation',
                 selected: _scenario == 'foundation',
                 onSelected: _onScenarioChanged,
               ),
-              _ScenarioChip(
+              ScenarioChip(
                 label: l10n.get('system_design'),
                 value: 'systemDesign',
                 selected: _scenario == 'systemDesign',
                 onSelected: _onScenarioChanged,
               ),
-              _ScenarioChip(
+              ScenarioChip(
                 label: l10n.get('code_question_count'),
                 value: 'code',
                 selected: _scenario == 'code',
                 onSelected: _onScenarioChanged,
               ),
-              _ScenarioChip(
+              ScenarioChip(
                 label: l10n.get('project_deep_dig'),
                 value: 'project',
                 selected: _scenario == 'project',
@@ -1358,19 +1359,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _ResultStat(
+                    ResultStat(
                       icon: Icons.timer_outlined,
                       value: _formatDuration(totalSeconds),
                       label: l10n.get('total_use_time'),
                     ),
                     const SizedBox(width: 24),
-                    _ResultStat(
+                    ResultStat(
                       icon: Icons.quiz_outlined,
                       value: '${_results.length}',
                       label: l10n.get('question_count'),
                     ),
                     const SizedBox(width: 24),
-                    _ResultStat(
+                    ResultStat(
                       icon: Icons.warning_amber_outlined,
                       value: '$weakCount',
                       label: l10n.get('demand_review'),
@@ -1658,66 +1659,5 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         ),
       );
     });
-  }
-}
-
-// ── 辅助组件 ──────────────────────────────────────────────
-
-class _ScenarioChip extends StatelessWidget {
-  const _ScenarioChip({
-    required this.label,
-    required this.value,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final String value;
-  final bool selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(value),
-    );
-  }
-}
-
-class _ResultStat extends StatelessWidget {
-  const _ResultStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-    this.valueColor,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color? valueColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 18, color: Colors.white60),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            color: valueColor ?? Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white54, fontSize: 11),
-        ),
-      ],
-    );
   }
 }

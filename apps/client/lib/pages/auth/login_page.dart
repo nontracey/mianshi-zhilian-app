@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -224,11 +225,10 @@ class _LoginPageState extends State<LoginPage> {
                       if (!_isRegister) ...[
                         TextButton(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SubmitTicketPage(
-                                  type: 'password_reset',
-                                ),
+                            context.push(
+                              '/auth/submit-ticket',
+                              extra: const SubmitTicketPage(
+                                type: 'password_reset',
                               ),
                             );
                           },

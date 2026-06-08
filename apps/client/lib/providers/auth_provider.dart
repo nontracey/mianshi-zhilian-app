@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
 import '../models/user.dart';
 import '../services/api_headers.dart';
+import '../services/api_response.dart';
 import '../services/endpoint_fallback_client.dart';
 import '../services/route_resolver.dart';
 import '../services/route_state_store.dart';
@@ -196,12 +197,11 @@ class AuthProvider extends ChangeNotifier {
         }),
       );
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        _user = User.fromJson(data['user'] as Map<String, dynamic>);
-        _token = data['token'] as String;
-        _refreshToken = data['refreshToken'] as String?;
+      final data = ApiResponse.fromJson(response);
+      if (response.statusCode == 200 && data.hasSuccessField) {
+        _user = User.fromJson(data.data!['user'] as Map<String, dynamic>);
+        _token = data.data!['token'] as String;
+        _refreshToken = data.data!['refreshToken'] as String?;
         await _saveUser();
         await _storage.recordAnalyticsFeature('login');
         _bindDevice();
@@ -210,7 +210,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? L10n.get('register_failed', L10n.currentLanguage);
+        _error = data.error ?? data.data?['error'] as String? ?? L10n.get('register_failed', L10n.currentLanguage);
         _isLoading = false;
         notifyListeners();
         return false;
@@ -294,12 +294,12 @@ class AuthProvider extends ChangeNotifier {
         timeout: const Duration(seconds: 15),
       );
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
+      final data = ApiResponse.fromJson(response);
 
-      if (response.statusCode == 200 && data['success'] == true) {
-        _user = User.fromJson(data['user'] as Map<String, dynamic>);
-        _token = data['token'] as String;
-        _refreshToken = data['refreshToken'] as String?;
+      if (response.statusCode == 200 && data.hasSuccessField) {
+        _user = User.fromJson(data.data!['user'] as Map<String, dynamic>);
+        _token = data.data!['token'] as String;
+        _refreshToken = data.data!['refreshToken'] as String?;
         await _saveUser();
         await _storage.recordAnalyticsFeature('login');
         // 设备绑定不阻塞登录返回
@@ -309,7 +309,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = data['error'] as String? ?? L10n.get('login_failed', L10n.currentLanguage);
+        _error = data.error ?? data.data?['error'] as String? ?? L10n.get('login_failed', L10n.currentLanguage);
         _isLoading = false;
         notifyListeners();
         return false;

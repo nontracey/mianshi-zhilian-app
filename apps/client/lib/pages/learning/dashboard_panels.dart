@@ -1,0 +1,1103 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/domain.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:mianshi_zhilian/utils/mastery_utils.dart';
+import 'dashboard_widgets.dart';
+import 'dashboard_dialogs.dart';
+
+// ── 学习路径项目组件 ──
+
+class LearningPathItem extends StatefulWidget {
+  const LearningPathItem({
+    super.key,
+    required this.domain,
+    required this.index,
+    required this.masteryPercent,
+    required this.isSelected,
+    required this.onTap,
+    this.onViewCatalog,
+  });
+
+  final Domain domain;
+  final int index;
+  final int masteryPercent;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback? onViewCatalog;
+
+  @override
+  State<LearningPathItem> createState() => LearningPathItemState();
+}
+
+class LearningPathItemState extends State<LearningPathItem> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final level = getMasteryLevel(widget.masteryPercent);
+    final status = level == MasteryLevel.mastered
+        ? l10n.get('already_complete')
+        : level == MasteryLevel.learning
+        ? l10n.get('progress_action_in')
+        : l10n.get('un_start');
+    final statusColor = getMasteryColor(widget.masteryPercent);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: widget.isSelected
+            ? AppColors.accent.withValues(alpha: 0.05)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: widget.isSelected
+              ? AppColors.accent.withValues(alpha: 0.3)
+              : (isDark ? AppColors.borderMidnight : AppColors.borderLight),
+        ),
+      ),
+      child: Column(
+        children: [
+          // 主行
+          InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // 序号
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: widget.isSelected
+                          ? AppColors.accent
+                          : (isDark
+                                ? AppColors.borderMidnightSubtle
+                                : const Color(0xFFF0F2F5)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${widget.index + 1}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: widget.isSelected
+                              ? Colors.white
+                              : (isDark
+                                    ? Colors.white70
+                                    : Colors.grey.shade700),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 标题和状态
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.domain.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              l10n.getp('progress_percent_2', {
+                                'percent': widget.masteryPercent,
+                              }),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              l10n.getp('exam_point_count_2', {
+                                'count': widget.domain.topicCount,
+                              }),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 展开/折叠按钮
+                  GestureDetector(
+                    onTap: () => setState(() => _isExpanded = !_isExpanded),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: isDark ? Colors.white54 : Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // 展开的详情
+          if (_isExpanded)
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  // 描述
+                  if (widget.domain.description.isNotEmpty) ...[
+                    Text(
+                      widget.domain.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  // 统计信息
+                  Row(
+                    children: [
+                      _buildStatItem(
+                        context,
+                        icon: Icons.menu_book_outlined,
+                        label: l10n.get('knowledge_point'),
+                        value: '${widget.domain.topicCount}',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatItem(
+                        context,
+                        icon: Icons.trending_up,
+                        label: l10n.get('mastery'),
+                        value: '${widget.masteryPercent}%',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatItem(
+                        context,
+                        icon: Icons.category_outlined,
+                        label: l10n.get('score_category'),
+                        value: '${widget.domain.categories.length}',
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 进度条
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: widget.masteryPercent / 100,
+                      backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                      color: AppColors.accent,
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 查看详情按钮
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onViewCatalog ?? widget.onTap,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: Text(l10n.get('check_view_knowledge_catalog')),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: isDark ? Colors.white54 : Colors.grey),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white38 : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── 左侧面板：今日复习队列、薄弱知识点TOP5 ──
+
+class LeftPanel extends StatelessWidget {
+  const LeftPanel({
+    super.key,
+    required this.dueTopics,
+    required this.weakTopics,
+    required this.onTopicTap,
+    required this.onReview,
+    required this.progressProvider,
+  });
+
+  final List<Topic> dueTopics;
+  final List<Topic> weakTopics;
+  final ValueChanged<String> onTopicTap;
+  final VoidCallback? onReview;
+  final ProgressProvider progressProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 今日复习队列
+        PanelCard(
+          title: l10n.get('today_day_review_queue'),
+          icon: Icons.replay_outlined,
+          trailing: '${dueTopics.length}',
+          headerTrailing: Text(
+            l10n.get('to_day_time'),
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white38 : AppColors.textTertiary,
+            ),
+          ),
+          child: Column(
+            children: [
+              if (dueTopics.isEmpty)
+                EmptyState(message: l10n.get('temporary_no_to_day_content'))
+              else
+                ...dueTopics.take(5).map((topic) {
+                  final progress = progressProvider.getTopicProgress(topic.id);
+                  final score = progress?.score ?? 0;
+                  final nextReviewAt = progress?.nextReviewAt;
+                  return ReviewItem(
+                    topic: topic,
+                    score: score,
+                    nextReviewAt: nextReviewAt,
+                    onTap: () => onTopicTap(topic.id),
+                  );
+                }),
+              if (dueTopics.length > 5)
+                TextButton(
+                  onPressed: onReview,
+                  child: Text(l10n.get('check_view_all_review')),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 薄弱知识点TOP5
+        PanelCard(
+          title: l10n.get('weak_knowledge_point_top_5'),
+          icon: Icons.trending_down_outlined,
+          trailing: '${weakTopics.length}',
+          child: Column(
+            children: [
+              if (weakTopics.isEmpty)
+                EmptyState(message: l10n.get('temporary_no_weak_item'))
+              else
+                ...weakTopics.map((topic) {
+                  final progress = progressProvider.getTopicProgress(topic.id);
+                  final score = progress?.score ?? 0;
+                  return WeakTopicItem(
+                    topic: topic,
+                    score: score,
+                    onTap: () => onTopicTap(topic.id),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── 中间面板：当前学习路线、领域知识卡片 ──
+
+class CenterPanel extends StatefulWidget {
+  const CenterPanel({
+    super.key,
+    required this.currentDomain,
+    required this.allDomains,
+    required this.currentDomainId,
+    required this.recommendedTopics,
+    required this.masteryPercent,
+    required this.topicCount,
+    required this.readiness,
+    required this.streakDays,
+    required this.onDomainChanged,
+    required this.onTopicTap,
+    required this.onViewDomainCatalog,
+    required this.onPractice,
+    required this.onReview,
+    required this.onMockInterview,
+    required this.contentProvider,
+    required this.progressProvider,
+    required this.settingsProvider,
+  });
+
+  final Domain? currentDomain;
+  final List<Domain> allDomains;
+  final String currentDomainId;
+  final List<Topic> recommendedTopics;
+  final int masteryPercent;
+  final int topicCount;
+  final int readiness;
+  final int streakDays;
+  final ValueChanged<String> onDomainChanged;
+  final ValueChanged<String> onTopicTap;
+  final ValueChanged<String> onViewDomainCatalog;
+  final VoidCallback onPractice;
+  final VoidCallback? onReview;
+  final VoidCallback? onMockInterview;
+  final ContentProvider contentProvider;
+  final ProgressProvider progressProvider;
+  final SettingsProvider settingsProvider;
+
+  @override
+  State<CenterPanel> createState() => CenterPanelState();
+}
+
+class CenterPanelState extends State<CenterPanel> {
+  LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+  final _storage = StorageService();
+  List<String> _disabledIds = [];
+  LearningRoute? _selectedRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisabled();
+    _loadSelectedRoute();
+  }
+
+  Future<void> _loadDisabled() async {
+    final ids = await _storage.loadDisabledDomains();
+    if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  Future<void> _loadSelectedRoute() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId != null && mounted) {
+      // 加载自定义路线
+      final customData = await _storage.loadJsonList('custom_routes');
+      final customRoutes = customData
+          .map((e) => LearningRoute.fromJson(e))
+          .toList();
+
+      // 默认路线
+      final defaultRoutes = [
+        LearningRoute(
+          id: 'java',
+          name: l10n.get('java_backend_dev'),
+          description: l10n.get(
+            'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
+          ),
+          domainIds: [
+            'java',
+            'architecture',
+            'design-pattern',
+            'network',
+            'os',
+          ],
+          isDefault: true,
+        ),
+        LearningRoute(
+          id: 'frontend',
+          name: l10n.get('frontend_dev'),
+          description: l10n.get(
+            'javascript_typescript_react_vue_frontend_engineering_transform',
+          ),
+          domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
+          isDefault: true,
+        ),
+        LearningRoute(
+          id: 'agent',
+          name: l10n.get('agent_dev'),
+          description: l10n.get('ai_tech_stack_description'),
+          domainIds: ['agent', 'algorithm', 'architecture', 'network'],
+          isDefault: true,
+        ),
+      ];
+
+      // 从内容仓库生成的学习路线
+      final contentRoutes = _generateRoutesFromContent();
+
+      final allRoutes = [...defaultRoutes, ...contentRoutes, ...customRoutes];
+      final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
+      if (route != null && mounted) {
+        setState(() => _selectedRoute = route);
+      }
+    }
+  }
+
+  Future<void> _saveSelectedRoute(LearningRoute? route) async {
+    if (route != null) {
+      await _storage.save('selected_route_id', route.id);
+    } else {
+      await _storage.save('selected_route_id', null);
+    }
+    if (mounted) setState(() => _selectedRoute = route);
+  }
+
+  List<Domain> get _domains {
+    var domains = widget.allDomains
+        .where((d) => !_disabledIds.contains(d.id))
+        .toList();
+
+    // 如果选中了路线，按路线顺序过滤
+    if (_selectedRoute != null && _selectedRoute!.domainIds.isNotEmpty) {
+      domains = domains
+          .where((d) => _selectedRoute!.domainIds.contains(d.id))
+          .toList();
+      domains.sort(
+        (a, b) => _selectedRoute!.domainIds
+            .indexOf(a.id)
+            .compareTo(_selectedRoute!.domainIds.indexOf(b.id)),
+      );
+    }
+
+    return domains;
+  }
+
+  // 所有未禁用的领域（不受路线选择影响）
+  List<Domain> get _allEnabledDomains {
+    return widget.allDomains
+        .where((d) => !_disabledIds.contains(d.id))
+        .toList();
+  }
+
+  List<LearningRoute> _generateRoutesFromContent() {
+    if (widget.allDomains.isEmpty) return [];
+    return [
+      LearningRoute(
+        id: 'all_content',
+        name: l10n.get('all_topics'),
+        description: '',
+        domainIds: widget.allDomains.map((d) => d.id).toList(),
+        isDefault: false,
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final domains = _domains;
+    final allEnabledDomains = _allEnabledDomains;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 当前学习路线
+        PanelCard(
+          title: l10n.get('current_study_route'),
+          icon: Icons.route_outlined,
+          trailing: l10n.get('toggle_switch_route'),
+          onTrailingTap: () => _showRouteSelector(context),
+          child: Column(
+            children: [
+              if (domains.isEmpty)
+                EmptyState(message: l10n.get('temporary_no_study_route'))
+              else
+                ...domains.take(5).toList().asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final domain = entry.value;
+                  final dp = widget.progressProvider.getDomainProgress(
+                    domain.id,
+                    widget.contentProvider.topics.values.toList(),
+                  );
+                  return LearningPathItem(
+                    domain: domain,
+                    index: index,
+                    masteryPercent: dp.masteryPercent,
+                    isSelected: domain.id == widget.currentDomainId,
+                    onTap: () {
+                      widget.onDomainChanged(domain.id);
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
+                        widget.contentProvider.loadDomainTopics(domain.id);
+                      }
+                    },
+                    onViewCatalog: () {
+                      widget.onDomainChanged(domain.id);
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
+                        widget.contentProvider.loadDomainTopics(domain.id);
+                      }
+                      widget.onViewDomainCatalog(domain.id);
+                    },
+                  );
+                }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 领域知识卡片
+        PanelCard(
+          title: l10n.get('domain_knowledge_card'),
+          icon: Icons.school_outlined,
+          trailing: l10n.get('management_domain'),
+          onTrailingTap: () => _showManageDomains(context),
+          child: Column(
+            children: [
+              if (allEnabledDomains.isEmpty)
+                EmptyState(message: l10n.get('temporary_no_domain_data'))
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // 根据宽度决定每行几个卡片
+                    final cardWidth = constraints.maxWidth > 900
+                        ? (constraints.maxWidth - 36) /
+                              4 // 一行4个
+                        : constraints.maxWidth > 600
+                        ? (constraints.maxWidth - 24) /
+                              3 // 一行3个
+                        : (constraints.maxWidth - 12) / 2; // 一行2个
+
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: allEnabledDomains.map((domain) {
+                        final dp = widget.progressProvider.getDomainProgress(
+                          domain.id,
+                          widget.contentProvider.topics.values.toList(),
+                        );
+                        final practiceCount = widget.progressProvider
+                            .getDomainPracticeCount(
+                              domain.id,
+                              widget.contentProvider.topics.values.toList(),
+                            );
+                        return SizedBox(
+                          width: cardWidth,
+                          child: DomainKnowledgeCard(
+                            domain: domain,
+                            masteryPercent: dp.masteryPercent,
+                            practiceCount: practiceCount,
+                            onTap: () {
+                              widget.onDomainChanged(domain.id);
+                              if (widget.contentProvider.getLoadedTopicCount(
+                                    domain.id,
+                                  ) ==
+                                  0) {
+                                widget.contentProvider.loadDomainTopics(
+                                  domain.id,
+                                );
+                              }
+                              widget.onViewDomainCatalog(domain.id);
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showRouteSelector(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final defaultRoutes = [
+      LearningRoute(
+        id: 'java',
+        name: l10n.get('java_backend_dev'),
+        description: l10n.get(
+          'java_core_jvm_concurrent_spring_database_in_between_condition_syst',
+        ),
+        domainIds: ['java', 'architecture', 'design-pattern', 'network', 'os'],
+        isDefault: true,
+      ),
+      LearningRoute(
+        id: 'frontend',
+        name: l10n.get('frontend_dev'),
+        description: l10n.get(
+          'javascript_typescript_react_vue_frontend_engineering_transform',
+        ),
+        domainIds: ['frontend', 'algorithm', 'design-pattern', 'network'],
+        isDefault: true,
+      ),
+      LearningRoute(
+        id: 'agent',
+        name: l10n.get('agent_dev'),
+        description: l10n.get('ai_tech_stack_description'),
+        domainIds: ['agent', 'algorithm', 'architecture', 'network'],
+        isDefault: true,
+      ),
+    ];
+
+    // 从内容仓库生成的学习路线
+    final contentRoutes = _generateRoutesFromContent();
+
+    final routes = [...defaultRoutes, ...contentRoutes];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => RouteSelectorDialog(
+        routes: routes,
+        currentRouteId: _selectedRoute?.id,
+        availableDomains: widget.allDomains,
+        disabledDomainIds: _disabledIds,
+        onRouteSelected: (route) {
+          _saveSelectedRoute(route);
+          if (route.domainIds.isNotEmpty) {
+            widget.onDomainChanged(route.domainIds.first);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showManageDomains(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => ManageDomainsDialog(
+        domains: widget.allDomains,
+        disabledDomainIds: _disabledIds.toSet(),
+        onToggleDomain: (domainId) async {
+          setState(() {
+            if (_disabledIds.contains(domainId)) {
+              _disabledIds.remove(domainId);
+            } else {
+              _disabledIds.add(domainId);
+            }
+          });
+          await _storage.saveDisabledDomains(_disabledIds);
+        },
+      ),
+    );
+  }
+}
+
+// ── 右侧面板 ──
+
+class RightPanel extends StatelessWidget {
+  const RightPanel({
+    super.key,
+    required this.currentDomainId,
+    required this.domains,
+    required this.masteryPercent,
+    required this.readiness,
+    required this.weakTopics,
+    required this.recentAttempts,
+    required this.onTopicTap,
+    required this.onDomainChanged,
+    required this.progressProvider,
+    required this.contentProvider,
+  });
+
+  final String currentDomainId;
+  final List<Domain> domains;
+  final int masteryPercent;
+  final int readiness;
+  final List<Topic> weakTopics;
+  final List<PracticeAttempt> recentAttempts;
+  final ValueChanged<String> onTopicTap;
+  final ValueChanged<String> onDomainChanged;
+  final ProgressProvider progressProvider;
+  final ContentProvider contentProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    // 获取掌握度趋势数据
+    final trendData = progressProvider.getMasteryTrend();
+
+    // 计算当前领域的分类掌握度
+    final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
+
+    // 按分类计算掌握度
+    final categoryMap = <String, List<Topic>>{};
+    for (final topic in domainTopics) {
+      categoryMap.putIfAbsent(topic.category, () => []).add(topic);
+    }
+
+    final categories = categoryMap.entries.map((entry) {
+      final topics = entry.value;
+      int totalScore = 0;
+      int learnedCount = 0;
+      for (final t in topics) {
+        final score = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+        if (score > 0) {
+          totalScore += score;
+          learnedCount++;
+        }
+      }
+      // 没有学习过的分类，掌握度为0
+      final avgScore = learnedCount == 0 ? 0 : totalScore ~/ learnedCount;
+      return CategoryMastery(name: entry.key, masteryPercent: avgScore);
+    }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
+
+    // 计算掌握程度百分比
+    int totalTopics = domainTopics.length;
+    int masteredCount = 0;
+    int learningCount = 0;
+    int newCount = 0;
+
+    for (final topic in domainTopics) {
+      final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
+      if (score >= 85) {
+        masteredCount++;
+      } else if (score >= 60) {
+        learningCount++;
+      } else {
+        newCount++;
+      }
+    }
+
+    final masteredPercent = totalTopics == 0
+        ? 0
+        : (masteredCount * 100 ~/ totalTopics);
+    final learningPercent = totalTopics == 0
+        ? 0
+        : (learningCount * 100 ~/ totalTopics);
+    final newPercent = totalTopics == 0 ? 0 : (newCount * 100 ~/ totalTopics);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 掌握度概览
+        PanelCard(
+          title: l10n.get('mastery_overview_browse'),
+          icon: Icons.pie_chart_outline,
+          headerTrailing: DomainDropdown(
+            currentDomainId: currentDomainId,
+            domains: domains,
+            onChanged: onDomainChanged,
+          ),
+          child: Column(
+            children: [
+              MasteryOverview(
+                masteryPercent: masteryPercent,
+                masteredPercent: masteredPercent,
+                learningPercent: learningPercent,
+                newPercent: newPercent,
+              ),
+              const SizedBox(height: 16),
+              MasteryStats(categories: categories.take(4).toList()),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 掌握度趋势
+        PanelCard(
+          title: l10n.get('mastery_trend_recent_7_day'),
+          icon: Icons.trending_up_outlined,
+          child: MasteryTrendChart(trendData: trendData),
+        ),
+        const SizedBox(height: 16),
+        // 下一步最佳行动
+        PanelCard(
+          title: l10n.get('next_step_best_action'),
+          icon: Icons.lightbulb_outline,
+          child: NextBestAction(
+            weakTopics: weakTopics,
+            onTopicTap: onTopicTap,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 备选行动
+        PanelCard(
+          title: l10n.get('alternate_select_action'),
+          icon: Icons.list_alt_outlined,
+          child: AlternativeActions(
+            weakTopics: weakTopics,
+            onTopicTap: onTopicTap,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 练习记录
+        PanelCard(
+          title: l10n.get('practice_record'),
+          icon: Icons.auto_awesome_outlined,
+          trailing: recentAttempts.isEmpty ? null : l10n.get('check_view_all'),
+          onTrailingTap: recentAttempts.isEmpty
+              ? null
+              : () => _showPracticeRecords(context),
+          child: Column(
+            children: [
+              if (recentAttempts.isEmpty)
+                EmptyState(message: l10n.get('temporary_no_feedback_record'))
+              else
+                ...recentAttempts.take(3).map((attempt) {
+                  return AIFeedbackItem(attempt: attempt);
+                }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showPracticeRecords(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ProgressProvider>.value(
+            value: progressProvider,
+          ),
+          ChangeNotifierProvider<ContentProvider>.value(value: contentProvider),
+        ],
+        child: const PracticeRecordsSheet(),
+      ),
+    );
+  }
+}
+
+// ── 练习记录面板 ──
+
+class PracticeRecordsSheet extends StatefulWidget {
+  const PracticeRecordsSheet({super.key});
+
+  @override
+  State<PracticeRecordsSheet> createState() => PracticeRecordsSheetState();
+}
+
+class PracticeRecordsSheetState extends State<PracticeRecordsSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final progressProvider = context.watch<ProgressProvider>();
+    final contentProvider = context.watch<ContentProvider>();
+    final attempts = _filterAttempts(
+      progressProvider.recentAttempts,
+      contentProvider,
+    );
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.78,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.get('practice_record'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() {
+                  _query = value.trim().toLowerCase();
+                }),
+                decoration: InputDecoration(
+                  hintText: l10n.get('search_practice_record'),
+                  prefixIcon: const Icon(Icons.search_outlined),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: l10n.get('clear'),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: attempts.isEmpty
+                  ? Center(
+                      child: EmptyState(
+                        message: l10n.get('temporary_no_feedback_record'),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      itemCount: attempts.length,
+                      separatorBuilder: (_, _) => const Divider(height: 16),
+                      itemBuilder: (_, index) => PracticeRecordItem(
+                        attempt: attempts[index],
+                        topic: contentProvider.findTopic(
+                          attempts[index].topicId,
+                        ),
+                        onDelete: () => _confirmDelete(attempts[index]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<PracticeAttempt> _filterAttempts(
+    List<PracticeAttempt> attempts,
+    ContentProvider contentProvider,
+  ) {
+    if (_query.isEmpty) return attempts;
+
+    return attempts.where((attempt) {
+      final topic = contentProvider.findTopic(attempt.topicId);
+      final text = [
+        topic?.title,
+        attempt.topicId,
+        attempt.mode,
+        attempt.question,
+        attempt.answer,
+        attempt.summary,
+        attempt.nextAction,
+        attempt.missedPoints.join(' '),
+        attempt.wrongPoints.join(' '),
+      ].whereType<String>().join(' ').toLowerCase();
+      return text.contains(_query);
+    }).toList();
+  }
+
+  Future<void> _confirmDelete(PracticeAttempt attempt) async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.get('confirm_delete')),
+        content: Text(l10n.get('confirm_delete_practice_record')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(l10n.get('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await context.read<ProgressProvider>().deleteAttempt(attempt.id);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.get('practice_record_deleted'))),
+    );
+  }
+}

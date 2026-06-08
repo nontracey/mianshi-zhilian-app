@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'answer_template_widgets.dart';
 
 class AnswerTemplatePage extends StatelessWidget {
   const AnswerTemplatePage({
@@ -33,7 +34,7 @@ class AnswerTemplatePage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // 问题卡片
-          _QuestionCard(topicTitle: topicTitle, question: question),
+          QuestionCard(topicTitle: topicTitle, question: question),
           const SizedBox(height: 16),
 
           // 模板说明
@@ -63,7 +64,7 @@ class AnswerTemplatePage extends StatelessWidget {
           const SizedBox(height: 20),
 
           // 简短版模板
-          _TemplateCard(
+          TemplateCard(
             title: l10n.get('simple_short_version'),
             subtitle: l10n.get(
               'suitable_combine_electric_word_interview_fast_speed_answer',
@@ -72,15 +73,15 @@ class AnswerTemplatePage extends StatelessWidget {
             color: const Color(0xFF10B981),
             duration: l10n.get('time_30sec_to_1min'),
             structure: [
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'core_definition',
                 descKey: 'one_sentence_explain_concept',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'key_feature',
                 descKey: 'two_three_core_points',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'actual_application',
                 descKey: 'step_1_actual_example_2',
               ),
@@ -91,7 +92,7 @@ class AnswerTemplatePage extends StatelessWidget {
           const SizedBox(height: 12),
 
           // 标准版模板
-          _TemplateCard(
+          TemplateCard(
             title: l10n.get('standard_version'),
             subtitle: l10n.get(
               'suitable_combine_large_multi_count_tech_interview',
@@ -100,23 +101,23 @@ class AnswerTemplatePage extends StatelessWidget {
             color: AppColors.accent,
             duration: l10n.get('time_2to3min'),
             structure: [
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'concept_definition',
                 descKey: 'clarify_clear_explain_is_what',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'core_principle',
                 descKey: 'working_principle_and_mechanism',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'comparison_analysis',
                 descKey: 'pros_cons_or_comparison',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'actual_application',
                 descKey: 'project_in_use_scenario',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'note_intention_matter_item',
                 descKey: 'common_pitfall_and_best_practice',
               ),
@@ -127,7 +128,7 @@ class AnswerTemplatePage extends StatelessWidget {
           const SizedBox(height: 12),
 
           // 深入版模板
-          _TemplateCard(
+          TemplateCard(
             title: l10n.get('deep_enter_version'),
             subtitle: l10n.get(
               'suitable_combine_deep_enter_probe_discuss_senior_position',
@@ -136,31 +137,31 @@ class AnswerTemplatePage extends StatelessWidget {
             color: const Color(0xFF8B5CF6),
             duration: l10n.get('time_3to5min'),
             structure: [
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'concept_definition',
                 descKey: 'clarify_clear_explain_is_what',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'underlying_layer_principle',
                 descKey: 'deep_enter_working_principle',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'source_code_analysis',
                 descKey: 'key_implementation_detail',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'performance_analysis',
                 descKey: 'time_space_complexity',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'design_pattern',
                 descKey: 'involve_and_design_thinking_want',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'actual_case',
                 descKey: 'project_in_application',
               ),
-              _TemplateSection(
+              TemplateSection(
                 nameKey: 'optional_extension_capability_design',
                 descKey: 'mutual_close_tech_extension',
               ),
@@ -316,297 +317,5 @@ class AnswerTemplatePage extends StatelessWidget {
 
   String _getDeepExample(LocalizationProvider l10n) {
     return l10n.get('template_deep_example');
-  }
-}
-
-class _QuestionCard extends StatelessWidget {
-  const _QuestionCard({required this.topicTitle, required this.question});
-
-  final String topicTitle;
-  final String question;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.accent.withValues(alpha: 0.3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    l10n.get('problem'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    topicTitle,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              question,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TemplateSection {
-  final String nameKey;
-  final String descKey;
-
-  const _TemplateSection({required this.nameKey, required this.descKey});
-}
-
-class _TemplateCard extends StatelessWidget {
-  const _TemplateCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.duration,
-    required this.structure,
-    required this.example,
-    this.onSelect,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final String duration;
-  final List<_TemplateSection> structure;
-  final String example;
-  final VoidCallback? onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: color.withValues(alpha: 0.3)),
-      ),
-      child: ExpansionTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(fontWeight: FontWeight.w700, color: color),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                duration,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.expand_more, color: Colors.grey.shade400),
-          ],
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 结构说明
-                Text(
-                  l10n.get('answer_structure'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...structure.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final section = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: color,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.get(section.nameKey),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Text(
-                                l10n.get(section.descKey),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 12),
-
-                // 示例
-                Row(
-                  children: [
-                    Text(
-                      l10n.get('show_example_answer'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: example));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              l10n.get('already_review_control_show_example'),
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.copy, size: 14),
-                      label: Text(
-                        l10n.get('review_control'),
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    example,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 1.6,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 使用按钮
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: onSelect,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: color,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text(l10n.get('use_this_template')),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

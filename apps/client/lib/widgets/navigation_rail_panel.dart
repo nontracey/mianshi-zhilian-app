@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../main.dart';
+import '../pages/learning_shell.dart';
 import '../theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 

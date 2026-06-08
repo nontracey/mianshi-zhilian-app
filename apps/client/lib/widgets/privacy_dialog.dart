@@ -196,43 +196,6 @@ class PrivacyConfirmDialog extends StatelessWidget {
   }
 }
 
-// 隐私控制服务
-class PrivacyService {
-  static bool _hasConfirmed = false;
-  static String? _confirmedDataType;
-
-  static bool get hasConfirmed => _hasConfirmed;
-
-  static Future<bool> confirmUpload({
-    required BuildContext context,
-    required String dataType,
-    required String dataDescription,
-  }) async {
-    // 如果已经确认过相同类型的数据，直接返回
-    if (_hasConfirmed && _confirmedDataType == dataType) {
-      return true;
-    }
-
-    final confirmed = await PrivacyConfirmDialog.show(
-      context: context,
-      dataType: dataType,
-      dataDescription: dataDescription,
-    );
-
-    if (confirmed) {
-      _hasConfirmed = true;
-      _confirmedDataType = dataType;
-    }
-
-    return confirmed;
-  }
-
-  static void reset() {
-    _hasConfirmed = false;
-    _confirmedDataType = null;
-  }
-}
-
 // 隐私设置页面
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});

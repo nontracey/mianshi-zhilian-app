@@ -18,6 +18,7 @@ class DataSyncService {
 
   static const _fileName = 'sync-state.json';
   static const _timeout = Duration(seconds: 30);
+  static const _uploadTimeout = Duration(seconds: 120);
 
   void start() {
     _timer?.cancel();
@@ -493,7 +494,7 @@ class DataSyncService {
     } else if (existing.statusCode != 404) {
       _ensureSuccess(existing, 'Gitee 读取远端版本失败');
     }
-    final body = <String, String>{
+    final body = <String, dynamic>{
       'access_token': settings.giteeToken,
       'message': 'chore: sync mianshi zhilian data',
       'content': base64Encode(
@@ -503,8 +504,20 @@ class DataSyncService {
     };
     if (sha != null) body['sha'] = sha;
     final response = sha == null
-        ? await http.post(uri, body: body).timeout(_timeout)
-        : await http.put(uri, body: body).timeout(_timeout);
+        ? await http
+            .post(
+              uri.replace(queryParameters: {'access_token': settings.giteeToken}),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode(body),
+            )
+            .timeout(_uploadTimeout)
+        : await http
+            .put(
+              uri.replace(queryParameters: {'access_token': settings.giteeToken}),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode(body),
+            )
+            .timeout(_uploadTimeout);
     if (response.statusCode == 409) throw const SyncConflictException();
     _ensureSuccess(response, 'Gitee 上传失败');
   }

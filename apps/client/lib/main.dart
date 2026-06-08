@@ -3,20 +3,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'l10n/l10n.dart';
 
-import 'models/user.dart';
 import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/connectivity_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/localization_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
-import 'services/content_api_service.dart';
-import 'services/ai_service.dart';
+import 'providers/theme_provider.dart';
 import 'services/analytics_service.dart';
 import 'services/app_log_service.dart';
 import 'services/data_sync_service.dart';
@@ -24,19 +24,22 @@ import 'services/endpoint_fallback_client.dart';
 import 'services/route_state_store.dart';
 import 'services/storage_service.dart';
 import 'services/update_service.dart';
-import 'pages/learning/dashboard_page.dart';
-import 'pages/learning/catalog_page.dart';
-import 'pages/learning/topic_detail_page.dart';
-import 'pages/practice/practice_page.dart';
-import 'pages/practice/recall_page.dart';
-import 'pages/practice/mock_interview_page.dart';
-import 'pages/practice/today_review_page.dart';
-import 'pages/prep/interview_prep_page.dart';
-import 'pages/mastery/mastery_page.dart';
-import 'pages/profile/profile_page.dart';
-import 'widgets/navigation_rail_panel.dart';
-import 'widgets/header_bar.dart';
+import 'services/ai_service.dart';
+import 'services/content_api_service.dart';
+import 'pages/auth/login_page.dart';
+import 'pages/auth/change_password_page.dart';
+import 'pages/profile/ai_config_page.dart';
+import 'pages/profile/log_management_page.dart';
+import 'pages/profile/on_device_model_management_page.dart';
+import 'pages/profile/sync_backup_page.dart';
+import 'pages/profile/ai_voice_settings_page.dart';
+import 'pages/profile/learning_preferences_page.dart';
+import 'pages/profile/appearance_language_page.dart';
+import 'pages/profile/content_source_page.dart';
+import 'pages/profile/route_preference_page.dart';
+import 'pages/profile/about_update_page.dart';
 import 'widgets/onboarding_screen.dart';
+import 'pages/learning_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +90,7 @@ void main() async {
   final dataSyncService = DataSyncService(storage);
   final analyticsService = AnalyticsService(storage, routeClient: routeClient)
     ..start();
+  final connectivityProvider = ConnectivityProvider()..start();
 
   runApp(
     MianshiZhilianApp(
@@ -98,11 +102,11 @@ void main() async {
       updateService: updateService,
       routeClient: routeClient,
       initialLanguage: savedSettings.language,
+      themeProvider: ThemeProvider(),
+      connectivityProvider: connectivityProvider,
     ),
   );
 }
-
-enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 
 class MianshiZhilianApp extends StatefulWidget {
   final StorageService storage;
@@ -113,6 +117,8 @@ class MianshiZhilianApp extends StatefulWidget {
   final UpdateService updateService;
   final EndpointFallbackClient routeClient;
   final String initialLanguage;
+  final ThemeProvider themeProvider;
+  final ConnectivityProvider connectivityProvider;
 
   const MianshiZhilianApp({
     super.key,
@@ -124,6 +130,8 @@ class MianshiZhilianApp extends StatefulWidget {
     required this.updateService,
     required this.routeClient,
     required this.initialLanguage,
+    required this.themeProvider,
+    required this.connectivityProvider,
   });
 
   @override
@@ -137,6 +145,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   void dispose() {
     widget.dataSyncService.stop();
     widget.analyticsService.stop();
+    widget.connectivityProvider.dispose();
     super.dispose();
   }
 
@@ -144,9 +153,11 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: widget.connectivityProvider),
+        ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(
           create: (_) =>
-              SettingsProvider(widget.storage, widget.dataSyncService)
+              SettingsProvider(widget.storage, widget.dataSyncService, widget.themeProvider)
                 ..loadSettings(),
         ),
         ChangeNotifierProvider(
@@ -170,9 +181,10 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         ),
         Provider<AnalyticsService>.value(value: widget.analyticsService),
       ],
-      child: Consumer<SettingsProvider>(
-        builder: (context, settings, _) {
+      child: Consumer<ThemeProvider>(
+        builder: (context, theme, _) {
           final l10n = context.watch<LocalizationProvider>();
+          final settings = context.watch<SettingsProvider>();
           // 设置加载完成后，再加载内容（使用当前领域）
           if (!settings.isLoading && !_contentLoaded) {
             _contentLoaded = true;
@@ -207,16 +219,132 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           final systemIsDark = systemBrightness == Brightness.dark;
 
           // 构建主题
-          final theme = buildTheme(
-            settings.settings.primaryColor,
-            settings.settings.accentColor,
-            settings.settings.themeType.key,
-            fontScale: settings.settings.fontScale,
-            cardDensity: settings.settings.cardDensity,
+          final appTheme = buildTheme(
+            theme.primaryColor,
+            theme.accentColor,
+            theme.themeType.key,
+            fontScale: theme.fontScale,
+            cardDensity: theme.cardDensity,
             systemIsDark: systemIsDark,
           );
 
-          return MaterialApp(
+          final router = GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, __) => settings.settings.onboardingCompleted
+                    ? const LearningShell()
+                    : const OnboardingScreen(),
+              ),
+              GoRoute(
+                path: '/topic',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/recall',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/mock-interview',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/today-review',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/weakness-training',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/answer-versions',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/follow-up-training',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/high-frequency',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/system-design',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/practice/project-dig',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/auth/login',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const LoginPage(),
+              ),
+              GoRoute(
+                path: '/auth/change-password',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const ChangePasswordPage(),
+              ),
+              GoRoute(
+                path: '/auth/submit-ticket',
+                builder: (_, state) => state.extra as Widget,
+              ),
+              GoRoute(
+                path: '/profile/ai-config',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const AiConfigPage(),
+              ),
+              GoRoute(
+                path: '/profile/log-management',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const LogManagementPage(),
+              ),
+              GoRoute(
+                path: '/profile/model-management',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const OnDeviceModelManagementPage(),
+              ),
+              GoRoute(
+                path: '/profile/sync-backup',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const SyncBackupPage(),
+              ),
+              GoRoute(
+                path: '/profile/ai-voice-settings',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const AiVoiceSettingsPage(),
+              ),
+              GoRoute(
+                path: '/profile/learning-preferences',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const LearningPreferencesPage(),
+              ),
+              GoRoute(
+                path: '/profile/appearance-language',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const AppearanceLanguagePage(),
+              ),
+              GoRoute(
+                path: '/profile/content-source',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const ContentSourcePage(),
+              ),
+              GoRoute(
+                path: '/profile/route-preference',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const RoutePreferencePage(),
+              ),
+              GoRoute(
+                path: '/profile/about-update',
+                builder: (_, state) =>
+                    state.extra as Widget? ?? const AboutUpdatePage(),
+              ),
+            ],
+          );
+
+          return MaterialApp.router(
             title: l10n.get('interview_intelligence_training'),
             debugShowCheckedModeBanner: false,
             locale: Locale(l10n.language),
@@ -227,10 +355,8 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
             ],
             supportedLocales: L10n.supportedLocales,
             themeMode: settings.settings.themeMode,
-            theme: theme,
-            home: settings.settings.onboardingCompleted
-                ? const LearningShell()
-                : const OnboardingScreen(),
+            theme: appTheme,
+            routerConfig: router,
           );
         },
       ),
@@ -238,297 +364,3 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
   }
 }
 
-class LearningShell extends StatefulWidget {
-  const LearningShell({super.key});
-
-  @override
-  State<LearningShell> createState() => _LearningShellState();
-}
-
-class _LearningShellState extends State<LearningShell> {
-  AppSection _section = AppSection.dashboard;
-  String? _selectedTopicId;
-  int _selectedTopicInitialTab = 0;
-  bool _isSidebarCollapsed = false;
-  late AuthProvider _auth;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _auth = context.read<AuthProvider>();
-    _auth.autoLogoutReason.removeListener(_onAutoLogout);
-    _auth.autoLogoutReason.addListener(_onAutoLogout);
-  }
-
-  @override
-  void dispose() {
-    _auth.autoLogoutReason.removeListener(_onAutoLogout);
-    super.dispose();
-  }
-
-  void _onAutoLogout() {
-    final reason = _auth.autoLogoutReason.value;
-    if (reason != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(reason),
-          duration: const Duration(seconds: 6),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      _auth.autoLogoutReason.value = null;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    final wide = MediaQuery.sizeOf(context).width >= 860;
-    final settings = context.watch<SettingsProvider>();
-    final content = context.watch<ContentProvider>();
-    final progress = context.watch<ProgressProvider>();
-
-    return Scaffold(
-      body: Row(
-        children: [
-          if (wide)
-            NavigationRailPanel(
-              section: _section,
-              onSelect: _setSection,
-              currentDomain: settings.settings.currentDomain,
-              topicCount: content.topics.length,
-              streakDays: progress.streakDays,
-              totalHours: progress.totalHours,
-              todayHoursGrowth: progress.todayHoursGrowth,
-              isCollapsed: _isSidebarCollapsed,
-              onToggleCollapse: () =>
-                  setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
-            ),
-          Expanded(
-            child: Column(
-              children: [
-                HeaderBar(
-                  title: _sectionTitle(_section, l10n),
-                  sectionIndex: _section.index,
-                  onProfile: () => _setSection(AppSection.profile),
-                  onTopicTap: (topicId) => setState(() {
-                    _selectedTopicId = topicId;
-                    _selectedTopicInitialTab = 0;
-                  }),
-                  onContentStageChanged: (contentEnv) async {
-                    // 检查权限
-                    final authProvider = context.read<AuthProvider>();
-                    final userRole = authProvider.userRole;
-                    if (!userRole.allowedContentEnvs.contains(contentEnv.key)) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            userRole == UserRole.guest
-                                ? l10n.get(
-                                    'login_after_optional_check_view_test_version_content',
-                                  )
-                                : l10n.get(
-                                    'demand_key_management_member_permission_check_view_draft_con',
-                                  ),
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                      return;
-                    }
-
-                    // 切换内容环境
-                    await settings.setContentEnv(contentEnv);
-                    if (!context.mounted) return;
-                    final contentProvider = context.read<ContentProvider>();
-                    await contentProvider.switchContentEnv(
-                      settings.settings.contentBaseUrl,
-                      currentDomainId: settings.settings.currentDomain,
-                    );
-                  },
-                ),
-                Expanded(child: _buildCurrentPage(wide)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: wide
-          ? null
-          : NavigationBar(
-              selectedIndex: _section.index,
-              onDestinationSelected: (i) => _setSection(AppSection.values[i]),
-              destinations: [
-                NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  label: l10n.get('study'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.menu_book_outlined),
-                  label: l10n.get('catalog'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.psychology_alt_outlined),
-                  label: l10n.get('practice'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.flag_outlined),
-                  label: l10n.get('interview'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.bar_chart_outlined),
-                  label: l10n.get('mastery'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  label: l10n.get('settings'),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildCurrentPage(bool wide) {
-    if (_selectedTopicId != null) {
-      final content = context.read<ContentProvider>();
-      final topic = content.findTopic(_selectedTopicId!);
-      if (topic != null) {
-        return TopicDetailPage(
-          topic: topic,
-          initialTabIndex: _selectedTopicInitialTab,
-          onBack: () => setState(() => _selectedTopicId = null),
-        );
-      }
-    }
-
-    // 各页面自行管理滚动和 padding，避免嵌套 ListView
-    return _currentPage();
-  }
-
-  Widget _currentPage() {
-    final content = context.read<ContentProvider>();
-    final settings = context.read<SettingsProvider>();
-
-    return switch (_section) {
-      AppSection.dashboard => DashboardPage(
-        currentDomainId: settings.settings.currentDomain,
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
-        onPractice: () => _setSection(AppSection.practice),
-        onTopicTap: (topicId) => setState(() {
-          _selectedTopicId = topicId;
-          _selectedTopicInitialTab = 0;
-        }),
-        onViewDomainCatalog: (domainId) {
-          settings.updateSettings(
-            settings.settings.copyWith(currentDomain: domainId),
-          );
-          setState(() => _section = AppSection.catalog);
-        },
-        onReview: () => _setSection(AppSection.practice),
-        onMockInterview: () => _setSection(AppSection.practice),
-      ),
-      AppSection.catalog => CatalogPage(
-        currentDomainId: settings.settings.currentDomain,
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
-        onTopicLearn: (topicId) => setState(() {
-          _selectedTopicId = topicId;
-          _selectedTopicInitialTab = 0;
-        }),
-        onTopicPractice: (topicId) => setState(() {
-          _selectedTopicId = topicId;
-          _selectedTopicInitialTab = 1;
-        }),
-      ),
-      AppSection.practice => PracticePage(
-        currentDomainId: settings.settings.currentDomain,
-        onDailyReview: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TodayReviewPage(
-                currentDomainId: settings.settings.currentDomain,
-              ),
-            ),
-          );
-        },
-        onRandomQuiz: (domainId) {
-          final domainTopics = content.getTopicsByDomain(domainId);
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
-            ),
-          );
-        },
-        onMockInterview: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  MockInterviewPage(topicIds: topicIds.take(10).toList()),
-            ),
-          );
-        },
-      ),
-      AppSection.prep => InterviewPrepPage(
-        currentDomainId: settings.settings.currentDomain,
-        onStartPractice: () => _setSection(AppSection.practice),
-        onStartMock: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  MockInterviewPage(topicIds: topicIds.take(10).toList()),
-            ),
-          );
-        },
-      ),
-      AppSection.mastery => MasteryPage(
-        currentDomainId: settings.settings.currentDomain,
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
-        onStartPractice: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RecallPage(topicIds: topicIds.take(5).toList()),
-            ),
-          );
-        },
-      ),
-      AppSection.profile => const ProfilePage(),
-    };
-  }
-
-  void _setSection(AppSection value) {
-    context.read<AnalyticsService>().recordSection(value.name);
-    setState(() {
-      _section = value;
-      _selectedTopicId = null;
-    });
-  }
-
-  String _sectionTitle(AppSection section, LocalizationProvider l10n) =>
-      switch (section) {
-        AppSection.dashboard => l10n.get('dashboard_title'),
-        AppSection.catalog => l10n.get('catalog_title'),
-        AppSection.practice => l10n.get('practice_title'),
-        AppSection.prep => l10n.get('interview_preparation'),
-        AppSection.mastery => l10n.get('mastery_title'),
-        AppSection.profile => l10n.get('profile_title'),
-      };
-}

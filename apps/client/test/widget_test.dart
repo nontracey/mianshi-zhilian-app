@@ -12,6 +12,8 @@ import 'package:mianshi_zhilian/services/endpoint_fallback_client.dart';
 import 'package:mianshi_zhilian/services/route_state_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/update_service.dart';
+import 'package:mianshi_zhilian/providers/theme_provider.dart';
+import 'package:mianshi_zhilian/providers/connectivity_provider.dart';
 
 /// 测试环境把 NetworkImage 拦截掉，统一返回 1x1 透明 PNG，
 /// 否则 widget tree 里的 DiceBear 头像会让 pumpAndSettle 失败。
@@ -165,6 +167,8 @@ void main() {
         updateService: updateService,
         routeClient: routeClient,
         initialLanguage: 'zh',
+        themeProvider: ThemeProvider(),
+        connectivityProvider: ConnectivityProvider(),
       ),
     );
 
