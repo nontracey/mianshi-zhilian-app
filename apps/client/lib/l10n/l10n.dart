@@ -1143,6 +1143,7 @@ class L10n {
     'start_mock_interview': '开始模拟面试',
     'view_history_count': '查看历史记录 ({count})',
     'start_project_dig': '开始项目深挖',
+    'interview_target': '面试目标',
     'jd_keywords_prefill': '已从 JD 识别 {count} 个技术关键词，将预填到项目技术栈',
     'un_review': '未复习',
     'un_score_category': '未评分',
@@ -2497,6 +2498,7 @@ class L10n {
     'start_mock_interview': 'Start Mock Interview',
     'view_history_count': 'View History ({count})',
     'start_project_dig': 'Start Project Deep Dive',
+    'interview_target': 'Interview Target',
     'jd_keywords_prefill': '{count} tech keywords extracted from JD, will pre-fill project tech stack',
     'un_settings_goal_position_also_optional_by_direct_connect_use':
         'You can use it without setting a target position. Currently recommending reviews, high-frequency topics, and mock interviews based on a general tech interview path.',
