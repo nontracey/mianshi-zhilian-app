@@ -113,7 +113,6 @@ void main() {
   group('field-level serialization', () {
     test('themeType serializes to and from key strings', () {
       for (final type in AppThemeType.values) {
-        const base = AppSettings();
         final custom = AppSettings(themeType: type);
         final json = custom.toJson();
         expect(json['themeType'], type.key);
