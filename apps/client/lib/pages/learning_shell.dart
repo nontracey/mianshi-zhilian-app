@@ -238,9 +238,12 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.dashboard => DashboardPage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
+        onDomainChanged: (id) {
+          settings.updateSettings(settings.settings.copyWith(currentDomain: id));
+          if (content.getLoadedTopicCount(id) == 0) {
+            content.loadDomainTopics(id);
+          }
+        },
         onPractice: () => _setSection(AppSection.practice),
         onTopicTap: (topicId) => setState(() {
           _selectedTopicId = topicId;
@@ -250,6 +253,9 @@ class _LearningShellState extends State<LearningShell> {
           settings.updateSettings(
             settings.settings.copyWith(currentDomain: domainId),
           );
+          if (content.getLoadedTopicCount(domainId) == 0) {
+            content.loadDomainTopics(domainId);
+          }
           setState(() => _section = AppSection.catalog);
         },
         onReview: () => _setSection(AppSection.practice),
@@ -257,9 +263,12 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.catalog => CatalogPage(
         currentDomainId: settings.settings.currentDomain,
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
+        onDomainChanged: (id) {
+          settings.updateSettings(settings.settings.copyWith(currentDomain: id));
+          if (content.getLoadedTopicCount(id) == 0) {
+            content.loadDomainTopics(id);
+          }
+        },
         onTopicLearn: (topicId) => setState(() {
           _selectedTopicId = topicId;
           _selectedTopicInitialTab = 0;

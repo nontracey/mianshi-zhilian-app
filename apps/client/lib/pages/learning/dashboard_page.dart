@@ -94,9 +94,19 @@ class DashboardPage extends StatelessWidget {
             Icon(Icons.auto_stories_outlined, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
             Text(
-              l10n.get('temporary_no_knowledge_point'),
+              contentProvider.topicLoadFailures.isNotEmpty
+                  ? l10n.get('knowledge_point_loading_fail')
+                  : l10n.get('temporary_no_knowledge_point'),
               style: TextStyle(color: Colors.grey.shade600),
             ),
+            if (contentProvider.topicLoadFailures.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: () => contentProvider.loadDomainTopics(currentDomainId),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l10n.get('retry')),
+              ),
+            ],
           ],
         ),
       );
