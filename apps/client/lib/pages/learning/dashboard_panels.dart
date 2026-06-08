@@ -715,11 +715,18 @@ class CenterPanelState extends State<CenterPanel> {
     );
   }
 
-  void _showRouteSelector(BuildContext context) {
+  Future<void> _showRouteSelector(BuildContext context) async {
     final l10n = context.watch<LocalizationProvider>();
     final defaultRoutes = _buildOfficialRoutes(widget.allDomains, l10n);
-    final allRoutes = [...defaultRoutes];
 
+    final customData = await _storage.loadJsonList('custom_routes');
+    final customRoutes = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .toList();
+
+    final allRoutes = [...defaultRoutes, ...customRoutes];
+
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => RouteSelectorDialog(

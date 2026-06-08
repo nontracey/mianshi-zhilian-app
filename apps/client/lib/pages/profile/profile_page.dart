@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -404,6 +405,17 @@ class _AccountPanel extends StatelessWidget {
     );
   }
 
+  ImageProvider? _resolveAvatarImage(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('data:')) {
+      final parts = url.split(',');
+      if (parts.length > 1) {
+        return MemoryImage(base64Decode(parts[1]));
+      }
+    }
+    return NetworkImage(url);
+  }
+
   /// 显示名优先级：localProfile.nickname（本地，可被 sync 流程回填）
   /// > authProvider.user.nickname（服务端，仅在本地未设置时兜底）
   /// > authProvider.user.username
@@ -467,7 +479,7 @@ class _AccountPanel extends StatelessWidget {
                 ? seedColor.withValues(alpha: 0.15)
                 : null,
             backgroundImage: hasAvatarUrl
-                ? NetworkImage(profile.avatarUrl!)
+                ? _resolveAvatarImage(profile.avatarUrl)
                 : diceBearUrl != null
                 ? NetworkImage(diceBearUrl)
                 : null,
@@ -612,8 +624,11 @@ class _AccountPanel extends StatelessWidget {
         imageQuality: 80,
       );
       if (image != null) {
-        // 在移动端，直接使用文件路径
-        onProfileChanged(profile.copyWith(avatarUrl: image.path));
+        final bytes = await image.readAsBytes();
+        final b64 = base64Encode(bytes);
+        onProfileChanged(profile.copyWith(
+          avatarUrl: 'data:image/jpeg;base64,$b64',
+        ));
       }
     } catch (e) {
       if (context.mounted) {
@@ -640,18 +655,11 @@ class _AccountPanel extends StatelessWidget {
         imageQuality: 80,
       );
       if (image != null) {
-        if (kIsWeb) {
-          // Web 端需要读取为 base64 或 data URL
-          final bytes = await image.readAsBytes();
-          final base64 = Uri.dataFromBytes(
-            bytes,
-            mimeType: 'image/jpeg',
-          ).toString();
-          onProfileChanged(profile.copyWith(avatarUrl: base64));
-        } else {
-          // 移动端直接使用文件路径
-          onProfileChanged(profile.copyWith(avatarUrl: image.path));
-        }
+        final bytes = await image.readAsBytes();
+        final b64 = base64Encode(bytes);
+        onProfileChanged(profile.copyWith(
+          avatarUrl: 'data:image/jpeg;base64,$b64',
+        ));
       }
     } catch (e) {
       if (context.mounted) {
@@ -804,10 +812,7 @@ class _AccountPanel extends StatelessWidget {
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.1),
                     backgroundImage:
-                        profile.avatarUrl != null &&
-                            profile.avatarUrl!.isNotEmpty
-                        ? NetworkImage(profile.avatarUrl!)
-                        : null,
+                        _resolveAvatarImage(profile.avatarUrl),
                     child:
                         profile.avatarUrl == null || profile.avatarUrl!.isEmpty
                         ? Text(

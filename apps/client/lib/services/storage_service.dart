@@ -748,7 +748,10 @@ class StorageService {
       return null;
     }
     if (key == 'local_profile' && value is Map<String, dynamic>) {
-      return {...value}..remove('avatarUrl');
+      if (!syncSettings.syncPrivatePrepData) {
+        return {...value}..remove('avatarUrl');
+      }
+      return value;
     }
     return value;
   }

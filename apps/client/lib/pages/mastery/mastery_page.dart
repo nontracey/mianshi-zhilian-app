@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
+import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -38,16 +39,32 @@ class _MasteryPageState extends State<MasteryPage> {
   final _storage = StorageService();
   List<String> _disabledIds = [];
   bool _routeScopeOnly = false;
+  List<String> _routeTopicIds = [];
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
+    _loadRouteTopicIds();
   }
 
   Future<void> _loadDisabled() async {
     final ids = await _storage.loadDisabledDomains();
     if (mounted) setState(() => _disabledIds = ids);
+  }
+
+  Future<void> _loadRouteTopicIds() async {
+    final routeId = await _storage.load('selected_route_id');
+    if (routeId == null || !mounted) return;
+
+    final customData = await _storage.loadJsonList('custom_routes');
+    final allCustom = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .toList();
+    final route = allCustom.where((r) => r.id == routeId).firstOrNull;
+    if (route != null && mounted) {
+      setState(() => _routeTopicIds = route.allTopicIds);
+    }
   }
 
   List<Domain> _filterDomains(List<Domain> all) {
@@ -653,8 +670,7 @@ class _MasteryPageState extends State<MasteryPage> {
 
   /// 获取当前选中路线的知识点 ID 列表
   List<String> _getRouteTopicIds() {
-    // 路线功能将在 Phase 2-3 集成，暂返回空
-    return [];
+    return _routeTopicIds;
   }
 }
 

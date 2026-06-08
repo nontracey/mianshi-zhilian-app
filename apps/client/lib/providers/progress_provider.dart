@@ -52,10 +52,8 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   Future<void> updateTopicProgress(String topicId, {required int score}) async {
-    final status = score >= 85
-        ? 'mastered'
-        : (score >= 60 ? 'learning' : 'new');
-    await updateProgress(topicId, score, status);
+    final status = computeMastery(topicId, progressMap: _progressMap, attempts: _attempts);
+    await updateProgress(topicId, score, status.name);
   }
 
   DateTime _calculateNextReview(int score) {
@@ -413,31 +411,10 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   int readinessScore(List<Topic> topics) {
-    if (topics.isEmpty) return 0;
-    final hasScoredProgress = topics.any(
-      (topic) => (_progressMap[topic.id]?.score ?? 0) > 0,
+    return routeReadinessScore(
+      routeTopicIds: topics.map((t) => t.id).toList(),
+      allTopics: topics,
     );
-    if (!hasScoredProgress && _mockSessions.isEmpty) return 0;
-
-    final domainAverage =
-        topics
-            .map((t) => _progressMap[t.id]?.score ?? 0)
-            .fold<int>(0, (sum, score) => sum + score) ~/
-        topics.length;
-    final reviewPenalty = getTodayReviewTopics(topics).length.clamp(0, 10) * 2;
-    final mockAverage = _mockSessions.isEmpty
-        ? domainAverage
-        : _mockSessions
-                  .take(3)
-                  .map((s) => s.averageScore)
-                  .fold<int>(0, (a, b) => a + b) ~/
-              _mockSessions.take(3).length;
-    return ((domainAverage * 0.55 +
-                mockAverage * 0.35 +
-                practiceStreakDays * 2) -
-            reviewPenalty)
-        .round()
-        .clamp(0, 100);
   }
 
   /// 连续学习天数（别名）

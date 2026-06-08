@@ -651,4 +651,52 @@ void main() {
       expect(modified.githubToken, 'keep-me');
     });
   });
+
+  group('PrepPlan', () {
+    test('toJson/fromJson round-trip with all fields', () {
+      final now = DateTime.now();
+      final plan = PrepPlan(
+        targetRole: 'Java后端',
+        techStack: 'Spring,Redis',
+        interviewDate: now.add(const Duration(days: 30)),
+        dailyMinutes: 60,
+        jobDescription: '精通Java、Spring Cloud',
+        company: '字节跳动',
+        currentLevel: 'intermediate',
+        updatedAt: now,
+      );
+      final json = plan.toJson();
+      final restored = PrepPlan.fromJson(json);
+      expect(restored.targetRole, plan.targetRole);
+      expect(restored.company, '字节跳动');
+      expect(restored.currentLevel, 'intermediate');
+      expect(restored.hasTarget, isTrue);
+    });
+
+    test('hasTarget works with company alone', () {
+      final plan = PrepPlan(
+        company: '阿里',
+        updatedAt: DateTime.now(),
+      );
+      expect(plan.hasTarget, isTrue);
+    });
+
+    test('empty plan has no target', () {
+      final plan = PrepPlan.empty();
+      expect(plan.hasTarget, isFalse);
+    });
+
+    test('company and currentLevel are nullable', () {
+      final plan = PrepPlan(updatedAt: DateTime.now());
+      expect(plan.company, isNull);
+      expect(plan.currentLevel, isNull);
+    });
+
+    test('toJson omits null company and currentLevel', () {
+      final plan = PrepPlan(updatedAt: DateTime.now());
+      final json = plan.toJson();
+      expect(json.containsKey('company'), isFalse);
+      expect(json.containsKey('currentLevel'), isFalse);
+    });
+  });
 }

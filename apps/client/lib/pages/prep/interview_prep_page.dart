@@ -350,7 +350,7 @@ class InterviewPrepPage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          '学习阶段',
+          l10n.get('learning_phase'),
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
@@ -404,6 +404,7 @@ class InterviewPrepPage extends StatelessWidget {
     required ProgressProvider progress,
     required List<Topic> topics,
   }) {
+    final l10n = context.watch<LocalizationProvider>();
     final mockCount = progress.mockSessions.length;
 
     return ListView(
@@ -422,7 +423,7 @@ class InterviewPrepPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              '模拟真实面试场景，检验你的准备程度',
+              l10n.get('mock_interview_description'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -432,7 +433,7 @@ class InterviewPrepPage extends StatelessWidget {
             FilledButton.icon(
               onPressed: onStartMock,
               icon: const Icon(Icons.play_arrow),
-              label: Text('开始模拟面试'),
+              label: Text(l10n.get('start_mock_interview')),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
               ),
@@ -442,7 +443,7 @@ class InterviewPrepPage extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.history),
-                label: Text('查看历史记录 ($mockCount)'),
+                label: Text(l10n.getp('view_history_count', {'count': mockCount})),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -519,12 +520,12 @@ class InterviewPrepPage extends StatelessWidget {
                 });
           },
           icon: const Icon(Icons.menu_book_outlined),
-          label: Text('开始项目深挖'),
+          label: Text(l10n.get('start_project_dig')),
         ),
         if (keywords.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            '已从 JD 识别 ${keywords.length} 个技术关键词，将预填到项目技术栈',
+            l10n.getp('jd_keywords_prefill', {'count': keywords.length}),
             style: TextStyle(
               fontSize: 12,
               color: AppColors.textTertiary,

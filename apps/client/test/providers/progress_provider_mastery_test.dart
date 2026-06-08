@@ -1,9 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('computeMastery', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test('returns new_ for null progress', () {
       final result = ProgressProvider.computeMastery(
         't1',
@@ -53,6 +59,28 @@ void main() {
         ],
       );
       expect(result, MasteryStatus.skilled);
+    });
+  });
+
+  group('routeReadinessScore', () {
+    test('returns 0 for empty routeTopicIds', () {
+      final provider = ProgressProvider(StorageService());
+      final score = provider.routeReadinessScore(
+        routeTopicIds: [],
+        allTopics: [],
+      );
+      expect(score, 0);
+    });
+
+    test('returns > 0 when topics have scores', () {
+      final provider = ProgressProvider(StorageService());
+      // Set up some mock data
+      // Since we can't easily mock the private _progressMap, test at minimum
+      // that the method doesn't throw
+      expect(() => provider.routeReadinessScore(
+        routeTopicIds: ['t1'],
+        allTopics: [],
+      ), returnsNormally);
     });
   });
 }

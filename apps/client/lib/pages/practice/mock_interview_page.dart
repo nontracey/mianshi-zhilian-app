@@ -14,9 +14,10 @@ import 'package:mianshi_zhilian/pages/practice/mock_interview_widgets.dart';
 enum _InterviewStage { main, followUp, clarify, summary }
 
 class MockInterviewPage extends StatefulWidget {
-  const MockInterviewPage({super.key, required this.topicIds});
+  const MockInterviewPage({super.key, required this.topicIds, this.sourceRouteId});
 
   final List<String> topicIds;
+  final String? sourceRouteId;
 
   @override
   State<MockInterviewPage> createState() => _MockInterviewPageState();
@@ -1634,6 +1635,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             l10n.get('again_progress_action_one_round_mode_mock_interview'),
           ],
           formalMode: _formalMode,
+          sourceRouteId: widget.sourceRouteId,
         ),
       );
     });

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
 import 'dashboard_panels.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -127,11 +129,19 @@ class DashboardPage extends StatelessWidget {
     // 到期复习
     final dueTopics = progressProvider.getTodayReviewTopics(domainTopics);
 
+    // 面试目标横幅
+    final plan = progressProvider.prepPlan;
+
     // 三栏工作台布局
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
+      child: Column(
+        children: [
+          if (plan.hasTarget)
+            _buildTargetBanner(context, plan),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 1200;
           final isMedium =
               constraints.maxWidth >= 800 && constraints.maxWidth < 1200;
@@ -315,6 +325,84 @@ class DashboardPage extends StatelessWidget {
             );
           }
         },
+      ),
+    ),
+  ],
+),
+);
+  }
+
+  Widget _buildTargetBanner(BuildContext context, PrepPlan plan) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final interviewDate = plan.interviewDate;
+    final days = interviewDate != null
+        ? interviewDate.difference(DateTime.now()).inDays + 1
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.accent.withValues(alpha: 0.08),
+            isDark ? const Color(0xFF1A1D23) : const Color(0xFFF8F9FA),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.work_outline, color: AppColors.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  plan.targetRole.isNotEmpty
+                      ? '${plan.targetRole}${plan.techStack.isNotEmpty ? ' · ${plan.techStack}' : ''}'
+                      : l10n.get('interview_target'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  days != null
+                      ? (days > 0 ? '距面试 $days 天' : '面试日已到')
+                      : '已设置面试目标',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (days != null && days > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$days',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  color: AppColors.warning,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
