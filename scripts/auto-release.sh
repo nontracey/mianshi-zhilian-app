@@ -50,13 +50,15 @@ echo "PR #$PR_NUMBER: $PR_URL"
 echo "=== 3/5 等待 CI 通过 ==="
 gh pr checks "$PR_NUMBER" --watch --interval 15 --required || true
 
-echo "=== 4/5 管理员合并 PR ==="
+echo "=== 4/5 管理员合并 PR + 删除远程分支 ==="
 gh pr merge "$PR_NUMBER" --merge --admin
-echo "PR #$PR_NUMBER 已合并"
+git push origin --delete "$BRANCH" 2>/dev/null || true
+echo "PR #$PR_NUMBER 已合并，远程分支已删除"
 
-echo "=== 5/5 同步 main + 打 tag ==="
+echo "=== 5/5 同步 main + 删除本地分支 + 打 tag ==="
 git checkout main
 git pull origin main
+git branch -D "$BRANCH" 2>/dev/null || true
 
 if [ "$FORCE_TAG" = true ]; then
   git tag -f "$TAG"
