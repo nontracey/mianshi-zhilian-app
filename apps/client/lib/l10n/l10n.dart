@@ -373,8 +373,11 @@ class L10n {
     'route_backup_only': '仅国内线路',
     'route_primary_only': '仅国际线路',
     'route_diagnosis': '线路诊断',
+    'route_diagnostics_subtitle': '自动 / pages.dev / de5.net',
     'route_setting_local_only': '该设置只保存在当前设备。自动模式会按入口域名和最近可用线路选择，失败后短期记忆成功线路。',
     'save_answer_drafts_locally': '将回答草稿保存在本地',
+    'saved_as_local_practice': '已保存为本地练习',
+    'all_topics': '所有题目',
     'save_jd_locally': '将 JD 岗位描述保存在本地',
     'save_locally': '本地保存',
     'save_project_dig_info_locally': '将项目深挖信息保存在本地',
@@ -1541,6 +1544,7 @@ class L10n {
     'confirm_delete_runtime_desc':
         '确定要删除已下载的 ONNX Runtime 吗？删除后本机 STT 模型将无法使用，直到重新下载运行时。',
     'on_device_model_management': '模型管理',
+    'model_management_subtitle': '查看已下载的模型和运行时',
     'model_management_all_models': '所有模型',
     'model_management_others_runtime': '运行时',
     'model_storage_path': '存储路径',
@@ -1560,6 +1564,7 @@ class L10n {
     'and_more_items': '以及 {count} 项',
     'copy': '复制',
     'log_management': '日志管理',
+    'log_management_subtitle': '查看、复制和清理诊断日志',
     'clear_regular_logs': '清理普通日志',
     'clear_all_logs': '清空全部日志',
     'log_management_summary':
@@ -1953,9 +1958,12 @@ class L10n {
     'route_backup_only': 'Domestic Route Only',
     'route_primary_only': 'International Route Only',
     'route_diagnosis': 'Route Diagnostics',
+    'route_diagnostics_subtitle': 'Auto / pages.dev / de5.net',
     'route_setting_local_only':
         'This setting is saved on this device only. Auto mode selects based on entry domain and recently available routes, remembering successful routes on failure.',
     'save_answer_drafts_locally': 'Save answer drafts locally',
+    'saved_as_local_practice': 'Saved as local practice',
+    'all_topics': 'All Topics',
     'save_jd_locally': 'Save JD/job description locally',
     'save_locally': 'Save Locally',
     'save_project_dig_info_locally': 'Save project deep dig info locally',
@@ -3322,6 +3330,7 @@ class L10n {
     'confirm_delete_runtime_desc':
         'Are you sure you want to delete the downloaded ONNX Runtime? On-device STT models cannot be used until the runtime is downloaded again.',
     'on_device_model_management': 'Model Management',
+    'model_management_subtitle': 'View downloaded models and runtimes',
     'model_management_all_models': 'All Models',
     'model_management_others_runtime': 'Runtime',
     'model_storage_path': 'Storage Path',
@@ -3343,6 +3352,7 @@ class L10n {
     'and_more_items': 'and {count} more',
     'copy': 'Copy',
     'log_management': 'Log Management',
+    'log_management_subtitle': 'View, copy, and clear diagnostic logs',
     'clear_regular_logs': 'Clear Regular Logs',
     'clear_all_logs': 'Clear All Logs',
     'log_management_summary':

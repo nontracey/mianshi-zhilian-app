@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_log_service.dart';
 import 'app_version_service.dart';
+import 'download_source_resolver.dart';
 import 'endpoint_fallback_client.dart';
 import 'on_device_stt/runtime_platform.dart';
 import 'route_resolver.dart';
@@ -237,9 +238,6 @@ class UpdateService {
              stateStore: RouteStateStore(StorageService()),
            );
 
-  /// 默认备用镜像站
-  static const defaultMirrorPrefix = 'https://ghfast.top';
-
   /// 检查是否有新版本
   Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
@@ -332,35 +330,11 @@ class UpdateService {
   }
 
   /// 根据 URL 生成用户可读的下载源描述
-  ///
-  /// 注意：镜像 URL 格式为 `mirrorPrefix/https://github.com/...`，
-  /// 镜像 URL 中也包含 `github.com`，必须先检查镜像前缀再检查 GitHub。
   String _sourceLabelFromUrl(String url) {
-    // 优先检查自定义镜像前缀（URL 以镜像域名开头，说明走的是镜像）
-    if (customMirrorPrefix != null && customMirrorPrefix!.isNotEmpty) {
-      final prefix = customMirrorPrefix!.replaceAll(RegExp(r'/+$'), '');
-      if (url.startsWith(prefix)) {
-        try {
-          final uri = Uri.parse(url);
-          return uri.host;
-        } catch (_) {
-          return prefix;
-        }
-      }
-    }
-    // 内置默认镜像
-    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
-    // ghproxy.com 已废弃但保留兼容
-    if (url.startsWith('https://ghproxy.com')) return 'ghproxy.com';
-    // 最后才检查是否为 GitHub 官方源
-    if (url.contains('github.com')) return 'GitHub';
-    // 其他：提取域名
-    try {
-      final uri = Uri.parse(url);
-      return uri.host;
-    } catch (_) {
-      return url.substring(0, url.length.clamp(0, 30));
-    }
+    return DownloadSourceResolver.sourceLabel(
+      url,
+      customMirrorPrefix: customMirrorPrefix,
+    );
   }
 
   /// 构建下载 URL 列表，按 [downloadSourceMode] 排序
@@ -370,49 +344,15 @@ class UpdateService {
   }
 
   List<String> _buildDownloadUrls(PlatformUpdate platformUpdate) {
-    final githubUrl = platformUpdate.url.trim();
-    final mirrorPrefix = (customMirrorPrefix ?? '').replaceAll(
-      RegExp(r'/+$'),
-      '',
+    final candidates = DownloadSourceResolver.resolve(
+      originalUrl: platformUpdate.url.trim(),
+      customMirrorPrefix: customMirrorPrefix,
+      additionalMirrors: platformUpdate.mirrors
+          .where((m) => m.trim().isNotEmpty)
+          .toList(),
+      mode: downloadSourceMode,
     );
-    final customMirrorUrl = mirrorPrefix.isNotEmpty
-        ? '$mirrorPrefix/$githubUrl'
-        : '';
-    final defaultMirrorUrl = githubUrl.isNotEmpty
-        ? '$defaultMirrorPrefix/$githubUrl'
-        : '';
-    final manifestMirrors = platformUpdate.mirrors
-        .where((m) => m.trim().isNotEmpty)
-        .toList();
-
-    // 按模式构造 URL 列表
-    List<String> buildList(bool mirrorFirst) {
-      final urls = <String>[];
-      if (mirrorFirst) {
-        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
-        if (githubUrl.isNotEmpty) urls.add(githubUrl);
-      } else {
-        if (githubUrl.isNotEmpty) urls.add(githubUrl);
-        if (customMirrorUrl.isNotEmpty) urls.add(customMirrorUrl);
-      }
-      if (defaultMirrorUrl.isNotEmpty && !urls.contains(defaultMirrorUrl)) {
-        urls.add(defaultMirrorUrl);
-      }
-      for (final mirror in manifestMirrors) {
-        if (!urls.contains(mirror)) urls.add(mirror);
-      }
-      return urls;
-    }
-
-    switch (downloadSourceMode) {
-      case DownloadSourceMode.githubOnly:
-        return githubUrl.isNotEmpty ? [githubUrl] : [];
-      case DownloadSourceMode.auto:
-      case DownloadSourceMode.githubFirst:
-        return buildList(false);
-      case DownloadSourceMode.mirrorFirst:
-        return buildList(true);
-    }
+    return candidates.map((c) => c.url).toList();
   }
 
   /// 下载更新文件
@@ -586,46 +526,7 @@ class UpdateService {
   }
 
   Future<List<String>> _orderUrlsByProbeLatency(List<String> urls) async {
-    if (urls.length <= 1) return urls;
-    final probes = await Future.wait(urls.map((url) => _probeDownloadUrl(url)));
-    final byUrl = {for (final probe in probes) probe.url: probe};
-    final ordered = [...urls]
-      ..sort((a, b) {
-        final pa = byUrl[a]!;
-        final pb = byUrl[b]!;
-        if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
-        if (!pa.reachable && !pb.reachable) {
-          return urls.indexOf(a).compareTo(urls.indexOf(b));
-        }
-        return pa.elapsed.compareTo(pb.elapsed);
-      });
-    return ordered;
-  }
-
-  Future<_DownloadSourceProbe> _probeDownloadUrl(String url) async {
-    final client = http.Client();
-    final stopwatch = Stopwatch()..start();
-    try {
-      final request = http.Request('HEAD', Uri.parse(url));
-      final response = await client
-          .send(request)
-          .timeout(const Duration(seconds: 6));
-      stopwatch.stop();
-      return _DownloadSourceProbe(
-        url: url,
-        reachable: response.statusCode >= 200 && response.statusCode < 400,
-        elapsed: stopwatch.elapsed,
-      );
-    } catch (_) {
-      stopwatch.stop();
-      return _DownloadSourceProbe(
-        url: url,
-        reachable: false,
-        elapsed: const Duration(days: 1),
-      );
-    } finally {
-      client.close();
-    }
+    return DownloadSourceResolver.orderByProbeLatency(urls);
   }
 
   Future<_DownloadStatus> _downloadFromUrl({
@@ -840,15 +741,3 @@ class UpdateService {
 
 /// 下载状态内部枚举
 enum _DownloadStatus { success, networkError, verificationFailed, cancelled }
-
-class _DownloadSourceProbe {
-  const _DownloadSourceProbe({
-    required this.url,
-    required this.reachable,
-    required this.elapsed,
-  });
-
-  final String url;
-  final bool reachable;
-  final Duration elapsed;
-}

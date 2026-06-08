@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
 import '../app_log_service.dart';
+import '../download_source_resolver.dart';
 import '../route_resolver.dart';
 import 'runtime_platform.dart' as runtime_platform;
 
@@ -526,11 +527,6 @@ class ModelDownloader {
     return runtimeDir;
   }
 
-  /// GitHub 代理镜像 URL 列表（按优先级排序）
-  ///
-  /// ghfast.top 在国内可直接访问 GitHub release 资源。
-  /// 如果 ghfast.top 失效，可在此追加新的镜像地址。
-  static const _mirrorPrefixes = ['https://ghfast.top'];
 
   /// 下载指定模型（下载 .tar.bz2 存档并解压到模型目录）
   ///
@@ -973,102 +969,34 @@ class ModelDownloader {
     String? mirrorBaseUrl,
     DownloadSourceMode mode,
   ) {
-    final mirrorUrl = _resolveUrl(archiveUrl, mirrorBaseUrl);
-    final customMirror = mirrorUrl != archiveUrl ? mirrorUrl : null;
-    final defaultMirror = '$defaultMirrorPrefix/$archiveUrl';
-    final urls = <String>[];
-    void add(String? url) {
-      if (url != null && url.isNotEmpty && !urls.contains(url)) urls.add(url);
-    }
-
-    if (mode == DownloadSourceMode.githubOnly) {
-      add(archiveUrl);
-    } else if (mode == DownloadSourceMode.mirrorFirst) {
-      add(customMirror);
-      add(archiveUrl);
-      add(defaultMirror);
-    } else {
-      add(archiveUrl);
-      add(customMirror);
-      add(defaultMirror);
-    }
-    for (final prefix in _mirrorPrefixes) {
-      add('$prefix/$archiveUrl');
-    }
-    return urls;
+    final candidates = DownloadSourceResolver.resolve(
+      originalUrl: archiveUrl,
+      customMirrorPrefix: mirrorBaseUrl,
+      mode: mode,
+      transformUrl: (url, prefix) {
+        final releasePrefix =
+            'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/';
+        if (url.startsWith(releasePrefix)) {
+          final relativePath = url.substring(releasePrefix.length);
+          return '${prefix.replaceAll(RegExp(r'/$'), '')}/$relativePath';
+        }
+        return '${prefix.replaceAll(RegExp(r'/+$'), '')}/$url';
+      },
+    );
+    return candidates.map((c) => c.url).toList();
   }
 
   static Future<List<String>> _orderCandidatesByProbeLatency(
     List<String> urls,
   ) async {
-    if (urls.length <= 1) return urls;
-    final probes = await Future.wait(urls.map(_probeDownloadCandidate));
-    final byUrl = {for (final probe in probes) probe.url: probe};
-    final ordered = [...urls]
-      ..sort((a, b) {
-        final pa = byUrl[a]!;
-        final pb = byUrl[b]!;
-        if (pa.reachable != pb.reachable) return pa.reachable ? -1 : 1;
-        if (!pa.reachable && !pb.reachable) {
-          return urls.indexOf(a).compareTo(urls.indexOf(b));
-        }
-        return pa.elapsed.compareTo(pb.elapsed);
-      });
-    return ordered;
+    return DownloadSourceResolver.orderByProbeLatency(urls);
   }
-
-  static Future<_DownloadCandidateProbe> _probeDownloadCandidate(
-    String url,
-  ) async {
-    final client = http.Client();
-    final stopwatch = Stopwatch()..start();
-    try {
-      final request = http.Request('HEAD', Uri.parse(url));
-      final response = await client
-          .send(request)
-          .timeout(const Duration(seconds: 6));
-      stopwatch.stop();
-      return _DownloadCandidateProbe(
-        url: url,
-        reachable: response.statusCode >= 200 && response.statusCode < 400,
-        elapsed: stopwatch.elapsed,
-      );
-    } catch (_) {
-      stopwatch.stop();
-      return _DownloadCandidateProbe(
-        url: url,
-        reachable: false,
-        elapsed: const Duration(days: 1),
-      );
-    } finally {
-      client.close();
-    }
-  }
-
-  static String _resolveUrl(String originalUrl, String? mirrorBaseUrl) {
-    if (mirrorBaseUrl == null || mirrorBaseUrl.isEmpty) return originalUrl;
-
-    final releasePrefix =
-        'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/';
-    if (originalUrl.startsWith(releasePrefix)) {
-      final relativePath = originalUrl.substring(releasePrefix.length);
-      return '${mirrorBaseUrl.replaceAll(RegExp(r'/$'), '')}/$relativePath';
-    }
-    return '${mirrorBaseUrl.replaceAll(RegExp(r'/+$'), '')}/$originalUrl';
-  }
-
-  static const defaultMirrorPrefix = 'https://ghfast.top';
 
   static String _sourceLabelFromUrl(String url, String? mirrorBaseUrl) {
-    if (mirrorBaseUrl != null && mirrorBaseUrl.isNotEmpty) {
-      final prefix = mirrorBaseUrl.replaceAll(RegExp(r'/+$'), '');
-      if (url.startsWith(prefix)) {
-        return Uri.tryParse(prefix)?.host ?? prefix;
-      }
-    }
-    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
-    if (url.contains('github.com')) return 'GitHub';
-    return Uri.tryParse(url)?.host ?? url;
+    return DownloadSourceResolver.sourceLabel(
+      url,
+      customMirrorPrefix: mirrorBaseUrl,
+    );
   }
 
   static double _speedBytesPerSecond(
@@ -1514,16 +1442,4 @@ class ModelDownloader {
 
   static bool _looksLikeZip(List<int> bytes) =>
       bytes.length > 4 && bytes[0] == 0x50 && bytes[1] == 0x4b;
-}
-
-class _DownloadCandidateProbe {
-  const _DownloadCandidateProbe({
-    required this.url,
-    required this.reachable,
-    required this.elapsed,
-  });
-
-  final String url;
-  final bool reachable;
-  final Duration elapsed;
 }
