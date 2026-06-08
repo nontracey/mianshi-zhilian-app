@@ -296,10 +296,19 @@ class InterviewPrepPage extends StatelessWidget {
     required ({int masteryPercent, int topicCount}) domainProgress,
   }) {
     final l10n = context.watch<LocalizationProvider>();
+    final content = context.watch<ContentProvider>();
+
+    // 构建分类 ID → 标题的映射
+    final categoryTitles = <String, String>{};
+    for (final domain in content.domains) {
+      for (final cat in domain.categories) {
+        categoryTitles[cat.id] = cat.title;
+      }
+    }
 
     final phaseGroups = <String, List<Topic>>{};
     for (final topic in topics) {
-      final phaseName = topic.phase ?? topic.category;
+      final phaseName = topic.phase ?? categoryTitles[topic.category] ?? topic.category;
       phaseGroups.putIfAbsent(phaseName, () => []).add(topic);
     }
 
