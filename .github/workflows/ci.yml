@@ -31,10 +31,9 @@ jobs:
         with:
           path: |
             apps/client/.dart_tool
-            apps/client/build
-          key: flutter-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock', 'apps/client/lib/**') }}
+          key: flutter-cache-${{ runner.os }}-${{ hashFiles('apps/client/pubspec.lock') }}
           restore-keys: |
-            flutter-${{ runner.os }}-
+            flutter-cache-${{ runner.os }}-
       
       - run: flutter pub get
       - run: bash tool/generate_version.sh
