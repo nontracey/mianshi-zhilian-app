@@ -67,7 +67,8 @@ class RoutePhase {
   final List<String> categoryIds;
   final List<String> prerequisiteSteps;
   final int estimatedHours;
-  final String type; // 'learn' | 'practice' | 'mock'
+  final String type;
+  final String? domainId;
 
   const RoutePhase({
     required this.id,
@@ -78,6 +79,7 @@ class RoutePhase {
     this.prerequisiteSteps = const [],
     this.estimatedHours = 0,
     this.type = 'learn',
+    this.domainId,
   });
 
   RoutePhase copyWith({
@@ -89,6 +91,7 @@ class RoutePhase {
     List<String>? prerequisiteSteps,
     int? estimatedHours,
     String? type,
+    String? domainId,
   }) => RoutePhase(
     id: id ?? this.id,
     focus: focus ?? this.focus,
@@ -98,6 +101,7 @@ class RoutePhase {
     prerequisiteSteps: prerequisiteSteps ?? this.prerequisiteSteps,
     estimatedHours: estimatedHours ?? this.estimatedHours,
     type: type ?? this.type,
+    domainId: domainId ?? this.domainId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +113,7 @@ class RoutePhase {
     'prerequisiteSteps': prerequisiteSteps,
     'estimatedHours': estimatedHours,
     'type': type,
+    if (domainId != null) 'domainId': domainId,
   };
 
   factory RoutePhase.fromJson(Map<String, dynamic> json) => RoutePhase(
@@ -120,5 +125,6 @@ class RoutePhase {
     prerequisiteSteps: (json['prerequisiteSteps'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     estimatedHours: (json['estimatedHours'] as num?)?.toInt() ?? 0,
     type: json['type'] as String? ?? 'learn',
+    domainId: json['domainId'] as String?,
   );
 }

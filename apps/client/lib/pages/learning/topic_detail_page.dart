@@ -6,6 +6,7 @@ import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
@@ -18,11 +19,15 @@ class TopicDetailPage extends StatefulWidget {
     required this.topic,
     required this.onBack,
     this.initialTabIndex = 0,
+    this.routeTopicIds,
+    this.onRouteTopicTap,
   });
 
   final Topic topic;
   final VoidCallback onBack;
   final int initialTabIndex;
+  final List<String>? routeTopicIds;
+  final ValueChanged<String>? onRouteTopicTap;
 
   @override
   State<TopicDetailPage> createState() => _TopicDetailPageState();
@@ -66,9 +71,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 顶部导航栏
         _buildTopBar(context, topic, isDesktop),
-        // 主内容区域
+        if (widget.routeTopicIds != null && widget.routeTopicIds!.isNotEmpty)
+          _buildRouteNav(context),
         Expanded(
           child: isDesktop
               ? _buildDesktopLayout(context, topic)
@@ -154,6 +159,69 @@ class _TopicDetailPageState extends State<TopicDetailPage>
           ),
           // Tab 切换按钮
           _buildTabToggle(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteNav(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final contentProvider = context.read<ContentProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ids = widget.routeTopicIds!;
+    final currentIdx = ids.indexOf(widget.topic.id);
+    if (currentIdx < 0) return const SizedBox.shrink();
+    final hasPrev = currentIdx > 0;
+    final hasNext = currentIdx < ids.length - 1;
+    final prevTitle = hasPrev ? contentProvider.findTopic(ids[currentIdx - 1])?.title ?? '' : '';
+    final nextTitle = hasNext ? contentProvider.findTopic(ids[currentIdx + 1])?.title ?? '' : '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.accent.withValues(alpha: 0.06) : AppColors.accent.withValues(alpha: 0.04),
+        border: Border(bottom: BorderSide(color: AppColors.accent.withValues(alpha: 0.12))),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.route, size: 14, color: AppColors.accent),
+          const SizedBox(width: 8),
+          Text(
+            l10n.getp('route_topic_progress', {
+              'current': '${currentIdx + 1}',
+              'total': '${ids.length}',
+            }),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+          ),
+          const Spacer(),
+          if (hasPrev)
+            _RouteNavButton(
+              icon: Icons.navigate_before,
+              label: prevTitle,
+              accentColor: AppColors.accent,
+              onTap: () => widget.onRouteTopicTap?.call(ids[currentIdx - 1]),
+            )
+          else
+            IconButton(
+              onPressed: null,
+              icon: const Icon(Icons.navigate_before, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          if (hasNext)
+            _RouteNavButton(
+              icon: Icons.navigate_next,
+              label: nextTitle,
+              accentColor: AppColors.accent,
+              onTap: () => widget.onRouteTopicTap?.call(ids[currentIdx + 1]),
+            )
+          else
+            IconButton(
+              onPressed: null,
+              icon: const Icon(Icons.navigate_next, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
         ],
       ),
     );
@@ -403,5 +471,48 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         setState(() => _isEvaluating = false);
       }
     }
+  }
+}
+
+class _RouteNavButton extends StatelessWidget {
+  const _RouteNavButton({
+    required this.icon,
+    required this.label,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 120),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: accentColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: accentColor),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

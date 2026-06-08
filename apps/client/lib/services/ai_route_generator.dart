@@ -172,7 +172,6 @@ $topicLines
   ) {
     final phases = <RoutePhase>[];
     final now = DateTime.now();
-    final allTopics = contentProvider.topics;
 
     for (final domainId in domainIds) {
       final domain = _allDomains.firstWhereOrNull((d) => d.id == domainId);
@@ -205,6 +204,7 @@ $topicLines
               prerequisiteSteps: step.prerequisiteSteps,
               estimatedHours: step.estimatedHours,
               type: i == lp.steps.length - 1 ? 'practice' : 'learn',
+              domainId: domainId,
             ));
           }
         }

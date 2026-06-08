@@ -12,6 +12,7 @@ import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/practice_widgets.dart';
 import 'package:mianshi_zhilian/pages/practice/high_frequency_sprint_page.dart';
+import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 
 class PracticePage extends StatelessWidget {
   const PracticePage({
@@ -21,6 +22,7 @@ class PracticePage extends StatelessWidget {
     required this.onRandomQuiz,
     required this.onMockInterview,
     this.routeTopicIds,
+    this.routeModeEnabled = false,
   });
 
   final String currentDomainId;
@@ -28,6 +30,7 @@ class PracticePage extends StatelessWidget {
   final ValueChanged<String> onRandomQuiz;
   final VoidCallback onMockInterview;
   final List<String>? routeTopicIds;
+  final bool routeModeEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -40,17 +43,16 @@ class PracticePage extends StatelessWidget {
 
     // 还没有加载到任何知识点时显示空状态
     if (domainTopics.isEmpty && contentProvider.isLoadingTopics) {
-      final l10n = context.watch<LocalizationProvider>();
-      return Center(
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            SkeletonCard(height: 100),
             const SizedBox(height: 16),
-            Text(
-              l10n.get('loading_knowledge_point'),
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
+            ...List.generate(4, (_) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: SkeletonTopicRow(),
+            )),
           ],
         ),
       );
@@ -65,6 +67,29 @@ class PracticePage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        if (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.route, size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.getp('knowledge_points_in_route', {'count': routeTopicIds!.length}),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Text(
           l10n.get('select_practice_mode'),
           style: Theme.of(

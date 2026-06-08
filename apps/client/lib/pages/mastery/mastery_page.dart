@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:collection/collection.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
@@ -20,16 +19,20 @@ class MasteryPage extends StatefulWidget {
     super.key,
     required this.currentDomainId,
     required this.onDomainChanged,
+    this.onStartTopicPractice,
     this.onStartPractice,
     this.routeTopicIds,
+    this.routeDomainIds,
     this.routeModeEnabled = false,
     this.onRouteModeChanged,
   });
 
   final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
+  final ValueChanged<String>? onStartTopicPractice;
   final VoidCallback? onStartPractice;
   final List<String>? routeTopicIds;
+  final List<String>? routeDomainIds;
   final bool routeModeEnabled;
   final VoidCallback? onRouteModeChanged;
 
@@ -95,11 +98,12 @@ class _MasteryPageState extends State<MasteryPage> {
 
     final allDomains = contentProvider.domains;
     final domains = _filterDomains(allDomains);
+    final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
     final currentDomain = allDomains
         .where((d) => d.id == widget.currentDomainId)
         .firstOrNull;
-    if (currentDomain == null) {
-      return Center(child: Text(l10n.get('please_select_one_domain')));
+    if (currentDomain == null && !isCrossDomain) {
+      return _buildDomainPrompt(context, contentProvider, domains, isDark);
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(
@@ -107,13 +111,23 @@ class _MasteryPageState extends State<MasteryPage> {
     );
 
     // 路线范围过滤
-    final scopedTopics = _routeScopeOnly
-        ? domainTopics.where((t) => _getRouteTopicIds().contains(t.id)).toList()
-        : domainTopics;
-    final domainProgress = progressProvider.getDomainProgress(
-      widget.currentDomainId,
-      contentProvider.topics.values.toList(),
-    );
+    List<Topic> scopedTopics;
+    if (_routeScopeOnly && isCrossDomain && _routeTopicIds.isNotEmpty) {
+      scopedTopics = _routeTopicIds
+          .map((id) => contentProvider.findTopic(id))
+          .whereType<Topic>()
+          .toList();
+    } else if (_routeScopeOnly) {
+      scopedTopics = domainTopics.where((t) => _getRouteTopicIds().contains(t.id)).toList();
+    } else {
+      scopedTopics = domainTopics;
+    }
+    final domainProgress = _routeScopeOnly
+        ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
+        : progressProvider.getDomainProgress(
+            widget.currentDomainId,
+            contentProvider.topics.values.toList(),
+          );
     final masteryPercent = domainProgress.masteryPercent;
     final dueCount = progressProvider.getTodayReviewTopics(scopedTopics).length;
     final readiness = progressProvider.readinessScore(scopedTopics);
@@ -148,18 +162,19 @@ class _MasteryPageState extends State<MasteryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 顶部：紧凑的领域选择和统计
-          _buildCompactHeader(
-            context,
-            currentDomain,
-            masteryPercent,
-            domains,
-            contentProvider,
-            isDark,
-          ),
+          if (isCrossDomain && _routeScopeOnly)
+            _buildCrossDomainOverview(context, scopedTopics, progressProvider, domains, contentProvider, isDark)
+          else
+            _buildCompactHeader(
+              context,
+              currentDomain,
+              masteryPercent,
+              domains,
+              contentProvider,
+              isDark,
+            ),
           const SizedBox(height: 12),
 
-          // 诊断指标（可点击筛选）
           _buildDiagnosticCards(
             context,
             readiness,
@@ -171,17 +186,29 @@ class _MasteryPageState extends State<MasteryPage> {
           ),
           const SizedBox(height: 12),
 
-          // 筛选和排序
           _buildFilterSortBar(context, isDark),
           const SizedBox(height: 12),
 
-          // 知识点列表
           Expanded(
             child: sortedTopics.isEmpty
                 ? Center(
-                    child: Text(
-                      l10n.get('temporary_no_data'),
-                      style: TextStyle(color: Colors.grey.shade500),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bar_chart_outlined, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.get('temporary_no_data'),
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                        if (_routeScopeOnly) ...[
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () => setState(() => _routeScopeOnly = false),
+                            child: Text(l10n.get('all_topics')),
+                          ),
+                        ],
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -196,6 +223,191 @@ class _MasteryPageState extends State<MasteryPage> {
                     },
                   ),
           ),
+         ],
+      ),
+    );
+  }
+
+  Widget _buildCrossDomainOverview(
+    BuildContext context,
+    List<Topic> scopedTopics,
+    ProgressProvider progressProvider,
+    List<Domain> domains,
+    ContentProvider contentProvider,
+    bool isDark,
+  ) {
+    final l10n = context.watch<LocalizationProvider>();
+    final routeDomainIds = widget.routeDomainIds ?? [];
+
+    int mastered = 0;
+    int learning = 0;
+    int unfamiliar = 0;
+    for (final t in scopedTopics) {
+      final s = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+      if (s >= 85) {
+        mastered++;
+      } else if (s >= 60) {
+        learning++;
+      } else {
+        unfamiliar++;
+      }
+    }
+    final total = scopedTopics.length;
+    final pct = total > 0 ? (mastered * 100 ~/ total) : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.route, size: 18, color: AppColors.accent),
+              const SizedBox(width: 8),
+              Text(
+                l10n.get('route_mastery_overview'),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                '$pct%',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: pct / 100,
+                        minHeight: 8,
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 16,
+                      children: [
+                        _buildStatChip(AppColors.success, l10n.get('skilled_training'), '$mastered'),
+                        _buildStatChip(AppColors.warning, l10n.get('not_skilled_training'), '$learning'),
+                        _buildStatChip(AppColors.danger, l10n.get('un_mastery'), '$unfamiliar'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: routeDomainIds.map((did) {
+                final d = domains.where((dd) => dd.id == did).firstOrNull;
+                final dTopics = scopedTopics.where((t) => t.domainId == did).toList();
+                int dMastered = 0;
+                for (final t in dTopics) {
+                  if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85) dMastered++;
+                }
+                final dPct = dTopics.isNotEmpty ? (dMastered * 100 ~/ dTopics.length) : 0;
+                return Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: (d?.color ?? AppColors.accent).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: (d?.color ?? AppColors.accent).withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d?.title ?? did,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: d?.color ?? AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$dPct% ($dMastered/${dTopics.length})',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white54 : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(Color color, String label, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text('$value $label', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildDomainPrompt(BuildContext context, ContentProvider contentProvider, List<Domain> domains, bool isDark) {
+    final l10n = context.watch<LocalizationProvider>();
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.explore_outlined, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(l10n.get('please_select_one_domain'), style: TextStyle(color: Colors.grey.shade600)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: domains.take(6).map((d) => ActionChip(
+              label: Text(d.title),
+              avatar: Icon(Icons.arrow_forward, size: 14),
+              onPressed: () {
+                widget.onDomainChanged(d.id);
+                if (contentProvider.getLoadedTopicCount(d.id) == 0) {
+                  contentProvider.loadDomainTopics(d.id);
+                }
+              },
+            )).toList(),
+          ),
         ],
       ),
     );
@@ -203,7 +415,7 @@ class _MasteryPageState extends State<MasteryPage> {
 
   Widget _buildCompactHeader(
     BuildContext context,
-    Domain domain,
+    Domain? domain,
     int masteryPercent,
     List<Domain> domains,
     ContentProvider contentProvider,
@@ -425,28 +637,29 @@ class _MasteryPageState extends State<MasteryPage> {
             ),
           ),
         ),
-        const SizedBox(width: 16),
-        // 路线范围切换
-        GestureDetector(
-          onTap: () => setState(() => _routeScopeOnly = !_routeScopeOnly),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: _routeScopeOnly
-                  ? Theme.of(context).colorScheme.primary
-                  : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              _routeScopeOnly ? l10n.get('only_route') : l10n.get('all_topics'),
-              style: TextStyle(
-                fontSize: 12,
-                color: _routeScopeOnly ? Colors.white : null,
-                fontWeight: FontWeight.w600,
+        if (_routeTopicIds.isNotEmpty) ...[
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => setState(() => _routeScopeOnly = !_routeScopeOnly),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _routeScopeOnly
+                    ? Theme.of(context).colorScheme.primary
+                    : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                _routeScopeOnly ? l10n.get('only_route') : l10n.get('all_topics'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _routeScopeOnly ? Colors.white : null,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-        ),
+        ],
         const SizedBox(width: 16),
         // 排序
         _buildSortChip(l10n.get('low_high'), MasterySort.scoreAsc, isDark),
@@ -609,7 +822,13 @@ class _MasteryPageState extends State<MasteryPage> {
 
           // 操作
           TextButton(
-            onPressed: widget.onStartPractice,
+            onPressed: () {
+              if (widget.onStartTopicPractice != null) {
+                widget.onStartTopicPractice!(topic.id);
+              } else {
+                widget.onStartPractice?.call();
+              }
+            },
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -685,6 +904,23 @@ class _MasteryPageState extends State<MasteryPage> {
   /// 获取当前选中路线的知识点 ID 列表
   List<String> _getRouteTopicIds() {
     return _routeTopicIds;
+  }
+
+  static int _calcMasteryPercent(List<Topic> topics, ProgressProvider progress) {
+    if (topics.isEmpty) return 0;
+    double totalScore = 0;
+    int count = 0;
+    for (final topic in topics) {
+      final score = progress.getTopicProgress(topic.id)?.score ?? 0;
+      if (score > 0) {
+        totalScore += score;
+        count++;
+      }
+    }
+    if (count == 0) return 0;
+    final avgScore = totalScore / count;
+    final coverage = count / topics.length;
+    return (avgScore * coverage).round();
   }
 }
 

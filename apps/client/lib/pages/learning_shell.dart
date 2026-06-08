@@ -25,6 +25,7 @@ import 'package:mianshi_zhilian/pages/mastery/mastery_page.dart';
 import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
 import 'package:mianshi_zhilian/widgets/navigation_rail_panel.dart';
 import 'package:mianshi_zhilian/widgets/header_bar.dart';
+import 'package:mianshi_zhilian/theme/colors.dart';
 
 enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 
@@ -57,41 +58,49 @@ class _LearningShellState extends State<LearningShell> {
   Future<void> _loadRouteTopicIds() async {
     final routeId = await _storage.load('selected_route_id');
     if (routeId == null || routeId == 'all') {
-      if (mounted) setState(() {
-        _routeTopicIds = null;
-        _routeDomainIds = null;
-        _activeRouteId = null;
-        _routeModeEnabled = false;
-      });
+      if (mounted) {
+        setState(() {
+          _routeTopicIds = null;
+          _routeDomainIds = null;
+          _activeRouteId = null;
+          _routeModeEnabled = false;
+        });
+      }
       return;
     }
+    final disabledFlag = await _storage.load('route_mode_disabled');
     final customData = await _storage.loadJsonList('custom_routes');
     for (final data in customData) {
       final route = LearningRoute.fromJson(data);
       if (route.id == routeId) {
         final ids = route.allTopicIds;
-        if (mounted) setState(() {
-          _routeTopicIds = ids.isEmpty ? null : ids;
-          _routeDomainIds = route.domainIds;
-          _routePhases = route.phases;
-          _activeRouteId = routeId;
-          _routeModeEnabled = true;
-        });
-        // 确保路线涉及的领域知识已加载
-        try {
-          final content = context.read<ContentProvider>();
-          await content.ensureTopicsLoaded(route.domainIds);
-        } catch (_) {}
+        if (mounted) {
+          setState(() {
+            _routeTopicIds = ids.isEmpty ? null : ids;
+            _routeDomainIds = route.domainIds;
+            _routePhases = route.phases;
+            _activeRouteId = routeId;
+            _routeModeEnabled = disabledFlag != '1';
+          });
+        }
+        if (mounted) {
+          try {
+            final content = context.read<ContentProvider>();
+            await content.ensureTopicsLoaded(route.domainIds);
+          } catch (_) {}
+        }
         return;
       }
     }
-    if (mounted) setState(() {
-      _routeTopicIds = null;
-      _routeDomainIds = null;
-      _routePhases = null;
-      _activeRouteId = null;
-      _routeModeEnabled = false;
-    });
+    if (mounted) {
+      setState(() {
+        _routeTopicIds = null;
+        _routeDomainIds = null;
+        _routePhases = null;
+        _activeRouteId = null;
+        _routeModeEnabled = false;
+      });
+    }
   }
 
   @override
@@ -138,6 +147,8 @@ class _LearningShellState extends State<LearningShell> {
       body: Column(
         children: [
           const OfflineBanner(),
+          if (_routeModeEnabled && _routeDomainIds != null && _routeDomainIds!.isNotEmpty)
+            _buildRouteContextBar(context),
           Expanded(
             child: Row(
               children: [
@@ -249,11 +260,22 @@ class _LearningShellState extends State<LearningShell> {
           topic: topic,
           initialTabIndex: _selectedTopicInitialTab,
           onBack: () => setState(() => _selectedTopicId = null),
+          routeTopicIds: _routeModeEnabled ? _routeTopicIds : null,
+          onRouteTopicTap: (topicId) => setState(() {
+            _selectedTopicId = topicId;
+            _selectedTopicInitialTab = 0;
+          }),
         );
       }
     }
 
-    return _currentPage();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: KeyedSubtree(
+        key: ValueKey(_section),
+        child: _currentPage(),
+      ),
+    );
   }
 
   Widget _currentPage() {
@@ -264,6 +286,7 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.dashboard => DashboardPage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
+        routeDomainIds: _routeDomainIds,
         routeModeEnabled: _routeModeEnabled,
         onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) {
@@ -287,8 +310,24 @@ class _LearningShellState extends State<LearningShell> {
           setState(() => _section = AppSection.catalog);
         },
         onReview: () => _setSection(AppSection.practice),
-        onMockInterview: () => _setSection(AppSection.practice),
+        onMockInterview: () {
+          final routeIds = _routeTopicIds;
+          List<String> topicIds;
+          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
+            topicIds = List.from(routeIds)..shuffle();
+          } else {
+            final domainTopics = content.getTopicsByDomain(
+              settings.settings.currentDomain,
+            );
+            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          }
+          context.push(
+            '/practice/mock-interview',
+            extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
+          );
+        },
         onPrepNavigation: () => _setSection(AppSection.prep),
+        onNavigateToCatalog: () => _setSection(AppSection.catalog),
       ),
       AppSection.catalog => CatalogPage(
         currentDomainId: settings.settings.currentDomain,
@@ -315,6 +354,7 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.practice => PracticePage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
+        routeModeEnabled: _routeModeEnabled,
         onDailyReview: () {
           context.push(
             '/practice/today-review',
@@ -325,8 +365,17 @@ class _LearningShellState extends State<LearningShell> {
           );
         },
         onRandomQuiz: (domainId) {
-          final domainTopics = content.getTopicsByDomain(domainId);
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          List<String> topicIds;
+          if (_routeTopicIds != null && _routeTopicIds!.isNotEmpty && _routeModeEnabled) {
+            final routeInDomain = _routeTopicIds!.where((id) {
+              final t = content.findTopic(id);
+              return t != null && t.domainId == domainId;
+            }).toList()..shuffle();
+            topicIds = routeInDomain.isNotEmpty ? routeInDomain : content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle();
+          } else {
+            final domainTopics = content.getTopicsByDomain(domainId);
+            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          }
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
@@ -335,7 +384,7 @@ class _LearningShellState extends State<LearningShell> {
         onMockInterview: () {
           final routeIds = _routeTopicIds;
           List<String> topicIds;
-          if (routeIds != null && routeIds.isNotEmpty) {
+          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
             topicIds = List.from(routeIds)..shuffle();
           } else {
             final domainTopics = content.getTopicsByDomain(
@@ -352,13 +401,14 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.prep => InterviewPrepPage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
+        routeDomainIds: _routeDomainIds,
         routeModeEnabled: _routeModeEnabled,
         onRouteModeChanged: _toggleRouteMode,
         onStartPractice: () => _setSection(AppSection.practice),
         onStartMock: () {
           final routeIds = _routeTopicIds;
           List<String> topicIds;
-          if (routeIds != null && routeIds.isNotEmpty) {
+          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
             topicIds = List.from(routeIds)..shuffle();
           } else {
             final domainTopics = content.getTopicsByDomain(
@@ -375,16 +425,26 @@ class _LearningShellState extends State<LearningShell> {
       AppSection.mastery => MasteryPage(
         currentDomainId: settings.settings.currentDomain,
         routeTopicIds: _routeTopicIds,
+        routeDomainIds: _routeDomainIds,
         routeModeEnabled: _routeModeEnabled,
         onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) => settings.updateSettings(
           settings.settings.copyWith(currentDomain: id),
         ),
+        onStartTopicPractice: (topicId) => setState(() {
+          _selectedTopicId = topicId;
+          _selectedTopicInitialTab = 1;
+        }),
         onStartPractice: () {
-          final domainTopics = content.getTopicsByDomain(
-            settings.settings.currentDomain,
-          );
-          final topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          List<String> topicIds;
+          if (_routeTopicIds != null && _routeTopicIds!.isNotEmpty && _routeModeEnabled) {
+            topicIds = List.from(_routeTopicIds!)..shuffle();
+          } else {
+            final domainTopics = content.getTopicsByDomain(
+              settings.settings.currentDomain,
+            );
+            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+          }
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
@@ -409,6 +469,93 @@ class _LearningShellState extends State<LearningShell> {
   void _toggleRouteMode() {
     if (_activeRouteId == null) return;
     setState(() => _routeModeEnabled = !_routeModeEnabled);
+    _storage.save('route_mode_disabled', _routeModeEnabled ? null : '1');
+  }
+
+  String _currentPhaseName() {
+    if (_routePhases == null || _routeTopicIds == null) return '';
+    final progress = context.read<ProgressProvider>();
+    final l10n = context.read<LocalizationProvider>();
+    for (final p in _routePhases!) {
+      for (final tid in p.topicIds) {
+        if (_routeTopicIds!.contains(tid) && (progress.getTopicProgress(tid)?.score ?? 0) < 85) {
+          return p.focus.isNotEmpty ? p.focus : '${l10n.get('phases_suffix')} ${_routePhases!.indexOf(p) + 1}';
+        }
+      }
+    }
+    if (_routePhases!.isNotEmpty) {
+      return '${_routePhases!.last.focus} ✓';
+    }
+    return '';
+  }
+
+  Widget _buildRouteContextBar(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final phaseName = _currentPhaseName();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.accent.withValues(alpha: 0.08)
+            : AppColors.accent.withValues(alpha: 0.06),
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.accent.withValues(alpha: 0.15),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.route, size: 14, color: AppColors.accent),
+          const SizedBox(width: 6),
+          Text(
+            l10n.get('route_mode'),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.accent,
+            ),
+          ),
+          if (phaseName.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                phaseName,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          const Spacer(),
+          SizedBox(
+            height: 26,
+            child: FilledButton.tonal(
+              onPressed: _toggleRouteMode,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(
+                l10n.get('exit_route'),
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _sectionTitle(AppSection section, LocalizationProvider l10n) =>

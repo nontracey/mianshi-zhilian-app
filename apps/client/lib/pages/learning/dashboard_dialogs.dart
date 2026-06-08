@@ -48,13 +48,12 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
       widget.routes.where((r) => r.source == 'official').toList();
 
   Future<void> _loadRoutes() async {
+    final progress = context.read<ProgressProvider>();
+    final plan = progress.prepPlan;
     final customData = await _storage.loadJsonList('custom_routes');
     final allCustom = customData
         .map((e) => LearningRoute.fromJson(e))
         .toList();
-
-    final progress = context.read<ProgressProvider>();
-    final plan = progress.prepPlan;
 
     LearningRoute? interviewRoute;
     if (plan.hasTarget) {

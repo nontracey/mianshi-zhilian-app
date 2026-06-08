@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:collection/collection.dart';
 
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
-import 'package:mianshi_zhilian/pages/learning/topic_detail_page.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -13,12 +11,7 @@ import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
-import 'package:mianshi_zhilian/models/learning_route.dart';
-import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
-import 'package:mianshi_zhilian/services/ai_route_generator.dart';
-import 'package:mianshi_zhilian/services/storage_service.dart';
-import 'package:mianshi_zhilian/pages/learning/dashboard_widgets.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
@@ -27,6 +20,7 @@ class InterviewPrepPage extends StatelessWidget {
     required this.onStartPractice,
     required this.onStartMock,
     this.routeTopicIds,
+    this.routeDomainIds,
     this.routeModeEnabled = false,
     this.onRouteModeChanged,
   });
@@ -35,6 +29,7 @@ class InterviewPrepPage extends StatelessWidget {
   final VoidCallback onStartPractice;
   final VoidCallback onStartMock;
   final List<String>? routeTopicIds;
+  final List<String>? routeDomainIds;
   final bool routeModeEnabled;
   final VoidCallback? onRouteModeChanged;
 
@@ -42,26 +37,52 @@ class InterviewPrepPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
-    final topics = content.getTopicsByDomain(currentDomainId);
+    final l10n = context.watch<LocalizationProvider>();
+    final isCrossDomain = routeModeEnabled &&
+        routeDomainIds != null &&
+        routeDomainIds!.length > 1 &&
+        routeTopicIds != null &&
+        routeTopicIds!.isNotEmpty;
+
+    List<Topic> topics;
+    if (isCrossDomain) {
+      topics = routeTopicIds!
+          .map((id) => content.findTopic(id))
+          .whereType<Topic>()
+          .toList();
+    } else if (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) {
+      final domainTopics = content.getTopicsByDomain(currentDomainId);
+      final routeSet = routeTopicIds!.toSet();
+      topics = domainTopics.where((t) => routeSet.contains(t.id)).toList();
+    } else {
+      topics = content.getTopicsByDomain(currentDomainId);
+    }
+
     final plan = progress.prepPlan;
     final readiness = progress.readinessScore(topics);
     final reviewCount = progress.getTodayReviewTopics(topics).length;
-    final lowScoreCount = progress.lowScoreAttempts.length;
+    final lowScoreCount = topics
+        .where((t) {
+          final s = progress.getTopicProgress(t.id)?.score ?? 0;
+          return s > 0 && s < 60;
+        })
+        .length;
     final highFrequencyUnmastered = topics.where((topic) {
       final topicProgress = progress.getTopicProgress(topic.id);
       return topic.highFrequency && (topicProgress?.score ?? 0) < 85;
     }).length;
-    final domainProgress = progress.getDomainProgress(currentDomainId, topics);
+    final domainProgress = isCrossDomain
+        ? (masteryPercent: _calcMastery(topics, progress), topicCount: topics.length)
+        : progress.getDomainProgress(currentDomainId, topics);
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Column(
         children: [
           TabBar(
-            tabs: const [
-              Tab(text: '工作台'),
-              Tab(text: '路线'),
-              Tab(text: '模拟面试'),
+            tabs: [
+              Tab(text: l10n.get('interview_preparation')),
+              Tab(text: l10n.get('mode_mock_interview')),
             ],
           ),
           Expanded(
@@ -79,7 +100,6 @@ class InterviewPrepPage extends StatelessWidget {
                   content: content,
                   domainProgress: domainProgress,
                 ),
-                _buildRouteTab(context, progress: progress),
                 _buildMockTab(context, progress: progress, topics: topics),
               ],
             ),
@@ -102,9 +122,15 @@ class InterviewPrepPage extends StatelessWidget {
     required ({int masteryPercent, int topicCount}) domainProgress,
   }) {
     final l10n = context.watch<LocalizationProvider>();
+    final routeContent = (routeModeEnabled && routeDomainIds != null && routeDomainIds!.length > 1 && routeTopicIds != null && routeTopicIds!.isNotEmpty)
+        ? _buildRouteSummary(context, topics, progress) : null;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        if (routeContent != null) ...[
+          routeContent,
+          const SizedBox(height: 16),
+        ],
         WorkPanel(
           title: plan.hasTarget
               ? l10n.getp('interview_preparation_role_2', {
@@ -300,17 +326,6 @@ class InterviewPrepPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRouteTab(
-    BuildContext context, {
-    required ProgressProvider progress,
-  }) {
-    final content = context.watch<ContentProvider>();
-    return _RouteTabContent(
-      progress: progress,
-      content: content,
-    );
-  }
-
   Widget _buildMockTab(
     BuildContext context, {
     required ProgressProvider progress,
@@ -337,11 +352,11 @@ class InterviewPrepPage extends StatelessWidget {
             : <String>[];
 
     return WorkPanel(
-      title: '项目深挖',
+      title: l10n.get('project_dig'),
       children: [
         InfoLine(
           icon: Icons.work_outline,
-          text: '使用 STAR 法则梳理项目经验，准备深挖追问',
+          text: l10n.get('project_dig_description'),
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
@@ -495,6 +510,115 @@ class InterviewPrepPage extends StatelessWidget {
     return AppColors.danger;
   }
 
+  static int _calcMastery(List<Topic> topics, ProgressProvider progress) {
+    if (topics.isEmpty) return 0;
+    double totalScore = 0;
+    int count = 0;
+    for (final topic in topics) {
+      final score = progress.getTopicProgress(topic.id)?.score ?? 0;
+      if (score > 0) {
+        totalScore += score;
+        count++;
+      }
+    }
+    if (count == 0) return 0;
+    final avgScore = totalScore / count;
+    final coverage = count / topics.length;
+    return (avgScore * coverage).round();
+  }
+
+  Widget _buildRouteSummary(BuildContext context, List<Topic> topics, ProgressProvider progress) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final content = context.read<ContentProvider>();
+    int mastered = 0;
+    for (final t in topics) {
+      if ((progress.getTopicProgress(t.id)?.score ?? 0) >= 85) mastered++;
+    }
+    final total = topics.length;
+    final pct = total > 0 ? (mastered * 100 ~/ total) : 0;
+    final isMultiDomain = routeDomainIds != null && routeDomainIds!.length > 1;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.route, color: AppColors.accent, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.get('route_progress_label'),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.accent),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: total > 0 ? mastered / total : 0,
+                        minHeight: 6,
+                        backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '$pct%',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppColors.accent),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$mastered/$total',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+              ),
+            ],
+          ),
+          if (isMultiDomain) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: (routeDomainIds ?? []).map((did) {
+                  final d = content.domains.where((dd) => dd.id == did).firstOrNull;
+                  final dTopics = topics.where((t) => t.domainId == did).toList();
+                  int dMastered = 0;
+                  for (final t in dTopics) {
+                    if ((progress.getTopicProgress(t.id)?.score ?? 0) >= 85) dMastered++;
+                  }
+                  final dPct = dTopics.isNotEmpty ? (dMastered * 100 ~/ dTopics.length) : 0;
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: (d?.color ?? AppColors.accent).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${d?.title ?? did} $dPct%',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: d?.color ?? AppColors.accent),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _showPlanDialog(
     BuildContext context,
     ProgressProvider progress,
@@ -631,307 +755,6 @@ class InterviewPrepPage extends StatelessWidget {
   }
 }
 
-class _RouteTabContent extends StatefulWidget {
-  final ProgressProvider progress;
-  final ContentProvider content;
-
-  const _RouteTabContent({
-    required this.progress,
-    required this.content,
-  });
-
-  @override
-  State<_RouteTabContent> createState() => _RouteTabContentState();
-}
-
-class _RouteTabContentState extends State<_RouteTabContent> {
-  final _storage = StorageService();
-  LearningRoute? _selectedRoute;
-  bool _isLoading = true;
-  bool _isGenerating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSelectedRoute();
-  }
-
-  Future<void> _loadSelectedRoute() async {
-    final routeId = await _storage.load('selected_route_id');
-    if (routeId != null) {
-      final customData = await _storage.loadJsonList('custom_routes');
-      final route = customData
-          .map((e) => LearningRoute.fromJson(e))
-          .firstWhereOrNull((r) => r.id == routeId);
-      if (route != null && mounted) {
-        setState(() {
-          _selectedRoute = route;
-          _isLoading = false;
-        });
-        return;
-      }
-    }
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  Future<void> _generateAiRoute() async {
-    final plan = widget.progress.prepPlan;
-    final l10n = context.read<LocalizationProvider>();
-    final aiProvider = context.read<AiProvider>();
-    final allDomains = widget.content.domains;
-    final generator = AiRouteGenerator(_storage, allDomains);
-    setState(() => _isGenerating = true);
-    try {
-      final route = await generator.generateRoute(
-        plan: plan,
-        allTopics: widget.content.topics.values.toList(),
-        progressProvider: widget.progress,
-        aiService: aiProvider.aiService,
-        contentProvider: widget.content,
-        forceRegenerate: true,
-      );
-
-      final customData = await _storage.loadJsonList('custom_routes');
-      // 移除旧 AI 路线，防止积压
-      customData.removeWhere((e) => e['source'] == 'ai');
-      customData.add(route.toJson());
-      await _storage.saveJsonList('custom_routes', customData);
-      await _storage.save('selected_route_id', route.id);
-
-      if (mounted) setState(() => _selectedRoute = route);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.getp('route_gen_fail', {'error': '$e'}))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isGenerating = false);
-    }
-  }
-
-  /// 根据面试目标筛选相关领域，避免全量加载
-  Color _scoreColor(int score) {
-    if (score >= 85) return AppColors.success;
-    if (score >= 60) return AppColors.warning;
-    return AppColors.danger;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    if (_isLoading || _isGenerating) return const Center(child: CircularProgressIndicator());
-    if (_selectedRoute == null) return _buildNoRouteView(context, l10n);
-    return _buildRouteView(context, l10n);
-  }
-
-  Widget _buildNoRouteView(BuildContext context, LocalizationProvider l10n) {
-    final plan = widget.progress.prepPlan;
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        WorkPanel(
-          title: plan.hasTarget ? '暂无路线' : '请先设置面试目标',
-          children: [
-            const SizedBox(height: 8),
-            Icon(
-              plan.hasTarget ? Icons.route : Icons.flag_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              plan.hasTarget
-                  ? '暂未生成学习路线，点击下方按钮生成 AI 个性化路线'
-                  : '请先在"工作台"中设置面试目标，然后可以生成个性化学习路线',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (plan.hasTarget)
-              FilledButton.icon(
-                onPressed: _generateAiRoute,
-                icon: const Icon(Icons.auto_awesome),
-                label: Text(l10n.get('ai_route_gen')),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRouteView(BuildContext context, LocalizationProvider l10n) {
-    final route = _selectedRoute!;
-    final phases = route.phases ?? [];
-    final allTopics = widget.content.topics;
-
-    int totalMastered = 0;
-    int totalTopics = 0;
-    for (final phase in phases) {
-      for (final topicId in phase.topicIds) {
-        totalTopics++;
-        final topic = allTopics[topicId];
-        if (topic != null) {
-          final score = widget.progress.getTopicProgress(topic.id)?.score ?? 0;
-          if (score >= 85) totalMastered++;
-        }
-      }
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        WorkPanel(
-          title: route.name,
-          trailing: Text(
-            l10n.getp('phases_count', {'count': phases.length}),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          children: [
-            Row(
-              children: [
-                Text(
-                  '$totalMastered/$totalTopics',
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    color: _scoreColor(
-                      totalTopics > 0 ? (totalMastered * 100 ~/ totalTopics) : 0,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: totalTopics > 0 ? totalMastered / totalTopics : 0,
-                          minHeight: 10,
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '$totalTopics ${l10n.get('item')}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (route.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                route.description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (phases.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Text(
-                l10n.get('route_no_phases'),
-                style: TextStyle(color: AppColors.textTertiary),
-              ),
-            ),
-          )
-        else ...[
-          Text(
-            l10n.get('learning_phase'),
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          // 按领域分组展示路线阶段
-          ..._groupPhasesByDomain(context, route, widget.content, widget.progress, allTopics, l10n),
-        ],
-        const SizedBox(height: 16),
-        Center(
-          child: TextButton.icon(
-            onPressed: _generateAiRoute,
-            icon: const Icon(Icons.auto_awesome),
-            label: Text(l10n.get('regenerate_route')),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _navigateToTopic(BuildContext context, String? topicId) {
-    if (topicId == null) return;
-    final topic = widget.content.topics[topicId];
-    if (topic == null) return;
-    context.push('/topic', extra: TopicDetailPage(topic: topic, onBack: () => context.pop()));
-  }
-
-  List<Widget> _groupPhasesByDomain(BuildContext ctx, LearningRoute route,
-      ContentProvider content, ProgressProvider progress,
-      Map<String, Topic> topics, LocalizationProvider l10n) {
-    final phases = route.phases ?? [];
-    final byDomain = <String, List<RoutePhase>>{};
-    for (final p in phases) {
-      final did = p.topicIds.isNotEmpty
-          ? (topics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
-          : (route.domainIds.firstOrNull ?? '');
-      byDomain.putIfAbsent(did, () => []).add(p);
-    }
-    return byDomain.entries.expand((e) {
-      final domain = content.domains.firstWhereOrNull((d) => d.id == e.key);
-      final title = domain?.title ?? e.key;
-      return [
-        Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 4),
-          child: Text(title,
-              style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(ctx).colorScheme.primary, fontWeight: FontWeight.w700)),
-        ),
-        ...e.value.map((p) {
-          final pids = p.topicIds.toSet().toList();
-          final ptitles = <String, String>{};
-          var mastered = 0; var practiced = 0;
-          for (final id in pids) {
-            final t = topics[id]; if (t != null) ptitles[id] = t.title;
-            final s = progress.getTopicProgress(id)?.score ?? 0;
-            if (s >= 85) mastered++;
-            if (s > 0) practiced++;
-          }
-          final allDone = mastered == pids.length && pids.isNotEmpty;
-          final inProgress = practiced > 0 && !allDone;
-          return PhaseCard(
-            name: p.focus.isNotEmpty ? p.focus : '$title 阶段 ${e.value.indexOf(p) + 1}',
-            totalTopics: pids.length,
-            masteredTopics: mastered,
-            statusText: allDone ? l10n.get('skilled_training') : (inProgress ? l10n.get('progress_action_in') : l10n.get('un_start')),
-            statusColor: allDone ? AppColors.success : (inProgress ? AppColors.warning : AppColors.textTertiary),
-            statusIcon: allDone ? Icons.check_circle : (inProgress ? Icons.trending_up : Icons.radio_button_unchecked),
-            isCurrent: inProgress,
-            topicIds: pids, topicTitles: ptitles,
-            onTap: pids.isNotEmpty ? () => _navigateToTopic(ctx, pids.first) : null,
-            onTopicTap: (id) => _navigateToTopic(ctx, id),
-          );
-        }),
-      ];
-    }).toList();
-  }
-}
-
 class _PrepMetric extends StatelessWidget {
   const _PrepMetric({
     required this.label,
@@ -1037,13 +860,12 @@ class _MockTabContentState extends State<_MockTabContent> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final mockCount = widget.progress.mockSessions.length;
 
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         WorkPanel(
-          title: '模拟面试',
+          title: l10n.get('mode_mock_interview'),
           children: [
             const SizedBox(height: 8),
             Center(
@@ -1132,17 +954,6 @@ class _MockTabContentState extends State<_MockTabContent> {
                 minimumSize: const Size(double.infinity, 48),
               ),
             ),
-            if (mockCount > 0) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.history),
-                label: Text(l10n.getp('view_history_count', {'count': mockCount})),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-            ],
           ],
         ),
       ],

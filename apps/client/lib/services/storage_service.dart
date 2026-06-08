@@ -29,6 +29,7 @@ class StorageService {
     'disabled_domains',
     'custom_routes',
     'selected_route_id',
+    'route_mode_disabled',
 
     'project_library',
     'project_dig_projects',

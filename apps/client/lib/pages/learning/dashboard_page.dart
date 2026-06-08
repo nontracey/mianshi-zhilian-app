@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mianshi_zhilian/models/domain.dart';
+import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 import 'dashboard_panels.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -19,9 +22,11 @@ class DashboardPage extends StatelessWidget {
     this.onReview,
     this.onMockInterview,
     this.routeTopicIds,
+    this.routeDomainIds,
     this.routeModeEnabled = false,
     this.onRouteModeChanged,
     this.onPrepNavigation,
+    this.onNavigateToCatalog,
   });
 
   final String currentDomainId;
@@ -32,7 +37,9 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback? onReview;
   final VoidCallback? onMockInterview;
   final VoidCallback? onPrepNavigation;
+  final VoidCallback? onNavigateToCatalog;
   final List<String>? routeTopicIds;
+  final List<String>? routeDomainIds;
   final bool routeModeEnabled;
   final VoidCallback? onRouteModeChanged;
 
@@ -44,13 +51,15 @@ class DashboardPage extends StatelessWidget {
     final l10n = context.watch<LocalizationProvider>();
 
     if (contentProvider.isLoading || contentProvider.isLoadingTopics) {
-      return Center(
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            SkeletonCard(height: 160),
             const SizedBox(height: 16),
-            Text(l10n.get('loading_latest_knowledge')),
+            SkeletonMetricGrid(),
+            const SizedBox(height: 16),
+            SkeletonCard(height: 120),
           ],
         ),
       );
@@ -92,7 +101,26 @@ class DashboardPage extends StatelessWidget {
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
-    if (!contentProvider.isLoadingTopics && domainTopics.isEmpty) {
+
+    final isCrossDomainRoute = routeModeEnabled &&
+        routeDomainIds != null &&
+        routeDomainIds!.length > 1 &&
+        routeTopicIds != null &&
+        routeTopicIds!.isNotEmpty;
+
+    List<Topic> scopedTopics;
+    if (isCrossDomainRoute) {
+      scopedTopics = routeTopicIds!
+          .map((id) => contentProvider.findTopic(id))
+          .whereType<Topic>()
+          .toList();
+    } else if (routeTopicIds != null) {
+      scopedTopics = domainTopics.where((t) => routeTopicIds!.contains(t.id)).toList();
+    } else {
+      scopedTopics = domainTopics;
+    }
+
+    if (!contentProvider.isLoadingTopics && scopedTopics.isEmpty && domainTopics.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -118,17 +146,21 @@ class DashboardPage extends StatelessWidget {
       );
     }
 
-    final domainProgress = progressProvider.getDomainProgress(
-      currentDomainId,
-      contentProvider.topics.values.toList(),
-    );
+    final isRouteFocused = routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty;
+
+    final domainProgress = isCrossDomainRoute || isRouteFocused
+        ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
+        : progressProvider.getDomainProgress(
+            currentDomainId,
+            contentProvider.topics.values.toList(),
+          );
     final masteryPercent = domainProgress.masteryPercent;
     final topicCount = domainProgress.topicCount;
-    final readiness = progressProvider.readinessScore(domainTopics);
+    final readiness = progressProvider.readinessScore(scopedTopics);
 
     final recommendedTopics = progressProvider.getRecommendedTopics(
       currentDomainId,
-      contentProvider.topics.values.toList(),
+      isCrossDomainRoute || isRouteFocused ? scopedTopics : contentProvider.topics.values.toList(),
       settingsProvider.settings.recommendStrategy,
       lowScoreWeight: settingsProvider.settings.lowScoreWeight,
       overdueWeight: settingsProvider.settings.overdueWeight,
@@ -142,19 +174,17 @@ class DashboardPage extends StatelessWidget {
 
     final plan = progressProvider.prepPlan;
 
-    // 路线范围过滤
-    final scopedTopics = routeTopicIds != null
-        ? domainTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
-        : domainTopics;
-
-    // 薄弱知识点 Top 5
     final weakTopics = progressProvider.getWeakTopics(scopedTopics, limit: 5);
-    // 最近练习
     final recentAttempts = progressProvider.recentAttempts.take(5).toList();
-    // 到期复习
     final dueTopics = progressProvider.getTodayReviewTopics(scopedTopics);
 
-    // 三栏工作台布局
+    if (isRouteFocused) {
+      return _buildRouteFocusedLayout(
+        context, scopedTopics, progressProvider, contentProvider,
+        settingsProvider, domains, currentDomain, plan, l10n,
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -177,19 +207,22 @@ class DashboardPage extends StatelessWidget {
                 Expanded(
                   flex: 2,
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: LeftPanel(
-                        dueTopics: dueTopics,
-                        weakTopics: weakTopics,
-                        routeTopicIds: routeTopicIds,
-                        onTopicTap: onTopicTap,
-                        onReview: onReview,
-                        progressProvider: progressProvider,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // 中间栏：当前学习路线、领域知识卡片
+                       padding: const EdgeInsets.only(bottom: 16),
+                       child: LeftPanel(
+                         dueTopics: dueTopics,
+                         weakTopics: weakTopics,
+                         routeTopicIds: routeTopicIds,
+                         isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
+                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                         onStartLearning: onNavigateToCatalog,
+                         onTopicTap: onTopicTap,
+                         onReview: onReview,
+                         progressProvider: progressProvider,
+                       ),
+                     ),
+                   ),
+                   const SizedBox(width: 16),
+                   // 中间栏：当前学习路线、领域知识卡片
                   Expanded(
                     flex: 3,
                     child: SingleChildScrollView(
@@ -224,17 +257,18 @@ class DashboardPage extends StatelessWidget {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: RightPanel(
-                        currentDomainId: currentDomainId,
-                        domains: domains,
-                        masteryPercent: masteryPercent,
-                        readiness: readiness,
-                        weakTopics: weakTopics,
-                        recentAttempts: recentAttempts,
-                        onTopicTap: onTopicTap,
-                        onDomainChanged: onDomainChanged,
-                        progressProvider: progressProvider,
-                        contentProvider: contentProvider,
-                      ),
+                         currentDomainId: currentDomainId,
+                         domains: domains,
+                         masteryPercent: masteryPercent,
+                         readiness: readiness,
+                         weakTopics: weakTopics,
+                         recentAttempts: recentAttempts,
+                         onTopicTap: onTopicTap,
+                         onDomainChanged: onDomainChanged,
+                         progressProvider: progressProvider,
+                         contentProvider: contentProvider,
+                         routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
+                       ),
                     ),
                   ),
               ],
@@ -248,20 +282,23 @@ class DashboardPage extends StatelessWidget {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: LeftPanel(
-                        dueTopics: dueTopics,
-                        weakTopics: weakTopics,
-                        routeTopicIds: routeTopicIds,
-                        onTopicTap: onTopicTap,
-                        onReview: onReview,
-                        progressProvider: progressProvider,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Column(
+                         dueTopics: dueTopics,
+                         weakTopics: weakTopics,
+                         routeTopicIds: routeTopicIds,
+                         isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
+                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                         onStartLearning: onNavigateToCatalog,
+                         onTopicTap: onTopicTap,
+                         onReview: onReview,
+                         progressProvider: progressProvider,
+                       ),
+                     ),
+                   ),
+                   const SizedBox(width: 16),
+                   Expanded(
+                     child: SingleChildScrollView(
+                       padding: const EdgeInsets.only(bottom: 16),
+                       child: Column(
                         children: [
                           CenterPanel(
                             currentDomain: currentDomain,
@@ -286,17 +323,18 @@ class DashboardPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
                           RightPanel(
-                            currentDomainId: currentDomainId,
-                            domains: domains,
-                            masteryPercent: masteryPercent,
-                            readiness: readiness,
-                            weakTopics: weakTopics,
-                            recentAttempts: recentAttempts,
-                            onTopicTap: onTopicTap,
-                            onDomainChanged: onDomainChanged,
-                            progressProvider: progressProvider,
-                            contentProvider: contentProvider,
-                          ),
+                             currentDomainId: currentDomainId,
+                             domains: domains,
+                             masteryPercent: masteryPercent,
+                             readiness: readiness,
+                             weakTopics: weakTopics,
+                             recentAttempts: recentAttempts,
+                             onTopicTap: onTopicTap,
+                             onDomainChanged: onDomainChanged,
+                             progressProvider: progressProvider,
+                             contentProvider: contentProvider,
+                             routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
+                           ),
                         ],
                       ),
                     ),
@@ -312,6 +350,9 @@ class DashboardPage extends StatelessWidget {
                     dueTopics: dueTopics,
                     weakTopics: weakTopics,
                     routeTopicIds: routeTopicIds,
+                    isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
+                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                         onStartLearning: onNavigateToCatalog,
                     onTopicTap: onTopicTap,
                     onReview: onReview,
                     progressProvider: progressProvider,
@@ -350,6 +391,7 @@ class DashboardPage extends StatelessWidget {
                     onDomainChanged: onDomainChanged,
                     progressProvider: progressProvider,
                     contentProvider: contentProvider,
+                    routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
                   ),
                 ],
               ),
@@ -409,8 +451,8 @@ class DashboardPage extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   days != null
-                      ? (days > 0 ? '距面试 $days 天' : '面试日已到')
-                      : '已设置面试目标',
+                      ? (days > 0 ? l10n.getp('days_until_interview', {'days': days}) : l10n.get('interview_day_already_to'))
+                      : l10n.get('interview_target_set'),
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.white54 : Colors.grey,
@@ -438,6 +480,287 @@ class DashboardPage extends StatelessWidget {
         ],
       ),
     ),
+    );
+  }
+
+  static int _calcMasteryPercent(List<Topic> topics, ProgressProvider progress) {
+    if (topics.isEmpty) return 0;
+    double totalScore = 0;
+    int count = 0;
+    for (final topic in topics) {
+      final score = progress.getTopicProgress(topic.id)?.score ?? 0;
+      if (score > 0) {
+        totalScore += score;
+        count++;
+      }
+    }
+    if (count == 0) return 0;
+    final avgScore = totalScore / count;
+    final coverage = count / topics.length;
+    return (avgScore * coverage).round();
+  }
+
+  Widget _buildRouteFocusedLayout(
+    BuildContext context,
+    List<Topic> scopedTopics,
+    ProgressProvider progressProvider,
+    ContentProvider contentProvider,
+    SettingsProvider settingsProvider,
+    List<Domain> domains,
+    Domain? currentDomain,
+    PrepPlan plan,
+    LocalizationProvider l10n,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dueTopics = progressProvider.getTodayReviewTopics(scopedTopics);
+    final weakTopics = progressProvider.getWeakTopics(scopedTopics, limit: 3);
+
+    int mastered = 0;
+    for (final t in scopedTopics) {
+      if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85) mastered++;
+    }
+    final total = scopedTopics.length;
+    final pct = total > 0 ? (mastered * 100 ~/ total) : 0;
+
+    String? nextTopicId;
+    for (final t in scopedTopics) {
+      final s = progressProvider.getTopicProgress(t.id)?.score ?? 0;
+      if (s < 85) { nextTopicId = t.id; break; }
+    }
+
+    final hasStarted = scopedTopics.any((t) => (progressProvider.getTopicProgress(t.id)?.score ?? 0) > 0);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (plan.hasTarget) _buildTargetBanner(context, plan),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF161B22) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.route, color: AppColors.accent, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$pct%',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          Text(
+                            '$mastered/$total ${l10n.get('item')}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white54 : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (dueTopics.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              l10n.getp('pending_review_count', {'count': dueTopics.length}),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warning),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: total > 0 ? mastered / total : 0,
+                    minHeight: 8,
+                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (!hasStarted)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.rocket_launch_outlined, color: AppColors.accent, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.get('route_start_guidance'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.accent),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.get('route_start_guidance_desc'),
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54, height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  if (nextTopicId != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => onTopicTap(nextTopicId!),
+                        icon: const Icon(Icons.play_arrow, size: 20),
+                        label: Text(l10n.get('start_first_topic')),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else ...[
+            if (dueTopics.isNotEmpty) ...[
+              _buildQuickActionRow(
+                context, isDark,
+                icon: Icons.replay_outlined,
+                label: l10n.get('today_day_review_queue'),
+                count: dueTopics.length,
+                color: AppColors.warning,
+                onTap: onReview,
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (weakTopics.isNotEmpty) ...[
+              _buildQuickActionRow(
+                context, isDark,
+                icon: Icons.trending_down_outlined,
+                label: l10n.get('weak_knowledge_point_top_5'),
+                count: weakTopics.length,
+                color: AppColors.danger,
+                onTap: () {
+                  final t = weakTopics.first;
+                  onTopicTap(t.id);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+            _buildQuickActionRow(
+              context, isDark,
+              icon: Icons.psychology_alt_outlined,
+              label: l10n.get('practice'),
+              count: null,
+              color: AppColors.accent,
+              onTap: onPractice,
+            ),
+            const SizedBox(height: 10),
+            _buildQuickActionRow(
+              context, isDark,
+              icon: Icons.record_voice_over_outlined,
+              label: l10n.get('mode_mock_interview'),
+              count: null,
+              color: AppColors.categoryPurple,
+              onTap: onMockInterview,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionRow(
+    BuildContext context,
+    bool isDark, {
+    required IconData icon,
+    required String label,
+    required int? count,
+    required Color color,
+    required VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF161B22) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? Colors.white : AppColors.textPrimary),
+              ),
+            ),
+            if (count != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+              ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 18, color: isDark ? Colors.white24 : Colors.grey.shade400),
+          ],
+        ),
+      ),
     );
   }
 }

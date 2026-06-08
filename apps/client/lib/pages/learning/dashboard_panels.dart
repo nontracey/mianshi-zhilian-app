@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
@@ -325,6 +324,9 @@ class LeftPanel extends StatelessWidget {
     required this.onReview,
     required this.progressProvider,
     this.routeTopicIds,
+    this.isRouteMode = false,
+    this.routeFirstTopicId,
+    this.onStartLearning,
   });
 
   final List<Topic> dueTopics;
@@ -333,6 +335,9 @@ class LeftPanel extends StatelessWidget {
   final VoidCallback? onReview;
   final ProgressProvider progressProvider;
   final List<String>? routeTopicIds;
+  final bool isRouteMode;
+  final String? routeFirstTopicId;
+  final VoidCallback? onStartLearning;
 
   List<Topic> get _filteredDueTopics => routeTopicIds != null
       ? dueTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
@@ -342,6 +347,15 @@ class LeftPanel extends StatelessWidget {
       ? weakTopics.where((t) => routeTopicIds!.contains(t.id)).toList()
       : weakTopics;
 
+  bool get _hasNoProgress {
+    final ids = routeTopicIds ?? [];
+    if (ids.isEmpty) return dueTopics.isEmpty && weakTopics.isEmpty;
+    for (final id in ids) {
+      if ((progressProvider.getTopicProgress(id)?.score ?? 0) > 0) return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -349,10 +363,13 @@ class LeftPanel extends StatelessWidget {
     final filteredDueTopics = _filteredDueTopics;
     final filteredWeakTopics = _filteredWeakTopics;
 
+    if (isRouteMode && _hasNoProgress) {
+      return _buildStartGuidance(context, l10n, isDark);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 今日复习队列
         PanelCard(
           title: l10n.get('today_day_review_queue'),
           icon: Icons.replay_outlined,
@@ -389,7 +406,6 @@ class LeftPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // 薄弱知识点TOP5
         PanelCard(
           title: l10n.get('weak_knowledge_point_top_5'),
           icon: Icons.trending_down_outlined,
@@ -414,9 +430,56 @@ class LeftPanel extends StatelessWidget {
       ],
     );
   }
-}
 
-// ── 中间面板：当前学习路线、领域知识卡片 ──
+  Widget _buildStartGuidance(BuildContext context, LocalizationProvider l10n, bool isDark) {
+    return PanelCard(
+      title: l10n.get('route_start_guidance'),
+      icon: Icons.rocket_launch_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.get('route_start_guidance_desc'),
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (routeFirstTopicId != null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => onTopicTap(routeFirstTopicId!),
+                icon: const Icon(Icons.play_arrow, size: 18),
+                label: Text(l10n.get('start_first_topic')),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          if (onStartLearning != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onStartLearning,
+                icon: const Icon(Icons.explore_outlined, size: 18),
+                label: Text(l10n.get('browse_route_catalog')),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class CenterPanel extends StatefulWidget {
   const CenterPanel({
@@ -751,7 +814,7 @@ class CenterPanelState extends State<CenterPanel> {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w900,
-                color: topicIds.length > 0
+                color: topicIds.isNotEmpty
                     ? (totalMastered * 100 ~/ topicIds.length >= 85
                         ? AppColors.success
                         : totalMastered * 100 ~/ topicIds.length >= 50
@@ -768,7 +831,7 @@ class CenterPanelState extends State<CenterPanel> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: topicIds.length > 0 ? totalMastered / topicIds.length : 0,
+                      value: topicIds.isNotEmpty ? totalMastered / topicIds.length : 0,
                       minHeight: 8,
                       backgroundColor: Theme.of(context)
                           .colorScheme
@@ -818,26 +881,54 @@ class CenterPanelState extends State<CenterPanel> {
     final phases = route.phases ?? [];
     final byDomain = <String, List<RoutePhase>>{};
     for (final p in phases) {
-      final did = p.topicIds.isNotEmpty
-          ? (allTopics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
-          : (route.domainIds.firstOrNull ?? '');
+      final did = p.domainId ??
+          (p.topicIds.isNotEmpty
+              ? (allTopics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
+              : (route.domainIds.firstOrNull ?? ''));
       byDomain.putIfAbsent(did, () => []).add(p);
     }
 
-    return byDomain.entries.expand((e) {
-      final domain = widget.allDomains.firstWhereOrNull((d) => d.id == e.key);
+    final domainOrder = route.domainIds;
+    final sortedEntries = byDomain.entries.toList();
+    sortedEntries.sort((a, b) {
+      final ia = domainOrder.indexOf(a.key);
+      final ib = domainOrder.indexOf(b.key);
+      final oa = ia == -1 ? domainOrder.length : ia;
+      final ob = ib == -1 ? domainOrder.length : ib;
+      return oa.compareTo(ob);
+    });
+
+    return sortedEntries.expand((e) {
+      final domain = widget.allDomains.cast<Domain?>().firstWhere(
+        (d) => d?.id == e.key,
+        orElse: () => null,
+      );
       final domainTitle = domain?.title ?? e.key;
+      final domainColor = domain?.color ?? AppColors.accent;
       return [
         Padding(
           padding: const EdgeInsets.only(top: 10, bottom: 4),
-          child: Text(
-            domainTitle,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w700),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: domainColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                domainTitle,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(
+                        color: domainColor,
+                        fontWeight: FontWeight.w700),
+              ),
+            ],
           ),
         ),
         ...e.value.map((p) {
@@ -855,7 +946,7 @@ class CenterPanelState extends State<CenterPanel> {
           final allDone = mastered == pids.length && pids.isNotEmpty;
           final inProgress = practiced > 0 && !allDone;
           return PhaseCard(
-            name: p.focus.isNotEmpty ? p.focus : '${domainTitle} ${l10n.get('phases_suffix')} ${e.value.indexOf(p) + 1}',
+            name: p.focus.isNotEmpty ? p.focus : '$domainTitle ${l10n.get('phases_suffix')} ${e.value.indexOf(p) + 1}',
             totalTopics: pids.length,
             masteredTopics: mastered,
             statusText: allDone
@@ -955,6 +1046,7 @@ class RightPanel extends StatelessWidget {
     required this.onDomainChanged,
     required this.progressProvider,
     required this.contentProvider,
+    this.routeTopicIds,
   });
 
   final String currentDomainId;
@@ -967,19 +1059,21 @@ class RightPanel extends StatelessWidget {
   final ValueChanged<String> onDomainChanged;
   final ProgressProvider progressProvider;
   final ContentProvider contentProvider;
+  final List<String>? routeTopicIds;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    // 获取掌握度趋势数据
-    final trendData = progressProvider.getMasteryTrend();
 
-    // 计算当前领域的分类掌握度
-    final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
+    final scopedTopics = routeTopicIds != null && routeTopicIds!.isNotEmpty
+        ? routeTopicIds!
+            .map((id) => contentProvider.findTopic(id))
+            .whereType<Topic>()
+            .toList()
+        : contentProvider.getTopicsByDomain(currentDomainId);
 
-    // 按分类计算掌握度
     final categoryMap = <String, List<Topic>>{};
-    for (final topic in domainTopics) {
+    for (final topic in scopedTopics) {
       categoryMap.putIfAbsent(topic.category, () => []).add(topic);
     }
 
@@ -1000,12 +1094,12 @@ class RightPanel extends StatelessWidget {
     }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
 
     // 计算掌握程度百分比
-    int totalTopics = domainTopics.length;
+    int totalTopics = scopedTopics.length;
     int masteredCount = 0;
     int learningCount = 0;
     int newCount = 0;
 
-    for (final topic in domainTopics) {
+    for (final topic in scopedTopics) {
       final score = progressProvider.getTopicProgress(topic.id)?.score ?? 0;
       if (score >= 85) {
         masteredCount++;
@@ -1027,7 +1121,6 @@ class RightPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 掌握度概览
         PanelCard(
           title: l10n.get('mastery_overview_browse'),
           icon: Icons.pie_chart_outline,
@@ -1050,14 +1143,6 @@ class RightPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // 掌握度趋势
-        PanelCard(
-          title: l10n.get('mastery_trend_recent_7_day'),
-          icon: Icons.trending_up_outlined,
-          child: MasteryTrendChart(trendData: trendData),
-        ),
-        const SizedBox(height: 16),
-        // 下一步最佳行动
         PanelCard(
           title: l10n.get('next_step_best_action'),
           icon: Icons.lightbulb_outline,
@@ -1066,211 +1151,8 @@ class RightPanel extends StatelessWidget {
             onTopicTap: onTopicTap,
           ),
         ),
-        const SizedBox(height: 16),
-        // 备选行动
-        PanelCard(
-          title: l10n.get('alternate_select_action'),
-          icon: Icons.list_alt_outlined,
-          child: AlternativeActions(
-            weakTopics: weakTopics,
-            onTopicTap: onTopicTap,
-          ),
-        ),
-        const SizedBox(height: 16),
-        // 练习记录
-        PanelCard(
-          title: l10n.get('practice_record'),
-          icon: Icons.auto_awesome_outlined,
-          trailing: recentAttempts.isEmpty ? null : l10n.get('check_view_all'),
-          onTrailingTap: recentAttempts.isEmpty
-              ? null
-              : () => _showPracticeRecords(context),
-          child: Column(
-            children: [
-              if (recentAttempts.isEmpty)
-                EmptyState(message: l10n.get('temporary_no_feedback_record'))
-              else
-                ...recentAttempts.take(3).map((attempt) {
-                  return AIFeedbackItem(attempt: attempt);
-                }),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  void _showPracticeRecords(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider<ProgressProvider>.value(
-            value: progressProvider,
-          ),
-          ChangeNotifierProvider<ContentProvider>.value(value: contentProvider),
-        ],
-        child: const PracticeRecordsSheet(),
-      ),
-    );
   }
-}
-
-// ── 练习记录面板 ──
-
-class PracticeRecordsSheet extends StatefulWidget {
-  const PracticeRecordsSheet({super.key});
-
-  @override
-  State<PracticeRecordsSheet> createState() => PracticeRecordsSheetState();
-}
-
-class PracticeRecordsSheetState extends State<PracticeRecordsSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    final progressProvider = context.watch<ProgressProvider>();
-    final contentProvider = context.watch<ContentProvider>();
-    final attempts = _filterAttempts(
-      progressProvider.recentAttempts,
-      contentProvider,
-    );
-
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.78,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.history_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    l10n.get('practice_record'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() {
-                  _query = value.trim().toLowerCase();
-                }),
-                decoration: InputDecoration(
-                  hintText: l10n.get('search_practice_record'),
-                  prefixIcon: const Icon(Icons.search_outlined),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: l10n.get('clear'),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: attempts.isEmpty
-                  ? Center(
-                      child: EmptyState(
-                        message: l10n.get('temporary_no_feedback_record'),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      itemCount: attempts.length,
-                      separatorBuilder: (_, _) => const Divider(height: 16),
-                      itemBuilder: (_, index) => PracticeRecordItem(
-                        attempt: attempts[index],
-                        topic: contentProvider.findTopic(
-                          attempts[index].topicId,
-                        ),
-                        onDelete: () => _confirmDelete(attempts[index]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<PracticeAttempt> _filterAttempts(
-    List<PracticeAttempt> attempts,
-    ContentProvider contentProvider,
-  ) {
-    if (_query.isEmpty) return attempts;
-
-    return attempts.where((attempt) {
-      final topic = contentProvider.findTopic(attempt.topicId);
-      final text = [
-        topic?.title,
-        attempt.topicId,
-        attempt.mode,
-        attempt.question,
-        attempt.answer,
-        attempt.summary,
-        attempt.nextAction,
-        attempt.missedPoints.join(' '),
-        attempt.wrongPoints.join(' '),
-      ].whereType<String>().join(' ').toLowerCase();
-      return text.contains(_query);
-    }).toList();
-  }
-
-  Future<void> _confirmDelete(PracticeAttempt attempt) async {
-    final l10n = context.read<LocalizationProvider>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.get('confirm_delete')),
-        content: Text(l10n.get('confirm_delete_practice_record')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(l10n.get('cancel')),
-          ),
-          FilledButton.tonalIcon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: Text(l10n.get('delete')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    await context.read<ProgressProvider>().deleteAttempt(attempt.id);
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.get('practice_record_deleted'))),
-    );
-  }
-}
