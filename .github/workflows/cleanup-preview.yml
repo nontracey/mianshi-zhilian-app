@@ -16,16 +16,18 @@ jobs:
         run: |
           set -euo pipefail
           for project in mianshi-zhilian-app mianshi-zhilian-api; do
-            deployments=$(curl -s -X GET \
+            deployments=$(curl -s --fail -X GET \
               "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${project}/deployments" \
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json")
+              -H "Content-Type: application/json") 2>/dev/null || {
+              echo "Project $project not found or API error; skipping"
+              continue
+            }
 
             ids=$(echo "$deployments" | python3 -c "
 import json, sys, os
 branch = os.environ['BRANCH']
-data = json.load(sys.stdin)
-for d in data.get('result', []):
+for d in json.load(sys.stdin).get('result', []):
     meta = d.get('deployment_trigger', {}).get('metadata', {})
     if meta.get('branch', '') == branch:
         print(d['id'])
