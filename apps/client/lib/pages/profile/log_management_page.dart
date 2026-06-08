@@ -13,7 +13,7 @@ class LogManagementPage extends StatefulWidget {
 }
 
 class _LogManagementPageState extends State<LogManagementPage> {
-  AppLogLevel _minimumLevel = AppLogLevel.debug;
+  AppLogLevel _minimumLevel = AppLogLevel.error;
 
   @override
   Widget build(BuildContext context) {
