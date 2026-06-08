@@ -573,9 +573,6 @@ class CenterPanelState extends State<CenterPanel> {
     final domains = _domains;
     final allEnabledDomains = _allEnabledDomains;
     final route = _selectedRoute;
-    final hasPhases = route != null &&
-        route.phases != null &&
-        route.phases!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,8 +616,10 @@ class CenterPanelState extends State<CenterPanel> {
             children: [
               if (domains.isEmpty)
                 EmptyState(message: l10n.get('temporary_no_study_route'))
-              else if (hasPhases)
-                _buildPhaseView(route!, l10n)
+              else if (route != null &&
+                  route.phases != null &&
+                  route.phases!.isNotEmpty)
+                _buildPhaseView(route, l10n)
               else
                 ...domains.take(5).toList().asMap().entries.map((entry) {
                   final index = entry.key;
