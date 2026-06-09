@@ -216,9 +216,9 @@ $topicLines
                 final topic = contentProvider.getTopicById(cacheKey);
                 if (topic == null) continue;
                 final tid = topic.id; // 使用 "java.jvm.xxx" 格式的 content ID
-                // 只包含 AI 选中且已掌握度低于 85 的
-                final score = progressProvider.getTopicProgress(tid)?.score ?? 0;
-                if (relevantTopicIds.contains(tid) && score < 85) {
+                // 全量纳入 AI 选中的 topic（含已掌握），掌握状态交展示层着色，
+                // 避免重新生成后掌握度分母缩减、进度被人为推高。
+                if (relevantTopicIds.contains(tid)) {
                   stepTopics.add(tid);
                 }
               }

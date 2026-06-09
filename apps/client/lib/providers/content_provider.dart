@@ -17,12 +17,14 @@ class ContentProvider extends ChangeNotifier {
   Map<String, Topic> _topics = {};
   Map<String, dynamic>? _manifest;
   bool _isLoading = false;
-  bool _isLoadingTopics = false;
+  int _loadingDomainCount = 0;  // 并发加载中的领域数；>0 即 isLoadingTopics
   bool _isCheckingUpdate = false;
   String? _error;
   List<String> _topicLoadFailures = [];
   String? _cachedContentVersion;
   int _loadEpoch = 0;
+  /// 当前正在进行的同域加载 Future，避免 ensureTopicsLoaded 并发触发重复网络请求。
+  final Map<String, Future<void>> _pendingDomainLoads = {};
 
   List<Domain> get domains => _domains;
 
@@ -39,7 +41,7 @@ class ContentProvider extends ChangeNotifier {
 
   Map<String, dynamic>? get manifest => _manifest;
   bool get isLoading => _isLoading;
-  bool get isLoadingTopics => _isLoadingTopics;
+  bool get isLoadingTopics => _loadingDomainCount > 0;
   bool get isCheckingUpdate => _isCheckingUpdate;
   String? get error => _error;
   List<String> get topicLoadFailures => List.unmodifiable(_topicLoadFailures);
@@ -218,19 +220,26 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadDomainTopics(String domainId) async {
+  Future<void> loadDomainTopics(String domainId) {
+    // 同域并发去重：若该领域已在加载中，直接复用同一 Future，避免重复网络请求。
+    return _pendingDomainLoads[domainId] ??=
+        _loadDomainTopicsInternal(domainId).whenComplete(() {
+      _pendingDomainLoads.remove(domainId);
+    });
+  }
+
+  Future<void> _loadDomainTopicsInternal(String domainId) async {
     final epoch = _loadEpoch;
-    _isLoadingTopics = true;
-    _topicLoadFailures = [];
+    _loadingDomainCount++;
+    // 不在此重置 _topicLoadFailures：并发加载多个领域时各自的失败都应累积保留。
+    // loadContent() 和手动刷新操作负责整体重置。
     notifyListeners();
 
     try {
       // 找到对应的 domain，从 categories 中获取 topic 路径列表
       final domain = _domains.where((d) => d.id == domainId).firstOrNull;
       if (domain == null) {
-        _isLoadingTopics = false;
-        notifyListeners();
-        return;
+        return; // finally 负责递减计数并 notify
       }
 
       // 检查是否有待刷新的版本
@@ -257,9 +266,7 @@ class ContentProvider extends ChangeNotifier {
             _topics[entry.value.id] ??= entry.value;
           }
         }
-        _isLoadingTopics = false;
-        notifyListeners();
-        return;
+        return; // finally 负责递减计数并 notify
       }
 
       // 缓存中没有或需要刷新，从网络并发加载
@@ -334,13 +341,12 @@ class ContentProvider extends ChangeNotifier {
       if (pendingVersion != null) {
         await _storage.save(_domainVersionKey(domainId), pendingVersion);
       }
-
-      _isLoadingTopics = false;
-      notifyListeners();
     } catch (e) {
       if (epoch != _loadEpoch) return;
       _error = e.toString();
-      _isLoadingTopics = false;
+    } finally {
+      // 无论成功/失败/提前返回，计数递减且只通知一次，避免并发时提前关闭 loading 态。
+      _loadingDomainCount = (_loadingDomainCount - 1).clamp(0, 9999);
       notifyListeners();
     }
   }

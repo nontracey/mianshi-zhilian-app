@@ -313,9 +313,7 @@ class _LearningShellState extends State<LearningShell> {
           _selectedTopicInitialTab = 1;
         }),
         onStartPractice: () {
-          final topicIds = scope.isRouteMode && scope.scopeTopicIds.isNotEmpty
-              ? (List<String>.from(scope.scopeTopicIds)..shuffle())
-              : (content.getTopicsByDomain(settings.settings.currentDomain).map((t) => t.id).toList()..shuffle());
+          final topicIds = scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
@@ -327,9 +325,7 @@ class _LearningShellState extends State<LearningShell> {
   }
 
   void _startMockInterview(ContentProvider content, SettingsProvider settings, LearningScopeProvider scope) {
-    final topicIds = scope.isRouteMode && scope.scopeTopicIds.isNotEmpty
-        ? (List<String>.from(scope.scopeTopicIds)..shuffle())
-        : (content.getTopicsByDomain(settings.settings.currentDomain).map((t) => t.id).toList()..shuffle());
+    final topicIds = scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
     context.push(
       '/practice/mock-interview',
       extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
