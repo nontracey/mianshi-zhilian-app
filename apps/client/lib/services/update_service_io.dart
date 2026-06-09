@@ -382,6 +382,10 @@ class UpdateService {
     final attempts = <DownloadAttempt>[];
     bool lastVerificationFailed = false;
 
+    // auto 模式已在 _orderUrlsByProbeLatency 中探测过所有 URL，
+    // 循环中无需重复 HEAD 检查
+    final skipHeadCheck = downloadSourceMode == DownloadSourceMode.auto;
+
     for (final url in urls) {
       if (cancelToken?.isCancelled ?? false) {
         _lastAttempts = attempts;
@@ -389,9 +393,23 @@ class UpdateService {
       }
       final sourceLabel = _sourceLabelFromUrl(url);
 
-      // HEAD 预检：快速判断源是否可达，避免等待完整超时
-      if (!await _headCheck(url, sourceLabel, attempts, cancelToken)) {
-        continue;
+      // 自动模式跳过循环内 HEAD（已在按延迟排序时探测过）
+      if (!skipHeadCheck) {
+        if (!await _headCheck(url, sourceLabel, attempts, cancelToken)) {
+          continue;
+        }
+      }
+
+      // 下载前检查文件是否已存在且 SHA256 匹配
+      final file = File(filePath);
+      if (await file.exists()) {
+        final alreadyValid = await verifySha256(filePath, platformUpdate.sha256);
+        if (alreadyValid) {
+          _lastAttempts = attempts;
+          return (filePath, DownloadResult.success);
+        }
+        // SHA256 不匹配，删除旧文件重新下载
+        await file.delete();
       }
 
       final result = await _downloadFromUrl(
@@ -416,7 +434,7 @@ class UpdateService {
               url: url,
               sourceLabel: sourceLabel,
               reached: true,
-              errorSummary: 'SHA256 校验不通过',
+              errorSummary: '$sourceLabel 文件已下载但 SHA256 校验不通过（文件可能已损坏或与 GitHub 版本不一致）',
             ),
           );
           lastVerificationFailed = true;
@@ -427,7 +445,7 @@ class UpdateService {
               url: url,
               sourceLabel: sourceLabel,
               reached: false,
-              errorSummary: '下载中断',
+              errorSummary: '$sourceLabel 下载中断',
             ),
           );
           continue;
@@ -542,11 +560,8 @@ class UpdateService {
     final file = File(filePath);
     IOSink? sink;
     try {
-      if (await file.exists()) {
-        await file.delete();
-      }
-
-      // 下载文件（HEAD 预检已确认源可达，缩短连接超时）
+      // 文件已不存在（调用前已检查 SHA256，不匹配已删除）
+      // 下载文件
       final request = http.Request('GET', Uri.parse(url));
       final response = await client
           .send(request)

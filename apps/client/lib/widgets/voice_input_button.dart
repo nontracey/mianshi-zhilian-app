@@ -107,6 +107,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     final aiProvider = context.read<AiProvider>();
     final settings = context.read<SettingsProvider>().settings;
     final provider = _resolveProvider(settings, aiProvider);
+    unawaited(_safeStopRecorder());
     final sessionId = ++_sessionId;
 
     _running = true;
@@ -690,6 +691,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     }
   }
 
+  Future<void> _safeStopRecorder() async {
+    try {
+      final path = await _recorder.stop();
+      if (path != null && path.isNotEmpty) {
+        unawaited(deleteFileAtPath(path));
+      }
+    } catch (_) {}
+  }
+
   void _discardQueuedChunks() {
     while (_chunkQueue.isNotEmpty) {
       final job = _chunkQueue.removeFirst();
@@ -780,6 +790,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     _finishAfterQueue = false;
     _producerRunning = false;
     _discardQueuedChunks();
+    unawaited(_safeStopRecorder());
     _setStateKind(VoiceInputState.error);
     widget.onError?.call(messageKey);
     unawaited(

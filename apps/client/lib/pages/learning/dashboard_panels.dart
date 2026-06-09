@@ -625,14 +625,34 @@ class CenterPanelState extends State<CenterPanel> {
     final allEnabledDomains = _allEnabledDomains();
 
     // 路线模式有阶段时，确保路线所涉及的领域 topics 已加载（避免 PhaseCard 显示"知识点"占位）
+    // 不仅检查 domain 的 topic 计数，还检查阶段引用的具体 topic ID 是否已加载
     if (scope.isRouteMode && route != null && route.phases != null && route.phases!.isNotEmpty) {
+      final allTopics = widget.contentProvider.topics;
       final routeDomainIds = route.domainIds;
+      final missingDomainIds = <String>{};
       for (final domainId in routeDomainIds) {
         if (widget.contentProvider.getLoadedTopicCount(domainId) == 0) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) widget.contentProvider.loadDomainTopics(domainId);
-          });
+          missingDomainIds.add(domainId);
         }
+      }
+      // 检查阶段引用的 topic ID 是否具体已在 allTopics 中（可能部分加载）
+      if (missingDomainIds.length < routeDomainIds.length) {
+        for (final phase in route.phases!) {
+          for (final tid in phase.topicIds) {
+            if (!allTopics.containsKey(tid) && phase.domainId != null) {
+              missingDomainIds.add(phase.domainId!);
+            }
+          }
+        }
+      }
+      if (missingDomainIds.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            for (final did in missingDomainIds) {
+              widget.contentProvider.loadDomainTopics(did);
+            }
+          }
+        });
       }
     }
 

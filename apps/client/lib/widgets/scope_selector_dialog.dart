@@ -151,19 +151,33 @@ class ScopeSelectorDialog extends StatelessWidget {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.12),
+                          color: AppColors.accent.withValues(alpha: scope.isGeneratingRoute ? 0.06 : 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.accent),
+                        child: scope.isGeneratingRoute
+                            ? const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                              )
+                            : const Icon(Icons.auto_awesome, size: 18, color: AppColors.accent),
                       ),
-                      title: Text(l10n.get('generate_ai_route'), style: const TextStyle(fontSize: 13)),
-                      subtitle: Text(l10n.get('ai_route_subtitle_hint'), style: const TextStyle(fontSize: 11)),
+                      title: Text(
+                        scope.isGeneratingRoute ? l10n.get('generating_route') : l10n.get('generate_ai_route'),
+                        style: TextStyle(fontSize: 13, color: scope.isGeneratingRoute ? AppColors.textTertiary : null),
+                      ),
+                      subtitle: Text(
+                        scope.isGeneratingRoute ? '' : l10n.get('ai_route_subtitle_hint'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       dense: true,
+                      enabled: !scope.isGeneratingRoute,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onGenerateAiRoute!();
-                      },
+                      onTap: scope.isGeneratingRoute
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                              onGenerateAiRoute!();
+                            },
                     ),
                   ],
                 ],

@@ -503,7 +503,7 @@ class SyncSettings {
     autoSyncIntervalMinutes:
         (json['autoSyncIntervalMinutes'] as num?)?.toInt() ?? 5,
     syncFullPracticeText: json['syncFullPracticeText'] as bool? ?? false,
-    syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? true,
+    syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? false,
     syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? true,
     lastSyncAt: json['lastSyncAt'] != null
         ? DateTime.parse(json['lastSyncAt'] as String)

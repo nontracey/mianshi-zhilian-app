@@ -240,6 +240,14 @@ class AppLogService extends ChangeNotifier {
         .replaceAll(
           RegExp(r'(authorization["\s:=]+)[^,\s"]+', caseSensitive: false),
           r'$1[redacted]',
+        )
+        .replaceAll(
+          RegExp(r'(/Users/)[^/]+'),
+          r'$1[redacted]',
+        )
+        .replaceAll(
+          RegExp(r'(/home/)[^/]+'),
+          r'$1[redacted]',
         );
     if (redacted.length <= maxLength) return redacted;
     return '${redacted.substring(0, maxLength)}...';

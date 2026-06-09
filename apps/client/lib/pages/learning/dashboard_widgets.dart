@@ -1431,7 +1431,7 @@ class PhaseCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    (topicTitles![id]?.isNotEmpty == true) ? topicTitles![id]! : '知识点',
+                    (topicTitles![id]?.isNotEmpty == true) ? topicTitles![id]! : l10n.get('knowledge_point'),
                     style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
