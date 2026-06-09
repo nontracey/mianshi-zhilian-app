@@ -58,7 +58,7 @@ The app uses **Provider** for state management with a layered architecture:
 - `connectivity_provider.dart` — network state
 
 **Services** (infrastructure layer):
-- `storage_service.dart` — SQLite (sqflite) local storage
+- `storage_service.dart` — local storage via `shared_preferences` (sqflite is declared as a dependency but not yet wired up; all persistence currently goes through SharedPreferences)
 - `ai_service.dart` — AI API calls (streaming, evaluation)
 - `data_sync_service.dart` — file/WebDAV/GitHub/Gitee sync with whitelist snapshot
 - `content_api_service.dart` — fetches knowledge content from CDN (dual-source fallback)

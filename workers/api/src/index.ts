@@ -34,7 +34,6 @@ export default {
         contentBackupBaseUrl: contentBackupBaseUrl(env),
         updateManifestUrl:
           "https://github.com/nontracey/mianshi-zhilian-app/releases/latest",
-        aiProxyEnabled: true,
       });
     }
 
@@ -45,13 +44,17 @@ export default {
     const blocked = await checkSecurityBlock(request, env);
     if (blocked) return blocked;
 
-    // 用户注册
+    // 用户注册（每 IP 每分钟最多 10 次）
     if (url.pathname === "/auth/register" && request.method === "POST") {
+      const limited = await checkRateLimit(request, env, "register", 10, 60);
+      if (limited) return limited;
       return handleRegister(request, env);
     }
 
-    // 用户登录
+    // 用户登录（每 IP 每分钟最多 10 次）
     if (url.pathname === "/auth/login" && request.method === "POST") {
+      const limited = await checkRateLimit(request, env, "login", 10, 60);
+      if (limited) return limited;
       return handleLogin(request, env);
     }
 
@@ -76,6 +79,9 @@ export default {
     }
 
     if (url.pathname === "/tickets" && request.method === "POST") {
+      // 工单提交：每 IP 每小时最多 10 次
+      const limited = await checkRateLimit(request, env, "tickets", 10, 3600);
+      if (limited) return limited;
       return handleCreateTicket(request, env);
     }
 
@@ -87,6 +93,15 @@ export default {
       url.pathname === "/tickets/password-reset" &&
       request.method === "POST"
     ) {
+      // 密码重置工单：每 IP 每 10 分钟最多 5 次
+      const limited = await checkRateLimit(
+        request,
+        env,
+        "pw-reset",
+        5,
+        600,
+      );
+      if (limited) return limited;
       return handleCreatePasswordResetTicket(request, env);
     }
 
@@ -937,6 +952,38 @@ async function checkSecurityBlock(
   }
 }
 
+/**
+ * KV 滑动窗口限流：以 IP + 端点 + 时间桶为 key，计数并对比上限。
+ * KV 故障时放行（fail open），不阻塞正常请求。
+ * @param windowSeconds 时间窗口长度（秒）
+ * @param limit         窗口内最多允许的请求次数
+ */
+async function checkRateLimit(
+  request: Request,
+  env: Env,
+  endpoint: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<Response | null> {
+  const ip = getClientIp(request);
+  if (!ip) return null;
+  const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
+  const key = `rl:${endpoint}:${ip}:${bucket}`;
+  try {
+    const raw = await env.KV.get(key);
+    const count = raw ? parseInt(raw, 10) + 1 : 1;
+    await env.KV.put(key, count.toString(), {
+      expirationTtl: windowSeconds * 2,
+    });
+    if (count > limit) {
+      return json({ error: "请求过于频繁，请稍后再试" }, 429);
+    }
+  } catch {
+    // KV 不可用时放行
+  }
+  return null;
+}
+
 // 用户注册
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   try {
@@ -973,11 +1020,21 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     const finalNickname = nickname || username;
     const normalizedUsername = username.toLowerCase();
 
-    await env.DB.prepare(
-      "INSERT INTO users (id, username, password_hash, nickname, role) VALUES (?, ?, ?, ?, 'user')",
-    )
-      .bind(userId, normalizedUsername, passwordHash, finalNickname)
-      .run();
+    try {
+      await env.DB.prepare(
+        "INSERT INTO users (id, username, password_hash, nickname, role) VALUES (?, ?, ?, ?, 'user')",
+      )
+        .bind(userId, normalizedUsername, passwordHash, finalNickname)
+        .run();
+    } catch (insertErr) {
+      // UNIQUE 约束冲突：两个请求几乎同时注册同一用户名，统一返回 409
+      const msg =
+        insertErr instanceof Error ? insertErr.message : String(insertErr);
+      if (msg.toLowerCase().includes("unique")) {
+        return json({ error: "用户名已存在" }, 409);
+      }
+      throw insertErr;
+    }
 
     // 生成 token
     const { token, refreshToken } = await issueAuthTokens(
