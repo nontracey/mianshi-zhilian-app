@@ -267,6 +267,13 @@ jobs:
           echo 'class ReleaseNotes {' >> lib/generated/release_notes.dart
           echo "  static const String notes = r'''${{ needs.prepare-release.outputs.release_notes }}''';" >> lib/generated/release_notes.dart
           echo '}' >> lib/generated/release_notes.dart
+      - name: Clean CMake cache (handle VS version mismatch across runner updates)
+        shell: pwsh
+        run: |
+          if (Test-Path "build\windows\CMakeCache.txt") {
+            Remove-Item -Recurse -Force "build\windows\CMakeFiles" -ErrorAction SilentlyContinue
+            Remove-Item -Force "build\windows\CMakeCache.txt" -ErrorAction SilentlyContinue
+          }
       - run: flutter build windows --release --build-name=${{ needs.prepare-release.outputs.app_version }} --build-number=${{ needs.prepare-release.outputs.app_build_number }} --dart-define=APP_VERSION=${{ needs.prepare-release.outputs.app_version }} --dart-define=APP_BUILD_NUMBER=${{ needs.prepare-release.outputs.app_build_number }}
       - name: Install Inno Setup
         shell: pwsh
