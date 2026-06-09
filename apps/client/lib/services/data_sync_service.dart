@@ -634,6 +634,7 @@ class DataSyncService {
     return result;
   }
 
+  /// custom_routes 合并策略：手动路线按 ID 合并，AI 路线仅保留本地版本。
   List<dynamic>? _mergeListById(dynamic remote, dynamic local) {
     if (remote == null && local == null) return null;
     final byId = <String, dynamic>{};

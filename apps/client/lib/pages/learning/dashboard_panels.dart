@@ -603,6 +603,10 @@ class CenterPanelState extends State<CenterPanel> {
       domains.sort(
         (a, b) => routeDomainIds.indexOf(a.id).compareTo(routeDomainIds.indexOf(b.id)),
       );
+    } else if (scope.isSingleDomain && scope.scopeDomainIds.isNotEmpty) {
+      // 单领域模式 → 只显示该领域
+      final ids = scope.scopeDomainIds;
+      domains = domains.where((d) => ids.contains(d.id)).toList();
     }
 
     return domains;
@@ -619,6 +623,18 @@ class CenterPanelState extends State<CenterPanel> {
     final route = scope.activeRoute;
     final domains = _domains(scope);
     final allEnabledDomains = _allEnabledDomains();
+
+    // 路线模式有阶段时，确保路线所涉及的领域 topics 已加载（避免 PhaseCard 显示"知识点"占位）
+    if (scope.isRouteMode && route != null && route.phases != null && route.phases!.isNotEmpty) {
+      final routeDomainIds = route.domainIds;
+      for (final domainId in routeDomainIds) {
+        if (widget.contentProvider.getLoadedTopicCount(domainId) == 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) widget.contentProvider.loadDomainTopics(domainId);
+          });
+        }
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,7 +655,7 @@ class CenterPanelState extends State<CenterPanel> {
                   route.phases!.isNotEmpty)
                 _buildPhaseView(route, l10n)
               else
-                ...domains.take(5).toList().asMap().entries.map((entry) {
+                ...domains.asMap().entries.map((entry) {
                   final index = entry.key;
                   final domain = entry.value;
                   final dp = widget.progressProvider.getDomainProgress(

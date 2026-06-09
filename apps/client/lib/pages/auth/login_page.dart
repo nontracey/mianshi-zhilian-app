@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'submit_ticket_page.dart';
 
@@ -20,9 +21,50 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _storage = StorageService();
+
   bool _isRegister = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  bool _rememberMe = false;
   String? _error;
+
+  static const _savedUsernameKey = '_saved_login_username';
+  static const _savedPasswordKey = '_saved_login_password';
+  static const _rememberMeKey = '_saved_login_remember';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final remember = await _storage.load(_rememberMeKey) as bool? ?? false;
+    if (!remember) return;
+    final username = await _storage.load(_savedUsernameKey) as String? ?? '';
+    final password = await _storage.load(_savedPasswordKey) as String? ?? '';
+    if (mounted) {
+      setState(() {
+        _rememberMe = remember;
+        _usernameController.text = username;
+        _passwordController.text = password;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials(String username, String password) async {
+    await _storage.save(_rememberMeKey, true);
+    await _storage.save(_savedUsernameKey, username);
+    await _storage.save(_savedPasswordKey, password);
+  }
+
+  Future<void> _clearSavedCredentials() async {
+    await _storage.save(_rememberMeKey, false);
+    await _storage.save(_savedUsernameKey, '');
+    await _storage.save(_savedPasswordKey, '');
+  }
 
   @override
   void dispose() {
@@ -57,6 +99,13 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (success && mounted) {
+      // 保存 / 清除记住的凭据
+      if (_rememberMe && !_isRegister) {
+        await _saveCredentials(username, password);
+      } else {
+        await _clearSavedCredentials();
+      }
+
       setState(() => _isLoading = false);
       await _mergeLocalDataToCloud();
       if (!mounted) return;
@@ -130,8 +179,18 @@ class _LoginPageState extends State<LoginPage> {
                           hintText: l10n.get('min_6_chars'),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscurePassword = !_obscurePassword),
+                            tooltip: _obscurePassword ? '显示密码' : '隐藏密码',
+                          ),
                         ),
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return l10n.get('please_enter_password');
@@ -153,8 +212,18 @@ class _LoginPageState extends State<LoginPage> {
                             hintText: l10n.get('confirm_password_hint'),
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirm
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscureConfirm = !_obscureConfirm),
+                              tooltip: _obscureConfirm ? '显示密码' : '隐藏密码',
+                            ),
                           ),
-                          obscureText: true,
+                          obscureText: _obscureConfirm,
                           validator: (value) {
                             if (!_isRegister) return null;
                             if (value == null || value.isEmpty) {
@@ -165,6 +234,29 @@ class _LoginPageState extends State<LoginPage> {
                             }
                             return null;
                           },
+                        ),
+                      ],
+
+                      // 记住账号密码（仅登录时显示）
+                      if (!_isRegister) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _rememberMe,
+                              onChanged: (v) =>
+                                  setState(() => _rememberMe = v ?? false),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _rememberMe = !_rememberMe),
+                              child: Text(
+                                l10n.get('remember_me'),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
 
