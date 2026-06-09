@@ -23,6 +23,8 @@ class InterviewPrepPage extends StatelessWidget {
     this.routeDomainIds,
     this.routeModeEnabled = false,
     this.onRouteModeChanged,
+    this.onGenerateAiRoute,
+    this.onNavigateToDashboard,
   });
 
   final String currentDomainId;
@@ -32,6 +34,8 @@ class InterviewPrepPage extends StatelessWidget {
   final List<String>? routeDomainIds;
   final bool routeModeEnabled;
   final VoidCallback? onRouteModeChanged;
+  final VoidCallback? onGenerateAiRoute;
+  final VoidCallback? onNavigateToDashboard;
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +222,12 @@ class InterviewPrepPage extends StatelessWidget {
                   icon: const Icon(Icons.record_voice_over_outlined),
                   label: Text(l10n.get('come_one_round_mode_mock_interview')),
                 ),
+                if (plan.hasTarget && onGenerateAiRoute != null)
+                  FilledButton.tonalIcon(
+                    onPressed: onGenerateAiRoute,
+                    icon: const Icon(Icons.auto_awesome, size: 16),
+                    label: Text(l10n.get('generate_ai_route')),
+                  ),
               ],
             ),
           ],

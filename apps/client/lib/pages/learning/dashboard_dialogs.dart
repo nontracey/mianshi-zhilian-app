@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
@@ -19,6 +20,7 @@ class RouteSelectorDialog extends StatefulWidget {
     required this.onRouteSelected,
     required this.availableDomains,
     this.disabledDomainIds = const [],
+    this.onRoutesChanged,
   });
 
   final List<LearningRoute> routes;
@@ -26,6 +28,7 @@ class RouteSelectorDialog extends StatefulWidget {
   final ValueChanged<LearningRoute> onRouteSelected;
   final List<Domain> availableDomains;
   final List<String> disabledDomainIds;
+  final VoidCallback? onRoutesChanged;
 
   @override
   State<RouteSelectorDialog> createState() => RouteSelectorDialogState();
@@ -65,11 +68,11 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
         id: '__interview_target__',
         name: plan.targetRole.isNotEmpty
             ? '${plan.targetRole}${plan.techStack.isNotEmpty ? ' (${plan.techStack})' : ''}'
-            : '面试目标',
+            : l10n.get('interview_target'),
         domainIds: [],
         description: days != null
-            ? (days > 0 ? '距面试 $days 天' : '面试日已到')
-            : '已设置面试目标',
+            ? (days > 0 ? l10n.getp('days_until_interview', {'days': days}) : l10n.get('interview_day_already_to'))
+            : l10n.get('interview_target_set'),
         source: 'custom',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -122,7 +125,14 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
       _customRoutes.removeWhere((r) => r.id == routeId);
     });
     _saveCustomRoutes();
+    widget.onRoutesChanged?.call();
   }
+
+  List<String> get _allRouteNames => [
+    ..._officialRoutes.map((r) => r.name),
+    ..._aiRoutes.map((r) => r.name),
+    ..._customRoutes.map((r) => r.name),
+  ];
 
   (int mastered, int total) _getPhaseProgress(LearningRoute route) {
     if (route.phases == null || route.phases!.isEmpty) {
@@ -240,6 +250,7 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                                     .map((d) => DomainItem(id: d.id, title: d.title))
                                     .toList(),
                                 existingRoute: route,
+                                existingRouteNames: _allRouteNames,
                                 onSave: (updatedRoute) {
                                   _updateRoute(route.id, updatedRoute);
                                   if (route.id == widget.currentRouteId) {
@@ -293,6 +304,7 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                                     .map((d) => DomainItem(id: d.id, title: d.title))
                                     .toList(),
                                 existingRoute: route,
+                                existingRouteNames: _allRouteNames,
                                 onSave: (updatedRoute) {
                                   _updateRoute(route.id, updatedRoute);
                                   if (route.id == widget.currentRouteId) {
@@ -310,7 +322,7 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
 
                     // 面试目标路线
                     if (_interviewRoute != null) ...[
-                      _SectionHeader(label: '面试目标'),
+                      _SectionHeader(label: l10n.get('interview_target')),
                       _buildInterviewRouteTile(_interviewRoute!, isDark),
                     ],
                   ],
@@ -334,6 +346,7 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                       availableDomains: enabledDomains
                           .map((d) => DomainItem(id: d.id, title: d.title))
                           .toList(),
+                      existingRouteNames: _allRouteNames,
                       onSave: _addCustomRoute,
                     ),
                   );
@@ -370,7 +383,7 @@ class RouteSelectorDialogState extends State<RouteSelectorDialog> {
                 borderRadius: BorderRadius.circular(3),
               ),
               child: Text(
-                days > 0 ? '倒计时 $days 天' : '已到期',
+                days > 0 ? l10n.getp('countdown_days', {'days': days}) : l10n.get('expired_already'),
                 style: TextStyle(
                   fontSize: 9,
                   color: days > 0 ? AppColors.warning : AppColors.danger,
@@ -729,4 +742,141 @@ class ManageDomainsDialogState extends State<ManageDomainsDialog> {
       ),
     );
   }
+}
+
+// ── 面试目标编辑对话框 ──
+
+void showPlanEditDialog(
+  BuildContext context,
+  ProgressProvider progress,
+  PrepPlan current,
+  LocalizationProvider l10n,
+) {
+  final roleController = TextEditingController(text: current.targetRole);
+  final stackController = TextEditingController(text: current.techStack);
+  final jdController = TextEditingController(text: current.jobDescription);
+  var dailyMinutes = current.dailyMinutes;
+  DateTime? interviewDate = current.interviewDate;
+
+  showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: Text(l10n.get('interview_goal')),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: roleController,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('goal_position_optional_select'),
+                    hintText: l10n.get(
+                      'java_backend_ai_engineering_transform_architect',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: stackController,
+                  decoration: InputDecoration(
+                    labelText: l10n.get('tech_stack_optional_select'),
+                    hintText: 'Spring Cloud, Redis, RAG...',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.getp('daily_send_enter_minutes_min_2', {
+                          'minutes': dailyMinutes,
+                        }),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: dailyMinutes > 15
+                          ? () => setDialogState(() => dailyMinutes -= 15)
+                          : null,
+                      icon: const Icon(Icons.remove),
+                    ),
+                    IconButton(
+                      onPressed: () =>
+                          setDialogState(() => dailyMinutes += 15),
+                      icon: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate:
+                          interviewDate ??
+                          DateTime.now().add(const Duration(days: 14)),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 1),
+                      ),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => interviewDate = picked);
+                    }
+                  },
+                  icon: const Icon(Icons.event_outlined),
+                  label: Text(
+                    interviewDate == null
+                        ? l10n.get('select_interview_day_optional')
+                        : l10n.getp('interview_day_year_month_day', {
+                            'year': interviewDate!.year,
+                            'month': interviewDate!.month,
+                            'day': interviewDate!.day,
+                          }),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: jdController,
+                  minLines: 4,
+                  maxLines: 8,
+                  decoration: InputDecoration(
+                    labelText: l10n.get(
+                      'position_description_jd_optional_select_local_save',
+                    ),
+                    alignLabelWithHint: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              progress.updatePrepPlan(
+                PrepPlan(
+                  targetRole: roleController.text.trim(),
+                  techStack: stackController.text.trim(),
+                  interviewDate: interviewDate,
+                  dailyMinutes: dailyMinutes,
+                  jobDescription: jdController.text.trim(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
+              Navigator.pop(ctx);
+            },
+            child: Text(l10n.get('save')),
+          ),
+        ],
+      ),
+    ),
+  );
 }

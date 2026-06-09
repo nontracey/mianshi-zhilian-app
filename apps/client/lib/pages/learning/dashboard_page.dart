@@ -9,6 +9,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 import 'dashboard_panels.dart';
+import 'dashboard_dialogs.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
@@ -26,6 +27,9 @@ class DashboardPage extends StatelessWidget {
     this.onRouteModeChanged,
     this.onPrepNavigation,
     this.onNavigateToCatalog,
+    this.onGenerateAiRoute,
+    this.onRegenerateAiRoute,
+    this.onRouteChanged,
   });
 
   final String currentDomainId;
@@ -37,6 +41,9 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback? onMockInterview;
   final VoidCallback? onPrepNavigation;
   final VoidCallback? onNavigateToCatalog;
+  final VoidCallback? onGenerateAiRoute;
+  final VoidCallback? onRegenerateAiRoute;
+  final VoidCallback? onRouteChanged;
   final List<String>? routeTopicIds;
   final List<String>? routeDomainIds;
   final bool routeModeEnabled;
@@ -239,6 +246,9 @@ class DashboardPage extends StatelessWidget {
                         contentProvider: contentProvider,
                         progressProvider: progressProvider,
                         settingsProvider: settingsProvider,
+                        onGenerateAiRoute: onGenerateAiRoute,
+                        onRegenerateAiRoute: onRegenerateAiRoute,
+                        onRouteChanged: onRouteChanged,
                       ),
                     ),
                   ),
@@ -259,7 +269,7 @@ class DashboardPage extends StatelessWidget {
                          onDomainChanged: onDomainChanged,
                          progressProvider: progressProvider,
                          contentProvider: contentProvider,
-                         routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
+                         routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
                        ),
                     ),
                   ),
@@ -312,6 +322,9 @@ class DashboardPage extends StatelessWidget {
                             contentProvider: contentProvider,
                             progressProvider: progressProvider,
                             settingsProvider: settingsProvider,
+                            onGenerateAiRoute: onGenerateAiRoute,
+                            onRegenerateAiRoute: onRegenerateAiRoute,
+                            onRouteChanged: onRouteChanged,
                           ),
                           const SizedBox(height: 16),
                           RightPanel(
@@ -325,7 +338,7 @@ class DashboardPage extends StatelessWidget {
                              onDomainChanged: onDomainChanged,
                              progressProvider: progressProvider,
                              contentProvider: contentProvider,
-                             routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
+                             routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
                            ),
                         ],
                       ),
@@ -370,6 +383,9 @@ class DashboardPage extends StatelessWidget {
                     contentProvider: contentProvider,
                     progressProvider: progressProvider,
                     settingsProvider: settingsProvider,
+                    onGenerateAiRoute: onGenerateAiRoute,
+                    onRegenerateAiRoute: onRegenerateAiRoute,
+                    onRouteChanged: onRouteChanged,
                   ),
                   const SizedBox(height: 16),
                   RightPanel(
@@ -383,7 +399,7 @@ class DashboardPage extends StatelessWidget {
                     onDomainChanged: onDomainChanged,
                     progressProvider: progressProvider,
                     contentProvider: contentProvider,
-                    routeTopicIds: isCrossDomainRoute ? routeTopicIds : null,
+                    routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
                   ),
                 ],
               ),
@@ -469,6 +485,19 @@ class DashboardPage extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: isDark ? Colors.white54 : Colors.grey,
+            ),
+            onPressed: () {
+              final progress = context.read<ProgressProvider>();
+              showPlanEditDialog(context, progress, plan, l10n);
+            },
+            tooltip: l10n.get('edit'),
+          ),
         ],
       ),
     ),

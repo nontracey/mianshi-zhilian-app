@@ -10,7 +10,9 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/analytics_service.dart';
+import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/pages/learning/dashboard_page.dart';
 import 'package:mianshi_zhilian/pages/learning/catalog_page.dart';
 import 'package:mianshi_zhilian/pages/learning/topic_detail_page.dart';
@@ -325,6 +327,9 @@ class _LearningShellState extends State<LearningShell> {
         },
         onPrepNavigation: () => _setSection(AppSection.prep),
         onNavigateToCatalog: () => _setSection(AppSection.catalog),
+        onGenerateAiRoute: () => _generateAiRoute(),
+        onRegenerateAiRoute: () => _generateAiRoute(forceRegenerate: true),
+        onRouteChanged: _loadRouteTopicIds,
       ),
       AppSection.catalog => CatalogPage(
         currentDomainId: settings.settings.currentDomain,
@@ -418,6 +423,8 @@ class _LearningShellState extends State<LearningShell> {
             extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
           );
         },
+        onGenerateAiRoute: () => _generateAiRoute(),
+        onNavigateToDashboard: () => _setSection(AppSection.dashboard),
       ),
       AppSection.mastery => MasteryPage(
         currentDomainId: settings.settings.currentDomain,
@@ -467,6 +474,80 @@ class _LearningShellState extends State<LearningShell> {
     if (_activeRouteId == null) return;
     setState(() => _routeModeEnabled = !_routeModeEnabled);
     _storage.save('route_mode_disabled', _routeModeEnabled ? null : '1');
+  }
+
+  /// AI 路线生成/重新生成
+  Future<void> _generateAiRoute({bool forceRegenerate = false}) async {
+    final progress = context.read<ProgressProvider>();
+    final content = context.read<ContentProvider>();
+    final aiProvider = context.read<AiProvider>();
+    final plan = progress.prepPlan;
+
+    if (!plan.hasTarget) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.read<LocalizationProvider>().get('set_target_first'))),
+        );
+      }
+      return;
+    }
+
+    // 确保所有领域的 topics 都加载
+    final domainIds = content.domains.map((d) => d.id).toList();
+    try {
+      await content.ensureTopicsLoaded(domainIds);
+    } catch (_) {}
+
+    final generator = AiRouteGenerator(_storage, content.domains);
+    try {
+      final route = await generator.generateRoute(
+        plan: plan,
+        allTopics: content.topics.values.toList(),
+        progressProvider: progress,
+        aiService: aiProvider.aiService,
+        contentProvider: content,
+        forceRegenerate: forceRegenerate,
+      );
+
+      // 保存到 custom_routes
+      final customData = await _storage.loadJsonList('custom_routes');
+      final existing = customData
+          .map((e) => LearningRoute.fromJson(e))
+          .toList();
+      // 替换同名/同 ID 的旧 AI 路线
+      existing.removeWhere((r) => r.id == route.id);
+      existing.add(route);
+      await _storage.saveJsonList(
+        'custom_routes',
+        existing.map((r) => r.toJson()).toList(),
+      );
+      await _storage.save('selected_route_id', route.id);
+      await _storage.save('route_mode_disabled', null);
+
+      if (mounted) {
+        setState(() {
+          _routeTopicIds = route.allTopicIds;
+          _routeDomainIds = route.domainIds;
+          _routePhases = route.phases;
+          _activeRouteId = route.id;
+          _routeModeEnabled = true;
+        });
+        final l10n = context.read<LocalizationProvider>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.get('route_generated_success')),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final l10n = context.read<LocalizationProvider>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.get('route_generate_failed'))),
+        );
+      }
+    }
   }
 
   String _sectionTitle(AppSection section, LocalizationProvider l10n) =>

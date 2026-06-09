@@ -10,11 +10,13 @@ class RouteEditorDialog extends StatefulWidget {
     required this.availableDomains,
     this.existingRoute,
     required this.onSave,
+    this.existingRouteNames = const [],
   });
 
   final List<DomainItem> availableDomains;
   final LearningRoute? existingRoute;
   final ValueChanged<LearningRoute> onSave;
+  final List<String> existingRouteNames;
 
   @override
   State<RouteEditorDialog> createState() => _RouteEditorDialogState();
@@ -52,6 +54,17 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.get('please_enter_route_name'))),
+      );
+      return;
+    }
+    // 检查名称重复（编辑时排除自身）
+    final name = _nameController.text.trim();
+    final isDuplicate = widget.existingRouteNames
+        .where((n) => widget.existingRoute == null || n != widget.existingRoute!.name)
+        .any((n) => n == name);
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('route_name_already_exists'))),
       );
       return;
     }
