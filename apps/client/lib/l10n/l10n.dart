@@ -1087,6 +1087,8 @@ class L10n {
     'min': '最小',
     'missed_point': '遗漏点',
     'mode_mock_interview': '模拟面试模式',
+    'practice_core': '核心练习',
+    'practice_advanced': '进阶练习',
     'mode_type_name': '模型名称',
     'must_cover_key_points': '必须覆盖关键点',
     'must_mention_key_points': '必须提及关键点',
@@ -1164,6 +1166,7 @@ class L10n {
     'search_all_route_domains': '搜索所有路线领域',
     'route_mode_cross_domain': '跨领域路线 · {domainCount} 个领域 · {topicCount} 个知识点',
     'pending_review_count': '{count} 个待复习',
+    'domain_overview': '领域概览',
     'route_gen_fail': '路线生成失败: {error}',
     'ai_route_gen': 'AI 生成路线',
     'phases_count': '{count} 阶段',
@@ -2558,6 +2561,7 @@ class L10n {
     'search_all_route_domains': 'Search all route domains',
     'route_mode_cross_domain': 'Cross-domain route · {domainCount} domains · {topicCount} topics',
     'pending_review_count': '{count} pending review',
+    'domain_overview': 'Domain Overview',
     'route_gen_fail': 'Route generation failed: {error}',
     'ai_route_gen': 'AI Generate Route',
     'phases_count': '{count} phases',
@@ -2611,6 +2615,8 @@ class L10n {
     'no_release_notes': 'No release notes',
     'mode_type_name': 'Model Name',
     'mode_mock_interview': 'Mock Interview',
+    'practice_core': 'Core Practice',
+    'practice_advanced': 'Advanced Practice',
     'mode_mock_interview_official_follow_up_deep_enter_practice_knowle':
         'Mock interviewer follow-ups for deeper topic practice',
     'mode_mock_interview_group_volume_bias_good':

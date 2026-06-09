@@ -7,7 +7,6 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/practice/follow_up_training_page.dart';
 import 'package:mianshi_zhilian/pages/practice/weakness_training_page.dart';
-import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/practice_widgets.dart';
@@ -35,6 +34,7 @@ class PracticePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final progressProvider = context.watch<ProgressProvider>();
     final reviewCount = progressProvider.getReviewCount(currentDomainId);
     final contentProvider = context.watch<ContentProvider>();
@@ -97,111 +97,161 @@ class PracticePage extends StatelessWidget {
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
+LayoutBuilder(
+ builder: (context, constraints) {
             final cardWidth = constraints.maxWidth > 900
                 ? (constraints.maxWidth - 32) / 3
-                : constraints.maxWidth;
+                : constraints.maxWidth > 500
+                    ? (constraints.maxWidth - 16) / 2
+                    : constraints.maxWidth;
 
-            return Wrap(
-              spacing: 16,
-              runSpacing: 16,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.today_outlined,
-                    title: l10n.get('today_day_review'),
-                    subtitle: l10n.getp(
-                      'based_on_forgetting_curve_today_day_has_count_knowledg_2',
-                      {'count': reviewCount},
-                    ),
-                    color: AppColors.accent,
-                    onTap: onDailyReview,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.get('practice_core'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.casino_outlined,
-                    title: l10n.get('random_machine_question'),
-                    subtitle: l10n.get(
-                      'select_domain_after_random_machine_fetch_knowledge_point_progress',
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.today_outlined,
+                        title: l10n.get('today_day_review'),
+                        subtitle: l10n.getp(
+                          'based_on_forgetting_curve_today_day_has_count_knowledg_2',
+                          {'count': reviewCount},
+                        ),
+                        color: AppColors.accent,
+                        onTap: onDailyReview,
+                      ),
                     ),
-                    color: AppColors.success,
-                    onTap: () => _showDomainPicker(context, domains),
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.casino_outlined,
+                        title: l10n.get('random_machine_question'),
+                        subtitle: l10n.get(
+                          'select_domain_after_random_machine_fetch_knowledge_point_progress',
+                        ),
+                        color: AppColors.success,
+                        onTap: () => _showDomainPicker(context, domains),
+                      ),
+                    ),
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.groups_outlined,
+                        title: l10n.get('mode_mock_interview'),
+                        subtitle: l10n.get(
+                          'streak_multi_question_count_mode_mock_real_actual_int',
+                        ),
+                        color: AppColors.categoryRed,
+                        onTap: onMockInterview,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.textTertiary,
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.get('practice_advanced'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.question_answer_outlined,
-                    title: l10n.get('follow_up_training'),
-                    subtitle: l10n.get(
-                      'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.question_answer_outlined,
+                        title: l10n.get('follow_up_training'),
+                        subtitle: l10n.get(
+                          'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
+                        ),
+                        color: AppColors.categoryPurple,
+                        onTap: () => _startFollowUpTraining(context, domainTopics),
+                      ),
                     ),
-                    color: AppColors.categoryPurple,
-                    onTap: () => _startFollowUpTraining(context, domainTopics),
-                  ),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.trending_down_outlined,
-                    title: l10n.get('weakness_training_pack'),
-                    subtitle: l10n.get(
-                      'needle_peer_weak_knowledge_point_progress_action_specialized_item_training',
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.trending_down_outlined,
+                        title: l10n.get('weakness_training_pack'),
+                        subtitle: l10n.get(
+                          'needle_peer_weak_knowledge_point_progress_action_specialized_item_training',
+                        ),
+                        color: AppColors.danger,
+                        onTap: () => _startWeaknessTraining(context),
+                      ),
                     ),
-                    color: AppColors.danger,
-                    onTap: () => _startWeaknessTraining(context),
-                  ),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.local_fire_department_outlined,
-                    title: l10n.get('high_freq_sprint'),
-                    subtitle: l10n.get(
-                      'needle_peer_high_freq_interview_question_count_progress_action_accent',
+                    SizedBox(
+ width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.local_fire_department_outlined,
+                        title: l10n.get('high_freq_sprint'),
+                        subtitle: l10n.get(
+                          'needle_peer_high_freq_interview_question_count_progress_action_accent',
+                        ),
+                        color: AppColors.warning,
+                        onTap: () =>
+                            _startHighFrequencyTraining(context, domainTopics),
+                      ),
                     ),
-                    color: AppColors.warning,
-                    onTap: () =>
-                        _startHighFrequencyTraining(context, domainTopics),
-                  ),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.work_outline,
-                    title: l10n.get('project_deep_dig'),
-                    subtitle: l10n.get(
-                      'star_rule_practice_deep_enter_project_detail_festival',
+                    SizedBox(
+                      width: cardWidth,
+                      child: PracticeModeCard(
+                        icon: Icons.architecture_outlined,
+                        title: l10n.get('system_design'),
+                        subtitle: l10n.get('system_design_interview_practice'),
+                        color: AppColors.categoryAmber,
+                        onTap: () => _startSystemDesign(context),
+                      ),
                     ),
-                    color: AppColors.categoryGreen,
-                    onTap: () => _startProjectDig(context),
-                  ),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.architecture_outlined,
-                    title: l10n.get('system_design'),
-                    subtitle: l10n.get('system_design_interview_practice'),
-                    color: AppColors.categoryAmber,
-                    onTap: () => _startSystemDesign(context),
-                  ),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child: PracticeModeCard(
-                    icon: Icons.groups_outlined,
-                    title: l10n.get('mode_mock_interview'),
-                    subtitle: l10n.get(
-                      'streak_multi_question_count_mode_mock_real_actual_int',
-                    ),
-                    color: AppColors.categoryRed,
-                    onTap: onMockInterview,
-                  ),
+                  ],
                 ),
               ],
             );
@@ -307,10 +357,6 @@ class PracticePage extends StatelessWidget {
       '/practice/high-frequency',
       extra: HighFrequencySprintPage(topics: highFrequencyTopics.cast<Topic>()),
     );
-  }
-
-  void _startProjectDig(BuildContext context) {
-    context.push('/practice/project-dig', extra: const ProjectDigPage());
   }
 
   void _startSystemDesign(BuildContext context) {

@@ -430,82 +430,142 @@ class _MasteryPageState extends State<MasteryPage> {
           color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
         ),
       ),
-      child: Row(
-        children: [
-          // 领域下拉选择
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: widget.currentDomainId,
-                isDense: true,
-                items: domains
-                    .map(
-                      (d) => DropdownMenuItem(
-                        value: d.id,
-                        child: Text(
-                          d.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    widget.onDomainChanged(value);
-                    if (contentProvider.getLoadedTopicCount(value) == 0) {
-                      contentProvider.loadDomainTopics(value);
-                    }
-                  }
-                },
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // 掌握度信息
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 400;
+          if (isWide) {
+            return Row(
               children: [
-                Text(
-                  '$masteryPercent%',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.primary,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: widget.currentDomainId,
+                      isDense: true,
+                      items: domains
+                          .map(
+                            (d) => DropdownMenuItem(
+                              value: d.id,
+                              child: Text(
+                                d.title,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          widget.onDomainChanged(value);
+                          if (contentProvider.getLoadedTopicCount(value) == 0) {
+                            contentProvider.loadDomainTopics(value);
+                          }
+                        }
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: masteryPercent / 100,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
-                    color: Theme.of(context).colorScheme.primary,
-                    minHeight: 6,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$masteryPercent%',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: masteryPercent / 100,
+                          backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          color: Theme.of(context).colorScheme.primary,
+                          minHeight: 6,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: widget.currentDomainId,
+                    isDense: true,
+                    isExpanded: true,
+                    items: domains
+                        .map(
+                          (d) => DropdownMenuItem(
+                            value: d.id,
+                            child: Text(
+                              d.title,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        widget.onDomainChanged(value);
+                        if (contentProvider.getLoadedTopicCount(value) == 0) {
+                          contentProvider.loadDomainTopics(value);
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    '$masteryPercent%',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: masteryPercent / 100,
+                        backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        color: Theme.of(context).colorScheme.primary,
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDiagnosticCards(
+Widget _buildDiagnosticCards(
     BuildContext context,
     int readiness,
     int dueCount,
@@ -514,46 +574,55 @@ class _MasteryPageState extends State<MasteryPage> {
     int regressedCount,
     bool isDark,
   ) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildDiagnosticCard(
-            l10n.get('readiness'),
-            '$readiness',
-            AppColors.accent,
-            isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildDiagnosticCard(
-            l10n.get('pending_review'),
-            '$dueCount',
-            AppColors.warning,
-            isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildDiagnosticCard(
-            l10n.get('un_review'),
-            '$longUnreviewedCount',
-            AppColors.accent,
-            isDark,
-            filterKey: 'longUnreviewed',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildDiagnosticCard(
-            l10n.get('regression_step'),
-            '$regressedCount',
-            AppColors.danger,
-            isDark,
-            filterKey: 'regressed',
-          ),
-        ),
-      ],
+    final cards = [
+      _buildDiagnosticCard(
+        l10n.get('readiness'),
+        '$readiness',
+        AppColors.accent,
+        isDark,
+      ),
+      _buildDiagnosticCard(
+        l10n.get('pending_review'),
+        '$dueCount',
+        AppColors.warning,
+        isDark,
+      ),
+      _buildDiagnosticCard(
+        l10n.get('un_review'),
+        '$longUnreviewedCount',
+        AppColors.accent,
+        isDark,
+        filterKey: 'longUnreviewed',
+      ),
+      _buildDiagnosticCard(
+        l10n.get('regression_step'),
+        '$regressedCount',
+        AppColors.danger,
+        isDark,
+        filterKey: 'regressed',
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 480) {
+          return Row(
+            children: cards
+                .expand((c) => [Expanded(child: c), const SizedBox(width: 8)])
+                .toList()
+              ..removeLast(),
+          );
+        }
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: cards
+              .map((c) => SizedBox(
+                    width: (constraints.maxWidth - 8) / 2,
+                    child: c,
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 

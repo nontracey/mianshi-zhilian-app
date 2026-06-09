@@ -807,7 +807,7 @@ class WeakTopicItem extends StatelessWidget {
                 color: scoreColor,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             FilledButton.tonal(
               onPressed: onTap,
               style: FilledButton.styleFrom(
@@ -940,12 +940,15 @@ class ReviewItem extends StatelessWidget {
               ),
             ),
             // 时间
-            Text(
-              timeText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: timeColor,
+            Flexible(
+              child: Text(
+                timeText,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: timeColor,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),

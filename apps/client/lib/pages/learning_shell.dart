@@ -25,7 +25,6 @@ import 'package:mianshi_zhilian/pages/mastery/mastery_page.dart';
 import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
 import 'package:mianshi_zhilian/widgets/navigation_rail_panel.dart';
 import 'package:mianshi_zhilian/widgets/header_bar.dart';
-import 'package:mianshi_zhilian/theme/colors.dart';
 
 enum AppSection { dashboard, catalog, practice, prep, mastery, profile }
 
@@ -147,8 +146,6 @@ class _LearningShellState extends State<LearningShell> {
       body: Column(
         children: [
           const OfflineBanner(),
-          if (_routeModeEnabled && _routeDomainIds != null && _routeDomainIds!.isNotEmpty)
-            _buildRouteContextBar(context),
           Expanded(
             child: Row(
               children: [
@@ -470,92 +467,6 @@ class _LearningShellState extends State<LearningShell> {
     if (_activeRouteId == null) return;
     setState(() => _routeModeEnabled = !_routeModeEnabled);
     _storage.save('route_mode_disabled', _routeModeEnabled ? null : '1');
-  }
-
-  String _currentPhaseName() {
-    if (_routePhases == null || _routeTopicIds == null) return '';
-    final progress = context.read<ProgressProvider>();
-    final l10n = context.read<LocalizationProvider>();
-    for (final p in _routePhases!) {
-      for (final tid in p.topicIds) {
-        if (_routeTopicIds!.contains(tid) && (progress.getTopicProgress(tid)?.score ?? 0) < 85) {
-          return p.focus.isNotEmpty ? p.focus : '${l10n.get('phases_suffix')} ${_routePhases!.indexOf(p) + 1}';
-        }
-      }
-    }
-    if (_routePhases!.isNotEmpty) {
-      return '${_routePhases!.last.focus} ✓';
-    }
-    return '';
-  }
-
-  Widget _buildRouteContextBar(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final phaseName = _currentPhaseName();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppColors.accent.withValues(alpha: 0.08)
-            : AppColors.accent.withValues(alpha: 0.06),
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.accent.withValues(alpha: 0.15),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.route, size: 14, color: AppColors.accent),
-          const SizedBox(width: 6),
-          Text(
-            l10n.get('route_mode'),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.accent,
-            ),
-          ),
-          if (phaseName.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                phaseName,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-          const Spacer(),
-          SizedBox(
-            height: 26,
-            child: FilledButton.tonal(
-              onPressed: _toggleRouteMode,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                visualDensity: VisualDensity.compact,
-              ),
-              child: Text(
-                l10n.get('exit_route'),
-                style: const TextStyle(fontSize: 11),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   String _sectionTitle(AppSection section, LocalizationProvider l10n) =>

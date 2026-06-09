@@ -109,7 +109,6 @@ class _HeaderBarState extends State<HeaderBar> {
     _overlayEntry = OverlayEntry(
       builder: (context) => Stack(
         children: [
-          // 全屏透明层：点击外部关闭 overlay
           Positioned.fill(
             child: GestureDetector(
               onTap: () {
@@ -125,197 +124,190 @@ class _HeaderBarState extends State<HeaderBar> {
               child: const SizedBox.expand(),
             ),
           ),
-          // 搜索结果面板
           Positioned(
             top: size.height + 4,
-            right: 16, // 右对齐
-            width: 300,
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(10),
-              shadowColor: Colors.black.withValues(alpha: 0.15),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 400),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF161B22) : Colors.white,
+            right: 0,
+            left: 0,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Material(
+                  elevation: 8,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF30363D)
-                        : const Color(0xFFE0E0E0),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 搜索结果标题
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Row(
-                        children: [
-                          Text(
-                            l10n.get('search_results'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white54 : Colors.grey,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            l10n.getp('count_items_2', {
-                              'count': _searchResults.length,
-                            }),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? Colors.white38
-                                  : Colors.grey.shade400,
-                            ),
-                          ),
-                        ],
+                  shadowColor: Colors.black.withValues(alpha: 0.15),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 400),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161B22) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF30363D)
+                            : const Color(0xFFE0E0E0),
                       ),
                     ),
-                    Divider(
-                      height: 1,
-                      color: isDark
-                          ? const Color(0xFF30363D)
-                          : const Color(0xFFF0F0F0),
-                    ),
-                    // 搜索结果列表
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: _searchResults.length,
-                        separatorBuilder: (context, index) => Divider(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                l10n.get('search_results'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white54 : Colors.grey,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                l10n.getp('count_items_2', {
+                                  'count': _searchResults.length,
+                                }),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? Colors.white38
+                                      : Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(
                           height: 1,
-                          indent: 52,
                           color: isDark
                               ? const Color(0xFF30363D)
                               : const Color(0xFFF0F0F0),
                         ),
-                        itemBuilder: (context, index) {
-                          final topic = _searchResults[index];
-                          return InkWell(
-                            onTap: () {
-                              _removeOverlay();
-                              _searchController.clear();
-                              setState(() {
-                                _isSearching = false;
-                                _searchResults = [];
-                              });
-                              if (widget.onTopicTap != null) {
-                                widget.onTopicTap!(topic.id);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              child: Row(
-                                children: [
-                                  // 图标
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.accent.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.menu_book_outlined,
-                                      size: 18,
-                                      color: AppColors.accent,
-                                    ),
+                        Flexible(
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            itemCount: _searchResults.length,
+                            separatorBuilder: (context, index) => Divider(
+                              height: 1,
+                              indent: 52,
+                              color: isDark
+                                  ? const Color(0xFF30363D)
+                                  : const Color(0xFFF0F0F0),
+                            ),
+                            itemBuilder: (context, index) {
+                              final topic = _searchResults[index];
+                              return InkWell(
+                                onTap: () {
+                                  _removeOverlay();
+                                  _searchController.clear();
+                                  setState(() {
+                                    _isSearching = false;
+                                    _searchResults = [];
+                                  });
+                                  if (widget.onTopicTap != null) {
+                                    widget.onTopicTap!(topic.id);
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
                                   ),
-                                  const SizedBox(width: 12),
-                                  // 内容
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          topic.title,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF1A1A1A),
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Row(
+                                        child: const Icon(
+                                          Icons.menu_book_outlined,
+                                          size: 18,
+                                          color: AppColors.accent,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Icon(
-                                              Icons.folder_outlined,
-                                              size: 12,
-                                              color: isDark
-                                                  ? Colors.white38
-                                                  : Colors.grey,
-                                            ),
-                                            const SizedBox(width: 4),
                                             Text(
-                                              topic.domain,
+                                              topic.title,
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
                                                 color: isDark
-                                                    ? Colors.white38
-                                                    : Colors.grey,
+                                                    ? Colors.white
+                                                    : const Color(0xFF1A1A1A),
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            if (topic.highFrequency) ...[
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.folder_outlined,
+                                                  size: 12,
+                                                  color: isDark
+                                                      ? Colors.white38
+                                                      : Colors.grey,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  topic.domain,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark
+                                                        ? Colors.white38
+                                                        : Colors.grey,
+                                                  ),
+                                                ),
+                                                if (topic.highFrequency) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
                                                       horizontal: 4,
                                                       vertical: 1,
                                                     ),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.warning
-                                                      .withValues(alpha: 0.15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(3),
-                                                ),
-                                                child: Text(
-                                                  l10n.get('high_frequency'),
-                                                  style: TextStyle(
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: AppColors.warning,
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.warning.withValues(alpha: 0.15),
+                                                      borderRadius: BorderRadius.circular(3),
+                                                    ),
+                                                    child: Text(
+                                                      l10n.get('high_frequency'),
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppColors.warning,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                            ],
+                                                ],
+                                              ],
+                                            ),
                                           ],
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 14,
+                                        color: isDark
+                                            ? Colors.white24
+                                            : Colors.grey.shade300,
+                                      ),
+                                    ],
                                   ),
-                                  // 箭头
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    size: 14,
-                                    color: isDark
-                                        ? Colors.white24
-                                        : Colors.grey.shade300,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

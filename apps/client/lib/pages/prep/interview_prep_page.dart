@@ -578,11 +578,13 @@ class InterviewPrepPage extends StatelessWidget {
                 '$pct%',
                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppColors.accent),
               ),
-              const SizedBox(width: 8),
-              Text(
-                '$mastered/$total',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
-              ),
+              if (!isMultiDomain) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '$mastered/$total',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+                ),
+              ],
             ],
           ),
           if (isMultiDomain) ...[

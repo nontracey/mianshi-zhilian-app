@@ -38,12 +38,21 @@ class _SkeletonRectState extends State<SkeletonRect>
   @override
   Widget build(BuildContext context) {
     final baseColor = Theme.of(context).colorScheme.surfaceContainerHighest;
+    final highlightColor = Theme.of(context).colorScheme.surface;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final opacity = 0.3 + 0.2 * _controller.value;
-        return Opacity(
-          opacity: opacity,
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) {
+            final slidePercent = _controller.value - 0.3;
+            return LinearGradient(
+              begin: Alignment(slidePercent - 1, 0),
+              end: Alignment(slidePercent, 0),
+              colors: [baseColor, highlightColor, baseColor],
+              stops: const [0.0, 0.5, 1.0],
+            ).createShader(bounds);
+          },
           child: child,
         );
       },

@@ -285,34 +285,37 @@ class _CatalogPageState extends State<CatalogPage> {
             ),
           const SizedBox(height: 12),
 
-          if (_routeActive && !isCrossDomainRouteMode) _buildRouteBanner(context, isDark),
-          if (_routeActive && !isCrossDomainRouteMode) const SizedBox(height: 12),
+          if (_routeActive) _buildRouteBanner(context, isDark),
+          if (_routeActive) const SizedBox(height: 12),
 
           if (_showFilters) ...[
             _buildFilterBar(context, isDark),
             const SizedBox(height: 12),
           ],
 
-          Expanded(
-            child: sortedTopics.isEmpty
-                ? _buildEmptyState(context)
-                : (_routeActive &&
-                        widget.routePhases != null &&
-                        widget.routePhases!.isNotEmpty
-                    ? _buildPhasedTopicList(
-                        context,
-                        currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
-                        sortedTopics,
-                        progressProvider,
-                        isDark,
-                      )
-                    : _buildTopicList(
-                        context,
-                        currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
-                        sortedTopics,
-                        progressProvider,
-                        isDark,
-                      )),
+Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => contentProvider.loadDomainTopics(widget.currentDomainId),
+              child: sortedTopics.isEmpty
+                  ? _buildEmptyState(context)
+                  : (_routeActive &&
+                          widget.routePhases != null &&
+                          widget.routePhases!.isNotEmpty
+                      ? _buildPhasedTopicList(
+                          context,
+                          currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
+                          sortedTopics,
+                          progressProvider,
+                          isDark,
+                        )
+                      : _buildTopicList(
+                          context,
+                          currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
+                          sortedTopics,
+                          progressProvider,
+                          isDark,
+                        )),
+            ),
           ),
         ],
       ),
@@ -710,7 +713,7 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  Widget _buildRouteBanner(BuildContext context, bool isDark) {
+Widget _buildRouteBanner(BuildContext context, bool isDark) {
     final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -719,48 +722,58 @@ class _CatalogPageState extends State<CatalogPage> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Icon(Icons.route, size: 16, color: AppColors.accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isCrossDomain
-                  ? l10n.getp('route_mode_cross_domain', {
-                      'domainCount': '${widget.routeDomainIds!.length}',
-                      'topicCount': '${_routeTopicIds.length}',
-                    })
-                  : l10n.get('route_mode'),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.accent,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.route, size: 16, color: AppColors.accent),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  isCrossDomain
+                      ? l10n.getp('route_mode_cross_domain', {
+                          'domainCount': '${widget.routeDomainIds!.length}',
+                          'topicCount': '${_routeTopicIds.length}',
+                        })
+                      : l10n.get('route_mode'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
+            ],
           ),
-          if (widget.onRouteModeChanged != null) ...[
-            Switch(
-              value: widget.routeModeEnabled,
-              onChanged: (_) {
-                _routeScopeOnly = true;
-                widget.onRouteModeChanged?.call();
-              },
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ] else ...[
-            Switch(
-              value: _routeScopeOnly,
-              onChanged: (v) => setState(() => _routeScopeOnly = v),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ],
-          const SizedBox(width: 4),
-          Text(
-            l10n.getp('knowledge_points_in_route', {'count': _routeTopicIds.length}),
-            style: TextStyle(
-              fontSize: 11,
-              color: isDark ? Colors.white54 : Colors.grey,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.onRouteModeChanged != null)
+                Switch(
+                  value: widget.routeModeEnabled,
+                  onChanged: (_) {
+                    _routeScopeOnly = true;
+                    widget.onRouteModeChanged?.call();
+                  },
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                )
+              else
+                Switch(
+                  value: _routeScopeOnly,
+                  onChanged: (v) => setState(() => _routeScopeOnly = v),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              const SizedBox(width: 4),
+              Text(
+                l10n.getp('knowledge_points_in_route', {'count': _routeTopicIds.length}),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white54 : Colors.grey,
+                ),
+              ),
+            ],
           ),
         ],
       ),
