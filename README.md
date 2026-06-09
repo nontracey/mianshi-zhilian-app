@@ -117,12 +117,12 @@ mianshi-zhilian-app/
 └── .github/workflows/   # CI/CD 工作流
 ```
 
-## 相关仓库(暂未开放)
+## 相关仓库
 
 | 仓库 | 说明 |
 | --- | --- |
 | [mianshi-zhilian-content]() | 知识内容仓库 |
-| [mianshi-zhilian-content-studio]() | 内容管理工作台 |
+| [mianshi-zhilian-content-studio]() | 内容管理工作台(暂未开放) |
 
 ## 贡献与反馈
 

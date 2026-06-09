@@ -42,12 +42,12 @@ void main() {
       http.Response('backup ok', 200),
     ]);
     final fallbackClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(storage),
+      stateStore: EndpointStateStore(storage),
       httpClient: client,
     );
 
     final response = await fallbackClient.request(
-      RouteService.content,
+      EndpointService.content,
       'GET',
       '/manifest.json',
     );
@@ -63,8 +63,8 @@ void main() {
       Uri.parse(RouteResolver.contentBackup).host,
     );
     expect(
-      await RouteStateStore(storage).loadActiveLane(RouteService.content),
-      RouteLane.backup,
+      await EndpointStateStore(storage).loadActiveLane(EndpointService.content),
+      EndpointLane.backup,
     );
   });
 
@@ -74,12 +74,12 @@ void main() {
       http.Response('backup should not be used', 200),
     ]);
     final fallbackClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(StorageService()),
+      stateStore: EndpointStateStore(StorageService()),
       httpClient: client,
     );
 
     final response = await fallbackClient.request(
-      RouteService.appApi,
+      EndpointService.appApi,
       'POST',
       '/tickets',
       body: '{"subject":"x"}',
@@ -96,12 +96,12 @@ void main() {
       http.Response('backup also failed', 503),
     ]);
     final fallbackClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(storage),
+      stateStore: EndpointStateStore(storage),
       httpClient: client,
     );
 
     final response = await fallbackClient.request(
-      RouteService.content,
+      EndpointService.content,
       'GET',
       '/manifest.json',
     );
@@ -109,7 +109,7 @@ void main() {
     expect(response.statusCode, 503);
     expect(client.requests, hasLength(2));
     expect(
-      await RouteStateStore(storage).loadActiveLane(RouteService.content),
+      await EndpointStateStore(storage).loadActiveLane(EndpointService.content),
       isNull,
     );
   });

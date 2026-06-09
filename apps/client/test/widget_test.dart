@@ -149,7 +149,7 @@ void main() {
   testWidgets('renders learning workspace', (tester) async {
     final storage = StorageService();
     final routeClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(storage),
+      stateStore: EndpointStateStore(storage),
     );
     final contentApi = ContentApiService(routeClient: routeClient);
     final aiService = AiService();

@@ -8,10 +8,12 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/utils/mastery_utils.dart';
 import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
+import 'package:mianshi_zhilian/widgets/scope_selector_dialog.dart';
 import 'dashboard_widgets.dart';
 import 'dashboard_dialogs.dart';
 
@@ -542,11 +544,8 @@ class CenterPanel extends StatefulWidget {
     required this.contentProvider,
     required this.progressProvider,
     required this.settingsProvider,
-    this.routeModeEnabled = true,
-    this.onRouteModeChanged,
     this.onGenerateAiRoute,
     this.onRegenerateAiRoute,
-    this.onRouteChanged,
   });
 
   final Domain? currentDomain;
@@ -566,11 +565,8 @@ class CenterPanel extends StatefulWidget {
   final ContentProvider contentProvider;
   final ProgressProvider progressProvider;
   final SettingsProvider settingsProvider;
-  final bool routeModeEnabled;
-  final VoidCallback? onRouteModeChanged;
   final VoidCallback? onGenerateAiRoute;
   final VoidCallback? onRegenerateAiRoute;
-  final VoidCallback? onRouteChanged;
 
   @override
   State<CenterPanel> createState() => CenterPanelState();
@@ -580,23 +576,12 @@ class CenterPanelState extends State<CenterPanel> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _storage = StorageService();
   List<String> _disabledIds = [];
-  LearningRoute? _selectedRoute;
   bool _isGenerating = false;
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
-    _loadSelectedRoute();
-  }
-
-  @override
-  void didUpdateWidget(CenterPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.routeModeEnabled != widget.routeModeEnabled ||
-        oldWidget.allDomains != widget.allDomains) {
-      _loadSelectedRoute();
-    }
   }
 
   Future<void> _loadDisabled() async {
@@ -604,123 +589,46 @@ class CenterPanelState extends State<CenterPanel> {
     if (mounted) setState(() => _disabledIds = ids);
   }
 
-  Future<void> _loadSelectedRoute() async {
-    final routeId = await _storage.load('selected_route_id');
-    if (routeId != null && mounted) {
-      // 加载自定义路线
-      final customData = await _storage.loadJsonList('custom_routes');
-      final customRoutes = customData
-          .map((e) => LearningRoute.fromJson(e))
-          .toList();
-
-      // 从内容仓库动态生成官方路线
-      final defaultRoutes = _buildOfficialRoutes(widget.allDomains, l10n);
-
-      final allRoutes = [...defaultRoutes, ...customRoutes];
-      final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
-      if (route != null && mounted) {
-        setState(() => _selectedRoute = route);
-      } else if (mounted) {
-        // 路线已不存在（可能被删除），回退到默认
-        setState(() => _selectedRoute = defaultRoutes.firstOrNull);
-      }
-    }
-  }
-
-  Future<void> _saveSelectedRoute(LearningRoute? route) async {
-    if (route != null) {
-      await _storage.save('selected_route_id', route.id);
-    } else {
-      await _storage.save('selected_route_id', null);
-    }
-    if (mounted) setState(() => _selectedRoute = route);
-  }
-
-  List<Domain> get _domains {
+  List<Domain> _domains(LearningScopeProvider scope) {
     var domains = widget.allDomains
         .where((d) => !_disabledIds.contains(d.id))
         .toList();
 
-    // 路线模式 + 选中路线 → 按路线顺序过滤
-    if (widget.routeModeEnabled &&
-        _selectedRoute != null &&
-        _selectedRoute!.domainIds.isNotEmpty) {
+    // 路线模式 + 有路线领域 → 按路线顺序过滤
+    if (scope.isRouteMode && scope.scopeDomainIds.isNotEmpty) {
+      final routeDomainIds = scope.scopeDomainIds;
       domains = domains
-          .where((d) => _selectedRoute!.domainIds.contains(d.id))
+          .where((d) => routeDomainIds.contains(d.id))
           .toList();
       domains.sort(
-        (a, b) => _selectedRoute!.domainIds
-            .indexOf(a.id)
-            .compareTo(_selectedRoute!.domainIds.indexOf(b.id)),
+        (a, b) => routeDomainIds.indexOf(a.id).compareTo(routeDomainIds.indexOf(b.id)),
       );
     }
 
     return domains;
   }
 
-  // 所有未禁用的领域（不受路线选择影响）
-  List<Domain> get _allEnabledDomains {
-    return widget.allDomains
-        .where((d) => !_disabledIds.contains(d.id))
-        .toList();
-  }
-
-  List<LearningRoute> _buildOfficialRoutes(List<Domain> domains, LocalizationProvider l10n) {
-    return [
-      LearningRoute(
-        id: 'all',
-        name: l10n.get('all_topics'),
-        description: '',
-        domainIds: domains.map((d) => d.id).toList(),
-        phases: null,
-        source: 'official',
-        isDefault: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
+  List<Domain> _allEnabledDomains() {
+    return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final domains = _domains;
-    final allEnabledDomains = _allEnabledDomains;
-    final route = _selectedRoute;
+    final scope = context.watch<LearningScopeProvider>();
+    final route = scope.activeRoute;
+    final domains = _domains(scope);
+    final allEnabledDomains = _allEnabledDomains();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 路线模式切换（“全部”路线无意义，隐藏切换）
-        if (_selectedRoute != null && _selectedRoute!.id != 'all' && widget.onRouteModeChanged != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment(
-                      value: true,
-                      label: Text(l10n.get('route_mode'), style: const TextStyle(fontSize: 12)),
-                      icon: const Icon(Icons.route, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: false,
-                      label: Text(l10n.get('free_explore'), style: const TextStyle(fontSize: 12)),
-                      icon: const Icon(Icons.explore_outlined, size: 16),
-                    ),
-                  ],
-                  selected: {widget.routeModeEnabled},
-                  onSelectionChanged: (_) => widget.onRouteModeChanged?.call(),
-                  style: ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        // 当前学习路线
+        // 单一范围选择器芯片
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ScopeSelectorChip(onGenerateAiRoute: widget.onGenerateAiRoute),
+        ),
+        // 当前学习范围内容（路线/领域列表）
         PanelCard(
           title: route != null ? route.name : l10n.get('current_study_route'),
           icon: Icons.route_outlined,
@@ -730,7 +638,8 @@ class CenterPanelState extends State<CenterPanel> {
             children: [
               if (domains.isEmpty)
                 EmptyState(message: l10n.get('temporary_no_study_route'))
-              else if (route != null &&
+              else if (scope.isRouteMode &&
+                  route != null &&
                   route.phases != null &&
                   route.phases!.isNotEmpty)
                 _buildPhaseView(route, l10n)
@@ -749,19 +658,13 @@ class CenterPanelState extends State<CenterPanel> {
                     isSelected: domain.id == widget.currentDomainId,
                     onTap: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(
-                            domain.id,
-                          ) ==
-                          0) {
+                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                     },
                     onViewCatalog: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(
-                            domain.id,
-                          ) ==
-                          0) {
+                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                       widget.onViewDomainCatalog(domain.id);
@@ -771,8 +674,8 @@ class CenterPanelState extends State<CenterPanel> {
             ],
           ),
         ),
-        // AI 路线生成/管理按钮
-        if (widget.onGenerateAiRoute != null || widget.onRegenerateAiRoute != null)
+        // AI 路线生成/管理按钮（仅路线模式显示）
+        if (scope.isRouteMode && (widget.onGenerateAiRoute != null || widget.onRegenerateAiRoute != null))
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -791,7 +694,8 @@ class CenterPanelState extends State<CenterPanel> {
                       ],
                     ),
                   )
-                else if (route?.source == 'ai' && widget.onRegenerateAiRoute != null) ...[                  OutlinedButton.icon(
+                else if (route?.source == 'ai' && widget.onRegenerateAiRoute != null) ...[
+                  OutlinedButton.icon(
                     onPressed: _onGeneratePressed,
                     icon: const Icon(Icons.refresh, size: 16),
                     label: Text(l10n.get('regenerate_ai_route')),
@@ -1073,38 +977,7 @@ class CenterPanelState extends State<CenterPanel> {
   }
 
   Future<void> _showRouteSelector(BuildContext context) async {
-    final l10n = context.watch<LocalizationProvider>();
-    final defaultRoutes = _buildOfficialRoutes(widget.allDomains, l10n);
-
-    final customData = await _storage.loadJsonList('custom_routes');
-    final customRoutes = customData
-        .map((e) => LearningRoute.fromJson(e))
-        .toList();
-
-    final allRoutes = [...defaultRoutes, ...customRoutes];
-
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => RouteSelectorDialog(
-        routes: allRoutes,
-        currentRouteId: _selectedRoute?.id,
-        availableDomains: widget.allDomains,
-        disabledDomainIds: _disabledIds,
-        onRouteSelected: (route) {
-          _saveSelectedRoute(route);
-          if (route.domainIds.isNotEmpty) {
-            widget.onDomainChanged(route.domainIds.first);
-          }
-          widget.onRouteChanged?.call();
-        },
-        onRoutesChanged: () {
-          // 路线被删除或新增时，重新加载当前选中路线
-          _loadSelectedRoute();
-          widget.onRouteChanged?.call();
-        },
-      ),
-    );
+    ScopeSelectorDialog.show(context, onGenerateAiRoute: widget.onGenerateAiRoute);
   }
 
   void _showManageDomains(BuildContext context) {
@@ -1144,15 +1017,11 @@ class CenterPanelState extends State<CenterPanel> {
   }
 
   void _editSelectedAiRoute(BuildContext context) async {
-    final route = _selectedRoute;
+    final scope = context.read<LearningScopeProvider>();
+    final route = scope.activeRoute;
     if (route == null) return;
 
-    // 获取所有路线名称用于重名检查
-    final customData = await _storage.loadJsonList('custom_routes');
-    final allRouteNames = customData
-        .map((e) => LearningRoute.fromJson(e))
-        .map((r) => r.name)
-        .toList();
+    final allRouteNames = scope.customRoutes.map((r) => r.name).toList();
 
     if (!mounted) return;
     showDialog(
@@ -1164,21 +1033,7 @@ class CenterPanelState extends State<CenterPanel> {
         existingRoute: route,
         existingRouteNames: allRouteNames,
         onSave: (updatedRoute) async {
-          // 更新存储中的路线
-          final customData = await _storage.loadJsonList('custom_routes');
-          final all = customData.map((e) => LearningRoute.fromJson(e)).toList();
-          final idx = all.indexWhere((r) => r.id == route.id);
-          if (idx >= 0) {
-            all[idx] = updatedRoute;
-            await _storage.saveJsonList(
-              'custom_routes',
-              all.map((r) => r.toJson()).toList(),
-            );
-          }
-          if (mounted) {
-            setState(() => _selectedRoute = updatedRoute);
-            widget.onRouteChanged?.call();
-          }
+          await scope.upsertRoute(updatedRoute, activate: true);
         },
       ),
     );

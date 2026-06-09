@@ -26,7 +26,7 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider(this._storage, {EndpointFallbackClient? routeClient})
     : _routeClient =
           routeClient ??
-          EndpointFallbackClient(stateStore: RouteStateStore(_storage));
+          EndpointFallbackClient(stateStore: EndpointStateStore(_storage));
 
   User? _user;
   String? _token;
@@ -186,7 +186,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final passwordHash = _hashPassword(password);
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/auth/register',
         headers: await ApiHeaders.build(_storage),
@@ -283,7 +283,7 @@ class AuthProvider extends ChangeNotifier {
       final passwordHash = _hashPassword(password);
       final headers = await ApiHeaders.build(_storage);
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/auth/login',
         headers: headers,
@@ -335,7 +335,7 @@ class AuthProvider extends ChangeNotifier {
     if (refreshToken != null) {
       try {
         await _routeClient.request(
-          RouteService.appApi,
+          EndpointService.appApi,
           'POST',
           '/auth/logout',
           headers: await ApiHeaders.build(_storage),
@@ -376,7 +376,7 @@ class AuthProvider extends ChangeNotifier {
     if (token == null || token.isEmpty) return;
     try {
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'GET',
         '/auth/me',
         headers: await ApiHeaders.build(_storage, token: token),
@@ -438,7 +438,7 @@ class AuthProvider extends ChangeNotifier {
     http.Response? lastResponse;
     try {
       lastResponse = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/auth/refresh',
         headers: await ApiHeaders.build(_storage),
@@ -479,7 +479,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final deviceId = await _storage.getOrCreateDeviceId();
       await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/analytics/bind-device',
         headers: await ApiHeaders.build(_storage, token: token),
@@ -497,7 +497,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     Future<http.Response> send() async {
       return _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         path,
         headers: await ApiHeaders.build(_storage, token: _token),

@@ -11,29 +11,20 @@ import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 
 class InterviewPrepPage extends StatelessWidget {
   const InterviewPrepPage({
     super.key,
-    required this.currentDomainId,
     required this.onStartPractice,
     required this.onStartMock,
-    this.routeTopicIds,
-    this.routeDomainIds,
-    this.routeModeEnabled = false,
-    this.onRouteModeChanged,
     this.onGenerateAiRoute,
     this.onNavigateToDashboard,
   });
 
-  final String currentDomainId;
   final VoidCallback onStartPractice;
   final VoidCallback onStartMock;
-  final List<String>? routeTopicIds;
-  final List<String>? routeDomainIds;
-  final bool routeModeEnabled;
-  final VoidCallback? onRouteModeChanged;
   final VoidCallback? onGenerateAiRoute;
   final VoidCallback? onNavigateToDashboard;
 
@@ -42,25 +33,12 @@ class InterviewPrepPage extends StatelessWidget {
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
     final l10n = context.watch<LocalizationProvider>();
-    final isCrossDomain = routeModeEnabled &&
-        routeDomainIds != null &&
-        routeDomainIds!.length > 1 &&
-        routeTopicIds != null &&
-        routeTopicIds!.isNotEmpty;
+    final scope = context.watch<LearningScopeProvider>();
+    final settings = context.watch<SettingsProvider>();
 
-    List<Topic> topics;
-    if (isCrossDomain) {
-      topics = routeTopicIds!
-          .map((id) => content.findTopic(id))
-          .whereType<Topic>()
-          .toList();
-    } else if (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) {
-      final domainTopics = content.getTopicsByDomain(currentDomainId);
-      final routeSet = routeTopicIds!.toSet();
-      topics = domainTopics.where((t) => routeSet.contains(t.id)).toList();
-    } else {
-      topics = content.getTopicsByDomain(currentDomainId);
-    }
+    final isCrossDomain = scope.isCrossDomain;
+    final topics = scope.resolveScopedTopics(content);
+    final currentDomainId = settings.settings.currentDomain;
 
     final plan = progress.prepPlan;
     final readiness = progress.readinessScore(topics);
@@ -126,8 +104,9 @@ class InterviewPrepPage extends StatelessWidget {
     required ({int masteryPercent, int topicCount}) domainProgress,
   }) {
     final l10n = context.watch<LocalizationProvider>();
-    final routeContent = (routeModeEnabled && routeDomainIds != null && routeDomainIds!.length > 1 && routeTopicIds != null && routeTopicIds!.isNotEmpty)
-        ? _buildRouteSummary(context, topics, progress) : null;
+    final scope = context.watch<LearningScopeProvider>();
+    final routeContent = scope.isCrossDomain && topics.isNotEmpty
+        ? _buildRouteSummary(context, topics, progress, scope) : null;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -344,8 +323,6 @@ class InterviewPrepPage extends StatelessWidget {
     return _MockTabContent(
       progress: progress,
       topics: topics,
-      routeTopicIds: routeTopicIds,
-      routeModeEnabled: routeModeEnabled,
     );
   }
 
@@ -537,7 +514,7 @@ class InterviewPrepPage extends StatelessWidget {
     return (avgScore * coverage).round();
   }
 
-  Widget _buildRouteSummary(BuildContext context, List<Topic> topics, ProgressProvider progress) {
+  Widget _buildRouteSummary(BuildContext context, List<Topic> topics, ProgressProvider progress, LearningScopeProvider scope) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final content = context.read<ContentProvider>();
@@ -547,7 +524,7 @@ class InterviewPrepPage extends StatelessWidget {
     }
     final total = topics.length;
     final pct = total > 0 ? (mastered * 100 ~/ total) : 0;
-    final isMultiDomain = routeDomainIds != null && routeDomainIds!.length > 1;
+    final isMultiDomain = scope.isCrossDomain;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -602,7 +579,7 @@ class InterviewPrepPage extends StatelessWidget {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: (routeDomainIds ?? []).map((did) {
+                children: scope.scopeDomainIds.map((did) {
                   final d = content.domains.where((dd) => dd.id == did).firstOrNull;
                   final dTopics = topics.where((t) => t.domainId == did).toList();
                   int dMastered = 0;
@@ -843,14 +820,10 @@ class _MockTabContent extends StatefulWidget {
   const _MockTabContent({
     required this.progress,
     required this.topics,
-    required this.routeTopicIds,
-    required this.routeModeEnabled,
   });
 
   final ProgressProvider progress;
   final List<Topic> topics;
-  final List<String>? routeTopicIds;
-  final bool routeModeEnabled;
 
   @override
   State<_MockTabContent> createState() => _MockTabContentState();
@@ -859,26 +832,7 @@ class _MockTabContent extends StatefulWidget {
 class _MockTabContentState extends State<_MockTabContent> {
   String _scenario = 'tech';
   int _duration = 15;
-  String? _scope;
-
-  @override
-  void initState() {
-    super.initState();
-    _scope = widget.routeModeEnabled && widget.routeTopicIds?.isNotEmpty == true
-        ? 'route'
-        : null;
-  }
-
-  @override
-  void didUpdateWidget(covariant _MockTabContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.routeTopicIds != oldWidget.routeTopicIds ||
-        widget.routeModeEnabled != oldWidget.routeModeEnabled) {
-      _scope = widget.routeModeEnabled && widget.routeTopicIds?.isNotEmpty == true
-          ? 'route'
-          : null;
-    }
-  }
+  String? _scopeFilter; // null / 'route' / 'domain' / 'all'
 
   @override
   Widget build(BuildContext context) {
@@ -934,31 +888,37 @@ class _MockTabContentState extends State<_MockTabContent> {
             ),
             const SizedBox(height: 16),
 
-            // 题目范围
-            if (widget.routeTopicIds != null && widget.routeTopicIds!.isNotEmpty) ...[
-              Text(l10n.get('question_scope'), style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
+            // 题目范围（路线模式下才显示选择器）
+            Builder(builder: (context) {
+              final scope = context.watch<LearningScopeProvider>();
+              if (!scope.isRouteMode || widget.topics.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildScopeChip('route', l10n.get('by_current_route')),
-                  _buildScopeChip('domain', l10n.get('by_current_domain')),
-                  _buildScopeChip('all', l10n.get('all_topics')),
+                  Text(l10n.get('question_scope'), style: Theme.of(context).textTheme.labelMedium),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildScopeChip('route', l10n.get('by_current_route')),
+                      _buildScopeChip('domain', l10n.get('by_current_domain')),
+                      _buildScopeChip('all', l10n.get('all_topics')),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
-              ),
-              const SizedBox(height: 16),
-            ],
+              );
+            }),
 
             const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: () {
                 final content = context.read<ContentProvider>();
+                final scope = context.read<LearningScopeProvider>();
                 List<String> topicIds;
-                if (_scope == 'route' &&
-                    widget.routeTopicIds != null &&
-                    widget.routeTopicIds!.isNotEmpty) {
-                  topicIds = List<String>.from(widget.routeTopicIds!)..shuffle();
-                } else if (_scope == 'domain') {
+                if (_scopeFilter == 'route' && scope.isRouteMode) {
+                  topicIds = List<String>.from(scope.resolveScopedTopics(content).map((t) => t.id))..shuffle();
+                } else if (_scopeFilter == 'domain') {
                   final domainTopics = content.getTopicsByDomain(
                     context.read<SettingsProvider>().settings.currentDomain,
                   );
@@ -1004,12 +964,12 @@ class _MockTabContentState extends State<_MockTabContent> {
   }
 
   Widget _buildScopeChip(String value, String label) {
-    final selected = _scope == value;
+    final selected = _scopeFilter == value;
     return ChoiceChip(
       avatar: const Icon(Icons.tune, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
-      onSelected: (_) => setState(() => _scope = value),
+      onSelected: (_) => setState(() => _scopeFilter = value),
     );
   }
 }

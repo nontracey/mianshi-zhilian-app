@@ -23,7 +23,7 @@ class TicketService {
        _getToken = getToken,
        _routeClient =
            routeClient ??
-           EndpointFallbackClient(stateStore: RouteStateStore(storage));
+           EndpointFallbackClient(stateStore: EndpointStateStore(storage));
 
   /// 防注入：清理用户输入
   String _sanitize(String input) {
@@ -45,7 +45,7 @@ class TicketService {
     final token = _getToken?.call();
     if (type == 'password_reset') {
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/tickets/password-reset',
         headers: await ApiHeaders.build(_storage),
@@ -82,7 +82,7 @@ class TicketService {
     if (token != null) {
       try {
         final response = await _routeClient.request(
-          RouteService.appApi,
+          EndpointService.appApi,
           'POST',
           '/tickets',
           headers: await ApiHeaders.build(_storage, token: token),
@@ -122,7 +122,7 @@ class TicketService {
     if (token != null) {
       try {
         final response = await _routeClient.request(
-          RouteService.appApi,
+          EndpointService.appApi,
           'GET',
           '/tickets',
           headers: await ApiHeaders.build(_storage, token: token, json: false),

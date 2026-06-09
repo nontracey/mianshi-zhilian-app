@@ -235,14 +235,14 @@ class UpdateService {
   }) : _routeClient =
            routeClient ??
            EndpointFallbackClient(
-             stateStore: RouteStateStore(StorageService()),
+             stateStore: EndpointStateStore(StorageService()),
            );
 
   /// 检查是否有新版本
   Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'GET',
         '/update.json',
         timeout: const Duration(seconds: 15),

@@ -4,9 +4,9 @@ import 'package:mianshi_zhilian/services/route_resolver.dart';
 void main() {
   test('resolves appApi primary and backup candidates', () {
     final candidates = const RouteResolver().resolveCandidates(
-      RouteService.appApi,
+      EndpointService.appApi,
       '/auth/login',
-      mode: RouteMode.primaryFirst,
+      mode: EndpointMode.primaryFirst,
     );
 
     expect(candidates, hasLength(2));
@@ -22,9 +22,9 @@ void main() {
 
   test('honors backup only mode', () {
     final candidates = const RouteResolver().resolveCandidates(
-      RouteService.content,
+      EndpointService.content,
       'manifest.json',
-      mode: RouteMode.backupOnly,
+      mode: EndpointMode.backupOnly,
     );
 
     expect(candidates, hasLength(1));
@@ -36,9 +36,9 @@ void main() {
 
   test('active lane changes auto ordering', () {
     final candidates = const RouteResolver().resolveCandidates(
-      RouteService.appApi,
+      EndpointService.appApi,
       '/admin/users',
-      activeLane: RouteLane.backup,
+      activeLane: EndpointLane.backup,
     );
 
     expect(

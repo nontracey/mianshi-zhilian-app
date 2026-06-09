@@ -15,6 +15,7 @@ import 'providers/content_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/localization_provider.dart';
 import 'providers/progress_provider.dart';
+import 'providers/learning_scope_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/analytics_service.dart';
@@ -76,7 +77,7 @@ void main() async {
 
   final storage = StorageService();
   final routeClient = EndpointFallbackClient(
-    stateStore: RouteStateStore(storage),
+    stateStore: EndpointStateStore(storage),
   );
   // 先加载已保存的设置，获取正确的 contentBaseUrl
   final savedSettings = await storage.loadSettings();
@@ -283,6 +284,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           create: (_) => ProgressProvider(widget.storage)..loadProgress(),
         ),
         ChangeNotifierProvider(
+          create: (_) => LearningScopeProvider(widget.storage),
+        ),
+        ChangeNotifierProvider(
           create: (_) =>
               AuthProvider(widget.storage, routeClient: widget.routeClient)
                 ..loadUser(),
@@ -305,6 +309,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               final settingsProvider = context.read<SettingsProvider>();
               final aiProvider = context.read<AiProvider>();
               final localizationProvider = context.read<LocalizationProvider>();
+              final learningScopeProvider = context.read<LearningScopeProvider>();
               widget.dataSyncService.onDataImported = () async {
                 await progressProvider.loadProgress();
                 await settingsProvider.loadSettings();
@@ -312,11 +317,18 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
                 localizationProvider.setLanguage(
                   settingsProvider.settings.language,
                 );
+                await learningScopeProvider.reload(
+                  legacyDomainId: settingsProvider.settings.currentDomain,
+                );
               };
               widget.dataSyncService.start();
               // 同步语言设置到 LocalizationProvider
               context.read<LocalizationProvider>().setLanguage(
                 settings.settings.language,
+              );
+              // 加载学习范围（含旧键迁移）
+              learningScopeProvider.load(
+                legacyDomainId: settings.settings.currentDomain,
               );
               // 加载内容
               final contentProvider = context.read<ContentProvider>();

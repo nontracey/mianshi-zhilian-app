@@ -17,7 +17,7 @@ class AnalyticsService with WidgetsBindingObserver {
   AnalyticsService(this._storage, {EndpointFallbackClient? routeClient})
     : _routeClient =
           routeClient ??
-          EndpointFallbackClient(stateStore: RouteStateStore(_storage));
+          EndpointFallbackClient(stateStore: EndpointStateStore(_storage));
 
   final StorageService _storage;
   final EndpointFallbackClient _routeClient;
@@ -133,7 +133,7 @@ class AnalyticsService with WidgetsBindingObserver {
       };
       final headers = await ApiHeaders.build(_storage, token: token);
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/analytics/batch',
         headers: headers,
@@ -162,7 +162,7 @@ class AnalyticsService with WidgetsBindingObserver {
     try {
       final deviceId = await _storage.getOrCreateDeviceId();
       await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'POST',
         '/analytics/bind-device',
         headers: await ApiHeaders.build(_storage, token: token),

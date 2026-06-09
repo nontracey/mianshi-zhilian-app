@@ -35,9 +35,10 @@ class AiRouteGenerator {
     required ContentProvider contentProvider,
     AiConfig? aiConfig,
     bool forceRegenerate = false,
+    String? contentVersion,
   }) async {
     if (!forceRegenerate) {
-      final cached = await _loadCachedRoute(plan);
+      final cached = await _loadCachedRoute(plan, contentVersion: contentVersion);
       if (cached != null) return cached;
     }
 
@@ -54,7 +55,7 @@ class AiRouteGenerator {
         final route = _buildStructuredRoute(
           plan, selectedDomainIds, relevantTopicIds, contentProvider, progressProvider,
         );
-        await _cacheRoute(plan, route);
+        await _cacheRoute(plan, route, contentVersion: contentVersion);
         return route;
       } catch (e) {
         debugPrint('AI route generation failed, using fallback: $e');
@@ -62,7 +63,7 @@ class AiRouteGenerator {
     }
 
     final route = _generateFallbackRoute(plan, allTopics, progressProvider, contentProvider);
-    await _cacheRoute(plan, route);
+    await _cacheRoute(plan, route, contentVersion: contentVersion);
     return route;
   }
 
@@ -258,8 +259,8 @@ $topicLines
     );
   }
 
-  Future<LearningRoute?> _loadCachedRoute(PrepPlan plan) async {
-    final cacheKey = _cacheKey(plan);
+  Future<LearningRoute?> _loadCachedRoute(PrepPlan plan, {String? contentVersion}) async {
+    final cacheKey = _cacheKey(plan, contentVersion: contentVersion);
     final data = await _storage.load(cacheKey);
     if (data is Map<String, dynamic>) {
       final cached = LearningRoute.fromJson(data);
@@ -270,12 +271,12 @@ $topicLines
     return null;
   }
 
-  Future<void> _cacheRoute(PrepPlan plan, LearningRoute route) async {
-    await _storage.save(_cacheKey(plan), route.toJson());
+  Future<void> _cacheRoute(PrepPlan plan, LearningRoute route, {String? contentVersion}) async {
+    await _storage.save(_cacheKey(plan, contentVersion: contentVersion), route.toJson());
   }
 
-  String _cacheKey(PrepPlan plan) =>
-    'route_cache_${_hashString('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String()}')}';
+  String _cacheKey(PrepPlan plan, {String? contentVersion}) =>
+    'route_cache_${_hashString('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String()}_${contentVersion ?? ''}')}';
 
   String _hashString(String input) =>
     input.hashCode.toString();

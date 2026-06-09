@@ -1,8 +1,8 @@
-enum RouteService { appApi, content }
+enum EndpointService { appApi, content }
 
-enum RouteLane { primary, backup }
+enum EndpointLane { primary, backup }
 
-enum RouteMode { auto, primaryFirst, backupFirst, primaryOnly, backupOnly }
+enum EndpointMode { auto, primaryFirst, backupFirst, primaryOnly, backupOnly }
 
 /// 下载源模式
 ///
@@ -28,8 +28,8 @@ class RouteEndpoint {
     required this.baseUrl,
   });
 
-  final RouteService service;
-  final RouteLane lane;
+  final EndpointService service;
+  final EndpointLane lane;
   final String baseUrl;
 }
 
@@ -49,10 +49,10 @@ class RouteResolver {
   const RouteResolver();
 
   List<RouteCandidate> resolveCandidates(
-    RouteService service,
+    EndpointService service,
     String path, {
-    RouteMode mode = RouteMode.auto,
-    RouteLane? activeLane,
+    EndpointMode mode = EndpointMode.auto,
+    EndpointLane? activeLane,
   }) {
     final endpoints = _orderedEndpoints(
       service,
@@ -70,45 +70,45 @@ class RouteResolver {
   }
 
   List<RouteEndpoint> _orderedEndpoints(
-    RouteService service, {
-    required RouteMode mode,
-    RouteLane? activeLane,
+    EndpointService service, {
+    required EndpointMode mode,
+    EndpointLane? activeLane,
   }) {
-    final primary = _endpoint(service, RouteLane.primary);
-    final backup = _endpoint(service, RouteLane.backup);
+    final primary = _endpoint(service, EndpointLane.primary);
+    final backup = _endpoint(service, EndpointLane.backup);
 
     switch (mode) {
-      case RouteMode.primaryOnly:
+      case EndpointMode.primaryOnly:
         return [primary];
-      case RouteMode.backupOnly:
+      case EndpointMode.backupOnly:
         return [backup];
-      case RouteMode.primaryFirst:
+      case EndpointMode.primaryFirst:
         return [primary, backup];
-      case RouteMode.backupFirst:
+      case EndpointMode.backupFirst:
         return [backup, primary];
-      case RouteMode.auto:
+      case EndpointMode.auto:
         final preferred = activeLane ?? _laneFromEntranceHost();
-        return preferred == RouteLane.backup
+        return preferred == EndpointLane.backup
             ? [backup, primary]
             : [primary, backup];
     }
   }
 
-  RouteEndpoint _endpoint(RouteService service, RouteLane lane) {
+  RouteEndpoint _endpoint(EndpointService service, EndpointLane lane) {
     final baseUrl = switch ((service, lane)) {
-      (RouteService.appApi, RouteLane.primary) => appApiPrimary,
-      (RouteService.appApi, RouteLane.backup) => appApiBackup,
-      (RouteService.content, RouteLane.primary) => contentPrimary,
-      (RouteService.content, RouteLane.backup) => contentBackup,
+      (EndpointService.appApi, EndpointLane.primary) => appApiPrimary,
+      (EndpointService.appApi, EndpointLane.backup) => appApiBackup,
+      (EndpointService.content, EndpointLane.primary) => contentPrimary,
+      (EndpointService.content, EndpointLane.backup) => contentBackup,
     };
     return RouteEndpoint(service: service, lane: lane, baseUrl: baseUrl);
   }
 
-  static RouteLane? laneFromUrl(String url) {
+  static EndpointLane? laneFromUrl(String url) {
     final host = Uri.tryParse(url)?.host;
     if (host == null) return null;
-    if (host.endsWith('nontracey.de5.net')) return RouteLane.primary;
-    if (host.endsWith('pages.dev')) return RouteLane.backup;
+    if (host.endsWith('nontracey.de5.net')) return EndpointLane.primary;
+    if (host.endsWith('pages.dev')) return EndpointLane.backup;
     return null;
   }
 
@@ -117,10 +117,10 @@ class RouteResolver {
     return path.startsWith('/') ? path : '/$path';
   }
 
-  static RouteLane? _laneFromEntranceHost() {
+  static EndpointLane? _laneFromEntranceHost() {
     final host = Uri.base.host;
-    if (host.endsWith('nontracey.de5.net')) return RouteLane.primary;
-    if (host.endsWith('pages.dev')) return RouteLane.backup;
+    if (host.endsWith('nontracey.de5.net')) return EndpointLane.primary;
+    if (host.endsWith('pages.dev')) return EndpointLane.backup;
     return null;
   }
 }

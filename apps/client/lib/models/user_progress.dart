@@ -337,6 +337,10 @@ class PrepPlan {
       jobDescription.trim().isNotEmpty ||
       (company ?? '').trim().isNotEmpty;
 
+  /// 用于检测目标变化的签名（同字段组合的哈希）
+  String get signature =>
+      '${targetRole.trim()}_${techStack.trim()}_${jobDescription.trim()}_${interviewDate?.toIso8601String() ?? ''}'.hashCode.toString();
+
   factory PrepPlan.empty() => PrepPlan(updatedAt: DateTime.now());
 
   factory PrepPlan.fromJson(Map<String, dynamic> json) => PrepPlan(

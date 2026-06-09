@@ -1,8 +1,8 @@
 import 'storage_service.dart';
 import 'route_resolver.dart';
 
-class RouteStateStore {
-  RouteStateStore(this._storage);
+class EndpointStateStore {
+  EndpointStateStore(this._storage);
 
   final StorageService _storage;
 
@@ -10,22 +10,22 @@ class RouteStateStore {
   static const _modeKey = '_routeMode';
   static const _downloadSourceModeKey = '_downloadSourceMode';
 
-  Future<RouteMode> loadMode(RouteService service) async {
+  Future<EndpointMode> loadMode(EndpointService service) async {
     final data = await _storage.loadJsonObject(_modeKey);
     final raw = data?[service.name] as String?;
-    return RouteMode.values.firstWhere(
+    return EndpointMode.values.firstWhere(
       (mode) => mode.name == raw,
-      orElse: () => RouteMode.auto,
+      orElse: () => EndpointMode.auto,
     );
   }
 
-  Future<void> saveMode(RouteService service, RouteMode mode) async {
+  Future<void> saveMode(EndpointService service, EndpointMode mode) async {
     final data = await _storage.loadJsonObject(_modeKey) ?? {};
     data[service.name] = mode.name;
     await _storage.saveJsonObject(_modeKey, data);
   }
 
-  Future<RouteLane?> loadActiveLane(RouteService service) async {
+  Future<EndpointLane?> loadActiveLane(EndpointService service) async {
     final data = await _storage.loadJsonObject(_stateKey);
     final item = data?[service.name];
     if (item is! Map) return null;
@@ -37,15 +37,15 @@ class RouteStateStore {
     if (expiresAt == null || expiresAt.isBefore(DateTime.now())) return null;
 
     final active = item['active'] as String?;
-    return RouteLane.values.firstWhere(
+    return EndpointLane.values.firstWhere(
       (lane) => lane.name == active,
-      orElse: () => RouteLane.primary,
+      orElse: () => EndpointLane.primary,
     );
   }
 
   Future<void> rememberActiveLane(
-    RouteService service,
-    RouteLane lane, {
+    EndpointService service,
+    EndpointLane lane, {
     Duration ttl = const Duration(minutes: 30),
   }) async {
     final data = await _storage.loadJsonObject(_stateKey) ?? {};

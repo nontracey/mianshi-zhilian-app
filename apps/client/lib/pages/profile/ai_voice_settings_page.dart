@@ -654,7 +654,7 @@ class SttConfigPanelState extends State<SttConfigPanel> {
     });
 
     try {
-      final downloadSourceMode = await RouteStateStore(
+      final downloadSourceMode = await EndpointStateStore(
         StorageService(),
       ).loadDownloadSourceMode();
       if (!mounted) return;
@@ -760,7 +760,7 @@ class SttConfigPanelState extends State<SttConfigPanel> {
     });
 
     try {
-      final downloadSourceMode = await RouteStateStore(
+      final downloadSourceMode = await EndpointStateStore(
         StorageService(),
       ).loadDownloadSourceMode();
       if (!mounted) return;

@@ -556,6 +556,9 @@ class DataSyncService {
     if (remote == null) return local;
     final localData = Map<String, dynamic>.from(local['data'] as Map);
     final remoteData = Map<String, dynamic>.from(remote['data'] as Map);
+    // learning_scope, selected_route_id, disabled_domains, settings 等
+    // 通过 {...remoteData, ...localData} 得到 local-wins，
+    // 每个设备保持自己的偏好，不跨设备同步。
     final merged = <String, dynamic>{...remoteData, ...localData};
 
     merged['progress_map'] = _mergeProgressMap(

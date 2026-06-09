@@ -38,7 +38,7 @@ void main() {
     final storage = StorageService();
     final client = _QueuedClient([http.Response('{"domains":[]}', 200)]);
     final routeClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(storage),
+      stateStore: EndpointStateStore(storage),
       httpClient: client,
     );
     final service = ContentApiService(
@@ -60,7 +60,7 @@ void main() {
   test('custom production content bypasses official fallback', () async {
     final customClient = _QueuedClient([http.Response('{"domains":[]}', 200)]);
     final routeClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(StorageService()),
+      stateStore: EndpointStateStore(StorageService()),
       httpClient: _QueuedClient([
         http.Response('route client should not be used', 500),
       ]),
@@ -83,7 +83,7 @@ void main() {
   test('official test content maps through appApi proxy paths', () async {
     final client = _QueuedClient([http.Response('{"domains":[]}', 200)]);
     final routeClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(StorageService()),
+      stateStore: EndpointStateStore(StorageService()),
       httpClient: client,
     );
     final service = ContentApiService(
@@ -114,7 +114,7 @@ void main() {
         ),
       ]);
       final routeClient = EndpointFallbackClient(
-        stateStore: RouteStateStore(StorageService()),
+        stateStore: EndpointStateStore(StorageService()),
         httpClient: client,
       );
       final service = ContentApiService(

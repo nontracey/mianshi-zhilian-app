@@ -30,6 +30,7 @@ class StorageService {
     'custom_routes',
     'selected_route_id',
     'route_mode_disabled',
+    'learning_scope',
 
     'project_library',
     'project_dig_projects',

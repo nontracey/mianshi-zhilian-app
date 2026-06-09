@@ -35,7 +35,7 @@
 - `local_profile`：本地个人资料。
 - `settings`：主题、语言、练习偏好、语音模式等应用设置。
 - `disabled_domains`：首页隐藏的领域。
-- `custom_routes`、`selected_route_id`：自定义学习路线和当前选中路线。
+- `learning_scope`：当前学习范围（全领域/单领域/路线），替换旧的 `custom_routes` 和 `selected_route_id`（保留用于兼容迁移）。
 - `project_library`、`project_dig_projects`：项目库与项目深挖资料。
 - `ai_configs`：AI 配置元数据。
 - `answer_versions_*`：回答草稿、AI 修改版、面试版等版本记录。

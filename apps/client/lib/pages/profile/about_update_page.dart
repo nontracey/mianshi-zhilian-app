@@ -85,7 +85,7 @@ class AboutPanelState extends State<AboutPanel> {
   }
 
   Future<void> _loadSettings() async {
-    final store = RouteStateStore(StorageService());
+    final store = EndpointStateStore(StorageService());
     final mode = await store.loadDownloadSourceMode();
     if (mounted) {
       setState(() => _downloadSourceMode = mode);

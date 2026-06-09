@@ -123,22 +123,22 @@ class ContentApiService {
     final normalized = baseUrl.replaceAll(RegExp(r'/+$'), '');
     if (normalized == RouteResolver.contentPrimary ||
         normalized == RouteResolver.contentBackup) {
-      return _OfficialContentRoute(RouteService.content, path);
+      return _OfficialContentRoute(EndpointService.content, path);
     }
     if (normalized == '${RouteResolver.appApiPrimary}/content/production' ||
         normalized == '${RouteResolver.appApiBackup}/content/production') {
       return _OfficialContentRoute(
-        RouteService.appApi,
+        EndpointService.appApi,
         '/content/production$path',
       );
     }
     if (normalized == '${RouteResolver.appApiPrimary}/content/test' ||
         normalized == '${RouteResolver.appApiBackup}/content/test') {
-      return _OfficialContentRoute(RouteService.appApi, '/content/test$path');
+      return _OfficialContentRoute(EndpointService.appApi, '/content/test$path');
     }
     if (normalized == '${RouteResolver.appApiPrimary}/content/draft' ||
         normalized == '${RouteResolver.appApiBackup}/content/draft') {
-      return _OfficialContentRoute(RouteService.appApi, '/content/draft$path');
+      return _OfficialContentRoute(EndpointService.appApi, '/content/draft$path');
     }
     return null;
   }
@@ -147,6 +147,6 @@ class ContentApiService {
 class _OfficialContentRoute {
   const _OfficialContentRoute(this.service, this.path);
 
-  final RouteService service;
+  final EndpointService service;
   final String path;
 }

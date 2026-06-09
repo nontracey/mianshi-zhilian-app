@@ -172,7 +172,7 @@ class UpdateService {
   }) : _routeClient =
            routeClient ??
            EndpointFallbackClient(
-             stateStore: RouteStateStore(StorageService()),
+             stateStore: EndpointStateStore(StorageService()),
            );
 
   final String updateManifestUrl;
@@ -188,7 +188,7 @@ class UpdateService {
   Future<CheckUpdateResult> checkForUpdate(AppBuildInfo currentVersion) async {
     try {
       final response = await _routeClient.request(
-        RouteService.appApi,
+        EndpointService.appApi,
         'GET',
         '/update.json',
         timeout: const Duration(seconds: 15),
