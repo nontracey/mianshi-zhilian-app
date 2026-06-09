@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/models/domain.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -17,24 +18,14 @@ enum MasteryFilter { all, skilled, familiar, unfamiliar }
 class MasteryPage extends StatefulWidget {
   const MasteryPage({
     super.key,
-    required this.currentDomainId,
     required this.onDomainChanged,
     this.onStartTopicPractice,
     this.onStartPractice,
-    this.routeTopicIds,
-    this.routeDomainIds,
-    this.routeModeEnabled = false,
-    this.onRouteModeChanged,
   });
 
-  final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final ValueChanged<String>? onStartTopicPractice;
   final VoidCallback? onStartPractice;
-  final List<String>? routeTopicIds;
-  final List<String>? routeDomainIds;
-  final bool routeModeEnabled;
-  final VoidCallback? onRouteModeChanged;
 
   @override
   State<MasteryPage> createState() => _MasteryPageState();
@@ -47,36 +38,11 @@ class _MasteryPageState extends State<MasteryPage> {
   String? _diagnosticFilter; // null / 'longUnreviewed' / 'regressed'
   final _storage = StorageService();
   List<String> _disabledIds = [];
-  bool _routeScopeOnly = false;
-  List<String> _routeTopicIds = [];
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
-    _syncRouteState();
-  }
-
-  @override
-  void didUpdateWidget(MasteryPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.routeTopicIds != widget.routeTopicIds ||
-        oldWidget.routeModeEnabled != widget.routeModeEnabled) {
-      _syncRouteState();
-    }
-  }
-
-  void _syncRouteState() {
-    final ids = widget.routeTopicIds;
-    final enabled = widget.routeModeEnabled;
-    if (ids != null && ids.isNotEmpty && enabled) {
-      _routeTopicIds = ids;
-      _routeScopeOnly = true;
-    } else {
-      _routeTopicIds = [];
-      _routeScopeOnly = false;
-    }
-    if (mounted) setState(() {});
   }
 
   Future<void> _loadDisabled() async {
@@ -94,38 +60,26 @@ class _MasteryPageState extends State<MasteryPage> {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
+    final scope = context.watch<LearningScopeProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final currentDomainId = settingsProvider.settings.currentDomain;
     final allDomains = contentProvider.domains;
     final domains = _filterDomains(allDomains);
-    final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
+    final isCrossDomain = scope.isCrossDomain;
     final currentDomain = allDomains
-        .where((d) => d.id == widget.currentDomainId)
+        .where((d) => d.id == currentDomainId)
         .firstOrNull;
     if (currentDomain == null && !isCrossDomain) {
       return _buildDomainPrompt(context, contentProvider, domains, isDark);
     }
 
-    final domainTopics = contentProvider.getTopicsByDomain(
-      widget.currentDomainId,
-    );
-
-    // 路线范围过滤
-    List<Topic> scopedTopics;
-    if (_routeScopeOnly && isCrossDomain && _routeTopicIds.isNotEmpty) {
-      scopedTopics = _routeTopicIds
-          .map((id) => contentProvider.findTopic(id))
-          .whereType<Topic>()
-          .toList();
-    } else if (_routeScopeOnly) {
-      scopedTopics = domainTopics.where((t) => _getRouteTopicIds().contains(t.id)).toList();
-    } else {
-      scopedTopics = domainTopics;
-    }
-    final domainProgress = _routeScopeOnly
+    // 路线范围 topic 解析（通过 LearningScopeProvider 统一入口）
+    final scopedTopics = scope.resolveScopedTopics(contentProvider);
+    final domainProgress = scope.isRouteMode
         ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
         : progressProvider.getDomainProgress(
-            widget.currentDomainId,
+            currentDomainId,
             contentProvider.topics.values.toList(),
           );
     final masteryPercent = domainProgress.masteryPercent;
@@ -162,7 +116,7 @@ class _MasteryPageState extends State<MasteryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isCrossDomain && _routeScopeOnly)
+          if (isCrossDomain && scope.isRouteMode)
             _buildCrossDomainOverview(context, scopedTopics, progressProvider, domains, contentProvider, isDark)
           else
             _buildCompactHeader(
@@ -172,6 +126,7 @@ class _MasteryPageState extends State<MasteryPage> {
               domains,
               contentProvider,
               isDark,
+              currentDomainId,
             ),
           const SizedBox(height: 12),
 
@@ -201,13 +156,6 @@ class _MasteryPageState extends State<MasteryPage> {
                           l10n.get('temporary_no_data'),
                           style: TextStyle(color: Colors.grey.shade500),
                         ),
-                        if (_routeScopeOnly) ...[
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: () => setState(() => _routeScopeOnly = false),
-                            child: Text(l10n.get('all_topics')),
-                          ),
-                        ],
                       ],
                     ),
                   )
@@ -237,7 +185,8 @@ class _MasteryPageState extends State<MasteryPage> {
     bool isDark,
   ) {
     final l10n = context.watch<LocalizationProvider>();
-    final routeDomainIds = widget.routeDomainIds ?? [];
+    final scope = context.watch<LearningScopeProvider>();
+    final routeDomainIds = scope.scopeDomainIds;
 
     int mastered = 0;
     int learning = 0;
@@ -420,6 +369,7 @@ class _MasteryPageState extends State<MasteryPage> {
     List<Domain> domains,
     ContentProvider contentProvider,
     bool isDark,
+    String currentDomainId,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -444,7 +394,7 @@ class _MasteryPageState extends State<MasteryPage> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: widget.currentDomainId,
+                      value: currentDomainId,
                       isDense: true,
                       items: domains
                           .map(
@@ -508,7 +458,7 @@ class _MasteryPageState extends State<MasteryPage> {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: widget.currentDomainId,
+                    value: currentDomainId,
                     isDense: true,
                     isExpanded: true,
                     items: domains
@@ -706,29 +656,6 @@ Widget _buildDiagnosticCards(
             ),
           ),
         ),
-        if (_routeTopicIds.isNotEmpty) ...[
-          const SizedBox(width: 16),
-          GestureDetector(
-            onTap: () => setState(() => _routeScopeOnly = !_routeScopeOnly),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _routeScopeOnly
-                    ? Theme.of(context).colorScheme.primary
-                    : (isDark ? const Color(0xFF21262D) : const Color(0xFFF0F2F5)),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                _routeScopeOnly ? l10n.get('only_route') : l10n.get('all_topics'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _routeScopeOnly ? Colors.white : null,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
         const SizedBox(width: 16),
         // 排序
         _buildSortChip(l10n.get('low_high'), MasterySort.scoreAsc, isDark),
@@ -968,11 +895,6 @@ Widget _buildDiagnosticCards(
         );
     }
     return sorted;
-  }
-
-  /// 获取当前选中路线的知识点 ID 列表
-  List<String> _getRouteTopicIds() {
-    return _routeTopicIds;
   }
 
   static int _calcMasteryPercent(List<Topic> topics, ProgressProvider progress) {

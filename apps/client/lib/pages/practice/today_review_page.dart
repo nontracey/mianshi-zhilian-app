@@ -7,29 +7,21 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'recall_page.dart';
 import 'today_review_widgets.dart';
 
 class TodayReviewPage extends StatelessWidget {
-  const TodayReviewPage({
-    super.key,
-    required this.currentDomainId,
-    this.routeTopicIds,
-  });
-
-  final String currentDomainId;
-  final List<String>? routeTopicIds;
+  const TodayReviewPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
     final progress = context.watch<ProgressProvider>();
-    var topics = content.getTopicsByDomain(currentDomainId);
-    if (routeTopicIds != null) {
-      topics = topics.where((t) => routeTopicIds!.contains(t.id)).toList();
-    }
+    final scope = context.watch<LearningScopeProvider>();
+    final topics = scope.resolveScopedTopics(content);
     final dueTopics = progress.getTodayReviewTopics(topics);
     final lowScoreTopicIds = progress.lowScoreAttempts
         .map((a) => a.topicId)
@@ -81,7 +73,7 @@ class TodayReviewPage extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ── 路线范围提示 ──
-          if (routeTopicIds != null) ...[
+          if (scope.isRouteMode) ...[
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -344,10 +336,8 @@ class TodayReviewPage extends StatelessWidget {
   }
 
   void _startRecall(BuildContext context, List<Topic> topics) {
-    var topicIds = topics.map((t) => t.id).toList();
-    if (routeTopicIds != null) {
-      topicIds = topicIds.where((id) => routeTopicIds!.contains(id)).toList();
-    }
+    // topics 已经是 scope 解析后的结果，无需再次过滤
+    final topicIds = topics.map((t) => t.id).toList();
     if (topicIds.isEmpty) return;
     context.push(
       '/practice/recall',

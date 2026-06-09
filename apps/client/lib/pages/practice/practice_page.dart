@@ -11,38 +11,40 @@ import 'package:mianshi_zhilian/pages/practice/system_design_page.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/pages/practice/practice_widgets.dart';
 import 'package:mianshi_zhilian/pages/practice/high_frequency_sprint_page.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 
 class PracticePage extends StatelessWidget {
   const PracticePage({
     super.key,
-    required this.currentDomainId,
     required this.onDailyReview,
     required this.onRandomQuiz,
     required this.onMockInterview,
-    this.routeTopicIds,
-    this.routeModeEnabled = false,
   });
 
-  final String currentDomainId;
   final VoidCallback onDailyReview;
   final ValueChanged<String> onRandomQuiz;
   final VoidCallback onMockInterview;
-  final List<String>? routeTopicIds;
-  final bool routeModeEnabled;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final progressProvider = context.watch<ProgressProvider>();
-    final reviewCount = progressProvider.getReviewCount(currentDomainId);
     final contentProvider = context.watch<ContentProvider>();
+    final scope = context.watch<LearningScopeProvider>();
+    final settings = context.watch<SettingsProvider>();
     final domains = contentProvider.domains;
-    final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
+    // 使用统一范围解析：路线模式下跨域获取 topic，修复了原先只取当前域的 Bug
+    final scopedTopics = scope.resolveScopedTopics(contentProvider);
+    // 复习计数按范围内 topics 计算（修复原先仅按单域统计的 Bug）
+    final reviewCount = scope.isRouteMode
+        ? progressProvider.getTodayReviewTopics(scopedTopics).length
+        : progressProvider.getReviewCount(settings.settings.currentDomain);
 
-    // 还没有加载到任何知识点时显示空状态
-    if (domainTopics.isEmpty && contentProvider.isLoadingTopics) {
+    // 还没有加载到任何知识点时显示骨架
+    if (scopedTopics.isEmpty && contentProvider.isLoadingTopics) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
@@ -58,7 +60,8 @@ class PracticePage extends StatelessWidget {
       );
     }
 
-    if (domainTopics.isEmpty) {
+    if (scopedTopics.isEmpty) {
+      final currentDomainId = settings.settings.currentDomain;
       return EmptyPracticeState(
         onRetry: () => contentProvider.loadDomainTopics(currentDomainId),
       );
@@ -67,7 +70,7 @@ class PracticePage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        if (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ...[
+        if (scope.isRouteMode && scopedTopics.isNotEmpty) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -81,7 +84,7 @@ class PracticePage extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.getp('knowledge_points_in_route', {'count': routeTopicIds!.length}),
+                    l10n.getp('knowledge_points_in_route', {'count': scopedTopics.length}),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
                   ),
                 ),
@@ -213,7 +216,7 @@ LayoutBuilder(
                           'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
                         ),
                         color: AppColors.categoryPurple,
-                        onTap: () => _startFollowUpTraining(context, domainTopics),
+                        onTap: () => _startFollowUpTraining(context, scopedTopics),
                       ),
                     ),
                     SizedBox(
@@ -238,7 +241,7 @@ LayoutBuilder(
                         ),
                         color: AppColors.warning,
                         onTap: () =>
-                            _startHighFrequencyTraining(context, domainTopics),
+                            _startHighFrequencyTraining(context, scopedTopics),
                       ),
                     ),
                     SizedBox(
@@ -283,14 +286,8 @@ LayoutBuilder(
   }
 
   void _startFollowUpTraining(BuildContext context, List domainTopics) {
-    var scopedDomainTopics = domainTopics;
-    if (routeTopicIds != null) {
-      scopedDomainTopics = domainTopics
-          .where((t) => routeTopicIds!.contains(t.id))
-          .toList();
-    }
-    // 筛选有追问的知识点
-    final topicsWithFollowUps = scopedDomainTopics
+    // 筛选有追问的知识点（入参已经是 scope 解析后的 topics）
+    final topicsWithFollowUps = domainTopics
         .where((topic) => topic.followUps.isNotEmpty)
         .toList();
 
@@ -322,22 +319,13 @@ LayoutBuilder(
   void _startWeaknessTraining(BuildContext context) {
     context.push(
       '/practice/weakness-training',
-      extra: WeaknessTrainingPage(
-        currentDomainId: currentDomainId,
-        routeTopicIds: routeTopicIds,
-      ),
+      extra: const WeaknessTrainingPage(),
     );
   }
 
   void _startHighFrequencyTraining(BuildContext context, List domainTopics) {
-    var scopedDomainTopics = domainTopics;
-    if (routeTopicIds != null) {
-      scopedDomainTopics = domainTopics
-          .where((t) => routeTopicIds!.contains(t.id))
-          .toList();
-    }
-    // 筛选高频知识点
-    final highFrequencyTopics = scopedDomainTopics
+    // 筛选高频知识点（入参已经是 scope 解析后的 topics）
+    final highFrequencyTopics = domainTopics
         .where((topic) => topic.highFrequency)
         .toList();
 

@@ -10,6 +10,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 
 import 'topic_detail_panels.dart';
 
@@ -19,14 +20,12 @@ class TopicDetailPage extends StatefulWidget {
     required this.topic,
     required this.onBack,
     this.initialTabIndex = 0,
-    this.routeTopicIds,
     this.onRouteTopicTap,
   });
 
   final Topic topic;
   final VoidCallback onBack;
   final int initialTabIndex;
-  final List<String>? routeTopicIds;
   final ValueChanged<String>? onRouteTopicTap;
 
   @override
@@ -72,8 +71,13 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTopBar(context, topic, isDesktop),
-        if (widget.routeTopicIds != null && widget.routeTopicIds!.isNotEmpty)
-          _buildRouteNav(context),
+        Builder(builder: (ctx) {
+          final scope = ctx.watch<LearningScopeProvider>();
+          if (scope.isRouteMode && scope.scopeTopicIds.isNotEmpty) {
+            return _buildRouteNav(ctx, scope.scopeTopicIds);
+          }
+          return const SizedBox.shrink();
+        }),
         Expanded(
           child: isDesktop
               ? _buildDesktopLayout(context, topic)
@@ -164,11 +168,10 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     );
   }
 
-  Widget _buildRouteNav(BuildContext context) {
+  Widget _buildRouteNav(BuildContext context, List<String> ids) {
     final l10n = context.watch<LocalizationProvider>();
     final contentProvider = context.read<ContentProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ids = widget.routeTopicIds!;
     final currentIdx = ids.indexOf(widget.topic.id);
     if (currentIdx < 0) return const SizedBox.shrink();
     final hasPrev = currentIdx > 0;

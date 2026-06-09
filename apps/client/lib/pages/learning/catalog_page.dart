@@ -8,31 +8,21 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/models/learning_route.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
     super.key,
-    required this.currentDomainId,
     required this.onDomainChanged,
     required this.onTopicLearn,
     required this.onTopicPractice,
-    this.routeTopicIds,
-    this.routeDomainIds,
-    this.routePhases,
-    this.routeModeEnabled = false,
-    this.onRouteModeChanged,
   });
 
-  final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final ValueChanged<String> onTopicLearn;
   final ValueChanged<String> onTopicPractice;
-  final List<String>? routeTopicIds;
-  final List<String>? routeDomainIds;
-  final List<RoutePhase>? routePhases;
-  final bool routeModeEnabled;
-  final VoidCallback? onRouteModeChanged;
 
   @override
   State<CatalogPage> createState() => _CatalogPageState();
@@ -42,45 +32,12 @@ class _CatalogPageState extends State<CatalogPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   final _storage = StorageService();
   List<String> _disabledIds = [];
-  Set<String> _routeTopicIds = {};
-  bool _routeActive = false;
   bool _routeScopeOnly = true;
 
   @override
   void initState() {
     super.initState();
     _loadDisabled();
-    _syncRouteState();
-  }
-
-  @override
-  void didUpdateWidget(CatalogPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.routeTopicIds != widget.routeTopicIds ||
-        oldWidget.routeModeEnabled != widget.routeModeEnabled) {
-      _syncRouteState();
-    }
-  }
-
-  void _syncRouteState() {
-    final ids = widget.routeTopicIds;
-    final enabled = widget.routeModeEnabled;
-    if (ids != null && ids.isNotEmpty && enabled) {
-      final newSet = ids.toSet();
-      final changed = _routeTopicIds.length != newSet.length || !_routeTopicIds.containsAll(newSet);
-      setState(() {
-        _routeTopicIds = newSet;
-        _routeActive = true;
-        _routeScopeOnly = true;
-        if (changed) _crossDomainAllSelected = true;
-      });
-    } else {
-      setState(() {
-        _routeTopicIds = {};
-        _routeActive = false;
-        _routeScopeOnly = false;
-      });
-    }
   }
 
   Future<void> _loadDisabled() async {
@@ -184,9 +141,8 @@ class _CatalogPageState extends State<CatalogPage> {
       _hasLeetcodeOnly ||
       _statusFilters.isNotEmpty;
 
-  bool get isCrossDomainRouteMode =>
-      _routeActive && _routeScopeOnly &&
-      widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
+  bool _isCrossDomainRouteMode(LearningScopeProvider scope) =>
+      scope.isRouteMode && _routeScopeOnly && scope.isCrossDomain;
 
   void _clearFilters() {
     setState(() {
@@ -204,48 +160,51 @@ class _CatalogPageState extends State<CatalogPage> {
     final l10n = context.watch<LocalizationProvider>();
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
+    final scope = context.watch<LearningScopeProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentDomainId = settingsProvider.settings.currentDomain;
 
     final allDomains = contentProvider.domains;
     final domains = _filterDomains(allDomains);
     final currentDomain = allDomains
-        .where((d) => d.id == widget.currentDomainId)
+        .where((d) => d.id == currentDomainId)
         .firstOrNull;
+    final isCrossDomainRouteMode = _isCrossDomainRouteMode(scope);
     if (currentDomain == null && !isCrossDomainRouteMode) {
       return Center(child: Text(l10n.get('please_select_one_domain')));
     }
 
-    final domainTopicsRaw = contentProvider.getTopicsByDomain(
-      widget.currentDomainId,
-    );
-    final isRouteScoped = _routeActive && _routeScopeOnly;
-    final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
+    final isRouteScoped = scope.isRouteMode && _routeScopeOnly;
+    final isCrossDomain = scope.isCrossDomain;
+    final routeTopicIds = Set<String>.from(scope.scopeTopicIds);
 
     List<Topic> domainTopics;
-    if (isRouteScoped && isCrossDomain && _routeTopicIds.isNotEmpty) {
+    if (isRouteScoped && isCrossDomain && routeTopicIds.isNotEmpty) {
       if (_crossDomainAllSelected) {
-        domainTopics = _routeTopicIds
+        domainTopics = routeTopicIds
             .map((id) => contentProvider.findTopic(id))
             .whereType<Topic>()
             .toList();
       } else {
-        domainTopics = _routeTopicIds
+        domainTopics = routeTopicIds
             .map((id) => contentProvider.findTopic(id))
             .whereType<Topic>()
-            .where((t) => t.domainId == widget.currentDomainId)
+            .where((t) => t.domainId == currentDomainId)
             .toList();
       }
     } else if (isRouteScoped) {
-      domainTopics = domainTopicsRaw.where((t) => _routeTopicIds.contains(t.id)).toList();
+      final domainTopicsRaw = contentProvider.getTopicsByDomain(currentDomainId);
+      domainTopics = domainTopicsRaw.where((t) => routeTopicIds.contains(t.id)).toList();
     } else {
-      domainTopics = domainTopicsRaw;
+      domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
     }
 
     final routeProgressTopics = isRouteScoped ? domainTopics : contentProvider.topics.values.toList();
     final domainProgress = isRouteScoped && isCrossDomain
         ? (masteryPercent: _calcMasteryPercent(domainTopics, progressProvider), topicCount: domainTopics.length)
         : progressProvider.getDomainProgress(
-            widget.currentDomainId,
+            currentDomainId,
             routeProgressTopics,
           );
     final masteryPercent = domainProgress.masteryPercent;
@@ -272,7 +231,7 @@ class _CatalogPageState extends State<CatalogPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isCrossDomainRouteMode)
-            _buildCrossDomainHeader(context, domains, contentProvider, isDark, masteryPercent, totalTopics)
+            _buildCrossDomainHeader(context, domains, contentProvider, isDark, masteryPercent, totalTopics, scope, currentDomainId)
           else
             _buildCompactHeader(
               context,
@@ -282,11 +241,13 @@ class _CatalogPageState extends State<CatalogPage> {
               domains,
               contentProvider,
               isDark,
+              currentDomainId,
+              scope,
             ),
           const SizedBox(height: 12),
 
-          if (_routeActive) _buildRouteBanner(context, isDark),
-          if (_routeActive) const SizedBox(height: 12),
+          if (scope.isRouteMode) _buildRouteBanner(context, isDark, scope),
+          if (scope.isRouteMode) const SizedBox(height: 12),
 
           if (_showFilters) ...[
             _buildFilterBar(context, isDark),
@@ -297,16 +258,16 @@ Expanded(
             child: RefreshIndicator(
               onRefresh: () {
                 // 跨域路线模式下刷新所有路线领域
-                if (isCrossDomainRouteMode && widget.routeDomainIds != null) {
-                  return contentProvider.ensureTopicsLoaded(widget.routeDomainIds!);
+                if (isCrossDomainRouteMode && scope.scopeDomainIds.isNotEmpty) {
+                  return contentProvider.ensureTopicsLoaded(scope.scopeDomainIds);
                 }
-                return contentProvider.loadDomainTopics(widget.currentDomainId);
+                return contentProvider.loadDomainTopics(currentDomainId);
               },
               child: sortedTopics.isEmpty
                   ? _buildEmptyState(context)
-                  : (_routeActive &&
-                          widget.routePhases != null &&
-                          widget.routePhases!.isNotEmpty
+                  : (scope.isRouteMode &&
+                          scope.scopePhases != null &&
+                          scope.scopePhases!.isNotEmpty
                       ? _buildPhasedTopicList(
                           context,
                           currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
@@ -336,6 +297,8 @@ Expanded(
     List<Domain> domains,
     ContentProvider contentProvider,
     bool isDark,
+    String currentDomainId,
+    LearningScopeProvider scope,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -355,9 +318,9 @@ Expanded(
               children: [
                 Row(
                   children: [
-                    _buildDomainDropdown(domains, contentProvider),
+                    _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildSearchField()),
+                    Expanded(child: _buildSearchField(scope)),
                     const SizedBox(width: 8),
                     _buildFilterButton(),
                     const SizedBox(width: 4),
@@ -373,9 +336,9 @@ Expanded(
               children: [
                 Row(
                   children: [
-                    _buildDomainDropdown(domains, contentProvider),
+                    _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildSearchField()),
+                    Expanded(child: _buildSearchField(scope)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -434,9 +397,10 @@ Expanded(
     bool isDark,
     int masteryPercent,
     int totalTopics,
+    LearningScopeProvider scope,
+    String currentDomainId,
   ) {
-    final routeDomainIds = widget.routeDomainIds ?? [];
-    final routeDomains = domains.where((d) => routeDomainIds.contains(d.id)).toList();
+    final routeDomains = domains.where((d) => scope.scopeDomainIds.contains(d.id)).toList();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -452,7 +416,7 @@ Expanded(
         children: [
           Row(
             children: [
-              Expanded(child: _buildSearchField()),
+              Expanded(child: _buildSearchField(scope)),
               const SizedBox(width: 8),
               _buildFilterButton(),
               const SizedBox(width: 4),
@@ -476,7 +440,7 @@ Expanded(
                   padding: const EdgeInsets.only(right: 6),
                   child: _buildDomainTab(
                     label: d.title,
-                    selected: widget.currentDomainId == d.id,
+                    selected: currentDomainId == d.id,
                     onTap: () {
                       setState(() => _crossDomainAllSelected = false);
                       widget.onDomainChanged(d.id);
@@ -547,16 +511,17 @@ Expanded(
   Widget _buildDomainDropdown(
     List<Domain> domains,
     ContentProvider contentProvider,
+    LearningScopeProvider scope,
+    String currentDomainId,
   ) {
     // 路线模式下只显示路线中的领域
     var displayDomains = domains;
-    if (_routeActive && widget.routeModeEnabled && widget.routeDomainIds != null) {
-      final routeSet = widget.routeDomainIds!.toSet();
+    if (scope.isRouteMode && scope.isCrossDomain) {
+      final routeSet = scope.scopeDomainIds.toSet();
       displayDomains = domains.where((d) => routeSet.contains(d.id)).toList();
-      // 确保当前选中的领域始终在列表中
-      if (!routeSet.contains(widget.currentDomainId) &&
-          domains.any((d) => d.id == widget.currentDomainId)) {
-        displayDomains.add(domains.firstWhere((d) => d.id == widget.currentDomainId));
+      if (!routeSet.contains(currentDomainId) &&
+          domains.any((d) => d.id == currentDomainId)) {
+        displayDomains.add(domains.firstWhere((d) => d.id == currentDomainId));
       }
     }
     return ConstrainedBox(
@@ -569,7 +534,7 @@ Expanded(
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
-            value: widget.currentDomainId,
+            value: currentDomainId,
             isDense: true,
             isExpanded: true,
             selectedItemBuilder: (_) => displayDomains
@@ -615,12 +580,13 @@ Expanded(
     );
   }
 
-  Widget _buildSearchField() {
+  Widget _buildSearchField([LearningScopeProvider? scope]) {
+    final isCrossRoute = scope != null && _isCrossDomainRouteMode(scope);
     return SizedBox(
       height: 36,
       child: TextField(
         decoration: InputDecoration(
-          hintText: isCrossDomainRouteMode
+          hintText: isCrossRoute
               ? l10n.get('search_all_route_domains')
               : l10n.get('search_current_domain'),
           prefixIcon: const Icon(Icons.search, size: 18),
@@ -719,8 +685,7 @@ Expanded(
     );
   }
 
-Widget _buildRouteBanner(BuildContext context, bool isDark) {
-    final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
+Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvider scope) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -741,10 +706,10 @@ Widget _buildRouteBanner(BuildContext context, bool isDark) {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  isCrossDomain
+                  scope.isCrossDomain
                       ? l10n.getp('route_mode_cross_domain', {
-                          'domainCount': '${widget.routeDomainIds!.length}',
-                          'topicCount': '${_routeTopicIds.length}',
+                          'domainCount': '${scope.scopeDomainIds.length}',
+                          'topicCount': '${scope.scopeTopicIds.length}',
                         })
                       : l10n.get('route_mode'),
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
@@ -756,24 +721,14 @@ Widget _buildRouteBanner(BuildContext context, bool isDark) {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.onRouteModeChanged != null)
-                Switch(
-                  value: widget.routeModeEnabled,
-                  onChanged: (_) {
-                    _routeScopeOnly = true;
-                    widget.onRouteModeChanged?.call();
-                  },
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                )
-              else
-                Switch(
-                  value: _routeScopeOnly,
-                  onChanged: (v) => setState(() => _routeScopeOnly = v),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+              Switch(
+                value: _routeScopeOnly,
+                onChanged: (v) => setState(() => _routeScopeOnly = v),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               const SizedBox(width: 4),
               Text(
-                l10n.getp('knowledge_points_in_route', {'count': _routeTopicIds.length}),
+                l10n.getp('knowledge_points_in_route', {'count': scope.scopeTopicIds.length}),
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white54 : Colors.grey,
@@ -1037,9 +992,10 @@ Widget _buildRouteBanner(BuildContext context, bool isDark) {
     ProgressProvider progressProvider,
     bool isDark,
   ) {
-    final phases = widget.routePhases!;
+    final scopeProvider = context.read<LearningScopeProvider>();
+    final phases = scopeProvider.scopePhases!;
     final allTopics = context.read<ContentProvider>().topics;
-    final isCrossDomain = widget.routeDomainIds != null && widget.routeDomainIds!.length > 1;
+    final isCrossDomain = scopeProvider.isCrossDomain;
 
     List<RoutePhase> displayPhases;
     if (isCrossDomain && _routeScopeOnly) {
@@ -1379,14 +1335,15 @@ Widget _buildRouteBanner(BuildContext context, bool isDark) {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        if (isCrossDomainRouteMode)
-                          Builder(builder: (ctx) {
-                            final cp = ctx.read<ContentProvider>();
-                            final domainName = cp.domains
-                                .where((d) => d.id == topic.domainId)
-                                .firstOrNull?.title ?? topic.domainId;
-                            return _buildMiniTag(domainName, AppColors.accent, isDark);
-                          }),
+                        Builder(builder: (ctx) {
+                          final sp = ctx.read<LearningScopeProvider>();
+                          if (!_isCrossDomainRouteMode(sp)) return const SizedBox.shrink();
+                          final cp = ctx.read<ContentProvider>();
+                          final domainName = cp.domains
+                              .where((d) => d.id == topic.domainId)
+                              .firstOrNull?.title ?? topic.domainId;
+                          return _buildMiniTag(domainName, AppColors.accent, isDark);
+                        }),
                         if (difficultyLabel.isNotEmpty)
                           _buildMiniTag(
                             difficultyLabel,

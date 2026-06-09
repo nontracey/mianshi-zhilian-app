@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/services/analytics_service.dart';
 import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/pages/learning/dashboard_page.dart';
@@ -43,65 +44,11 @@ class _LearningShellState extends State<LearningShell> {
   int _selectedTopicInitialTab = 0;
   bool _isSidebarCollapsed = false;
   late AuthProvider _auth;
-  List<String>? _routeTopicIds;
-  List<String>? _routeDomainIds;
-  List<RoutePhase>? _routePhases;
-  bool _routeModeEnabled = true;
-  String? _activeRouteId;
   final _storage = StorageService();
 
   @override
   void initState() {
     super.initState();
-    _loadRouteTopicIds();
-  }
-
-  Future<void> _loadRouteTopicIds() async {
-    final routeId = await _storage.load('selected_route_id');
-    if (routeId == null || routeId == 'all') {
-      if (mounted) {
-        setState(() {
-          _routeTopicIds = null;
-          _routeDomainIds = null;
-          _activeRouteId = null;
-          _routeModeEnabled = false;
-        });
-      }
-      return;
-    }
-    final disabledFlag = await _storage.load('route_mode_disabled');
-    final customData = await _storage.loadJsonList('custom_routes');
-    for (final data in customData) {
-      final route = LearningRoute.fromJson(data);
-      if (route.id == routeId) {
-        final ids = route.allTopicIds;
-        if (mounted) {
-          setState(() {
-            _routeTopicIds = ids.isEmpty ? null : ids;
-            _routeDomainIds = route.domainIds;
-            _routePhases = route.phases;
-            _activeRouteId = routeId;
-            _routeModeEnabled = disabledFlag != '1';
-          });
-        }
-        if (mounted) {
-          try {
-            final content = context.read<ContentProvider>();
-            await content.ensureTopicsLoaded(route.domainIds);
-          } catch (_) {}
-        }
-        return;
-      }
-    }
-    if (mounted) {
-      setState(() {
-        _routeTopicIds = null;
-        _routeDomainIds = null;
-        _routePhases = null;
-        _activeRouteId = null;
-        _routeModeEnabled = false;
-      });
-    }
   }
 
   @override
@@ -259,7 +206,6 @@ class _LearningShellState extends State<LearningShell> {
           topic: topic,
           initialTabIndex: _selectedTopicInitialTab,
           onBack: () => setState(() => _selectedTopicId = null),
-          routeTopicIds: _routeModeEnabled ? _routeTopicIds : null,
           onRouteTopicTap: (topicId) => setState(() {
             _selectedTopicId = topicId;
             _selectedTopicInitialTab = 0;
@@ -280,14 +226,10 @@ class _LearningShellState extends State<LearningShell> {
   Widget _currentPage() {
     final content = context.read<ContentProvider>();
     final settings = context.read<SettingsProvider>();
+    final scope = context.read<LearningScopeProvider>();
 
     return switch (_section) {
       AppSection.dashboard => DashboardPage(
-        currentDomainId: settings.settings.currentDomain,
-        routeTopicIds: _routeTopicIds,
-        routeDomainIds: _routeDomainIds,
-        routeModeEnabled: _routeModeEnabled,
-        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) {
           settings.updateSettings(settings.settings.copyWith(currentDomain: id));
           if (content.getLoadedTopicCount(id) == 0) {
@@ -309,35 +251,14 @@ class _LearningShellState extends State<LearningShell> {
           setState(() => _section = AppSection.catalog);
         },
         onReview: () => _setSection(AppSection.practice),
-        onMockInterview: () {
-          final routeIds = _routeTopicIds;
-          List<String> topicIds;
-          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
-            topicIds = List.from(routeIds)..shuffle();
-          } else {
-            final domainTopics = content.getTopicsByDomain(
-              settings.settings.currentDomain,
-            );
-            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          }
-          context.push(
-            '/practice/mock-interview',
-            extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
-          );
-        },
+        onMockInterview: () => _startMockInterview(content, settings, scope),
         onPrepNavigation: () => _setSection(AppSection.prep),
         onNavigateToCatalog: () => _setSection(AppSection.catalog),
         onGenerateAiRoute: () => _generateAiRoute(),
         onRegenerateAiRoute: () => _generateAiRoute(forceRegenerate: true),
-        onRouteChanged: _loadRouteTopicIds,
+        onRouteChanged: null,
       ),
       AppSection.catalog => CatalogPage(
-        currentDomainId: settings.settings.currentDomain,
-        routeTopicIds: _routeTopicIds,
-        routeDomainIds: _routeDomainIds,
-        routePhases: _routePhases,
-        routeModeEnabled: _routeModeEnabled,
-        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) {
           settings.updateSettings(settings.settings.copyWith(currentDomain: id));
           if (content.getLoadedTopicCount(id) == 0) {
@@ -354,84 +275,36 @@ class _LearningShellState extends State<LearningShell> {
         }),
       ),
       AppSection.practice => PracticePage(
-        currentDomainId: settings.settings.currentDomain,
-        routeTopicIds: _routeTopicIds,
-        routeModeEnabled: _routeModeEnabled,
         onDailyReview: () {
-          context.push(
-            '/practice/today-review',
-            extra: TodayReviewPage(
-              currentDomainId: settings.settings.currentDomain,
-              routeTopicIds: _routeTopicIds,
-            ),
-          );
+          context.push('/practice/today-review', extra: const TodayReviewPage());
         },
         onRandomQuiz: (domainId) {
-          List<String> topicIds;
-          if (_routeTopicIds != null && _routeTopicIds!.isNotEmpty && _routeModeEnabled) {
-            final routeInDomain = _routeTopicIds!.where((id) {
+          final List<String> topicIds;
+          if (scope.isRouteMode && scope.scopeTopicIds.isNotEmpty) {
+            final routeInDomain = scope.scopeTopicIds.where((id) {
               final t = content.findTopic(id);
               return t != null && t.domainId == domainId;
             }).toList()..shuffle();
-            topicIds = routeInDomain.isNotEmpty ? routeInDomain : content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle();
+            topicIds = routeInDomain.isNotEmpty
+                ? routeInDomain
+                : (content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle());
           } else {
-            final domainTopics = content.getTopicsByDomain(domainId);
-            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
+            topicIds = content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle();
           }
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
           );
         },
-        onMockInterview: () {
-          final routeIds = _routeTopicIds;
-          List<String> topicIds;
-          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
-            topicIds = List.from(routeIds)..shuffle();
-          } else {
-            final domainTopics = content.getTopicsByDomain(
-              settings.settings.currentDomain,
-            );
-            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          }
-          context.push(
-            '/practice/mock-interview',
-            extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
-          );
-        },
+        onMockInterview: () => _startMockInterview(content, settings, scope),
       ),
       AppSection.prep => InterviewPrepPage(
-        currentDomainId: settings.settings.currentDomain,
-        routeTopicIds: _routeTopicIds,
-        routeDomainIds: _routeDomainIds,
-        routeModeEnabled: _routeModeEnabled,
-        onRouteModeChanged: _toggleRouteMode,
         onStartPractice: () => _setSection(AppSection.practice),
-        onStartMock: () {
-          final routeIds = _routeTopicIds;
-          List<String> topicIds;
-          if (routeIds != null && routeIds.isNotEmpty && _routeModeEnabled) {
-            topicIds = List.from(routeIds)..shuffle();
-          } else {
-            final domainTopics = content.getTopicsByDomain(
-              settings.settings.currentDomain,
-            );
-            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          }
-          context.push(
-            '/practice/mock-interview',
-            extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
-          );
-        },
+        onStartMock: () => _startMockInterview(content, settings, scope),
         onGenerateAiRoute: () => _generateAiRoute(),
         onNavigateToDashboard: () => _setSection(AppSection.dashboard),
       ),
       AppSection.mastery => MasteryPage(
-        currentDomainId: settings.settings.currentDomain,
-        routeTopicIds: _routeTopicIds,
-        routeDomainIds: _routeDomainIds,
-        routeModeEnabled: _routeModeEnabled,
-        onRouteModeChanged: _toggleRouteMode,
         onDomainChanged: (id) => settings.updateSettings(
           settings.settings.copyWith(currentDomain: id),
         ),
@@ -440,15 +313,9 @@ class _LearningShellState extends State<LearningShell> {
           _selectedTopicInitialTab = 1;
         }),
         onStartPractice: () {
-          List<String> topicIds;
-          if (_routeTopicIds != null && _routeTopicIds!.isNotEmpty && _routeModeEnabled) {
-            topicIds = List.from(_routeTopicIds!)..shuffle();
-          } else {
-            final domainTopics = content.getTopicsByDomain(
-              settings.settings.currentDomain,
-            );
-            topicIds = domainTopics.map((t) => t.id).toList()..shuffle();
-          }
+          final topicIds = scope.isRouteMode && scope.scopeTopicIds.isNotEmpty
+              ? (List<String>.from(scope.scopeTopicIds)..shuffle())
+              : (content.getTopicsByDomain(settings.settings.currentDomain).map((t) => t.id).toList()..shuffle());
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
@@ -459,21 +326,22 @@ class _LearningShellState extends State<LearningShell> {
     };
   }
 
+  void _startMockInterview(ContentProvider content, SettingsProvider settings, LearningScopeProvider scope) {
+    final topicIds = scope.isRouteMode && scope.scopeTopicIds.isNotEmpty
+        ? (List<String>.from(scope.scopeTopicIds)..shuffle())
+        : (content.getTopicsByDomain(settings.settings.currentDomain).map((t) => t.id).toList()..shuffle());
+    context.push(
+      '/practice/mock-interview',
+      extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
+    );
+  }
+
   void _setSection(AppSection value) {
     context.read<AnalyticsService>().recordSection(value.name);
-    if (value == AppSection.dashboard || value == AppSection.catalog) {
-      _loadRouteTopicIds();
-    }
     setState(() {
       _section = value;
       _selectedTopicId = null;
     });
-  }
-
-  void _toggleRouteMode() {
-    if (_activeRouteId == null) return;
-    setState(() => _routeModeEnabled = !_routeModeEnabled);
-    _storage.save('route_mode_disabled', _routeModeEnabled ? null : '1');
   }
 
   /// AI 路线生成/重新生成
@@ -555,17 +423,8 @@ class _LearningShellState extends State<LearningShell> {
         'custom_routes',
         existing.map((r) => r.toJson()).toList(),
       );
-      await _storage.save('selected_route_id', route.id);
-      await _storage.save('route_mode_disabled', null);
-
       if (mounted) {
-        setState(() {
-          _routeTopicIds = route.allTopicIds;
-          _routeDomainIds = route.domainIds;
-          _routePhases = route.phases;
-          _activeRouteId = route.id;
-          _routeModeEnabled = true;
-        });
+        await context.read<LearningScopeProvider>().setRoute(route.id);
         final l10n = context.read<LocalizationProvider>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

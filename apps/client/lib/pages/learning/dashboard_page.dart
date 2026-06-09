@@ -5,6 +5,7 @@ import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
@@ -14,17 +15,12 @@ import 'dashboard_dialogs.dart';
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,
-    required this.currentDomainId,
     required this.onDomainChanged,
     required this.onPractice,
     required this.onTopicTap,
     required this.onViewDomainCatalog,
     this.onReview,
     this.onMockInterview,
-    this.routeTopicIds,
-    this.routeDomainIds,
-    this.routeModeEnabled = false,
-    this.onRouteModeChanged,
     this.onPrepNavigation,
     this.onNavigateToCatalog,
     this.onGenerateAiRoute,
@@ -32,7 +28,6 @@ class DashboardPage extends StatelessWidget {
     this.onRouteChanged,
   });
 
-  final String currentDomainId;
   final ValueChanged<String> onDomainChanged;
   final VoidCallback onPractice;
   final ValueChanged<String> onTopicTap;
@@ -44,17 +39,15 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback? onGenerateAiRoute;
   final VoidCallback? onRegenerateAiRoute;
   final VoidCallback? onRouteChanged;
-  final List<String>? routeTopicIds;
-  final List<String>? routeDomainIds;
-  final bool routeModeEnabled;
-  final VoidCallback? onRouteModeChanged;
 
   @override
   Widget build(BuildContext context) {
     final contentProvider = context.watch<ContentProvider>();
     final progressProvider = context.watch<ProgressProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
+    final scope = context.watch<LearningScopeProvider>();
     final l10n = context.watch<LocalizationProvider>();
+    final currentDomainId = settingsProvider.settings.currentDomain;
 
     if (contentProvider.isLoading || contentProvider.isLoadingTopics) {
       return Padding(
@@ -111,35 +104,14 @@ class DashboardPage extends StatelessWidget {
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
+    final isCrossDomainRoute = scope.isCrossDomain;
+    final isRouteFocused = scope.isRouteMode;
 
-    final isCrossDomainRoute = routeModeEnabled &&
-        routeDomainIds != null &&
-        routeDomainIds!.length > 1 &&
-        routeTopicIds != null &&
-        routeTopicIds!.isNotEmpty;
-
-    final isRouteFocused = routeModeEnabled &&
-        routeTopicIds != null &&
-        routeTopicIds!.isNotEmpty;
-
-    List<Topic> scopedTopics;
-    if (isCrossDomainRoute) {
-      scopedTopics = routeTopicIds!
-          .map((id) => contentProvider.findTopic(id))
-          .whereType<Topic>()
-          .toList();
-    } else if (isRouteFocused && routeTopicIds != null) {
-      // 单域路线：从路线的 topicIds 中查找，不限制当前域
-      scopedTopics = routeTopicIds!
-          .map((id) => contentProvider.findTopic(id))
-          .whereType<Topic>()
-          .toList();
-    } else {
-      scopedTopics = domainTopics;
-    }
+    // 通过 LearningScopeProvider 统一解析 scopedTopics
+    var scopedTopics = scope.resolveScopedTopics(contentProvider);
 
     if (!contentProvider.isLoadingTopics && scopedTopics.isEmpty) {
-      // 路线模式下 scopedTopics 为空（topic ID 无法解析），回退到当前域
+      // 路线模式下 scopedTopics 为空（topic 尚未加载），回退当前域
       if (isRouteFocused && domainTopics.isNotEmpty) {
         scopedTopics = domainTopics;
       } else if (domainTopics.isEmpty) {
@@ -169,7 +141,7 @@ class DashboardPage extends StatelessWidget {
       }
     }
 
-    final domainProgress = isCrossDomainRoute || isRouteFocused
+    final domainProgress = isRouteFocused
         ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
         : progressProvider.getDomainProgress(
             currentDomainId,
@@ -181,7 +153,7 @@ class DashboardPage extends StatelessWidget {
 
     final recommendedTopics = progressProvider.getRecommendedTopics(
       isCrossDomainRoute ? null : currentDomainId,
-      isCrossDomainRoute || isRouteFocused ? scopedTopics : contentProvider.topics.values.toList(),
+      isRouteFocused ? scopedTopics : contentProvider.topics.values.toList(),
       settingsProvider.settings.recommendStrategy,
       lowScoreWeight: settingsProvider.settings.lowScoreWeight,
       overdueWeight: settingsProvider.settings.overdueWeight,
@@ -203,7 +175,7 @@ class DashboardPage extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          if (!isRouteFocused && plan.hasTarget)
+          if (!scope.isRouteMode && plan.hasTarget)
             _buildTargetBanner(context, plan),
           Expanded(
             child: LayoutBuilder(
@@ -225,9 +197,9 @@ class DashboardPage extends StatelessWidget {
                        child: LeftPanel(
                          dueTopics: dueTopics,
                          weakTopics: weakTopics,
-                         routeTopicIds: routeTopicIds,
-                         isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
-                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                         isRouteMode: scope.isRouteMode,
+                         routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
                          onStartLearning: onNavigateToCatalog,
                          onTopicTap: onTopicTap,
                          onReview: onReview,
@@ -250,8 +222,8 @@ class DashboardPage extends StatelessWidget {
                         topicCount: topicCount,
                         readiness: readiness,
                         streakDays: progressProvider.streakDays,
-                        routeModeEnabled: routeModeEnabled,
-                        onRouteModeChanged: onRouteModeChanged,
+                        routeModeEnabled: scope.isRouteMode,
+                        onRouteModeChanged: () { final s = context.read<LearningScopeProvider>(); if (s.isRouteMode) { s.setAllDomains(); } else if (s.customRoutes.isNotEmpty) { s.setRoute(s.customRoutes.last.id); } },
                         onDomainChanged: onDomainChanged,
                         onTopicTap: onTopicTap,
                         onViewDomainCatalog: onViewDomainCatalog,
@@ -284,7 +256,7 @@ class DashboardPage extends StatelessWidget {
                          onDomainChanged: onDomainChanged,
                          progressProvider: progressProvider,
                          contentProvider: contentProvider,
-                         routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
+                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
                        ),
                     ),
                   ),
@@ -301,9 +273,9 @@ class DashboardPage extends StatelessWidget {
                       child: LeftPanel(
                          dueTopics: dueTopics,
                          weakTopics: weakTopics,
-                         routeTopicIds: routeTopicIds,
-                         isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
-                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                         isRouteMode: scope.isRouteMode,
+                         routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
                          onStartLearning: onNavigateToCatalog,
                          onTopicTap: onTopicTap,
                          onReview: onReview,
@@ -326,8 +298,15 @@ class DashboardPage extends StatelessWidget {
                             topicCount: topicCount,
                             readiness: readiness,
                             streakDays: progressProvider.streakDays,
-                            routeModeEnabled: routeModeEnabled,
-                            onRouteModeChanged: onRouteModeChanged,
+                            routeModeEnabled: scope.isRouteMode,
+                            onRouteModeChanged: () {
+                              final s = context.read<LearningScopeProvider>();
+                              if (s.isRouteMode) {
+                                s.setAllDomains();
+                              } else if (s.customRoutes.isNotEmpty) {
+                                s.setRoute(s.customRoutes.last.id);
+                              }
+                            },
                             onDomainChanged: onDomainChanged,
                             onTopicTap: onTopicTap,
                             onViewDomainCatalog: onViewDomainCatalog,
@@ -353,7 +332,7 @@ class DashboardPage extends StatelessWidget {
                              onDomainChanged: onDomainChanged,
                              progressProvider: progressProvider,
                              contentProvider: contentProvider,
-                             routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
+                             routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
                            ),
                         ],
                       ),
@@ -369,9 +348,9 @@ class DashboardPage extends StatelessWidget {
                   LeftPanel(
                     dueTopics: dueTopics,
                     weakTopics: weakTopics,
-                    routeTopicIds: routeTopicIds,
-                    isRouteMode: routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty,
-                         routeFirstTopicId: routeTopicIds?.isNotEmpty == true ? routeTopicIds!.first : null,
+                    routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                    isRouteMode: scope.isRouteMode,
+                    routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
                          onStartLearning: onNavigateToCatalog,
                     onTopicTap: onTopicTap,
                     onReview: onReview,
@@ -387,8 +366,8 @@ class DashboardPage extends StatelessWidget {
                     topicCount: topicCount,
                     readiness: readiness,
                     streakDays: progressProvider.streakDays,
-                    routeModeEnabled: routeModeEnabled,
-                    onRouteModeChanged: onRouteModeChanged,
+                    routeModeEnabled: scope.isRouteMode,
+                    onRouteModeChanged: () { final s = context.read<LearningScopeProvider>(); if (s.isRouteMode) { s.setAllDomains(); } else if (s.customRoutes.isNotEmpty) { s.setRoute(s.customRoutes.last.id); } },
                     onDomainChanged: onDomainChanged,
                     onTopicTap: onTopicTap,
                     onViewDomainCatalog: onViewDomainCatalog,
@@ -414,7 +393,7 @@ class DashboardPage extends StatelessWidget {
                     onDomainChanged: onDomainChanged,
                     progressProvider: progressProvider,
                     contentProvider: contentProvider,
-                    routeTopicIds: (routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty) ? routeTopicIds : null,
+                    routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
                   ),
                 ],
               ),
