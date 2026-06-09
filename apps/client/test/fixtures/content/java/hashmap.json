@@ -1,0 +1,22 @@
+{
+  "id": "java.collections.hashmap",
+  "domain": "java",
+  "category": "java-collections",
+  "title": "HashMap 原理",
+  "difficulty": 2,
+  "interviewFrequency": "high",
+  "cards": [
+    {
+      "id": "card-1",
+      "title": "HashMap 数据结构",
+      "content": "数组 + 链表 + 红黑树，负载因子默认 0.75"
+    }
+  ],
+  "recallPrompts": [
+    {
+      "id": "rp-1",
+      "prompt": "描述 HashMap 的扩容机制",
+      "difficulty": 2
+    }
+  ]
+}

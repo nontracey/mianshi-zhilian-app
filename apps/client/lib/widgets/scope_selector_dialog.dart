@@ -6,6 +6,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
+import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 
 /// 学习范围选择对话框：一个列表展示「全部领域 / 各领域 / 各路线（含 AI 路线）」。
 class ScopeSelectorDialog extends StatelessWidget {
@@ -103,7 +104,7 @@ class ScopeSelectorDialog extends StatelessWidget {
                       isDark: isDark,
                       icon: Icons.book_outlined,
                       title: d.title,
-                      subtitle: '${d.topicCount} ${l10n.get('knowledge_points_count')}',
+                      subtitle: l10n.getp('knowledge_points_count', {'count': d.topicCount}),
                       isSelected: scope.isSingleDomain && scope.scope.domainId == d.id,
                       onTap: () {
                         scope.setSingleDomain(d.id);
@@ -135,6 +136,8 @@ class ScopeSelectorDialog extends StatelessWidget {
                         scope.setRoute(r.id);
                         Navigator.of(context).pop();
                       },
+                      onEdit: () => _showEditRoute(context, r, scope, content),
+                      onDelete: () => _confirmDelete(context, r, scope),
                     )),
                   ],
 
@@ -220,13 +223,15 @@ class ScopeSelectorDialog extends StatelessWidget {
     required LearningRoute route,
     required bool isSelected,
     required VoidCallback onTap,
+    VoidCallback? onEdit,
+    VoidCallback? onDelete,
   }) {
     final l10n = context.watch<LocalizationProvider>();
     final topicCount = route.allTopicIds.length;
     final domainCount = route.domainIds.length;
     final subtitle = domainCount > 1
-        ? '$domainCount ${l10n.get("domains")} · $topicCount ${l10n.get("knowledge_points_count")}'
-        : '$topicCount ${l10n.get("knowledge_points_count")}';
+        ? '$domainCount ${l10n.get("domains")} · ${l10n.getp("knowledge_points_count", {"count": topicCount})}'
+        : l10n.getp('knowledge_points_count', {'count': topicCount});
     final badgeLabel = route.source == 'ai' ? 'AI' : null;
 
     return Container(
@@ -274,13 +279,89 @@ class ScopeSelectorDialog extends StatelessWidget {
           ],
         ),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
-        trailing: isSelected
-            ? const Icon(Icons.check_circle, size: 18, color: AppColors.accent)
-            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              const Icon(Icons.check_circle, size: 18, color: AppColors.accent),
+            if (onEdit != null) ...[
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                  onPressed: onEdit,
+                  padding: EdgeInsets.zero,
+                  tooltip: l10n.get('edit_route'),
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+            ],
+            if (onDelete != null) ...[
+              const SizedBox(width: 2),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 15),
+                  onPressed: onDelete,
+                  padding: EdgeInsets.zero,
+                  tooltip: l10n.get('delete'),
+                  color: Colors.red.shade400,
+                ),
+              ),
+            ],
+          ],
+        ),
         dense: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         tileColor: isSelected ? AppColors.accent.withValues(alpha: 0.06) : null,
         onTap: onTap,
+      ),
+    );
+  }
+
+  void _showEditRoute(BuildContext context, LearningRoute route, LearningScopeProvider scope, ContentProvider content) {
+    final allDomains = content.domains
+        .map((d) => DomainItem(id: d.id, title: d.title))
+        .toList();
+    final existingNames = scope.customRoutes
+        .where((r) => r.id != route.id)
+        .map((r) => r.name)
+        .toList();
+    showDialog(
+      context: context,
+      builder: (_) => RouteEditorDialog(
+        availableDomains: allDomains,
+        existingRoute: route,
+        existingRouteNames: existingNames,
+        onSave: (updated) => scope.upsertRoute(updated),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, LearningRoute route, LearningScopeProvider scope) {
+    final l10n = context.read<LocalizationProvider>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('delete_route')),
+        content: Text(l10n.getp('delete_route_confirm', {'name': route.name})),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.get('cancel')),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              scope.deleteRoute(route.id);
+            },
+            child: Text(l10n.get('delete')),
+          ),
+        ],
       ),
     );
   }

@@ -240,6 +240,19 @@ class StorageService {
     await prefs.clear();
   }
 
+  /// 清除内容缓存与 AI 路线缓存（content_cache_* 和 route_cache_*），保留用户数据。
+  Future<int> clearCacheData() async {
+    final prefs = await _instance;
+    final keys = prefs.getKeys();
+    final cacheKeys = keys.where(
+      (k) => k.startsWith('content_cache_') || k.startsWith('route_cache_'),
+    ).toList();
+    for (final k in cacheKeys) {
+      await prefs.remove(k);
+    }
+    return cacheKeys.length;
+  }
+
   /// 仅清除学习/练习产生的数据，保留 AI 配置、同步配置、内容缓存和个人资料。
   Future<void> clearPracticeData() async {
     final prefs = await _instance;
@@ -750,10 +763,14 @@ class StorageService {
       return null;
     }
     if (key == 'local_profile' && value is Map<String, dynamic>) {
+      final stripped = {...value}
+        ..remove('email')
+        ..remove('emailBound')
+        ..remove('wechatBound');
       if (!syncSettings.syncPrivatePrepData) {
-        return {...value}..remove('avatarUrl');
+        stripped.remove('avatarUrl');
       }
-      return value;
+      return stripped;
     }
     return value;
   }

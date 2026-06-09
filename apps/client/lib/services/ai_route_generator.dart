@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:collection/collection.dart';
 import '../models/ai_config.dart';
@@ -68,23 +69,25 @@ class AiRouteGenerator {
   }
 
   Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService, AiConfig aiConfig) async {
+    final validIds = _allDomains.map((d) => d.id).toSet();
     final domainList = _allDomains.map((d) =>
-        '${d.id}: ${d.title}（${d.categories.map((c) => c.title).join('、')}）').join('\n');
+        '"${d.id}": ${d.title}（${d.categories.map((c) => c.title).join('、')}）').join('\n');
 
     final prompt = '''
 用户目标：${plan.targetRole} / ${plan.techStack}
 ${plan.jobDescription.isNotEmpty ? 'JD概要：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
 
-可选领域：
+可选领域（只能从下列 ID 中选择，不要发明新 ID）：
 $domainList
 
-请按以下要求选择领域：
+要求：
 1. 选出与用户目标相关的领域，按相关度从高到低排序
-2. 包含用户目标所需的"前置知识"领域（如Agent开发需要Python/Java基础）
+2. 包含用户目标所需的前置知识领域（如 Agent 开发需要 java 或 python 基础）
 3. 不相关的领域不要包含
+4. 只能使用上面列出的领域 ID，严禁输出上面没有的 ID
 
-返回 JSON 数组，每个元素包含领域ID和理由。只输出JSON。
-示例格式：["java", "architecture", "agent"]
+只输出一个 JSON 字符串数组，不要任何其他文字。
+示例：["java", "architecture", "agent"]
 ''';
 
     try {
@@ -92,8 +95,11 @@ $domainList
       final start = response.indexOf('[');
       final end = response.lastIndexOf(']');
       if (start != -1 && end > start) {
-        return (json.decode(response.substring(start, end + 1)) as List)
+        final raw = (json.decode(response.substring(start, end + 1)) as List)
             .cast<String>();
+        // 白名单过滤，确保返回的 ID 都合法
+        final filtered = raw.where(validIds.contains).toList();
+        if (filtered.isNotEmpty) return filtered;
       }
     } catch (e) {
       debugPrint('AI domain selection failed: $e');
@@ -235,8 +241,9 @@ $topicLines
       }
     }
 
+    final sig = _stableHash('${plan.targetRole}_${plan.techStack}_${plan.jobDescription}_${plan.interviewDate?.toIso8601String() ?? ''}');
     return LearningRoute(
-      id: 'ai_${now.millisecondsSinceEpoch}',
+      id: 'ai_$sig',
       name: plan.targetRole.isNotEmpty ? '${plan.targetRole} 备考路线' : 'AI 个性化路线',
       description: plan.techStack.isNotEmpty ? '目标：${plan.techStack}' : '',
       domainIds: domainIds,
@@ -244,6 +251,7 @@ $topicLines
       source: 'ai',
       createdAt: now,
       updatedAt: now,
+      planSignature: sig,
     );
   }
   LearningRoute _generateFallbackRoute(
@@ -276,8 +284,8 @@ $topicLines
   }
 
   String _cacheKey(PrepPlan plan, {String? contentVersion}) =>
-    'route_cache_${_hashString('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String()}_${contentVersion ?? ''}')}';
+    'route_cache_${_stableHash('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String() ?? ''}_${contentVersion ?? ''}')}';
 
-  String _hashString(String input) =>
-    input.hashCode.toString();
+  static String _stableHash(String input) =>
+    sha256.convert(utf8.encode(input)).toString().substring(0, 16);
 }

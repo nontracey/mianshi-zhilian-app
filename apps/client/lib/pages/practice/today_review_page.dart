@@ -88,7 +88,7 @@ class TodayReviewPage extends StatelessWidget {
                   Icon(Icons.route_outlined, size: 16, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Text(
-                    '${l10n.get('route_scope')}: ${uniqueQueue.length} ${l10n.get('knowledge_points_count')}',
+                    '${l10n.get('route_scope')}: ${l10n.getp('knowledge_points_count', {'count': uniqueQueue.length})}',
                     style: TextStyle(fontSize: 12, color: AppColors.accent),
                   ),
                 ],

@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
+import 'package:mianshi_zhilian/widgets/scope_selector_dialog.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
@@ -319,6 +320,8 @@ Expanded(
                 Row(
                   children: [
                     _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
+                    const SizedBox(width: 8),
+                    ScopeSelectorChip(),
                     const SizedBox(width: 12),
                     Expanded(child: _buildSearchField(scope)),
                     const SizedBox(width: 8),
@@ -337,7 +340,9 @@ Expanded(
                 Row(
                   children: [
                     _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    ScopeSelectorChip(),
+                    const SizedBox(width: 8),
                     Expanded(child: _buildSearchField(scope)),
                   ],
                 ),

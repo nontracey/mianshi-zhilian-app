@@ -623,11 +623,6 @@ class CenterPanelState extends State<CenterPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 单一范围选择器芯片
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: ScopeSelectorChip(onGenerateAiRoute: widget.onGenerateAiRoute),
-        ),
         // 当前学习范围内容（路线/领域列表）
         PanelCard(
           title: route != null ? route.name : l10n.get('current_study_route'),

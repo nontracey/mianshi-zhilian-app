@@ -468,7 +468,10 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       if (lastResponse != null &&
           (lastResponse.statusCode == 401 || lastResponse.statusCode == 403)) {
-        await _clearSavedUser();
+        // 宽限期竞态保护：若 access token 仍可用，保持登录态等待下次重试
+        if (!_isTokenStillUsable(_token)) {
+          await _clearSavedUser();
+        }
       }
     }
   }

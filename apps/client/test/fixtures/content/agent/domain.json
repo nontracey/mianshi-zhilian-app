@@ -1,0 +1,29 @@
+{
+  "id": "agent",
+  "title": "AI Agent 开发",
+  "description": "AI Agent 与工具链",
+  "icon": "agent",
+  "categories": [
+    {
+      "id": "agent-core",
+      "title": "Agent 核心概念",
+      "description": "Reasoning、Memory、Tool Use",
+      "topics": ["agent/core/intro.json", "agent/core/tool-use.json"]
+    }
+  ],
+  "learningPaths": [
+    {
+      "id": "lp-agent-core",
+      "title": "Agent 入门路径",
+      "steps": [
+        {
+          "title": "Agent 基础",
+          "description": "理解 Agent 架构与工具调用",
+          "categoryIds": ["agent-core"],
+          "prerequisiteSteps": [],
+          "estimatedHours": 6
+        }
+      ]
+    }
+  ]
+}

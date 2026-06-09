@@ -1,0 +1,22 @@
+{
+  "id": "java.jvm.memory-model",
+  "domain": "java",
+  "category": "java-jvm",
+  "title": "JVM 内存模型",
+  "difficulty": 2,
+  "interviewFrequency": "high",
+  "cards": [
+    {
+      "id": "card-1",
+      "title": "JVM 内存分区",
+      "content": "堆、栈、方法区、程序计数器、本地方法栈"
+    }
+  ],
+  "recallPrompts": [
+    {
+      "id": "rp-1",
+      "prompt": "描述 JVM 内存分区及各区用途",
+      "difficulty": 2
+    }
+  ]
+}

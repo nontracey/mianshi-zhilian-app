@@ -1,0 +1,22 @@
+{
+  "id": "agent.core.intro",
+  "domain": "agent",
+  "category": "agent-core",
+  "title": "AI Agent 概述",
+  "difficulty": 1,
+  "interviewFrequency": "medium",
+  "cards": [
+    {
+      "id": "card-1",
+      "title": "什么是 AI Agent",
+      "content": "能感知环境、制定计划并执行动作的自主 AI 系统"
+    }
+  ],
+  "recallPrompts": [
+    {
+      "id": "rp-1",
+      "prompt": "说明 AI Agent 与普通 LLM 调用的核心区别",
+      "difficulty": 1
+    }
+  ]
+}
