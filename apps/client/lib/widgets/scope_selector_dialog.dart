@@ -80,7 +80,7 @@ class ScopeSelectorDialog extends StatelessWidget {
                     subtitle: '${domains.length} ${l10n.get('domains')}',
                     isSelected: scope.isAllDomains,
                     onTap: () {
-                      scope.setAllDomains();
+                      scope.setAllDomains(contentProvider: content);
                       Navigator.of(context).pop();
                     },
                   ),
@@ -107,7 +107,7 @@ class ScopeSelectorDialog extends StatelessWidget {
                       subtitle: l10n.getp('knowledge_points_count', {'count': d.topicCount}),
                       isSelected: scope.isSingleDomain && scope.scope.domainId == d.id,
                       onTap: () {
-                        scope.setSingleDomain(d.id);
+                        scope.setSingleDomain(d.id, contentProvider: content);
                         Navigator.of(context).pop();
                       },
                     )),
@@ -133,7 +133,7 @@ class ScopeSelectorDialog extends StatelessWidget {
                       route: r,
                       isSelected: scope.isRouteMode && scope.scope.routeId == r.id,
                       onTap: () {
-                        scope.setRoute(r.id);
+                        scope.setRoute(r.id, contentProvider: content);
                         Navigator.of(context).pop();
                       },
                       onEdit: () => _showEditRoute(context, r, scope, content),

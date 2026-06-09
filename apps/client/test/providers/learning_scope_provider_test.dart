@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 
 class _FakeStorage implements StorageService {
   final Map<String, dynamic> _data = {};
+  int clearRouteCachesCallCount = 0;
 
   _FakeStorage({Map<String, dynamic>? seed}) {
     if (seed != null) _data.addAll(seed);
@@ -31,6 +32,16 @@ class _FakeStorage implements StorageService {
     final raw = _data['custom_routes'];
     if (raw == null) return [];
     return (raw as List).cast<Map<String, dynamic>>();
+  }
+
+  @override
+  Future<int> clearRouteCaches() async {
+    clearRouteCachesCallCount++;
+    final keys = _data.keys.where((k) => k.startsWith('route_cache_')).toList();
+    for (final k in keys) {
+      _data.remove(k);
+    }
+    return keys.length;
   }
 
   // ignore: avoid_implementing_value_types, override_on_non_overriding_member
@@ -280,6 +291,48 @@ void main() {
       await p.deleteRoute('other');
       expect(p.scope, LearningScope.route('active'));
       expect(p.customRoutes.length, 1);
+    });
+
+    test('deleteRoute AI route clears independent route cache', () async {
+      final aiRoute = LearningRoute(
+        id: 'ai-1',
+        name: 'AI Route',
+        domainIds: ['java'],
+        source: 'ai',
+        createdAt: DateTime(2025),
+        updatedAt: DateTime(2025),
+        planSignature: 'sig-1',
+      );
+      final storage = _FakeStorage(seed: {
+        'custom_routes': [aiRoute.toJson()],
+        'route_cache_abc123': {'some': 'cached data'},
+        'some_other_key': 'should survive',
+      });
+      final p = LearningScopeProvider(storage);
+      await p.load();
+      await p.deleteRoute('ai-1');
+      // 验证缓存清除被调用，且 route_cache_* 被移除
+      expect(storage.clearRouteCachesCallCount, 1);
+      final remaining = await storage.load('route_cache_abc123');
+      expect(remaining, isNull);
+      // 验证其他键不受影响
+      final other = await storage.load('some_other_key');
+      expect(other, 'should survive');
+      // 验证路线本身也被删除
+      expect(p.customRoutes, isEmpty);
+    });
+
+    test('deleteRoute custom route does not clear route caches', () async {
+      final customRoute = _route(id: 'custom-1');
+      final storage = _FakeStorage(seed: {
+        'custom_routes': [customRoute.toJson()],
+        'route_cache_xyz': {'cached': 'value'},
+      });
+      final p = LearningScopeProvider(storage);
+      await p.load();
+      await p.deleteRoute('custom-1');
+      // 非 AI 路线不清除缓存
+      expect(storage.clearRouteCachesCallCount, 0);
     });
   });
 

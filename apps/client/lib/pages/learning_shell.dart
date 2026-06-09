@@ -248,7 +248,7 @@ class _LearningShellState extends State<LearningShell> {
             content.loadDomainTopics(domainId);
           }
           // 点领域卡片 = 切到单领域范围（退出路线裁剪），再跳目录
-          scope.setSingleDomain(domainId);
+          scope.setSingleDomain(domainId, contentProvider: content);
           setState(() => _section = AppSection.catalog);
         },
         onReview: () => _setSection(AppSection.practice),
@@ -420,7 +420,7 @@ class _LearningShellState extends State<LearningShell> {
       // 通过 LearningScopeProvider 保存并去重（同 planSignature 的旧 AI 路线会被替换）
       if (mounted) {
         final scopeProvider = context.read<LearningScopeProvider>();
-        await scopeProvider.upsertRoute(route, activate: true);
+        await scopeProvider.upsertRoute(route, activate: true, contentProvider: content);
         // 记录生成时的 plan 签名，以便后续检测目标是否变更
         scopeProvider.notifyPlanChanged(plan.signature);
         scopeProvider.clearRouteStale();

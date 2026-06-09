@@ -109,10 +109,9 @@ class DashboardPage extends StatelessWidget {
     var scopedTopics = scope.resolveScopedTopics(contentProvider);
 
     if (!contentProvider.isLoadingTopics && scopedTopics.isEmpty) {
-      // 路线模式下 scopedTopics 为空（topic 尚未加载），回退当前域
-      if (isRouteFocused && domainTopics.isNotEmpty) {
+      if (domainTopics.isNotEmpty) {
         scopedTopics = domainTopics;
-      } else if (domainTopics.isEmpty) {
+      } else {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -258,8 +257,8 @@ class DashboardPage extends StatelessWidget {
                          onTopicTap: onTopicTap,
                          onDomainChanged: onDomainChanged,
                          progressProvider: progressProvider,
-                         contentProvider: contentProvider,
-                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                         scopedTopics: scopedTopics,
+                         isRouteMode: scope.isRouteMode,
                        ),
                     ),
                   ),
@@ -324,8 +323,8 @@ class DashboardPage extends StatelessWidget {
                              onTopicTap: onTopicTap,
                              onDomainChanged: onDomainChanged,
                              progressProvider: progressProvider,
-                             contentProvider: contentProvider,
-                             routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                             scopedTopics: scopedTopics,
+                             isRouteMode: scope.isRouteMode,
                            ),
                         ],
                       ),
@@ -382,8 +381,8 @@ class DashboardPage extends StatelessWidget {
                     onTopicTap: onTopicTap,
                     onDomainChanged: onDomainChanged,
                     progressProvider: progressProvider,
-                    contentProvider: contentProvider,
-                    routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
+                    scopedTopics: scopedTopics,
+                    isRouteMode: scope.isRouteMode,
                   ),
                 ],
               ),

@@ -253,6 +253,19 @@ class StorageService {
     return cacheKeys.length;
   }
 
+  /// 清除 AI 路线缓存（route_cache_*），保留内容缓存和其他用户数据。
+  ///
+  /// 删除 AI 路线后调用，避免独立缓存在用户重新生成时返回已删除的旧路线。
+  Future<int> clearRouteCaches() async {
+    final prefs = await _instance;
+    final keys = prefs.getKeys();
+    final routeKeys = keys.where((k) => k.startsWith('route_cache_')).toList();
+    for (final k in routeKeys) {
+      await prefs.remove(k);
+    }
+    return routeKeys.length;
+  }
+
   /// 仅清除学习/练习产生的数据，保留 AI 配置、同步配置、内容缓存和个人资料。
   Future<void> clearPracticeData() async {
     final prefs = await _instance;

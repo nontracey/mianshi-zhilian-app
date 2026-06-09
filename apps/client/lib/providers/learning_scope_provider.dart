@@ -42,6 +42,8 @@ class _LearningScopeStore {
     await _storage.saveCustomRoutes(routes.map((r) => r.toJson()).toList());
   }
 
+  Future<int> clearRouteCaches() => _storage.clearRouteCaches();
+
   /// 从旧键迁移到新 scope 键（幂等）。
   /// 返回迁移出来的 scope（若旧键存在），否则返回 null。
   Future<LearningScope?> migrateFromLegacy(String? fallbackDomainId) async {
@@ -209,23 +211,28 @@ class LearningScopeProvider extends ChangeNotifier {
 
   // ── 状态变更 ──────────────────────────────────────────────────────
 
-  Future<void> setScope(LearningScope scope) async {
+  Future<void> setScope(LearningScope scope, {ContentProvider? contentProvider}) async {
     _scope = scope;
     await _store.saveScope(scope);
     notifyListeners();
+    // 路线模式切换时自动预加载所有涉及领域的 topics
+    if (scope.isRouteMode && contentProvider != null) {
+      await ensureScopeLoaded(contentProvider);
+    }
   }
 
-  Future<void> setSingleDomain(String domainId) =>
-      setScope(LearningScope.singleDomain(domainId));
+  Future<void> setSingleDomain(String domainId, {ContentProvider? contentProvider}) =>
+      setScope(LearningScope.singleDomain(domainId), contentProvider: contentProvider);
 
-  Future<void> setAllDomains() => setScope(const LearningScope.allDomains());
+  Future<void> setAllDomains({ContentProvider? contentProvider}) =>
+      setScope(const LearningScope.allDomains(), contentProvider: contentProvider);
 
-  Future<void> setRoute(String routeId) =>
-      setScope(LearningScope.route(routeId));
+  Future<void> setRoute(String routeId, {ContentProvider? contentProvider}) =>
+      setScope(LearningScope.route(routeId), contentProvider: contentProvider);
 
   /// 添加或更新路线，并可选择立即切换到该路线。
   /// AI 路线额外按 planSignature 去重，避免重复生成累积旧路线。
-  Future<void> upsertRoute(LearningRoute route, {bool activate = false}) async {
+  Future<void> upsertRoute(LearningRoute route, {bool activate = false, ContentProvider? contentProvider}) async {
     var routes = List<LearningRoute>.from(_customRoutes);
     // AI 路线：先移除同 planSignature 的旧条目（不同 id 但相同目标）
     if (route.source == 'ai' && route.planSignature != null) {
@@ -242,7 +249,7 @@ class LearningScopeProvider extends ChangeNotifier {
     _customRoutes = routes;
     await _store.saveCustomRoutes(_customRoutes);
     if (activate) {
-      await setRoute(route.id);
+      await setRoute(route.id, contentProvider: contentProvider);
     } else {
       notifyListeners();
     }
@@ -250,8 +257,13 @@ class LearningScopeProvider extends ChangeNotifier {
 
   /// 删除路线；若当前正在使用该路线则自动退回全部领域。
   Future<void> deleteRoute(String routeId) async {
+    final deleted = _customRoutes.where((r) => r.id == routeId).toList();
     _customRoutes = _customRoutes.where((r) => r.id != routeId).toList();
     await _store.saveCustomRoutes(_customRoutes);
+    // AI 路线删除时同步清除 AiRouteGenerator 独立缓存，避免重新生成时返回已删除的旧路线
+    if (deleted.any((r) => r.source == 'ai')) {
+      await _store.clearRouteCaches();
+    }
     if (_scope.isRouteMode && _scope.routeId == routeId) {
       await setScope(const LearningScope.allDomains());
     } else {

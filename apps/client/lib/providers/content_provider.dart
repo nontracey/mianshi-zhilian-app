@@ -123,9 +123,16 @@ class ContentProvider extends ChangeNotifier {
         // 5. 从缓存加载 topics
         final cached = await _storage.load(_cacheKey('topics_cache'));
         if (cached != null && cached is Map<String, dynamic>) {
-          _topics = cached.map(
+          final loaded = cached.map(
             (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
           );
+          _topics = <String, Topic>{};
+          for (final entry in loaded.entries) {
+            _topics[entry.key] = entry.value;
+            if (entry.value.id.isNotEmpty && entry.value.id != entry.key) {
+              _topics[entry.value.id] ??= entry.value;
+            }
+          }
           await _pruneCachedTopics();
         }
       }
@@ -233,7 +240,12 @@ class ContentProvider extends ChangeNotifier {
         final cachedTopics = cachedDomain.map(
           (k, v) => MapEntry(k, Topic.fromJson(v as Map<String, dynamic>)),
         );
-        _topics.addAll(cachedTopics);
+        for (final entry in cachedTopics.entries) {
+          _topics[entry.key] = entry.value;
+          if (entry.value.id.isNotEmpty && entry.value.id != entry.key) {
+            _topics[entry.value.id] ??= entry.value;
+          }
+        }
         _isLoadingTopics = false;
         notifyListeners();
         return;
@@ -276,7 +288,11 @@ class ContentProvider extends ChangeNotifier {
         for (final result in results) {
           final topic = result.topic;
           if (topic != null) {
-            _topics[ContentApiService.cacheKeyForTopicRef(result.path)] = topic;
+            final cacheKey = ContentApiService.cacheKeyForTopicRef(result.path);
+            _topics[cacheKey] = topic;
+            if (topic.id.isNotEmpty && topic.id != cacheKey) {
+              _topics[topic.id] ??= topic;
+            }
             continue;
           }
           _topicLoadFailures.add(result.path);

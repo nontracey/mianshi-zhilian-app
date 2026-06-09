@@ -907,10 +907,9 @@ class CenterPanelState extends State<CenterPanel> {
     final phases = route.phases ?? [];
     final byDomain = <String, List<RoutePhase>>{};
     for (final p in phases) {
+      final firstTopic = p.topicIds.isNotEmpty ? allTopics[p.topicIds.first] : null;
       final did = p.domainId ??
-          (p.topicIds.isNotEmpty
-              ? (allTopics[p.topicIds.first]?.domainId ?? route.domainIds.firstOrNull ?? '')
-              : (route.domainIds.firstOrNull ?? ''));
+          (firstTopic?.domainId ?? route.domainIds.firstOrNull ?? '');
       byDomain.putIfAbsent(did, () => []).add(p);
     }
 
@@ -995,8 +994,9 @@ class CenterPanelState extends State<CenterPanel> {
             },
             onPractice: inProgress
                 ? () {
+                    final firstTopic = pids.isNotEmpty ? allTopics[pids.first] : null;
                     widget.onDomainChanged(
-                      allTopics[pids.first]?.domainId ?? route.domainIds.firstOrNull ?? '',
+                      firstTopic?.domainId ?? route.domainIds.firstOrNull ?? '',
                     );
                     widget.onPractice();
                   }
@@ -1064,7 +1064,7 @@ class CenterPanelState extends State<CenterPanel> {
         existingRoute: route,
         existingRouteNames: allRouteNames,
         onSave: (updatedRoute) async {
-          await scope.upsertRoute(updatedRoute, activate: true);
+          await scope.upsertRoute(updatedRoute, activate: true, contentProvider: widget.contentProvider);
         },
       ),
     );
@@ -1085,8 +1085,8 @@ class RightPanel extends StatelessWidget {
     required this.onTopicTap,
     required this.onDomainChanged,
     required this.progressProvider,
-    required this.contentProvider,
-    this.routeTopicIds,
+    required this.scopedTopics,
+    this.isRouteMode = false,
   });
 
   final String currentDomainId;
@@ -1098,19 +1098,12 @@ class RightPanel extends StatelessWidget {
   final ValueChanged<String> onTopicTap;
   final ValueChanged<String> onDomainChanged;
   final ProgressProvider progressProvider;
-  final ContentProvider contentProvider;
-  final List<String>? routeTopicIds;
+  final List<Topic> scopedTopics;
+  final bool isRouteMode;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-
-    final scopedTopics = routeTopicIds != null && routeTopicIds!.isNotEmpty
-        ? routeTopicIds!
-            .map((id) => contentProvider.findTopic(id))
-            .whereType<Topic>()
-            .toList()
-        : contentProvider.getTopicsByDomain(currentDomainId);
 
     final categoryMap = <String, List<Topic>>{};
     for (final topic in scopedTopics) {
@@ -1163,7 +1156,7 @@ class RightPanel extends StatelessWidget {
         PanelCard(
           title: l10n.get('mastery_overview_browse'),
           icon: Icons.pie_chart_outline,
-          headerTrailing: routeTopicIds != null && routeTopicIds!.isNotEmpty
+          headerTrailing: isRouteMode
               ? null
               : DomainDropdown(
                   currentDomainId: currentDomainId,
