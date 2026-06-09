@@ -77,7 +77,7 @@ void main() async {
 
   final storage = StorageService();
   final routeClient = EndpointFallbackClient(
-    stateStore: RouteStateStore(storage),
+    stateStore: EndpointStateStore(storage),
   );
   // 先加载已保存的设置，获取正确的 contentBaseUrl
   final savedSettings = await storage.loadSettings();

@@ -119,7 +119,7 @@ void main() {
 ''', 200),
     ]);
     final routeClient = EndpointFallbackClient(
-      stateStore: RouteStateStore(StorageService()),
+      stateStore: EndpointStateStore(StorageService()),
       httpClient: client,
     );
     final service = UpdateService(routeClient: routeClient);

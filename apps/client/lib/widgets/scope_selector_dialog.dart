@@ -297,7 +297,6 @@ class ScopeSelectorChip extends StatelessWidget {
     final scope = context.watch<LearningScopeProvider>();
     final l10n = context.watch<LocalizationProvider>();
     final content = context.watch<ContentProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final domainTitles = {for (final d in content.domains) d.id: d.title};
     final label = switch (scope.scope.kind) {

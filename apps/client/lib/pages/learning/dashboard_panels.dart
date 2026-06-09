@@ -612,22 +612,6 @@ class CenterPanelState extends State<CenterPanel> {
     return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
   }
 
-  List<LearningRoute> _buildOfficialRoutes(List<Domain> domains, LocalizationProvider l10n) {
-    return [
-      LearningRoute(
-        id: 'all',
-        name: l10n.get('all_topics'),
-        description: '',
-        domainIds: domains.map((d) => d.id).toList(),
-        phases: null,
-        source: 'official',
-        isDefault: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();

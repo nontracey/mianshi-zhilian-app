@@ -19,7 +19,7 @@ class _MockRouteClient extends EndpointFallbackClient {
 
   @override
   Future<http.Response> request(
-    RouteService service,
+    EndpointService service,
     String method,
     String path, {
     Map<String, String>? headers,
@@ -67,7 +67,7 @@ void main() {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
       storage = StorageService();
-      mockClient = _MockRouteClient(stateStore: RouteStateStore(storage));
+      mockClient = _MockRouteClient(stateStore: EndpointStateStore(storage));
       provider = AuthProvider(storage, routeClient: mockClient);
     });
 

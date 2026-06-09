@@ -322,7 +322,7 @@ class _OnDeviceModelManagementPageState
     final settings = context.read<SettingsProvider>().settings;
     final mirrorBaseUrl = settings.customGithubMirror;
     try {
-      final downloadSourceMode = await RouteStateStore(
+      final downloadSourceMode = await EndpointStateStore(
         StorageService(),
       ).loadDownloadSourceMode();
       if (!mounted) return;

@@ -32,29 +32,29 @@ class RoutePreferencePanel extends StatefulWidget {
 }
 
 class RoutePreferencePanelState extends State<RoutePreferencePanel> {
-  late final RouteStateStore _store;
-  RouteMode _appApiMode = RouteMode.auto;
-  RouteMode _contentMode = RouteMode.auto;
+  late final EndpointStateStore _store;
+  EndpointMode _appApiMode = EndpointMode.auto;
+  EndpointMode _contentMode = EndpointMode.auto;
   DownloadSourceMode _downloadSourceMode = DownloadSourceMode.auto;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _store = RouteStateStore(StorageService());
+    _store = EndpointStateStore(StorageService());
     _load();
   }
 
   Future<void> _load() async {
     final results = await Future.wait([
-      _store.loadMode(RouteService.appApi),
-      _store.loadMode(RouteService.content),
+      _store.loadMode(EndpointService.appApi),
+      _store.loadMode(EndpointService.content),
       _store.loadDownloadSourceMode(),
     ]);
     if (!mounted) return;
     setState(() {
-      _appApiMode = results[0] as RouteMode;
-      _contentMode = results[1] as RouteMode;
+      _appApiMode = results[0] as EndpointMode;
+      _contentMode = results[1] as EndpointMode;
       _downloadSourceMode = results[2] as DownloadSourceMode;
       _loading = false;
     });
@@ -74,7 +74,7 @@ class RoutePreferencePanelState extends State<RoutePreferencePanel> {
           label: 'App API',
           value: _appApiMode,
           onChanged: (mode) async {
-            await _store.saveMode(RouteService.appApi, mode);
+            await _store.saveMode(EndpointService.appApi, mode);
             setState(() => _appApiMode = mode);
           },
         ),
@@ -83,7 +83,7 @@ class RoutePreferencePanelState extends State<RoutePreferencePanel> {
           label: l10n.get('route_content_cdn'),
           value: _contentMode,
           onChanged: (mode) async {
-            await _store.saveMode(RouteService.content, mode);
+            await _store.saveMode(EndpointService.content, mode);
             setState(() => _contentMode = mode);
           },
         ),
@@ -138,11 +138,11 @@ class RoutePreferencePanelState extends State<RoutePreferencePanel> {
 
   Widget _buildSelector({
     required String label,
-    required RouteMode value,
-    required ValueChanged<RouteMode> onChanged,
+    required EndpointMode value,
+    required ValueChanged<EndpointMode> onChanged,
   }) {
     final l10n = context.watch<LocalizationProvider>();
-    return DropdownButtonFormField<RouteMode>(
+    return DropdownButtonFormField<EndpointMode>(
       initialValue: value,
       decoration: InputDecoration(
         labelText: label,
@@ -150,23 +150,23 @@ class RoutePreferencePanelState extends State<RoutePreferencePanel> {
       ),
       items: [
         DropdownMenuItem(
-          value: RouteMode.auto,
+          value: EndpointMode.auto,
           child: Text(l10n.get('route_auto')),
         ),
         DropdownMenuItem(
-          value: RouteMode.backupFirst,
+          value: EndpointMode.backupFirst,
           child: Text(l10n.get('route_backup_first')),
         ),
         DropdownMenuItem(
-          value: RouteMode.primaryFirst,
+          value: EndpointMode.primaryFirst,
           child: Text(l10n.get('route_primary_first')),
         ),
         DropdownMenuItem(
-          value: RouteMode.backupOnly,
+          value: EndpointMode.backupOnly,
           child: Text(l10n.get('route_backup_only')),
         ),
         DropdownMenuItem(
-          value: RouteMode.primaryOnly,
+          value: EndpointMode.primaryOnly,
           child: Text(l10n.get('route_primary_only')),
         ),
       ],

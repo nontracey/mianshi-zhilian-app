@@ -10,18 +10,18 @@ import 'route_state_store.dart';
 class EndpointFallbackClient {
   EndpointFallbackClient({
     RouteResolver resolver = const RouteResolver(),
-    required RouteStateStore stateStore,
+    required EndpointStateStore stateStore,
     http.Client? httpClient,
   }) : _resolver = resolver,
        _stateStore = stateStore,
        _httpClient = httpClient ?? http.Client();
 
   final RouteResolver _resolver;
-  final RouteStateStore _stateStore;
+  final EndpointStateStore _stateStore;
   final http.Client _httpClient;
 
   Future<http.Response> request(
-    RouteService service,
+    EndpointService service,
     String method,
     String path, {
     Map<String, String>? headers,
@@ -154,10 +154,10 @@ class EndpointFallbackClient {
   }
 
   List<String> resolveUrls(
-    RouteService service,
+    EndpointService service,
     String path, {
-    RouteMode mode = RouteMode.auto,
-    RouteLane? activeLane,
+    EndpointMode mode = EndpointMode.auto,
+    EndpointLane? activeLane,
   }) {
     return _resolver
         .resolveCandidates(service, path, mode: mode, activeLane: activeLane)
@@ -193,8 +193,8 @@ class EndpointFallbackClient {
     return statusCode < 500;
   }
 
-  Duration _ttlFor(RouteService service) {
-    return service == RouteService.content
+  Duration _ttlFor(EndpointService service) {
+    return service == EndpointService.content
         ? const Duration(minutes: 45)
         : const Duration(minutes: 30);
   }
