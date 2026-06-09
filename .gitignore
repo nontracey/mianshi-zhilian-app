@@ -21,3 +21,4 @@ apps/client/macos/Flutter/ephemeral/
 apps/client/windows/flutter/ephemeral/
 .workbuddy/
 .qwen/
+.omo/
