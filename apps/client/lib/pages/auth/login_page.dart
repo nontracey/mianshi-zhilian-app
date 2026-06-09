@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -44,26 +48,75 @@ class _LoginPageState extends State<LoginPage> {
     final remember = await _storage.load(_rememberMeKey) as bool? ?? false;
     if (!remember) return;
     final username = await _storage.load(_savedUsernameKey) as String? ?? '';
+    final encryptedPwd = await _storage.load(_savedPasswordKey) as String? ?? '';
+    final deviceId = await _storage.getOrCreateDeviceId();
+    final password = _decryptPassword(encryptedPwd, deviceId);
     if (mounted) {
       setState(() {
         _rememberMe = remember;
         _usernameController.text = username;
-        // 不恢复密码——登录态由 refresh token 维持，密码不应持久化存储
+        _passwordController.text = password;
       });
     }
   }
 
-  Future<void> _saveCredentials(String username) async {
+  Future<void> _saveCredentials(String username, String password) async {
+    final deviceId = await _storage.getOrCreateDeviceId();
     await _storage.save(_rememberMeKey, true);
     await _storage.save(_savedUsernameKey, username);
-    // 清除历史遗留的明文密码（如果有）
-    await _storage.save(_savedPasswordKey, '');
+    await _storage.save(_savedPasswordKey, _encryptPassword(password, deviceId));
   }
 
   Future<void> _clearSavedCredentials() async {
     await _storage.save(_rememberMeKey, false);
     await _storage.save(_savedUsernameKey, '');
     await _storage.save(_savedPasswordKey, '');
+  }
+
+  /// 用设备 ID 派生密钥，XOR keystream 加密（HMAC-SHA256 CTR 模式）。
+  /// 密码不进入同步包，只存本设备，deviceId 本身也不同步，所以其他设备无法解密。
+  static String _encryptPassword(String text, String deviceId) {
+    if (text.isEmpty) return '';
+    final key = Hmac(sha256, utf8.encode(deviceId))
+        .convert(utf8.encode('mianshi-pwd-v1'))
+        .bytes;
+    final data = utf8.encode(text);
+    final ks = _generateKeystream(key, data.length);
+    return base64Encode(
+      Uint8List.fromList(List.generate(data.length, (i) => data[i] ^ ks[i])),
+    );
+  }
+
+  static String _decryptPassword(String b64, String deviceId) {
+    if (b64.isEmpty) return '';
+    try {
+      final key = Hmac(sha256, utf8.encode(deviceId))
+          .convert(utf8.encode('mianshi-pwd-v1'))
+          .bytes;
+      final data = base64Decode(b64);
+      final ks = _generateKeystream(key, data.length);
+      return utf8.decode(
+        Uint8List.fromList(List.generate(data.length, (i) => data[i] ^ ks[i])),
+      );
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static List<int> _generateKeystream(List<int> key, int length) {
+    final stream = <int>[];
+    var counter = 0;
+    while (stream.length < length) {
+      final msg = [
+        counter >> 24 & 0xFF,
+        counter >> 16 & 0xFF,
+        counter >> 8 & 0xFF,
+        counter & 0xFF,
+      ];
+      stream.addAll(Hmac(sha256, key).convert(msg).bytes);
+      counter++;
+    }
+    return stream.sublist(0, length);
   }
 
   @override
@@ -101,7 +154,7 @@ class _LoginPageState extends State<LoginPage> {
     if (success && mounted) {
       // 保存 / 清除记住的凭据
       if (_rememberMe && !_isRegister) {
-        await _saveCredentials(username);
+        await _saveCredentials(username, password);
       } else {
         await _clearSavedCredentials();
       }
