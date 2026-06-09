@@ -1136,21 +1136,25 @@ class CenterPanelState extends State<CenterPanel> {
 
   void _onGeneratePressed() {
     final generator = _generateRouteAsync;
-    if (generator == null) return;
+    if (generator == null || _isGenerating) return;
     setState(() => _isGenerating = true);
-    Future.microtask(() async {
-      try {
-        await generator();
-      } finally {
-        if (mounted) setState(() => _isGenerating = false);
-      }
+    generator().whenComplete(() {
+      if (mounted) setState(() => _isGenerating = false);
     });
   }
 
-  void _editSelectedAiRoute(BuildContext context) {
+  void _editSelectedAiRoute(BuildContext context) async {
     final route = _selectedRoute;
     if (route == null) return;
 
+    // 获取所有路线名称用于重名检查
+    final customData = await _storage.loadJsonList('custom_routes');
+    final allRouteNames = customData
+        .map((e) => LearningRoute.fromJson(e))
+        .map((r) => r.name)
+        .toList();
+
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => RouteEditorDialog(
@@ -1158,6 +1162,7 @@ class CenterPanelState extends State<CenterPanel> {
             .map((d) => DomainItem(id: d.id, title: d.title))
             .toList(),
         existingRoute: route,
+        existingRouteNames: allRouteNames,
         onSave: (updatedRoute) async {
           // 更新存储中的路线
           final customData = await _storage.loadJsonList('custom_routes');

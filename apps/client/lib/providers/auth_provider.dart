@@ -120,7 +120,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isTokenStillUsable(String? token) {
     final expiresAt = _tokenExpiresAt(token);
-    if (expiresAt == null) return token != null && token.isNotEmpty;
+    if (expiresAt == null) return false;
     return expiresAt.isAfter(DateTime.now().add(_refreshExpiryGuard));
   }
 
@@ -395,7 +395,11 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
       if (response.statusCode == 401 || response.statusCode == 403) {
-        debugPrint('Sync current user failed: token expired');
+        debugPrint('Sync current user failed: token expired, attempting refresh');
+        final refreshed = await _refreshLogin();
+        if (!refreshed) {
+          await _clearSavedUser();
+        }
       }
     } catch (e) {
       debugPrint('Sync current user failed: $e');
@@ -439,12 +443,14 @@ class AuthProvider extends ChangeNotifier {
         '/auth/refresh',
         headers: await ApiHeaders.build(_storage),
         body: json.encode({'refreshToken': refreshToken}),
-        fallbackOnAllHttpErrors: true,
+        timeout: const Duration(seconds: 15),
       );
 
       if (lastResponse.statusCode == 200) {
         final data = json.decode(lastResponse.body) as Map<String, dynamic>;
         if (data['success'] == true) {
+          // 如果在刷新期间 logout 被调用，放弃刷新结果
+          if (_user == null || _refreshToken == null) return false;
           _user = User.fromJson(data['user'] as Map<String, dynamic>);
           _token = data['token'] as String;
           _refreshToken = data['refreshToken'] as String?;

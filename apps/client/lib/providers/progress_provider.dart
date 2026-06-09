@@ -180,7 +180,7 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   List<Topic> getRecommendedTopics(
-    String domainId,
+    String? domainId,
     List<Topic> topics,
     String strategy, {
     int lowScoreWeight = 35,
@@ -191,7 +191,10 @@ class ProgressProvider extends ChangeNotifier {
     bool prioritizePrerequisites = true,
     bool allowSkipLowFrequency = false,
   }) {
-    final domainTopics = topics.where((t) => t.domainId == domainId).toList();
+    // 跨域路线模式：topics 已经是预过滤的跨域列表，不再按 domainId 过滤
+    final domainTopics = domainId != null
+        ? topics.where((t) => t.domainId == domainId).toList()
+        : List<Topic>.from(topics);
     final result = List<Topic>.from(domainTopics);
 
     switch (strategy) {

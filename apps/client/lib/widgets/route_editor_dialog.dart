@@ -80,7 +80,10 @@ class _RouteEditorDialogState extends State<RouteEditorDialog> {
       name: _nameController.text.trim(),
       description: _descController.text.trim(),
       domainIds: _selectedDomainIds,
-      createdAt: DateTime.now(),
+      phases: widget.existingRoute?.phases,
+      source: widget.existingRoute?.source ?? 'custom',
+      isDefault: widget.existingRoute?.isDefault ?? false,
+      createdAt: widget.existingRoute?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     ));
     Navigator.pop(context);

@@ -1,8 +1,18 @@
 name: Cleanup preview
 
+# 这个 workflow 不使用 GITHUB_TOKEN（只用 CLOUDFLARE_API_TOKEN），
+# 零权限可避免 GitHub 将它视为需要通知的安全事件。
+# PR 删除逻辑由 GitHub 内置的 "Automatically delete head branches" 处理。
+
 on:
   pull_request:
     types: [closed]
+
+permissions: {}
+
+concurrency:
+  group: cleanup-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   cleanup:

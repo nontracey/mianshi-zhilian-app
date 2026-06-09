@@ -209,9 +209,9 @@ class AiService {
   Future<bool> testConnection(AiConfig config) async =>
       (await testTextConnection(config)).success;
 
-  /// 检查 AI 是否可用（是否有已配置且测试通过的 AI 配置）
-  Future<bool> isAvailable() async {
-    return true;
+  /// 检查指定 AI 配置是否可用于文本生成
+  bool isConfigAvailable(AiConfig? config) {
+    return config != null && config.canEvaluate;
   }
 
   Future<AiTestResult> testAudioConnection(AiConfig config) async {
@@ -334,9 +334,31 @@ class AiService {
     }
   }
 
-  /// 发送文本消息并返回响应
-  Future<String> sendMessage(String prompt) async {
-    throw UnimplementedError('Use generateRoute with specific AI config');
+  /// 使用指定 AI 配置发送文本消息并返回响应
+  Future<String> sendMessage(String prompt, {required AiConfig config}) async {
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${config.apiKey}',
+      },
+      body: json.encode({
+        'model': config.model,
+        'messages': [
+          {'role': 'user', 'content': prompt},
+        ],
+        'temperature': 0.3,
+        'max_tokens': 1000,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      return body['choices']?[0]?['message']?['content'] as String? ?? '';
+    }
+    throw AiServiceException.fromResponse(response.statusCode, response.body);
   }
 
   Future<String> _transcribeViaEndpoint({

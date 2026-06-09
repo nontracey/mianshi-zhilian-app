@@ -492,13 +492,46 @@ class _LearningShellState extends State<LearningShell> {
       return;
     }
 
-    // 确保所有领域的 topics 都加载
+    // 只加载匹配领域的 topics（不再全量预加载）
     final domainIds = content.domains.map((d) => d.id).toList();
-    try {
-      await content.ensureTopicsLoaded(domainIds);
-    } catch (_) {}
 
     final generator = AiRouteGenerator(_storage, content.domains);
+    final aiConfig = aiProvider.defaultConfig;
+    final useAi = aiProvider.aiService.isConfigAvailable(aiConfig);
+
+    // 无可用 AI 配置时提前告知用户
+    if (!useAi && forceRegenerate) {
+      if (mounted) {
+        final l10n = context.read<LocalizationProvider>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.get('no_ai_config_available'))),
+        );
+      }
+      return;
+    }
+
+    if (useAi) {
+      // AI 选领域后再加载对应 topics，避免全量预加载
+      try {
+        final selectedDomainIds = await generator.selectDomainIds(
+          plan: plan,
+          aiService: aiProvider.aiService,
+          aiConfig: aiConfig!,
+        );
+        await content.ensureTopicsLoaded(selectedDomainIds);
+      } catch (_) {
+        // AI 选领域失败，加载全部领域作为兜底
+        try {
+          await content.ensureTopicsLoaded(domainIds);
+        } catch (_) {}
+      }
+    } else {
+      // 无 AI 时加载全部领域
+      try {
+        await content.ensureTopicsLoaded(domainIds);
+      } catch (_) {}
+    }
+
     try {
       final route = await generator.generateRoute(
         plan: plan,
@@ -506,6 +539,7 @@ class _LearningShellState extends State<LearningShell> {
         progressProvider: progress,
         aiService: aiProvider.aiService,
         contentProvider: content,
+        aiConfig: aiConfig,
         forceRegenerate: forceRegenerate,
       );
 

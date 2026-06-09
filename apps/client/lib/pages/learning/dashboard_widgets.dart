@@ -1321,7 +1321,13 @@ class LineChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant LineChartPainter oldDelegate) {
+    if (data.length != oldDelegate.data.length) return true;
+    for (int i = 0; i < data.length; i++) {
+      if (data[i] != oldDelegate.data[i]) return true;
+    }
+    return false;
+  }
 }
 
 // ── 练习记录项目组件 ──

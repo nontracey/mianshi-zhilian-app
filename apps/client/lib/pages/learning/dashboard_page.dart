@@ -101,9 +101,13 @@ class DashboardPage extends StatelessWidget {
         .firstOrNull;
 
     if (currentDomain == null && domains.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        onDomainChanged(domains.first.id);
-      });
+      // 当前域不在列表中，切换到第一个可用域
+      // 使用 ValueKey 确保只在域 ID 变化时触发切换，避免 build 中的无限回调
+      return _DomainAutoSwitch(
+        key: ValueKey(domains.first.id),
+        domainId: domains.first.id,
+        onDomainChanged: onDomainChanged,
+      );
     }
 
     final domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
@@ -114,45 +118,56 @@ class DashboardPage extends StatelessWidget {
         routeTopicIds != null &&
         routeTopicIds!.isNotEmpty;
 
+    final isRouteFocused = routeModeEnabled &&
+        routeTopicIds != null &&
+        routeTopicIds!.isNotEmpty;
+
     List<Topic> scopedTopics;
     if (isCrossDomainRoute) {
       scopedTopics = routeTopicIds!
           .map((id) => contentProvider.findTopic(id))
           .whereType<Topic>()
           .toList();
-    } else if (routeTopicIds != null) {
-      scopedTopics = domainTopics.where((t) => routeTopicIds!.contains(t.id)).toList();
+    } else if (isRouteFocused && routeTopicIds != null) {
+      // 单域路线：从路线的 topicIds 中查找，不限制当前域
+      scopedTopics = routeTopicIds!
+          .map((id) => contentProvider.findTopic(id))
+          .whereType<Topic>()
+          .toList();
     } else {
       scopedTopics = domainTopics;
     }
 
-    if (!contentProvider.isLoadingTopics && scopedTopics.isEmpty && domainTopics.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.auto_stories_outlined, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(
-              contentProvider.topicLoadFailures.isNotEmpty
-                  ? l10n.get('knowledge_point_loading_fail')
-                  : l10n.get('temporary_no_knowledge_point'),
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            if (contentProvider.topicLoadFailures.isNotEmpty) ...[
+    if (!contentProvider.isLoadingTopics && scopedTopics.isEmpty) {
+      // 路线模式下 scopedTopics 为空（topic ID 无法解析），回退到当前域
+      if (isRouteFocused && domainTopics.isNotEmpty) {
+        scopedTopics = domainTopics;
+      } else if (domainTopics.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_stories_outlined, size: 48, color: Colors.grey.shade400),
               const SizedBox(height: 12),
-              FilledButton.tonalIcon(
-                onPressed: () => contentProvider.loadDomainTopics(currentDomainId),
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(l10n.get('retry')),
+              Text(
+                contentProvider.topicLoadFailures.isNotEmpty
+                    ? l10n.get('knowledge_point_loading_fail')
+                    : l10n.get('temporary_no_knowledge_point'),
+                style: TextStyle(color: Colors.grey.shade600),
               ),
+              if (contentProvider.topicLoadFailures.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => contentProvider.loadDomainTopics(currentDomainId),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(l10n.get('retry')),
+                ),
+              ],
             ],
-          ],
-        ),
-      );
+          ),
+        );
+      }
     }
-
-    final isRouteFocused = routeModeEnabled && routeTopicIds != null && routeTopicIds!.isNotEmpty;
 
     final domainProgress = isCrossDomainRoute || isRouteFocused
         ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
@@ -165,7 +180,7 @@ class DashboardPage extends StatelessWidget {
     final readiness = progressProvider.readinessScore(scopedTopics);
 
     final recommendedTopics = progressProvider.getRecommendedTopics(
-      currentDomainId,
+      isCrossDomainRoute ? null : currentDomainId,
       isCrossDomainRoute || isRouteFocused ? scopedTopics : contentProvider.topics.values.toList(),
       settingsProvider.settings.recommendStrategy,
       lowScoreWeight: settingsProvider.settings.lowScoreWeight,
@@ -519,5 +534,40 @@ class DashboardPage extends StatelessWidget {
     final avgScore = totalScore / count;
     final coverage = count / topics.length;
     return (avgScore * coverage).round();
+  }
+}
+
+/// 当 currentDomainId 不在 domains 列表中时，自动切换到第一个可用域
+class _DomainAutoSwitch extends StatefulWidget {
+  const _DomainAutoSwitch({
+    super.key,
+    required this.domainId,
+    required this.onDomainChanged,
+  });
+
+  final String domainId;
+  final ValueChanged<String> onDomainChanged;
+
+  @override
+  State<_DomainAutoSwitch> createState() => _DomainAutoSwitchState();
+}
+
+class _DomainAutoSwitchState extends State<_DomainAutoSwitch> {
+  bool _switched = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_switched) {
+      _switched = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onDomainChanged(widget.domainId);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
   }
 }

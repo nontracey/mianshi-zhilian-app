@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:collection/collection.dart';
+import '../models/ai_config.dart';
 import '../models/domain.dart';
 import '../models/learning_route.dart';
 import '../models/topic.dart';
@@ -17,12 +18,22 @@ class AiRouteGenerator {
 
   AiRouteGenerator(this._storage, this._allDomains);
 
+  /// 仅执行领域选择步骤（供调用方预加载 topics）
+  Future<List<String>> selectDomainIds({
+    required PrepPlan plan,
+    required AiService aiService,
+    required AiConfig aiConfig,
+  }) async {
+    return _selectDomains(plan, aiService, aiConfig);
+  }
+
   Future<LearningRoute> generateRoute({
     required PrepPlan plan,
     required List<Topic> allTopics,
     required ProgressProvider progressProvider,
     required AiService aiService,
     required ContentProvider contentProvider,
+    AiConfig? aiConfig,
     bool forceRegenerate = false,
   }) async {
     if (!forceRegenerate) {
@@ -30,13 +41,14 @@ class AiRouteGenerator {
       if (cached != null) return cached;
     }
 
-    if (await aiService.isAvailable()) {
+    final useAi = aiService.isConfigAvailable(aiConfig);
+    if (useAi) {
       try {
-        final selectedDomainIds = await _selectDomains(plan, aiService);
+        final selectedDomainIds = await _selectDomains(plan, aiService, aiConfig!);
         await contentProvider.ensureTopicsLoaded(selectedDomainIds);
 
         final relevantTopicIds = await _selectTopics(
-          plan, selectedDomainIds, contentProvider, progressProvider, aiService,
+          plan, selectedDomainIds, contentProvider, progressProvider, aiService, aiConfig,
         );
 
         final route = _buildStructuredRoute(
@@ -54,12 +66,11 @@ class AiRouteGenerator {
     return route;
   }
 
-  Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService) async {
-    if (await aiService.isAvailable()) {
-      final domainList = _allDomains.map((d) =>
-          '${d.id}: ${d.title}（${d.categories.map((c) => c.title).join('、')}）').join('\n');
+  Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService, AiConfig aiConfig) async {
+    final domainList = _allDomains.map((d) =>
+        '${d.id}: ${d.title}（${d.categories.map((c) => c.title).join('、')}）').join('\n');
 
-      final prompt = '''
+    final prompt = '''
 用户目标：${plan.targetRole} / ${plan.techStack}
 ${plan.jobDescription.isNotEmpty ? 'JD概要：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
 
@@ -75,15 +86,16 @@ $domainList
 示例格式：["java", "architecture", "agent"]
 ''';
 
-      try {
-        final response = await aiService.sendMessage(prompt);
-        final start = response.indexOf('[');
-        final end = response.lastIndexOf(']');
-        if (start != -1 && end > start) {
-          return (json.decode(response.substring(start, end + 1)) as List)
-              .cast<String>();
-        }
-      } catch (_) {}
+    try {
+      final response = await aiService.sendMessage(prompt, config: aiConfig);
+      final start = response.indexOf('[');
+      final end = response.lastIndexOf(']');
+      if (start != -1 && end > start) {
+        return (json.decode(response.substring(start, end + 1)) as List)
+            .cast<String>();
+      }
+    } catch (e) {
+      debugPrint('AI domain selection failed: $e');
     }
 
     // 降级：本地关键词匹配
@@ -127,6 +139,7 @@ $domainList
     ContentProvider contentProvider,
     ProgressProvider progressProvider,
     AiService aiService,
+    AiConfig aiConfig,
   ) async {
     final topics = contentProvider.topics.values
         .where((t) => domainIds.contains(t.domainId))
@@ -150,7 +163,7 @@ $topicLines
 只输出 JSON 数组，不要额外文字。''';
 
     try {
-      final response = await aiService.sendMessage(prompt);
+      final response = await aiService.sendMessage(prompt, config: aiConfig);
       final start = response.indexOf('[');
       final end = response.lastIndexOf(']');
       if (start != -1 && end > start) {
@@ -158,10 +171,15 @@ $topicLines
             .cast<String>();
         return ids.toSet();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AI topic selection failed: $e');
+    }
 
-    // 降级：返回所有 topic ID
-    return topics.map((t) => t.id).toSet();
+    // 降级：返回面试频率为 high 或 medium 的 topic ID
+    return topics
+        .where((t) => t.interviewFrequency == 'high' || t.interviewFrequency == 'medium')
+        .map((t) => t.id)
+        .toSet();
   }
 
   LearningRoute _buildStructuredRoute(
@@ -257,7 +275,7 @@ $topicLines
   }
 
   String _cacheKey(PrepPlan plan) =>
-    'route_cache_${_hashString('${plan.jobDescription}_${plan.targetRole}_${plan.interviewDate?.toIso8601String()}')}';
+    'route_cache_${_hashString('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String()}')}';
 
   String _hashString(String input) =>
     input.hashCode.toString();

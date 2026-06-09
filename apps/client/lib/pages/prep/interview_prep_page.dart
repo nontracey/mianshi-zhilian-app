@@ -870,6 +870,17 @@ class _MockTabContentState extends State<_MockTabContent> {
   }
 
   @override
+  void didUpdateWidget(covariant _MockTabContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.routeTopicIds != oldWidget.routeTopicIds ||
+        widget.routeModeEnabled != oldWidget.routeModeEnabled) {
+      _scope = widget.routeModeEnabled && widget.routeTopicIds?.isNotEmpty == true
+          ? 'route'
+          : null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
 

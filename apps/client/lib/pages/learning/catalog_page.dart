@@ -295,7 +295,13 @@ class _CatalogPageState extends State<CatalogPage> {
 
 Expanded(
             child: RefreshIndicator(
-              onRefresh: () => contentProvider.loadDomainTopics(widget.currentDomainId),
+              onRefresh: () {
+                // 跨域路线模式下刷新所有路线领域
+                if (isCrossDomainRouteMode && widget.routeDomainIds != null) {
+                  return contentProvider.ensureTopicsLoaded(widget.routeDomainIds!);
+                }
+                return contentProvider.loadDomainTopics(widget.currentDomainId);
+              },
               child: sortedTopics.isEmpty
                   ? _buildEmptyState(context)
                   : (_routeActive &&
