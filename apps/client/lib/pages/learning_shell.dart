@@ -346,26 +346,31 @@ class _LearningShellState extends State<LearningShell> {
 
   /// AI 路线生成/重新生成
   Future<void> _generateAiRoute({bool forceRegenerate = false}) async {
-    final progress = context.read<ProgressProvider>();
-    final content = context.read<ContentProvider>();
-    final aiProvider = context.read<AiProvider>();
-    final plan = progress.prepPlan;
+    final scopeProvider = context.read<LearningScopeProvider>();
+    // 全局并发锁：防止重复生成
+    if (scopeProvider.isGeneratingRoute) return;
+    scopeProvider.setGeneratingRoute(true);
+    try {
+      final progress = context.read<ProgressProvider>();
+      final content = context.read<ContentProvider>();
+      final aiProvider = context.read<AiProvider>();
+      final plan = progress.prepPlan;
 
-    if (!plan.hasTarget) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationProvider>().get('set_target_first'))),
-        );
+      if (!plan.hasTarget) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.read<LocalizationProvider>().get('set_target_first'))),
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    // 只加载匹配领域的 topics（不再全量预加载）
-    final domainIds = content.domains.map((d) => d.id).toList();
+      // 只加载匹配领域的 topics（不再全量预加载）
+      final domainIds = content.domains.map((d) => d.id).toList();
 
-    final generator = AiRouteGenerator(_storage, content.domains);
-    final aiConfig = aiProvider.defaultConfig;
-    final useAi = aiProvider.aiService.isConfigAvailable(aiConfig);
+      final generator = AiRouteGenerator(_storage, content.domains);
+      final aiConfig = aiProvider.defaultConfig;
+      final useAi = aiProvider.aiService.isConfigAvailable(aiConfig);
 
     // 无可用 AI 配置时提前告知用户
     if (!useAi && forceRegenerate) {
@@ -434,6 +439,9 @@ class _LearningShellState extends State<LearningShell> {
           SnackBar(content: Text(l10n.get('route_generate_failed'))),
         );
       }
+    }
+    } finally {
+      scopeProvider.setGeneratingRoute(false);
     }
   }
 

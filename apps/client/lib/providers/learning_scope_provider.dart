@@ -87,6 +87,7 @@ class LearningScopeProvider extends ChangeNotifier {
   List<LearningRoute> _customRoutes = [];
   bool _loaded = false;
   bool _routeStale = false;
+  bool _isGeneratingRoute = false;
   String? _lastPlanSignature;
 
   LearningScopeProvider(this._storage) {
@@ -103,6 +104,14 @@ class LearningScopeProvider extends ChangeNotifier {
   bool get isSingleDomain => _scope.isSingleDomain;
   bool get isAllDomains => _scope.isAllDomains;
   bool get routeStale => _routeStale && isRouteMode;
+  bool get isGeneratingRoute => _isGeneratingRoute;
+
+  /// 设置/清除路线生成中状态，触发 UI 刷新。
+  void setGeneratingRoute(bool value) {
+    if (_isGeneratingRoute == value) return;
+    _isGeneratingRoute = value;
+    notifyListeners();
+  }
 
   /// 活动路线对象（路线模式下返回路线，否则 null）。
   LearningRoute? get activeRoute {
