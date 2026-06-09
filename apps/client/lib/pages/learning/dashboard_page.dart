@@ -25,7 +25,6 @@ class DashboardPage extends StatelessWidget {
     this.onNavigateToCatalog,
     this.onGenerateAiRoute,
     this.onRegenerateAiRoute,
-    this.onRouteChanged,
   });
 
   final ValueChanged<String> onDomainChanged;
@@ -38,7 +37,6 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback? onNavigateToCatalog;
   final VoidCallback? onGenerateAiRoute;
   final VoidCallback? onRegenerateAiRoute;
-  final VoidCallback? onRouteChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -230,8 +228,6 @@ class DashboardPage extends StatelessWidget {
                         topicCount: topicCount,
                         readiness: readiness,
                         streakDays: progressProvider.streakDays,
-                        routeModeEnabled: scope.isRouteMode,
-                        onRouteModeChanged: () { final s = context.read<LearningScopeProvider>(); if (s.isRouteMode) { s.setAllDomains(); } else if (s.customRoutes.isNotEmpty) { s.setRoute(s.customRoutes.last.id); } },
                         onDomainChanged: onDomainChanged,
                         onTopicTap: onTopicTap,
                         onViewDomainCatalog: onViewDomainCatalog,
@@ -243,7 +239,6 @@ class DashboardPage extends StatelessWidget {
                         settingsProvider: settingsProvider,
                         onGenerateAiRoute: onGenerateAiRoute,
                         onRegenerateAiRoute: onRegenerateAiRoute,
-                        onRouteChanged: onRouteChanged,
                       ),
                     ),
                   ),
@@ -306,15 +301,6 @@ class DashboardPage extends StatelessWidget {
                             topicCount: topicCount,
                             readiness: readiness,
                             streakDays: progressProvider.streakDays,
-                            routeModeEnabled: scope.isRouteMode,
-                            onRouteModeChanged: () {
-                              final s = context.read<LearningScopeProvider>();
-                              if (s.isRouteMode) {
-                                s.setAllDomains();
-                              } else if (s.customRoutes.isNotEmpty) {
-                                s.setRoute(s.customRoutes.last.id);
-                              }
-                            },
                             onDomainChanged: onDomainChanged,
                             onTopicTap: onTopicTap,
                             onViewDomainCatalog: onViewDomainCatalog,
@@ -326,7 +312,6 @@ class DashboardPage extends StatelessWidget {
                             settingsProvider: settingsProvider,
                             onGenerateAiRoute: onGenerateAiRoute,
                             onRegenerateAiRoute: onRegenerateAiRoute,
-                            onRouteChanged: onRouteChanged,
                           ),
                           const SizedBox(height: 16),
                           RightPanel(
@@ -374,8 +359,6 @@ class DashboardPage extends StatelessWidget {
                     topicCount: topicCount,
                     readiness: readiness,
                     streakDays: progressProvider.streakDays,
-                    routeModeEnabled: scope.isRouteMode,
-                    onRouteModeChanged: () { final s = context.read<LearningScopeProvider>(); if (s.isRouteMode) { s.setAllDomains(); } else if (s.customRoutes.isNotEmpty) { s.setRoute(s.customRoutes.last.id); } },
                     onDomainChanged: onDomainChanged,
                     onTopicTap: onTopicTap,
                     onViewDomainCatalog: onViewDomainCatalog,
@@ -387,7 +370,6 @@ class DashboardPage extends StatelessWidget {
                     settingsProvider: settingsProvider,
                     onGenerateAiRoute: onGenerateAiRoute,
                     onRegenerateAiRoute: onRegenerateAiRoute,
-                    onRouteChanged: onRouteChanged,
                   ),
                   const SizedBox(height: 16),
                   RightPanel(

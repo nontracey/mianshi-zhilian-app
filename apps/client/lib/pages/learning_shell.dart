@@ -256,7 +256,6 @@ class _LearningShellState extends State<LearningShell> {
         onNavigateToCatalog: () => _setSection(AppSection.catalog),
         onGenerateAiRoute: () => _generateAiRoute(),
         onRegenerateAiRoute: () => _generateAiRoute(forceRegenerate: true),
-        onRouteChanged: null,
       ),
       AppSection.catalog => CatalogPage(
         onDomainChanged: (id) {
