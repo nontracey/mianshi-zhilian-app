@@ -538,20 +538,21 @@ class ProgressProvider extends ChangeNotifier {
 
     final avgScore = scopedTopics
         .map((t) => _progressMap[t.id]?.score ?? 0)
-        .fold<int>(0, (sum, s) => sum + s) ~/
+        .fold<int>(0, (sum, s) => sum + s) /
         scopedTopics.length;
 
     final relevantMocks = _mockSessions.where(
       (s) => s.topicIds.any((id) => routeTopicIds.contains(id)),
     ).toList();
 
+    final mockCount = relevantMocks.take(3).length;
     final mockAvg = relevantMocks.isEmpty
-        ? avgScore.toDouble()
+        ? avgScore
         : relevantMocks
               .take(3)
               .map((s) => s.averageScore)
-              .fold<int>(0, (a, b) => a + b) ~/
-          relevantMocks.take(3).length;
+              .fold<int>(0, (a, b) => a + b) /
+          mockCount;
 
     final streakBonus = (practiceStreakDays.clamp(0, 14) * 1.5).round();
     final reviewPenalty = (getTodayReviewTopics(scopedTopics).length.clamp(0, 10) * 2);

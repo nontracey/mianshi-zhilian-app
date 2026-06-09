@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/utils/mastery_utils.dart';
+import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
 import 'dashboard_widgets.dart';
 import 'dashboard_dialogs.dart';
 
@@ -367,6 +368,11 @@ class LeftPanel extends StatelessWidget {
       return _buildStartGuidance(context, l10n, isDark);
     }
 
+    // 非路线模式下，未开始学习时显示引导
+    if (!isRouteMode && filteredDueTopics.isEmpty && filteredWeakTopics.isEmpty) {
+      return _buildNewUserGuidance(context, l10n, isDark);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -479,6 +485,41 @@ class LeftPanel extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildNewUserGuidance(BuildContext context, LocalizationProvider l10n, bool isDark) {
+    return PanelCard(
+      title: l10n.get('start_learning_journey'),
+      icon: Icons.auto_stories_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.get('new_user_guidance_desc'),
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (onStartLearning != null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onStartLearning,
+                icon: const Icon(Icons.explore_outlined, size: 18),
+                label: Text(l10n.get('browse_knowledge_catalog')),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class CenterPanel extends StatefulWidget {
@@ -503,6 +544,9 @@ class CenterPanel extends StatefulWidget {
     required this.settingsProvider,
     this.routeModeEnabled = true,
     this.onRouteModeChanged,
+    this.onGenerateAiRoute,
+    this.onRegenerateAiRoute,
+    this.onRouteChanged,
   });
 
   final Domain? currentDomain;
@@ -524,6 +568,9 @@ class CenterPanel extends StatefulWidget {
   final SettingsProvider settingsProvider;
   final bool routeModeEnabled;
   final VoidCallback? onRouteModeChanged;
+  final VoidCallback? onGenerateAiRoute;
+  final VoidCallback? onRegenerateAiRoute;
+  final VoidCallback? onRouteChanged;
 
   @override
   State<CenterPanel> createState() => CenterPanelState();
@@ -534,6 +581,7 @@ class CenterPanelState extends State<CenterPanel> {
   final _storage = StorageService();
   List<String> _disabledIds = [];
   LearningRoute? _selectedRoute;
+  bool _isGenerating = false;
 
   @override
   void initState() {
@@ -572,6 +620,9 @@ class CenterPanelState extends State<CenterPanel> {
       final route = allRoutes.where((r) => r.id == routeId).firstOrNull;
       if (route != null && mounted) {
         setState(() => _selectedRoute = route);
+      } else if (mounted) {
+        // 路线已不存在（可能被删除），回退到默认
+        setState(() => _selectedRoute = defaultRoutes.firstOrNull);
       }
     }
   }
@@ -640,8 +691,8 @@ class CenterPanelState extends State<CenterPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 路线模式切换
-        if (_selectedRoute != null && widget.onRouteModeChanged != null)
+        // 路线模式切换（“全部”路线无意义，隐藏切换）
+        if (_selectedRoute != null && _selectedRoute!.id != 'all' && widget.onRouteModeChanged != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -720,6 +771,46 @@ class CenterPanelState extends State<CenterPanel> {
             ],
           ),
         ),
+        // AI 路线生成/管理按钮
+        if (widget.onGenerateAiRoute != null || widget.onRegenerateAiRoute != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                if (_isGenerating)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(l10n.get('generating_route'), style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  )
+                else if (route?.source == 'ai' && widget.onRegenerateAiRoute != null) ...[                  OutlinedButton.icon(
+                    onPressed: _onGeneratePressed,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: Text(l10n.get('regenerate_ai_route')),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _editSelectedAiRoute(context),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: Text(l10n.get('edit_route')),
+                  ),
+                ] else if (widget.progressProvider.prepPlan.hasTarget && widget.onGenerateAiRoute != null) ...[                  FilledButton.tonalIcon(
+                    onPressed: _onGeneratePressed,
+                    icon: const Icon(Icons.auto_awesome, size: 16),
+                    label: Text(l10n.get('generate_ai_route')),
+                  ),
+                ],
+              ],
+            ),
+          ),
         const SizedBox(height: 16),
         // 领域知识卡片
         PanelCard(
@@ -1005,6 +1096,12 @@ class CenterPanelState extends State<CenterPanel> {
           if (route.domainIds.isNotEmpty) {
             widget.onDomainChanged(route.domainIds.first);
           }
+          widget.onRouteChanged?.call();
+        },
+        onRoutesChanged: () {
+          // 路线被删除或新增时，重新加载当前选中路线
+          _loadSelectedRoute();
+          widget.onRouteChanged?.call();
         },
       ),
     );
@@ -1025,6 +1122,58 @@ class CenterPanelState extends State<CenterPanel> {
             }
           });
           await _storage.saveDisabledDomains(_disabledIds);
+        },
+      ),
+    );
+  }
+
+  Future<void> Function()? get _generateRouteAsync {
+    // 优先用 regenerate，否则用 generate
+    if (widget.onRegenerateAiRoute != null) return () async => widget.onRegenerateAiRoute!.call();
+    if (widget.onGenerateAiRoute != null) return () async => widget.onGenerateAiRoute!.call();
+    return null;
+  }
+
+  void _onGeneratePressed() {
+    final generator = _generateRouteAsync;
+    if (generator == null) return;
+    setState(() => _isGenerating = true);
+    Future.microtask(() async {
+      try {
+        await generator();
+      } finally {
+        if (mounted) setState(() => _isGenerating = false);
+      }
+    });
+  }
+
+  void _editSelectedAiRoute(BuildContext context) {
+    final route = _selectedRoute;
+    if (route == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => RouteEditorDialog(
+        availableDomains: widget.allDomains
+            .map((d) => DomainItem(id: d.id, title: d.title))
+            .toList(),
+        existingRoute: route,
+        onSave: (updatedRoute) async {
+          // 更新存储中的路线
+          final customData = await _storage.loadJsonList('custom_routes');
+          final all = customData.map((e) => LearningRoute.fromJson(e)).toList();
+          final idx = all.indexWhere((r) => r.id == route.id);
+          if (idx >= 0) {
+            all[idx] = updatedRoute;
+            await _storage.saveJsonList(
+              'custom_routes',
+              all.map((r) => r.toJson()).toList(),
+            );
+          }
+          if (mounted) {
+            setState(() => _selectedRoute = updatedRoute);
+            widget.onRouteChanged?.call();
+          }
         },
       ),
     );
@@ -1088,8 +1237,7 @@ class RightPanel extends StatelessWidget {
           learnedCount++;
         }
       }
-      // 没有学习过的分类，掌握度为0
-      final avgScore = learnedCount == 0 ? 0 : totalScore ~/ learnedCount;
+      final avgScore = learnedCount == 0 ? 0 : (totalScore / learnedCount).round();
       return CategoryMastery(name: entry.key, masteryPercent: avgScore);
     }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
 
@@ -1124,11 +1272,13 @@ class RightPanel extends StatelessWidget {
         PanelCard(
           title: l10n.get('mastery_overview_browse'),
           icon: Icons.pie_chart_outline,
-          headerTrailing: DomainDropdown(
-            currentDomainId: currentDomainId,
-            domains: domains,
-            onChanged: onDomainChanged,
-          ),
+          headerTrailing: routeTopicIds != null && routeTopicIds!.isNotEmpty
+              ? null
+              : DomainDropdown(
+                  currentDomainId: currentDomainId,
+                  domains: domains,
+                  onChanged: onDomainChanged,
+                ),
           child: Column(
             children: [
               MasteryOverview(

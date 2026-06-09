@@ -8,6 +8,7 @@ import '../models/user_progress.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import '../services/ai_service.dart';
+import '../services/content_api_service.dart';
 import '../services/storage_service.dart';
 
 class AiRouteGenerator {
@@ -185,7 +186,11 @@ $topicLines
             final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
             if (category != null) {
               for (final topicFile in category.topics) {
-                final tid = topicFile.split('/').last.replaceAll('.json', '');
+                // 通过 cache key 查找 topic 对象，使用其 content ID
+                final cacheKey = ContentApiService.cacheKeyForTopicRef(topicFile);
+                final topic = contentProvider.getTopicById(cacheKey);
+                if (topic == null) continue;
+                final tid = topic.id; // 使用 "java.jvm.xxx" 格式的 content ID
                 // 只包含 AI 选中且已掌握度低于 85 的
                 final score = progressProvider.getTopicProgress(tid)?.score ?? 0;
                 if (relevantTopicIds.contains(tid) && score < 85) {
