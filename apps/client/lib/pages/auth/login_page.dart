@@ -44,20 +44,20 @@ class _LoginPageState extends State<LoginPage> {
     final remember = await _storage.load(_rememberMeKey) as bool? ?? false;
     if (!remember) return;
     final username = await _storage.load(_savedUsernameKey) as String? ?? '';
-    final password = await _storage.load(_savedPasswordKey) as String? ?? '';
     if (mounted) {
       setState(() {
         _rememberMe = remember;
         _usernameController.text = username;
-        _passwordController.text = password;
+        // 不恢复密码——登录态由 refresh token 维持，密码不应持久化存储
       });
     }
   }
 
-  Future<void> _saveCredentials(String username, String password) async {
+  Future<void> _saveCredentials(String username) async {
     await _storage.save(_rememberMeKey, true);
     await _storage.save(_savedUsernameKey, username);
-    await _storage.save(_savedPasswordKey, password);
+    // 清除历史遗留的明文密码（如果有）
+    await _storage.save(_savedPasswordKey, '');
   }
 
   Future<void> _clearSavedCredentials() async {
@@ -101,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
     if (success && mounted) {
       // 保存 / 清除记住的凭据
       if (_rememberMe && !_isRegister) {
-        await _saveCredentials(username, password);
+        await _saveCredentials(username);
       } else {
         await _clearSavedCredentials();
       }

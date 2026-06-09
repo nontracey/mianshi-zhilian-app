@@ -1343,9 +1343,15 @@ const ANALYTICS_SECTIONS = new Set([
 ]);
 const ANALYTICS_FEATURES = new Set([
   "ai_eval",
+  "ai_eval_success",
+  "ai_eval_failed",
+  "content_load_failed",
   "manual_sync",
+  "sync_success",
+  "sync_failed",
   "ticket_submit",
   "login",
+  "update_check",
 ]);
 
 function asString(value: unknown, max = 200): string {

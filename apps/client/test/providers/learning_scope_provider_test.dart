@@ -44,6 +44,13 @@ class _FakeStorage implements StorageService {
     return keys.length;
   }
 
+  final List<(String, String)> recordedDeletions = [];
+
+  @override
+  Future<void> recordDeletion(String collection, String id) async {
+    recordedDeletions.add((collection, id));
+  }
+
   // ignore: avoid_implementing_value_types, override_on_non_overriding_member
   @override
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError(i.memberName.toString());

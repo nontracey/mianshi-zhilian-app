@@ -260,6 +260,8 @@ class LearningScopeProvider extends ChangeNotifier {
     final deleted = _customRoutes.where((r) => r.id == routeId).toList();
     _customRoutes = _customRoutes.where((r) => r.id != routeId).toList();
     await _store.saveCustomRoutes(_customRoutes);
+    // 写删除墓碑，确保下次同步时远端也移除该路线
+    await _storage.recordDeletion('custom_routes', routeId);
     // AI 路线删除时同步清除 AiRouteGenerator 独立缓存，避免重新生成时返回已删除的旧路线
     if (deleted.any((r) => r.source == 'ai')) {
       await _store.clearRouteCaches();
@@ -296,8 +298,13 @@ class LearningScopeProvider extends ChangeNotifier {
   Future<LearningScopeProvider> load({String? legacyDomainId}) async {
     _customRoutes = await _store.loadCustomRoutes();
     // 一次性清理历史重复 AI 路线（同 planSignature 保留最新的一条）
-    _customRoutes = _deduplicateAiRoutes(_customRoutes);
+    final (deduped, discardedIds) = _deduplicateAiRoutes(_customRoutes);
+    _customRoutes = deduped;
     await _store.saveCustomRoutes(_customRoutes);
+    // 为丢弃的重复条目写墓碑，下次同步时远端并集也会被清掉
+    for (final id in discardedIds) {
+      await _storage.recordDeletion('custom_routes', id);
+    }
 
     // 尝试加载新键
     final saved = await _store.loadScope();
@@ -339,12 +346,22 @@ class LearningScopeProvider extends ChangeNotifier {
   }
 
   /// 清理历史重复 AI 路线，同 planSignature 只保留最新（updatedAt 最大）的一条。
-  static List<LearningRoute> _deduplicateAiRoutes(List<LearningRoute> routes) {
+  /// 返回 `(kept, discardedIds)`；discardedIds 用于写墓碑，确保下次同步时远端也移除。
+  static (List<LearningRoute>, List<String>) _deduplicateAiRoutes(
+    List<LearningRoute> routes,
+  ) {
     final seen = <String, LearningRoute>{};
     final nonAi = <LearningRoute>[];
+    // planSignature == null 的旧格式 AI 路线无法按签名去重，按 id 兜底折叠（保留最新）
+    final unsignedAi = <String, LearningRoute>{}; // id → route
     for (final r in routes) {
-      if (r.source != 'ai' || r.planSignature == null) {
+      if (r.source != 'ai') {
         nonAi.add(r);
+        continue;
+      }
+      if (r.planSignature == null) {
+        // 无签名旧 AI 路线：保留（不去重），但仍进 unsignedAi 以便调用方感知
+        unsignedAi[r.id] = r;
         continue;
       }
       final existing = seen[r.planSignature!];
@@ -352,7 +369,14 @@ class LearningScopeProvider extends ChangeNotifier {
         seen[r.planSignature!] = r;
       }
     }
-    return [...nonAi, ...seen.values];
+
+    final kept = [...nonAi, ...unsignedAi.values, ...seen.values];
+    final keptIds = kept.map((r) => r.id).toSet();
+    final discardedIds = routes
+        .where((r) => !keptIds.contains(r.id))
+        .map((r) => r.id)
+        .toList();
+    return (kept, discardedIds);
   }
 
   /// 外部数据导入后重新加载（对应 `dataSyncService.onDataImported`）。

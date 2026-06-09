@@ -265,7 +265,7 @@ LayoutBuilder(
   }
 
   void _showDomainPicker(BuildContext context, List domains) {
-    final l10n = context.watch<LocalizationProvider>();
+    final l10n = context.read<LocalizationProvider>();
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -292,7 +292,7 @@ LayoutBuilder(
         .toList();
 
     if (topicsWithFollowUps.isEmpty) {
-      final l10n = context.watch<LocalizationProvider>();
+      final l10n = context.read<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -330,7 +330,7 @@ LayoutBuilder(
         .toList();
 
     if (highFrequencyTopics.isEmpty) {
-      final l10n = context.watch<LocalizationProvider>();
+      final l10n = context.read<LocalizationProvider>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

@@ -31,6 +31,7 @@ class StorageService {
     'selected_route_id',
     'route_mode_disabled',
     'learning_scope',
+    'deletions',
 
     'project_library',
     'project_dig_projects',
@@ -324,6 +325,29 @@ class StorageService {
   /// 加载自定义路线
   Future<List<Map<String, dynamic>>> loadCustomRoutes() async {
     return await loadJsonList('custom_routes');
+  }
+
+  /// 加载删除墓碑表 `{<集合>:<id>: <deletedAt ISO>}`
+  Future<Map<String, String>> loadDeletions() async {
+    final data = await load('deletions');
+    if (data is! Map) return {};
+    return data.map((k, v) => MapEntry(k.toString(), v.toString()));
+  }
+
+  /// 记录一条删除墓碑；同时对超过 60 天的旧墓碑执行 GC。
+  Future<void> recordDeletion(String collection, String id) async {
+    final deletions = await loadDeletions();
+    deletions['$collection:$id'] = DateTime.now().toIso8601String();
+    _gcDeletions(deletions);
+    await save('deletions', deletions);
+  }
+
+  static void _gcDeletions(Map<String, String> deletions) {
+    final cutoff = DateTime.now().subtract(const Duration(days: 60));
+    deletions.removeWhere((_, value) {
+      final dt = DateTime.tryParse(value);
+      return dt != null && dt.isBefore(cutoff);
+    });
   }
 
   /// 导出白名单同步快照。同步目标凭证、登录态、API Key、缓存和运行态数据不会进入快照。

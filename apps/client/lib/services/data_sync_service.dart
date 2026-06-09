@@ -561,6 +561,17 @@ class DataSyncService {
     // 每个设备保持自己的偏好，不跨设备同步。
     final merged = <String, dynamic>{...remoteData, ...localData};
 
+    // 合并删除墓碑：取两侧各 id 的较晚时间戳，并 GC 60 天以上的旧墓碑。
+    final mergedDeletions = _mergeDeletions(
+      remoteData['deletions'],
+      localData['deletions'],
+    );
+    if (mergedDeletions.isNotEmpty) {
+      merged['deletions'] = mergedDeletions;
+    } else {
+      merged.remove('deletions');
+    }
+
     merged['progress_map'] = _mergeProgressMap(
       remoteData['progress_map'],
       localData['progress_map'],
@@ -573,7 +584,7 @@ class DataSyncService {
       'project_dig_projects',
       'custom_routes',
     ]) {
-      merged[key] = _mergeListById(remoteData[key], localData[key]);
+      merged[key] = _mergeListById(remoteData[key], localData[key], mergedDeletions, key);
     }
     merged['answer_versions'] = _mergeAnswerVersions(
       remoteData['answer_versions'],
@@ -634,24 +645,90 @@ class DataSyncService {
     return result;
   }
 
-  /// custom_routes 合并策略：手动路线按 ID 合并，AI 路线仅保留本地版本。
-  List<dynamic>? _mergeListById(dynamic remote, dynamic local) {
+  /// 通用列表合并：LWW（按 updatedAt 取较新者，本地同 updatedAt 时优先）+ 墓碑过滤。
+  ///
+  /// [deletions] 是已合并的墓碑表 `{<collection>:<id>: <deletedAt ISO>}`。
+  /// 若某条目的 `updatedAt <= deletedAt`（或无 `updatedAt`），则视为已删除而剔除。
+  /// 删除后若有意重新创建（`updatedAt > deletedAt`），该条目正常保留。
+  List<dynamic>? _mergeListById(
+    dynamic remote,
+    dynamic local,
+    Map<String, String> deletions,
+    String collectionKey,
+  ) {
     if (remote == null && local == null) return null;
     final byId = <String, dynamic>{};
+
+    // remote 先写，local 后写（local 同 updatedAt 时覆盖 remote，即本地优先）
     void addAll(dynamic value) {
       if (value is! List) return;
       for (final item in value) {
-        if (item is Map && item['id'] != null) {
-          byId[item['id'].toString()] = item;
+        if (item is! Map) continue;
+        final id = item['id']?.toString();
+        if (id == null) {
+          byId['_anon_${byId.length}'] = item;
+          continue;
+        }
+        final existing = byId[id];
+        if (existing == null) {
+          byId[id] = item;
         } else {
-          byId['idx_${byId.length}'] = item;
+          // LWW: 保留 updatedAt 较晚的；相同时 local 覆盖（remote 先写则 local 会覆盖）
+          final existingAt = (existing as Map)['updatedAt'] as String?;
+          final itemAt = item['updatedAt'] as String?;
+          if (existingAt == null ||
+              (itemAt != null && itemAt.compareTo(existingAt) >= 0)) {
+            byId[id] = item;
+          }
         }
       }
     }
 
     addAll(remote);
     addAll(local);
+
+    // 应用墓碑：deletedAt >= item.updatedAt 时判定已删除
+    if (deletions.isNotEmpty) {
+      byId.removeWhere((id, item) {
+        if (id.startsWith('_anon_')) return false;
+        final deletedAt = deletions['$collectionKey:$id'];
+        if (deletedAt == null) return false;
+        final itemUpdatedAt = (item as Map)['updatedAt'] as String?;
+        if (itemUpdatedAt == null) return true;
+        return deletedAt.compareTo(itemUpdatedAt) >= 0;
+      });
+    }
+
     return byId.values.toList();
+  }
+
+  /// 合并两侧墓碑表：每个 id 取较晚的 deletedAt；同时 GC 60 天以上的旧条目。
+  Map<String, String> _mergeDeletions(dynamic remote, dynamic local) {
+    final result = <String, String>{};
+
+    void addAll(dynamic value) {
+      if (value is! Map) return;
+      for (final entry in value.entries) {
+        final key = entry.key.toString();
+        final ts = entry.value.toString();
+        final existing = result[key];
+        if (existing == null || ts.compareTo(existing) > 0) {
+          result[key] = ts;
+        }
+      }
+    }
+
+    addAll(remote);
+    addAll(local);
+
+    // GC: 移除超过 60 天的旧墓碑（所有设备理应已同步过）
+    final cutoff = DateTime.now().subtract(const Duration(days: 60));
+    result.removeWhere((_, value) {
+      final dt = DateTime.tryParse(value);
+      return dt != null && dt.isBefore(cutoff);
+    });
+
+    return result;
   }
 
   Map<String, dynamic>? _mergeAnswerVersions(dynamic remote, dynamic local) {

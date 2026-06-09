@@ -25,7 +25,18 @@ class ContentProvider extends ChangeNotifier {
   int _loadEpoch = 0;
 
   List<Domain> get domains => _domains;
-  Map<String, Topic> get topics => _topics;
+
+  /// 返回按 topic.id 去重后的 topic 映射（key = topic.id）。
+  /// `_topics` 内部可能以 cacheKey（斜杠）和 topic.id（点号）双键存储同一对象；
+  /// 通过此 getter 暴露给外部的视图始终去重，确保 values / length / keys 不翻倍。
+  Map<String, Topic> get topics {
+    final seen = <String, Topic>{};
+    for (final t in _topics.values) {
+      seen[t.id] = t;
+    }
+    return seen;
+  }
+
   Map<String, dynamic>? get manifest => _manifest;
   bool get isLoading => _isLoading;
   bool get isLoadingTopics => _isLoadingTopics;
@@ -355,9 +366,9 @@ class ContentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 获取指定 domain 下已加载的 topic 数量
+  /// 获取指定 domain 下已加载的 topic 数量（去重后计数）
   int getLoadedTopicCount(String domainId) {
-    return _topics.values.where((t) => t.domainId == domainId).length;
+    return topics.values.where((t) => t.domainId == domainId).length;
   }
 
   /// 获取指定 domain 的预期 topic 总数（从 manifest 读取）
@@ -367,7 +378,7 @@ class ContentProvider extends ChangeNotifier {
   }
 
   List<Topic> getTopicsByDomain(String domainId) {
-    return _topics.values.where((t) => t.domainId == domainId).toList()
+    return topics.values.where((t) => t.domainId == domainId).toList()
       ..sort((a, b) {
         // Default learning order is content-driven; difficulty is only used
         // when a page explicitly asks for difficulty sorting.
@@ -376,13 +387,13 @@ class ContentProvider extends ChangeNotifier {
   }
 
   List<Topic> getTopicsByCategories(List<String> categoryIds) {
-    return _topics.values
+    return topics.values
         .where((t) => categoryIds.contains(t.categoryId))
         .toList();
   }
 
   List<Topic> getTopicsByCategory(String domainId, String categoryId) {
-    return _topics.values
+    return topics.values
         .where((t) => t.domainId == domainId && t.categoryId == categoryId)
         .toList()
       ..sort((a, b) {
