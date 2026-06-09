@@ -32,6 +32,7 @@ class ContentProvider extends ChangeNotifier {
   bool get isCheckingUpdate => _isCheckingUpdate;
   String? get error => _error;
   List<String> get topicLoadFailures => List.unmodifiable(_topicLoadFailures);
+  String? get contentVersion => _cachedContentVersion;
 
   String get _cacheScope => _api.baseUrl
       .replaceAll(RegExp(r'^https?://'), '')

@@ -166,6 +166,12 @@ class DashboardPage extends StatelessWidget {
     );
 
     final plan = progressProvider.prepPlan;
+    // 目标改变时通知 scope，检测路线陈旧
+    if (plan.hasTarget) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => scope.notifyPlanChanged(plan.signature),
+      );
+    }
 
     final weakTopics = progressProvider.getWeakTopics(scopedTopics, limit: 5);
     final recentAttempts = progressProvider.recentAttempts.take(5).toList();
@@ -175,6 +181,8 @@ class DashboardPage extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          if (scope.routeStale)
+            _buildRouteStaleBanner(context),
           if (!scope.isRouteMode && plan.hasTarget)
             _buildTargetBanner(context, plan),
           Expanded(
@@ -405,6 +413,48 @@ class DashboardPage extends StatelessWidget {
   ],
 ),
 );
+  }
+
+  Widget _buildRouteStaleBanner(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_outlined, size: 18, color: AppColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              l10n.get('route_stale_hint'),
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : AppColors.textPrimary),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () {
+              context.read<LearningScopeProvider>().clearRouteStale();
+              onRegenerateAiRoute?.call();
+            },
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
+            child: Text(l10n.get('update_route'), style: TextStyle(color: AppColors.warning, fontSize: 13)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            color: AppColors.warning,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => context.read<LearningScopeProvider>().clearRouteStale(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTargetBanner(BuildContext context, PrepPlan plan) {

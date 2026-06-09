@@ -405,6 +405,7 @@ class _LearningShellState extends State<LearningShell> {
         plan: plan,
         allTopics: content.topics.values.toList(),
         progressProvider: progress,
+        contentVersion: content.contentVersion,
         aiService: aiProvider.aiService,
         contentProvider: content,
         aiConfig: aiConfig,
@@ -424,7 +425,11 @@ class _LearningShellState extends State<LearningShell> {
         existing.map((r) => r.toJson()).toList(),
       );
       if (mounted) {
-        await context.read<LearningScopeProvider>().setRoute(route.id);
+        final scopeProvider = context.read<LearningScopeProvider>();
+        await scopeProvider.setRoute(route.id);
+        // 记录生成时的 plan 签名，以便后续检测目标是否变更
+        scopeProvider.notifyPlanChanged(plan.signature);
+        scopeProvider.clearRouteStale();
         final l10n = context.read<LocalizationProvider>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -86,6 +86,8 @@ class LearningScopeProvider extends ChangeNotifier {
   LearningScope _scope = const LearningScope.allDomains();
   List<LearningRoute> _customRoutes = [];
   bool _loaded = false;
+  bool _routeStale = false;
+  String? _lastPlanSignature;
 
   LearningScopeProvider(this._storage) {
     _store = _LearningScopeStore(_storage);
@@ -100,6 +102,7 @@ class LearningScopeProvider extends ChangeNotifier {
   bool get isRouteMode => _scope.isRouteMode;
   bool get isSingleDomain => _scope.isSingleDomain;
   bool get isAllDomains => _scope.isAllDomains;
+  bool get routeStale => _routeStale && isRouteMode;
 
   /// 活动路线对象（路线模式下返回路线，否则 null）。
   LearningRoute? get activeRoute {
@@ -132,17 +135,17 @@ class LearningScopeProvider extends ChangeNotifier {
   /// 是否跨多个领域（路线模式且涵盖 >1 个领域）。
   bool get isCrossDomain => _scope.isRouteMode && scopeDomainIds.length > 1;
 
-  /// 用于 UI 展示的范围名称。
-  String displayName(Map<String, String> domainTitles) {
+  /// 用于 UI 展示的范围名称 key（调用方通过 l10n 翻译）。
+  String displayNameKey(Map<String, String> domainTitles) {
     switch (_scope.kind) {
       case ScopeKind.allDomains:
-        return '全部领域';
+        return 'all_domains';
       case ScopeKind.singleDomain:
         final id = _scope.domainId;
-        if (id == null) return '单领域';
+        if (id == null) return 'single_domain';
         return domainTitles[id] ?? id;
       case ScopeKind.route:
-        return activeRoute?.name ?? '学习路线';
+        return activeRoute?.name ?? 'learning_route';
     }
   }
 
@@ -236,6 +239,22 @@ class LearningScopeProvider extends ChangeNotifier {
     } else {
       notifyListeners();
     }
+  }
+
+  /// 当 PrepPlan 目标改变时通知 scope，检测路线是否已过期。
+  void notifyPlanChanged(String planSignature) {
+    if (!isRouteMode) return;
+    if (_lastPlanSignature != null && _lastPlanSignature != planSignature) {
+      _routeStale = true;
+      notifyListeners();
+    }
+    _lastPlanSignature = planSignature;
+  }
+
+  /// 用户确认更新路线后清除陈旧标记。
+  void clearRouteStale() {
+    _routeStale = false;
+    notifyListeners();
   }
 
   // ── 初始化与迁移 ──────────────────────────────────────────────────
