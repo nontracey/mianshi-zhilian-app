@@ -531,7 +531,6 @@ class CenterPanel extends StatefulWidget {
     required this.allDomains,
     required this.currentDomainId,
     required this.recommendedTopics,
-    required this.masteryPercent,
     required this.topicCount,
     required this.readiness,
     required this.streakDays,
@@ -552,7 +551,6 @@ class CenterPanel extends StatefulWidget {
   final List<Domain> allDomains;
   final String currentDomainId;
   final List<Topic> recommendedTopics;
-  final int masteryPercent;
   final int topicCount;
   final int readiness;
   final int streakDays;

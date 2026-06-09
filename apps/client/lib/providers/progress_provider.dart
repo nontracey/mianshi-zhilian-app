@@ -204,11 +204,12 @@ class ProgressProvider extends ChangeNotifier {
           domainTopics,
           availableTopicIds,
         );
-        result.sort((a, b) {
-          final scoreA = _recommendationScore(
-            a,
+        // Schwartzian transform: compute score once per topic, sort by cached value.
+        final scored = result.map((t) {
+          final s = _recommendationScore(
+            t,
             availableTopicIds: availableTopicIds,
-            prerequisiteDemand: prerequisiteDemand[a.id] ?? 0,
+            prerequisiteDemand: prerequisiteDemand[t.id] ?? 0,
             lowScoreWeight: lowScoreWeight,
             overdueWeight: overdueWeight,
             highFrequencyWeight: highFrequencyWeight,
@@ -217,20 +218,12 @@ class ProgressProvider extends ChangeNotifier {
             prioritizePrerequisites: prioritizePrerequisites,
             allowSkipLowFrequency: allowSkipLowFrequency,
           );
-          final scoreB = _recommendationScore(
-            b,
-            availableTopicIds: availableTopicIds,
-            prerequisiteDemand: prerequisiteDemand[b.id] ?? 0,
-            lowScoreWeight: lowScoreWeight,
-            overdueWeight: overdueWeight,
-            highFrequencyWeight: highFrequencyWeight,
-            pathOrderWeight: pathOrderWeight,
-            notPracticedWeight: notPracticedWeight,
-            prioritizePrerequisites: prioritizePrerequisites,
-            allowSkipLowFrequency: allowSkipLowFrequency,
-          );
-          return scoreB.compareTo(scoreA);
-        });
+          return (topic: t, score: s);
+        }).toList()
+          ..sort((a, b) => b.score.compareTo(a.score));
+        result
+          ..clear()
+          ..addAll(scored.map((e) => e.topic));
         break;
       case 'low-score-first':
         result.sort((a, b) {

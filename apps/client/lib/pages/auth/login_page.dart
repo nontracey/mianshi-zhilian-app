@@ -127,11 +127,6 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // 防注入：过滤特殊字符
-  String _sanitizeInput(String input) {
-    return input.replaceAll(RegExp(r'[<>"\x27;\(\)]'), '').trim();
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -141,7 +136,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     final authProvider = context.read<AuthProvider>();
-    final username = _sanitizeInput(_usernameController.text);
+    // 后端使用参数化查询，无需客户端过滤；直接 trim 即可
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
     bool success;
 
@@ -218,6 +214,9 @@ class _LoginPageState extends State<LoginPage> {
                           }
                           if (value.trim().length < 3) {
                             return l10n.get('username_min_3_chars');
+                          }
+                          if (RegExp('[<>"\'();]').hasMatch(value)) {
+                            return l10n.get('username_invalid_chars');
                           }
                           return null;
                         },

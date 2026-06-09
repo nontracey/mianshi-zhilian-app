@@ -178,9 +178,10 @@ class DashboardPage extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          // 两个 banner 互斥：路线陈旧提示优先级更高，避免顶部区域拥挤。
           if (scope.routeStale)
-            _buildRouteStaleBanner(context),
-          if (!scope.isRouteMode && plan.hasTarget)
+            _buildRouteStaleBanner(context)
+          else if (!scope.isRouteMode && plan.hasTarget)
             _buildTargetBanner(context, plan),
           Expanded(
             child: LayoutBuilder(
@@ -223,7 +224,6 @@ class DashboardPage extends StatelessWidget {
                         allDomains: domains,
                         currentDomainId: currentDomainId,
                         recommendedTopics: recommendedTopics,
-                        masteryPercent: masteryPercent,
                         topicCount: topicCount,
                         readiness: readiness,
                         streakDays: progressProvider.streakDays,
@@ -296,7 +296,6 @@ class DashboardPage extends StatelessWidget {
                             allDomains: domains,
                             currentDomainId: currentDomainId,
                             recommendedTopics: recommendedTopics,
-                            masteryPercent: masteryPercent,
                             topicCount: topicCount,
                             readiness: readiness,
                             streakDays: progressProvider.streakDays,
@@ -354,7 +353,6 @@ class DashboardPage extends StatelessWidget {
                     allDomains: domains,
                     currentDomainId: currentDomainId,
                     recommendedTopics: recommendedTopics,
-                    masteryPercent: masteryPercent,
                     topicCount: topicCount,
                     readiness: readiness,
                     streakDays: progressProvider.streakDays,

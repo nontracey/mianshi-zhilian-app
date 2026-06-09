@@ -171,7 +171,7 @@ class AppSettings {
     this.primaryColor = const Color(0xFF1A2B4A),
     this.accentColor = const Color(0xFF3078F0),
     this.language = 'zh',
-    this.recommendStrategy = 'low-score-first',
+    this.recommendStrategy = 'smart',
     this.currentDomain = 'java',
     this.compactLayout = false,
     this.dailyNewCount = 3,
