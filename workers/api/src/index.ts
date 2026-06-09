@@ -429,10 +429,11 @@ function refreshTokenExpiresAt(): string {
 async function issueRefreshToken(
   db: D1Database,
   userId: string,
-): Promise<string> {
+): Promise<{ token: string; id: string }> {
   const refreshToken = generateOpaqueToken();
   const tokenHash = await hashRefreshToken(refreshToken);
   const expiresAt = refreshTokenExpiresAt();
+  const id = crypto.randomUUID();
 
   await db
     .prepare(
@@ -441,20 +442,20 @@ async function issueRefreshToken(
     VALUES (?, ?, ?, ?)
   `,
     )
-    .bind(crypto.randomUUID(), userId, tokenHash, expiresAt)
+    .bind(id, userId, tokenHash, expiresAt)
     .run();
 
-  return refreshToken;
+  return { token: refreshToken, id };
 }
 
 async function issueAuthTokens(
   db: D1Database,
   userId: string,
   secret: string,
-): Promise<{ token: string; refreshToken: string }> {
+): Promise<{ token: string; refreshToken: string; refreshTokenId: string }> {
   const token = await generateToken(userId, secret);
-  const refreshToken = await issueRefreshToken(db, userId);
-  return { token, refreshToken };
+  const { token: refreshToken, id: refreshTokenId } = await issueRefreshToken(db, userId);
+  return { token, refreshToken, refreshTokenId };
 }
 
 // 验证 JWT token
@@ -617,6 +618,12 @@ async function initDatabase(db: D1Database): Promise<void> {
     db,
     `CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`,
     "idx refresh_tokens user",
+  );
+  // 宽限期轮换：记录旋转出的新 token ID，允许旧 token 在 ~60s 内重试
+  await execSafely(
+    db,
+    `ALTER TABLE refresh_tokens ADD COLUMN rotated_to TEXT`,
+    "migrate refresh_tokens rotated_to",
   );
 
   await execSafely(
@@ -1096,7 +1103,7 @@ async function handleRefreshToken(
     const tokenHash = await hashRefreshToken(refreshToken);
     const tokenRow = (await env.DB.prepare(
       `
-      SELECT id, user_id, expires_at, revoked_at
+      SELECT id, user_id, expires_at, revoked_at, rotated_to
       FROM refresh_tokens
       WHERE token_hash = ?
     `,
@@ -1104,11 +1111,37 @@ async function handleRefreshToken(
       .bind(tokenHash)
       .first()) as any;
 
-    if (
-      !tokenRow ||
-      tokenRow.revoked_at ||
-      Date.parse(tokenRow.expires_at) <= Date.now()
-    ) {
+    if (!tokenRow) {
+      return json({ error: "登录已过期，请重新登录" }, 401);
+    }
+
+    // 宽限期轮换：已吊销但在 60s 内的 token，沿 rotated_to 找到后继 token 再旋转
+    if (tokenRow.revoked_at) {
+      const revokedMs = Date.parse(tokenRow.revoked_at);
+      const graceOk = Date.now() - revokedMs < 60_000 && tokenRow.rotated_to;
+      if (!graceOk) {
+        return json({ error: "登录已过期，请重新登录" }, 401);
+      }
+      // 找后继 token
+      const successor = (await env.DB.prepare(
+        `SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens WHERE id = ?`,
+      )
+        .bind(tokenRow.rotated_to)
+        .first()) as any;
+      if (
+        !successor ||
+        successor.revoked_at ||
+        Date.parse(successor.expires_at) <= Date.now()
+      ) {
+        return json({ error: "登录已过期，请重新登录" }, 401);
+      }
+      // 从后继 token 正常旋转
+      tokenRow.id = successor.id;
+      tokenRow.user_id = successor.user_id;
+      tokenRow.revoked_at = null;
+    }
+
+    if (Date.parse(tokenRow.expires_at) <= Date.now()) {
       return json({ error: "登录已过期，请重新登录" }, 401);
     }
 
@@ -1134,21 +1167,22 @@ async function handleRefreshToken(
       return json({ error: "账号已被禁用，请联系管理员" }, 403);
     }
 
-    await env.DB.prepare(
-      `
-      UPDATE refresh_tokens
-      SET revoked_at = datetime('now'), last_used_at = datetime('now')
-      WHERE id = ?
-    `,
-    )
-      .bind(tokenRow.id)
-      .run();
-
-    const { token, refreshToken: nextRefreshToken } = await issueAuthTokens(
+    const { token, refreshToken: nextRefreshToken, refreshTokenId } = await issueAuthTokens(
       env.DB,
       user.id,
       getJwtSecret(env),
     );
+
+    // 吊销当前 token，并记录宽限期链接
+    await env.DB.prepare(
+      `
+      UPDATE refresh_tokens
+      SET revoked_at = datetime('now'), last_used_at = datetime('now'), rotated_to = ?
+      WHERE id = ?
+    `,
+    )
+      .bind(refreshTokenId, tokenRow.id)
+      .run();
 
     return json({
       success: true,
@@ -1508,7 +1542,7 @@ async function handleCreateTicket(
       .bind(id, user.id, type, subject, description, JSON.stringify(imageUrls))
       .run();
 
-    const ticket = await env.DB.prepare("SELECT * FROM tickets WHERE id = ?")
+    const ticket = await env.DB.prepare("SELECT id, user_id, account_username, contact, type, subject, description, image_urls, status, admin_reply, created_at, resolved_at FROM tickets WHERE id = ?")
       .bind(id)
       .first();
     return json({ success: true, ticket: normalizeTicket(ticket) });
@@ -1548,7 +1582,7 @@ async function handleCreatePasswordResetTicket(
     return json({
       success: true,
       ticket: normalizeTicket(
-        await env.DB.prepare("SELECT * FROM tickets WHERE id = ?")
+        await env.DB.prepare("SELECT id, user_id, account_username, contact, type, subject, description, image_urls, status, admin_reply, created_at, resolved_at FROM tickets WHERE id = ?")
           .bind(id)
           .first(),
       ),
@@ -1571,7 +1605,7 @@ async function handleGetMyTickets(
     const user = await getActiveUserFromRequest(request, env);
     if (!user) return json({ error: "未登录或账号不可用" }, 401);
     const rows = await env.DB.prepare(
-      "SELECT * FROM tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 100",
+      "SELECT id, user_id, account_username, contact, type, subject, description, image_urls, status, admin_reply, created_at, resolved_at FROM tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 100",
     )
       .bind(user.id)
       .all();

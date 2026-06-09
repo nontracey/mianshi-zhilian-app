@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +47,7 @@ void main() async {
   await AppLogService.instance.initialize();
   final originalDebugPrint = debugPrint;
   debugPrint = (String? message, {int? wrapWidth}) {
-    originalDebugPrint(message, wrapWidth: wrapWidth);
+    if (!kReleaseMode) originalDebugPrint(message, wrapWidth: wrapWidth);
     final text = message;
     if (text != null && text.trim().isNotEmpty) {
       unawaited(AppLog.debug(text, source: 'debugPrint'));

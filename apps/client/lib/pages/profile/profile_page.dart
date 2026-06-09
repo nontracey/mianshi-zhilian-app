@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
@@ -20,10 +22,74 @@ import 'package:mianshi_zhilian/pages/profile/content_source_page.dart';
 import 'package:mianshi_zhilian/pages/profile/route_preference_page.dart';
 import 'package:mianshi_zhilian/pages/profile/about_update_page.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final _storage = StorageService();
+
+  Future<void> _clearCacheAndRecordings() async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('clear_cache_recordings')),
+        content: Text(l10n.get('clear_cache_recordings_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.get('confirm_fixed')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final cacheCount = await _storage.clearCacheData();
+
+    int recordingCount = 0;
+    if (!kIsWeb) {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final voiceFiles = tempDir
+            .listSync()
+            .whereType<File>()
+            .where((f) {
+              final name = f.path.split(Platform.pathSeparator).last;
+              return (name.startsWith('voice_') || name.startsWith('voice_diag_')) &&
+                  name.endsWith('.wav');
+            })
+            .toList();
+        for (final f in voiceFiles) {
+          try { f.deleteSync(); recordingCount++; } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          l10n.getp('clear_cache_done', {
+            'cache': cacheCount,
+            'recordings': recordingCount,
+          }),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +186,12 @@ class ProfilePage extends StatelessWidget {
                 '/profile/route-preference',
                 extra: const RoutePreferencePage(),
               ),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.cleaning_services_outlined,
+              title: l10n.get('clear_cache_recordings'),
+              subtitle: l10n.get('clear_cache_recordings_subtitle'),
+              onTap: _clearCacheAndRecordings,
             ),
             _ProfileSectionItem(
               icon: Icons.article_outlined,

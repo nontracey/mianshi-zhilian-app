@@ -1,0 +1,42 @@
+{
+  "id": "java",
+  "title": "Java",
+  "description": "Java 核心与生态",
+  "icon": "java",
+  "categories": [
+    {
+      "id": "java-jvm",
+      "title": "JVM",
+      "description": "JVM 内存模型与垃圾回收",
+      "topics": ["java/jvm/memory-model.json", "java/jvm/gc.json"]
+    },
+    {
+      "id": "java-collections",
+      "title": "集合框架",
+      "description": "Java 集合框架核心原理",
+      "topics": ["java/collections/arraylist.json", "java/collections/hashmap.json"]
+    }
+  ],
+  "learningPaths": [
+    {
+      "id": "lp-java-core",
+      "title": "Java 核心路径",
+      "steps": [
+        {
+          "title": "JVM 基础",
+          "description": "理解 JVM 内存与 GC",
+          "categoryIds": ["java-jvm"],
+          "prerequisiteSteps": [],
+          "estimatedHours": 8
+        },
+        {
+          "title": "集合框架",
+          "description": "掌握常用集合原理",
+          "categoryIds": ["java-collections"],
+          "prerequisiteSteps": ["java-jvm"],
+          "estimatedHours": 6
+        }
+      ]
+    }
+  ]
+}

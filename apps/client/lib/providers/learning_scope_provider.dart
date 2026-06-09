@@ -215,13 +215,22 @@ class LearningScopeProvider extends ChangeNotifier {
       setScope(LearningScope.route(routeId));
 
   /// 添加或更新路线，并可选择立即切换到该路线。
+  /// AI 路线额外按 planSignature 去重，避免重复生成累积旧路线。
   Future<void> upsertRoute(LearningRoute route, {bool activate = false}) async {
-    final idx = _customRoutes.indexWhere((r) => r.id == route.id);
-    if (idx >= 0) {
-      _customRoutes[idx] = route;
-    } else {
-      _customRoutes = [..._customRoutes, route];
+    var routes = List<LearningRoute>.from(_customRoutes);
+    // AI 路线：先移除同 planSignature 的旧条目（不同 id 但相同目标）
+    if (route.source == 'ai' && route.planSignature != null) {
+      routes.removeWhere(
+        (r) => r.source == 'ai' && r.planSignature == route.planSignature && r.id != route.id,
+      );
     }
+    final idx = routes.indexWhere((r) => r.id == route.id);
+    if (idx >= 0) {
+      routes[idx] = route;
+    } else {
+      routes = [...routes, route];
+    }
+    _customRoutes = routes;
     await _store.saveCustomRoutes(_customRoutes);
     if (activate) {
       await setRoute(route.id);
@@ -265,6 +274,9 @@ class LearningScopeProvider extends ChangeNotifier {
   /// 仅在没有新键也没有旧路线键时作为单领域范围使用。
   Future<LearningScopeProvider> load({String? legacyDomainId}) async {
     _customRoutes = await _store.loadCustomRoutes();
+    // 一次性清理历史重复 AI 路线（同 planSignature 保留最新的一条）
+    _customRoutes = _deduplicateAiRoutes(_customRoutes);
+    await _store.saveCustomRoutes(_customRoutes);
 
     // 尝试加载新键
     final saved = await _store.loadScope();
@@ -303,6 +315,23 @@ class LearningScopeProvider extends ChangeNotifier {
     _loaded = true;
     notifyListeners();
     return this;
+  }
+
+  /// 清理历史重复 AI 路线，同 planSignature 只保留最新（updatedAt 最大）的一条。
+  static List<LearningRoute> _deduplicateAiRoutes(List<LearningRoute> routes) {
+    final seen = <String, LearningRoute>{};
+    final nonAi = <LearningRoute>[];
+    for (final r in routes) {
+      if (r.source != 'ai' || r.planSignature == null) {
+        nonAi.add(r);
+        continue;
+      }
+      final existing = seen[r.planSignature!];
+      if (existing == null || r.updatedAt.isAfter(existing.updatedAt)) {
+        seen[r.planSignature!] = r;
+      }
+    }
+    return [...nonAi, ...seen.values];
   }
 
   /// 外部数据导入后重新加载（对应 `dataSyncService.onDataImported`）。

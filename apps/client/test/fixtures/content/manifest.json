@@ -1,0 +1,19 @@
+{
+  "version": "test-1.0",
+  "domains": [
+    {
+      "id": "java",
+      "entry": "domains/java.json",
+      "title": "Java",
+      "description": "Java 核心与生态",
+      "icon": "java"
+    },
+    {
+      "id": "agent",
+      "entry": "domains/agent.json",
+      "title": "AI Agent 开发",
+      "description": "AI Agent 与工具链",
+      "icon": "agent"
+    }
+  ]
+}

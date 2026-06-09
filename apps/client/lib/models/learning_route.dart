@@ -4,11 +4,13 @@ class LearningRoute {
   final String name;
   final String description;
   final List<String> domainIds;
-  final List<RoutePhase>? phases;     // 新增：阶段排期（官方路线可为 null）
+  final List<RoutePhase>? phases;     // 阶段排期（官方路线可为 null）
   final String source;                 // 'official' | 'custom' | 'ai'
   final bool isDefault;
   final DateTime createdAt;
   final DateTime updatedAt;
+  /// AI 路线专用：生成时的面试目标签名（用于去重）
+  final String? planSignature;
 
   const LearningRoute({
     required this.id,
@@ -20,6 +22,7 @@ class LearningRoute {
     this.isDefault = false,
     required this.createdAt,
     required this.updatedAt,
+    this.planSignature,
   });
 
   /// 获取路线中所有 topicId（去重）
@@ -41,6 +44,7 @@ class LearningRoute {
     'isDefault': isDefault,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    if (planSignature != null) 'planSignature': planSignature,
   };
 
   factory LearningRoute.fromJson(Map<String, dynamic> json) => LearningRoute(
@@ -55,6 +59,7 @@ class LearningRoute {
     isDefault: json['isDefault'] as bool? ?? false,
     createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
     updatedAt: DateTime.parse(json['updatedAt'] as String? ?? DateTime.now().toIso8601String()),
+    planSignature: json['planSignature'] as String?,
   );
 }
 

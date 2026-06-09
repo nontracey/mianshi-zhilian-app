@@ -21,7 +21,6 @@ import 'package:mianshi_zhilian/pages/practice/practice_page.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
 import 'package:mianshi_zhilian/pages/practice/today_review_page.dart';
-import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/pages/prep/interview_prep_page.dart';
 import 'package:mianshi_zhilian/pages/mastery/mastery_page.dart';
@@ -248,6 +247,8 @@ class _LearningShellState extends State<LearningShell> {
           if (content.getLoadedTopicCount(domainId) == 0) {
             content.loadDomainTopics(domainId);
           }
+          // 点领域卡片 = 切到单领域范围（退出路线裁剪），再跳目录
+          scope.setSingleDomain(domainId);
           setState(() => _section = AppSection.catalog);
         },
         onReview: () => _setSection(AppSection.practice),
@@ -411,21 +412,10 @@ class _LearningShellState extends State<LearningShell> {
         forceRegenerate: forceRegenerate,
       );
 
-      // 保存到 custom_routes
-      final customData = await _storage.loadJsonList('custom_routes');
-      final existing = customData
-          .map((e) => LearningRoute.fromJson(e))
-          .toList();
-      // 替换同名/同 ID 的旧 AI 路线
-      existing.removeWhere((r) => r.id == route.id);
-      existing.add(route);
-      await _storage.saveJsonList(
-        'custom_routes',
-        existing.map((r) => r.toJson()).toList(),
-      );
+      // 通过 LearningScopeProvider 保存并去重（同 planSignature 的旧 AI 路线会被替换）
       if (mounted) {
         final scopeProvider = context.read<LearningScopeProvider>();
-        await scopeProvider.setRoute(route.id);
+        await scopeProvider.upsertRoute(route, activate: true);
         // 记录生成时的 plan 签名，以便后续检测目标是否变更
         scopeProvider.notifyPlanChanged(plan.signature);
         scopeProvider.clearRouteStale();

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 
 class TopicProgress {
   final String topicId;
@@ -337,9 +339,11 @@ class PrepPlan {
       jobDescription.trim().isNotEmpty ||
       (company ?? '').trim().isNotEmpty;
 
-  /// 用于检测目标变化的签名（同字段组合的哈希）
-  String get signature =>
-      '${targetRole.trim()}_${techStack.trim()}_${jobDescription.trim()}_${interviewDate?.toIso8601String() ?? ''}'.hashCode.toString();
+  /// 用于检测目标变化的签名（稳定哈希，跨进程一致）
+  String get signature {
+    final input = '${targetRole.trim()}_${techStack.trim()}_${jobDescription.trim()}_${interviewDate?.toIso8601String() ?? ''}';
+    return sha256.convert(utf8.encode(input)).toString().substring(0, 16);
+  }
 
   factory PrepPlan.empty() => PrepPlan(updatedAt: DateTime.now());
 
@@ -472,7 +476,7 @@ class SyncSettings {
     this.autoSyncEnabled = true,
     this.autoSyncIntervalMinutes = 5,
     this.syncFullPracticeText = false,
-    this.syncPrivatePrepData = true,
+    this.syncPrivatePrepData = false,
     this.syncAiConfigMetadata = true,
     this.lastSyncAt,
     this.lastSyncStatus = 'local_mode',

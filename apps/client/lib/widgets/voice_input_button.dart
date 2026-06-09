@@ -400,12 +400,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           error: e,
         ),
       );
-      if (_running) rethrow;
       if (chunkPath != null) {
-        try {
-          await deleteFileAtPath(chunkPath);
-        } catch (_) {}
+        try { await deleteFileAtPath(chunkPath); } catch (_) {}
       }
+      if (_running) rethrow;
       return null;
     }
   }

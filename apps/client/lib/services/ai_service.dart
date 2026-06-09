@@ -777,7 +777,11 @@ class AiServiceException implements Exception {
   }
 
   static String _redact(String text) {
-    return text.replaceAll(RegExp(r'sk-[A-Za-z0-9_\-]{8,}'), 'sk-***');
+    return text
+        .replaceAll(RegExp(r'sk-[A-Za-z0-9_\-]{8,}'), 'sk-***')
+        .replaceAll(RegExp(r'AIza[A-Za-z0-9_\-]{30,}'), 'AIza***')
+        .replaceAll(RegExp(r'Bearer\s+[A-Za-z0-9._~+/=\-]{8,}'), 'Bearer [redacted]')
+        .replaceAll(RegExp(r'(api[_\-]?key["\s:=]+)[^,\s"]{8,}', caseSensitive: false), r'$1[redacted]');
   }
 
   @override
