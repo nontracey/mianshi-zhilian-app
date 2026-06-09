@@ -28,8 +28,6 @@ class StorageService {
     'settings',
     'disabled_domains',
     'custom_routes',
-    'selected_route_id',
-    'route_mode_disabled',
     'learning_scope',
     'deletions',
 

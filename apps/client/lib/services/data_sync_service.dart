@@ -20,6 +20,9 @@ class DataSyncService {
   static const _timeout = Duration(seconds: 30);
   static const _uploadTimeout = Duration(seconds: 120);
 
+  // ETag from last WebDAV GET; sent as If-Match on next PUT to detect concurrent writes.
+  String? _webDavEtag;
+
   void start() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -274,8 +277,12 @@ class DataSyncService {
     final base = _normalizeUrl(settings.webDavUrl);
     final uri = Uri.parse('$base/$_fileName');
     final response = await _webDavRequest('GET', uri, settings);
-    if (response.statusCode == 404) return null;
+    if (response.statusCode == 404) {
+      _webDavEtag = null;
+      return null;
+    }
     _ensureSuccess(response, 'WebDAV 下载失败');
+    _webDavEtag = response.headers['etag'];
     return json.decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -288,13 +295,23 @@ class DataSyncService {
     _require(settings.webDavPassword.isNotEmpty, '缺少 WebDAV 应用密码');
     final base = _normalizeUrl(settings.webDavUrl);
     final uri = Uri.parse('$base/$_fileName');
+    final etag = _webDavEtag;
     final response = await _webDavRequest(
       'PUT',
       uri,
       settings,
       body: const JsonEncoder.withIndent('  ').convert(package),
+      headers: etag != null ? {'If-Match': etag} : null,
     );
+    if (response.statusCode == 412) {
+      // Another device wrote since our last download — retry after re-download.
+      _webDavEtag = null;
+      throw const SyncConflictException();
+    }
     _ensureSuccess(response, 'WebDAV 上传失败');
+    // Update ETag from PUT response if the server provides one.
+    final newEtag = response.headers['etag'];
+    if (newEtag != null) _webDavEtag = newEtag;
   }
 
   Future<void> _testWebDavConnection(SyncSettings settings) async {
