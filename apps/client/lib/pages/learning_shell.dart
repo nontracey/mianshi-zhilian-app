@@ -328,7 +328,10 @@ class _LearningShellState extends State<LearningShell> {
     final topicIds = scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
     context.push(
       '/practice/mock-interview',
-      extra: MockInterviewPage(topicIds: topicIds.take(10).toList()),
+      extra: MockInterviewPage(
+        topicIds: topicIds.take(10).toList(),
+        interviewScenario: settings.settings.mockInterviewPreference,
+      ),
     );
   }
 

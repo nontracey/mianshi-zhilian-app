@@ -358,7 +358,19 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
       return Scaffold(
         appBar: AppBar(title: Text(l10n.get('mode_mock_interview'))),
         body: Center(
-          child: Text(l10n.get('not_has_optional_use_knowledge_point')),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.get('not_has_optional_use_knowledge_point')),
+              if (_scenario != 'mixed') ...[
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: () => setState(() => _scenario = 'mixed'),
+                  child: Text(l10n.get('mix_combine')),
+                ),
+              ],
+            ],
+          ),
         ),
       );
     }
