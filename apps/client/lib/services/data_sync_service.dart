@@ -22,6 +22,9 @@ class DataSyncService {
 
   // ETag from last WebDAV GET; sent as If-Match on next PUT to detect concurrent writes.
   String? _webDavEtag;
+  // True when the last GET returned 404 (remote file absent): the next PUT sends
+  // If-None-Match:* so two devices creating the file simultaneously don't overwrite.
+  bool _webDavRemoteAbsent = false;
 
   void start() {
     _timer?.cancel();
@@ -279,10 +282,12 @@ class DataSyncService {
     final response = await _webDavRequest('GET', uri, settings);
     if (response.statusCode == 404) {
       _webDavEtag = null;
+      _webDavRemoteAbsent = true;
       return null;
     }
     _ensureSuccess(response, 'WebDAV 下载失败');
     _webDavEtag = response.headers['etag'];
+    _webDavRemoteAbsent = false;
     return json.decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -296,20 +301,30 @@ class DataSyncService {
     final base = _normalizeUrl(settings.webDavUrl);
     final uri = Uri.parse('$base/$_fileName');
     final etag = _webDavEtag;
+    // 优先 If-Match（已知 ETag）；远端确认不存在时用 If-None-Match:* 防止
+    // 两设备首次同步互相覆盖；状态未知时不带前置条件（保持兼容）。
+    final Map<String, String>? preconditionHeaders = etag != null
+        ? {'If-Match': etag}
+        : _webDavRemoteAbsent
+            ? {'If-None-Match': '*'}
+            : null;
     final response = await _webDavRequest(
       'PUT',
       uri,
       settings,
       body: const JsonEncoder.withIndent('  ').convert(package),
-      headers: etag != null ? {'If-Match': etag} : null,
+      headers: preconditionHeaders,
     );
     if (response.statusCode == 412) {
-      // Another device wrote since our last download — retry after re-download.
+      // 前置条件失败：另一设备已写入（If-Match 时被改、If-None-Match 时被创建）。
+      // 重置状态并抛出冲突，由 _uploadWithConflictRetry 重新下载合并后重试。
       _webDavEtag = null;
+      _webDavRemoteAbsent = false;
       throw const SyncConflictException();
     }
     _ensureSuccess(response, 'WebDAV 上传失败');
-    // Update ETag from PUT response if the server provides one.
+    // 上传成功后远端文件必然存在；按服务器返回更新 ETag。
+    _webDavRemoteAbsent = false;
     final newEtag = response.headers['etag'];
     if (newEtag != null) _webDavEtag = newEtag;
   }
@@ -589,7 +604,7 @@ class DataSyncService {
       merged.remove('deletions');
     }
 
-    merged['progress_map'] = _mergeProgressMap(
+    merged['progress_map'] = mergeProgressMaps(
       remoteData['progress_map'],
       localData['progress_map'],
     );
@@ -621,43 +636,46 @@ class DataSyncService {
     };
   }
 
-  Map<String, dynamic> _mergeProgressMap(dynamic remote, dynamic local) {
+  /// 合并两侧 progress_map：按 `lastPracticeAt` 做 last-write-wins（取最近一次
+  /// 练习的版本），与其它集合的 LWW 口径一致——诚实反映"最近一次练习"，而非
+  /// 保留历史最高分。`practiceCount` 取两侧较大值（单调计数不回退）；时间戳缺失
+  /// 或并列时遵循本地优先。
+  @visibleForTesting
+  static Map<String, dynamic> mergeProgressMaps(dynamic remote, dynamic local) {
     final result = <String, dynamic>{};
     if (remote is Map) {
       result.addAll(remote.map((k, v) => MapEntry(k.toString(), v)));
     }
-    if (local is Map) {
-      for (final entry in local.entries) {
-        final topicId = entry.key.toString();
-        final localProgress = entry.value;
-        final remoteProgress = result[topicId];
-        if (localProgress is! Map) {
-          result[topicId] = localProgress;
-          continue;
-        }
-        if (remoteProgress is! Map) {
-          result[topicId] = localProgress;
-          continue;
-        }
-        final localScore = (localProgress['score'] as num?)?.toInt() ?? 0;
-        final remoteScore = (remoteProgress['score'] as num?)?.toInt() ?? 0;
-        if (localScore > remoteScore) {
-          result[topicId] = localProgress;
-        } else if (localScore == remoteScore) {
-          result[topicId] = {
-            ...remoteProgress,
-            ...localProgress,
-            'practiceCount': [
-              (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
-              (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
-            ].reduce((a, b) => a > b ? a : b),
-            'nextReviewAt': _earlierDateString(
-              remoteProgress['nextReviewAt'] as String?,
-              localProgress['nextReviewAt'] as String?,
-            ),
-          };
-        }
+    if (local is! Map) return result;
+
+    for (final entry in local.entries) {
+      final topicId = entry.key.toString();
+      final localProgress = entry.value;
+      final remoteProgress = result[topicId];
+      if (localProgress is! Map || remoteProgress is! Map) {
+        // 任一侧缺失或非 Map：本地优先。
+        result[topicId] = localProgress;
+        continue;
       }
+
+      final localTs = DateTime.tryParse('${localProgress['lastPracticeAt'] ?? ''}');
+      final remoteTs = DateTime.tryParse('${remoteProgress['lastPracticeAt'] ?? ''}');
+      final Map winner;
+      if (remoteTs == null) {
+        winner = localProgress; // 远端无时间戳 → 本地胜
+      } else if (localTs == null) {
+        winner = remoteProgress; // 本地无时间戳但远端有 → 远端胜
+      } else {
+        // 相同时间本地优先（!isBefore 即 local >= remote）。
+        winner = !localTs.isBefore(remoteTs) ? localProgress : remoteProgress;
+      }
+
+      final maxPractice = [
+        (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
+        (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
+      ].reduce((a, b) => a > b ? a : b);
+
+      result[topicId] = {...winner, 'practiceCount': maxPractice};
     }
     return result;
   }
@@ -781,16 +799,6 @@ class DataSyncService {
     addAll(remote);
     addAll(local);
     return result;
-  }
-
-  String? _earlierDateString(String? a, String? b) {
-    if (a == null || a.isEmpty) return b;
-    if (b == null || b.isEmpty) return a;
-    final da = DateTime.tryParse(a);
-    final db = DateTime.tryParse(b);
-    if (da == null) return b;
-    if (db == null) return a;
-    return da.isBefore(db) ? a : b;
   }
 
   void _validateRepoSettings({
