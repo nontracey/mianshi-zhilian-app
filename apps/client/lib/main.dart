@@ -19,6 +19,7 @@ import 'providers/progress_provider.dart';
 import 'providers/learning_scope_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/update_download_provider.dart';
 import 'services/analytics_service.dart';
 import 'services/app_log_service.dart';
 import 'services/data_sync_service.dart';
@@ -308,6 +309,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               LocalizationProvider(initialLanguage: widget.initialLanguage),
         ),
         Provider<AnalyticsService>.value(value: widget.analyticsService),
+        ChangeNotifierProvider(
+          create: (_) => UpdateDownloadProvider(widget.storage),
+        ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {

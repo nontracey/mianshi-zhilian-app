@@ -536,6 +536,9 @@ class L10n {
     'download_complete_please_operate_action_exe_file_press_photo_direction_5bf':
         '下载完成。请运行 EXE 文件按照向导完成安装。',
     'download_update': '下载更新',
+    'installer_ready': '已下载 {version}，可立即安装',
+    'install_now': '立即安装',
+    'delete_installer': '删除安装包',
     'not_will_save_storage_to_we_service_device': '不会保存到我们的服务器',
     'not_too_principle_understand': '原理理解不透彻',
     'not_skilled_training': '不熟练训练',
@@ -2257,6 +2260,9 @@ class L10n {
     'download_complete_please_operate_action_exe_file_press_photo_direction_5bf':
         'Download complete. Run the EXE and follow the setup wizard.',
     'download_update': 'Download Update',
+    'installer_ready': 'Downloaded {version}, ready to install',
+    'install_now': 'Install now',
+    'delete_installer': 'Delete package',
     'not_too_principle_understand': 'Poor Understanding',
     'not_skilled_training': 'Not Proficient',
     'not_login_also_enable_complete_overall_practice_only_use_in':
