@@ -9,7 +9,7 @@ import '../models/user_progress.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import '../services/ai_service.dart';
-import '../services/content_api_service.dart';
+import '../services/route_composer.dart';
 
 class AiRouteGenerator {
   final List<Domain> _allDomains;
@@ -51,20 +51,15 @@ class AiRouteGenerator {
       try {
         final selectedDomainIds = await _selectDomains(plan, aiService, aiConfig!);
         await contentProvider.ensureTopicsLoaded(selectedDomainIds);
-
-        final relevantTopicIds = await _selectTopics(
-          plan, selectedDomainIds, contentProvider, progressProvider, aiService, aiConfig,
-        );
-
-        return _buildStructuredRoute(
-          plan, selectedDomainIds, relevantTopicIds, contentProvider, progressProvider,
-        );
+        // 结构完全来自内容库 learningPath：AI 只负责「选哪些领域」，
+        // 领域内阶段/topic 不再由 AI 二次裁剪，避免「选了领域却没内容」。
+        return _buildStructuredRoute(plan, selectedDomainIds, contentProvider);
       } catch (e) {
         debugPrint('AI route generation failed, using fallback: $e');
       }
     }
 
-    return _generateFallbackRoute(plan, allTopics, progressProvider, contentProvider);
+    return _generateFallbackRoute(plan, contentProvider);
   }
 
   Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService, AiConfig aiConfig) async {
@@ -79,14 +74,15 @@ ${plan.jobDescription.isNotEmpty ? 'JD概要：${plan.jobDescription.substring(0
 可选领域（只能从下列 ID 中选择，不要发明新 ID）：
 $domainList
 
-要求：
-1. 选出与用户目标相关的领域，按相关度从高到低排序
-2. 包含用户目标所需的前置知识领域（如 Agent 开发需要 java 或 python 基础）
-3. 不相关的领域不要包含
-4. 只能使用上面列出的领域 ID，严禁输出上面没有的 ID
+要求（务必精准，宁缺毋滥）：
+1. 只选**与用户目标直接相关**的领域，按相关度从高到低排序
+2. 仅当确为该目标的**必要前置基础**时才纳入前置领域（如 Agent 开发需 python 或 java 基础）；不确定就不要加
+3. **严禁纳入与目标无关的领域**——例如后端/Agent 目标不要纳入「前端八股」，前端目标不要纳入 JVM/中间件等
+4. 领域数量通常 1-3 个，最多不超过 4 个；不要为了凑数而扩列
+5. 只能使用上面列出的领域 ID，严禁输出上面没有的 ID
 
 只输出一个 JSON 字符串数组，不要任何其他文字。
-示例：["java", "architecture", "agent"]
+示例：["python", "agent"]
 ''';
 
     try {
@@ -108,146 +104,70 @@ $domainList
     return _matchDomainsLocally(plan);
   }
 
+  // 过于通用、无区分度的词，匹配时忽略，避免「X 开发」把所有「Y 开发」领域都拉进来。
+  static const _genericWords = {
+    '开发', '工程师', '面试', '岗位', '方向', '基础', '进阶', '高级', '初级',
+    '中级', '实习', '校招', '社招', '相关', '技术', '知识',
+  };
+
+  static final _splitRe = RegExp(r'[\s,，、；;/]+');
+
+  /// 分词：小写、按分隔符切，过滤过短与通用词。用整词集合做交集，避免
+  /// 「java」误命中「javascript」这类子串假阳性。
+  Set<String> _tokenize(String s) => s
+      .toLowerCase()
+      .split(_splitRe)
+      .where((w) => w.length >= 2 && !_genericWords.contains(w))
+      .toSet();
+
+  /// 无 AI 时的本地领域匹配：用「目标词 ∩ 领域(id+标题+描述)词」的整词交集打分，
+  /// 不再扫描宽泛分类文本、不做贪婪前置推断——宁缺毋滥，按强度排序、最多取 4 个。
   List<String> _matchDomainsLocally(PrepPlan plan) {
-    final searchText =
-        '${plan.targetRole} ${plan.techStack} ${plan.jobDescription}'.toLowerCase();
-    if (searchText.length < 3) return _allDomains.map((d) => d.id).toList();
-
-    final matched = _allDomains.where((d) {
-      final text = '${d.title} ${d.description} ${d.categories.map((c) => '${c.title} ${c.id}').join(' ')}'.toLowerCase();
-      return searchText.split(RegExp(r'[\s,，、；;]+')).any((w) => w.length >= 2 && text.contains(w));
-    }).toList();
-
-    final matchedIds = matched.map((d) => d.id).toSet();
-
-    // 无AI时：包含匹配领域的前置知识领域（如Agent需要Java）
-    for (final domain in matched) {
-      for (final cat in domain.categories) {
-        // 通过分类信息推断前置领域
-        final text = '${cat.title} ${cat.description}'.toLowerCase();
-        for (final d in _allDomains) {
-          if (!matchedIds.contains(d.id)) {
-            final domainText = '${d.title} ${d.description} ${d.categories.map((c) => c.title).join(' ')}'.toLowerCase();
-            if (text.contains(d.id) || text.split(' ').any((w) => w.length >= 2 && domainText.contains(w))) {
-              matchedIds.add(d.id);
-            }
-          }
-        }
-      }
+    final goalTokens =
+        _tokenize('${plan.targetRole} ${plan.techStack} ${plan.jobDescription}');
+    if (goalTokens.isEmpty) {
+      return _allDomains.isNotEmpty ? [_allDomains.first.id] : [];
     }
 
-    return matchedIds.toList();
-  }
-
-  Future<Set<String>> _selectTopics(
-    PrepPlan plan,
-    List<String> domainIds,
-    ContentProvider contentProvider,
-    ProgressProvider progressProvider,
-    AiService aiService,
-    AiConfig aiConfig,
-  ) async {
-    final topics = contentProvider.topics.values
-        .where((t) => domainIds.contains(t.domainId))
-        .toList();
-    if (topics.isEmpty) return {};
-
-    final topicLines = topics.map((t) {
-      final score = progressProvider.getProgress(t.id)?.score ?? -1;
-      return '${t.id} | ${t.title} | ${t.domainId} | ${t.difficulty} | ${t.interviewFrequency} | $score';
-    }).join('\n');
-
-    final prompt = '''
-用户目标：${plan.targetRole} / ${plan.techStack}
-${plan.jobDescription.isNotEmpty ? 'JD：${plan.jobDescription.substring(0, plan.jobDescription.length.clamp(0, 300))}' : ''}
-
-相关领域的知识点（格式: id | 名称 | 领域 | 难度 | 面试频率 | 掌握度）：
-$topicLines
-
-从以上知识点中选出与用户目标直接相关的知识点，只返回被选中的 id 组成的 JSON 数组。
-示例：["java-jvm", "java-collections", "agent-intro"]
-只输出 JSON 数组，不要额外文字。''';
-
-    try {
-      final response = await aiService.sendMessage(prompt, config: aiConfig);
-      final start = response.indexOf('[');
-      final end = response.lastIndexOf(']');
-      if (start != -1 && end > start) {
-        final ids = (json.decode(response.substring(start, end + 1)) as List)
-            .cast<String>();
-        return ids.toSet();
-      }
-    } catch (e) {
-      debugPrint('AI topic selection failed: $e');
+    final scored = <MapEntry<String, int>>[];
+    for (final d in _allDomains) {
+      final domainTokens = _tokenize('${d.id} ${d.title} ${d.description}');
+      final overlap = goalTokens.intersection(domainTokens).length;
+      // 领域 id 作为整词出现在目标里 → 强信号加权
+      final idBonus = goalTokens.contains(d.id.toLowerCase()) ? 2 : 0;
+      final score = overlap + idBonus;
+      if (score > 0) scored.add(MapEntry(d.id, score));
     }
 
-    // 降级：返回面试频率为 high 或 medium 的 topic ID
-    return topics
-        .where((t) => t.interviewFrequency == 'high' || t.interviewFrequency == 'medium')
-        .map((t) => t.id)
-        .toSet();
+    scored.sort((a, b) => b.value.compareTo(a.value));
+    final result = scored.take(4).map((e) => e.key).toList();
+    if (result.isNotEmpty) return result;
+    // 兜底：完全无匹配时返回第一个领域，避免空路线。
+    return _allDomains.isNotEmpty ? [_allDomains.first.id] : [];
   }
 
+  /// 用内容库 learningPath 确定性地组装路线：领域内结构完全来自内容契约，
+  /// `domainIds` 由实际产出 phases 的领域推导，保证「声称领域 == 有内容领域」。
   LearningRoute _buildStructuredRoute(
     PrepPlan plan,
     List<String> domainIds,
-    Set<String> relevantTopicIds,
     ContentProvider contentProvider,
-    ProgressProvider progressProvider,
   ) {
-    final phases = <RoutePhase>[];
-    final now = DateTime.now();
+    final phases = RouteComposer.composePhasesFromContent(
+      orderedDomainIds: domainIds,
+      allDomains: _allDomains,
+      getTopicById: contentProvider.getTopicById,
+    );
+    final effectiveDomains = RouteComposer.domainsOf(phases);
 
-    for (final domainId in domainIds) {
-      final domain = _allDomains.firstWhereOrNull((d) => d.id == domainId);
-      if (domain == null || domain.learningPaths.isEmpty) continue;
-
-      for (final lp in domain.learningPaths) {
-        for (var i = 0; i < lp.steps.length; i++) {
-          final step = lp.steps[i];
-          final stepTopics = <String>[];
-          for (final catId in step.categoryIds) {
-            final category = domain.categories.firstWhereOrNull((c) => c.id == catId);
-            if (category != null) {
-              for (final topicFile in category.topics) {
-                // 通过 cache key 查找 topic 对象，使用其 content ID
-                final cacheKey = ContentApiService.cacheKeyForTopicRef(topicFile);
-                final topic = contentProvider.getTopicById(cacheKey);
-                if (topic == null) continue;
-                final tid = topic.id; // 使用 "java.jvm.xxx" 格式的 content ID
-                // 全量纳入 AI 选中的 topic（含已掌握），掌握状态交展示层着色，
-                // 避免重新生成后掌握度分母缩减、进度被人为推高。
-                if (relevantTopicIds.contains(tid)) {
-                  stepTopics.add(tid);
-                }
-              }
-            }
-          }
-          if (stepTopics.isNotEmpty) {
-            phases.add(RoutePhase(
-              id: '${domainId}_lp${lp.id}_s$i',
-              focus: step.title.isNotEmpty ? step.title : '${domain.title} ${lp.title} 第${i + 1}阶段',
-              description: step.description,
-              topicIds: stepTopics,
-              categoryIds: step.categoryIds,
-              prerequisiteSteps: step.prerequisiteSteps,
-              estimatedHours: step.estimatedHours,
-              type: i == lp.steps.length - 1 ? 'practice' : 'learn',
-              domainId: domainId,
-            ));
-          }
-        }
-      }
-    }
-
-    // 签名所有权统一归 PrepPlan.signature（已 trim），确保 route.planSignature
-    // 与目标变更检测、去重逻辑使用完全一致的口径。
     final sig = plan.signature;
+    final now = DateTime.now();
     return LearningRoute(
       id: 'ai_$sig',
       name: plan.targetRole.isNotEmpty ? '${plan.targetRole} 备考路线' : 'AI 个性化路线',
       description: plan.techStack.isNotEmpty ? '目标：${plan.techStack}' : '',
-      domainIds: domainIds,
+      // 与 phases 保持一致：没有内容的领域不进 domainIds（极端情况下退回原选择）
+      domainIds: effectiveDomains.isNotEmpty ? effectiveDomains : domainIds,
       phases: phases,
       source: 'ai',
       createdAt: now,
@@ -255,17 +175,12 @@ $topicLines
       planSignature: sig,
     );
   }
+
   LearningRoute _generateFallbackRoute(
     PrepPlan plan,
-    List<Topic> allTopics,
-    ProgressProvider progressProvider,
     ContentProvider contentProvider,
   ) {
     final domainIds = _matchDomainsLocally(plan);
-    final relevantIds = allTopics.map((t) => t.id).toSet();
-    return _buildStructuredRoute(
-      plan, domainIds, relevantIds, contentProvider, progressProvider,
-    );
+    return _buildStructuredRoute(plan, domainIds, contentProvider);
   }
-
 }

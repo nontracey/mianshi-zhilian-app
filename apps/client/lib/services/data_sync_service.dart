@@ -581,6 +581,14 @@ class DataSyncService {
     _ensureSuccess(branchResponse, 'Gitee 分支连接测试失败');
   }
 
+  /// 测试入口：暴露合并逻辑以验证 LWW + 删除墓碑的端到端行为。
+  @visibleForTesting
+  Map<String, dynamic> mergePackagesForTest(
+    Map<String, dynamic> local,
+    Map<String, dynamic>? remote,
+  ) =>
+      _mergePackages(local, remote);
+
   Map<String, dynamic> _mergePackages(
     Map<String, dynamic> local,
     Map<String, dynamic>? remote,
