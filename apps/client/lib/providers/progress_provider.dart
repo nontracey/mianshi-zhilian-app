@@ -351,6 +351,32 @@ class ProgressProvider extends ChangeNotifier {
     }).toList();
   }
 
+  /// 今日计划：依据备考目标的每日配额，从学习范围内组装"今日应学清单"。
+  /// - 复习项：今日到期（nextReviewAt <= 今天），按到期顺序取前 [reviewCount] 个；
+  /// - 新知识点：从未练习过的 topic，按内容侧 `Topic.order`（由浅到难）取前 [newCount] 个，
+  ///   不与复习项重复。
+  ///
+  /// 排序所有权遵循 L-3：新知识点默认顺序使用内容库维护的 order，App 不擅自重排。
+  ({List<Topic> reviewTopics, List<Topic> newTopics}) getTodayPlan(
+    List<Topic> scopedTopics, {
+    required int newCount,
+    required int reviewCount,
+  }) {
+    final reviewTopics =
+        getTodayReviewTopics(scopedTopics).take(reviewCount.clamp(0, 999)).toList();
+    final reviewIds = reviewTopics.map((t) => t.id).toSet();
+
+    final newCandidates = scopedTopics.where((t) {
+      if (reviewIds.contains(t.id)) return false;
+      final p = _progressMap[t.id];
+      return p == null || p.practiceCount == 0;
+    }).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    final newTopics = newCandidates.take(newCount.clamp(0, 999)).toList();
+    return (reviewTopics: reviewTopics, newTopics: newTopics);
+  }
+
   List<PracticeAttempt> getAttemptsForTopic(String topicId) =>
       _attempts.where((a) => a.topicId == topicId).toList();
 

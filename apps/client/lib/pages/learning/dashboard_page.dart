@@ -182,7 +182,15 @@ class DashboardPage extends StatelessWidget {
           if (scope.routeStale)
             _buildRouteStaleBanner(context)
           else if (!scope.isRouteMode && plan.hasTarget)
-            _buildTargetBanner(context, plan),
+            _buildTargetBanner(
+              context,
+              plan,
+              progressProvider.getTodayPlan(
+                scopedTopics,
+                newCount: settingsProvider.settings.dailyNewCount,
+                reviewCount: settingsProvider.settings.dailyReviewCount,
+              ),
+            ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -436,13 +444,19 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTargetBanner(BuildContext context, PrepPlan plan) {
+  Widget _buildTargetBanner(
+    BuildContext context,
+    PrepPlan plan,
+    ({List<Topic> reviewTopics, List<Topic> newTopics}) todayPlan,
+  ) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final interviewDate = plan.interviewDate;
     final days = interviewDate != null
         ? interviewDate.difference(DateTime.now()).inDays + 1
         : null;
+    final hasTodayPlan =
+        todayPlan.newTopics.isNotEmpty || todayPlan.reviewTopics.isNotEmpty;
 
     return GestureDetector(
       onTap: onPrepNavigation,
@@ -489,6 +503,20 @@ class DashboardPage extends StatelessWidget {
                     color: isDark ? Colors.white54 : Colors.grey,
                   ),
                 ),
+                if (hasTodayPlan) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.getp('today_plan_summary', {
+                      'new': todayPlan.newTopics.length,
+                      'review': todayPlan.reviewTopics.length,
+                    }),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
