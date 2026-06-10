@@ -1099,6 +1099,7 @@ class L10n {
     'mode_mock_interview': '模拟面试模式',
     'practice_core': '核心练习',
     'practice_advanced': '进阶练习',
+    'practice_advanced_hint': '追问 / 弱项 / 高频 / 系统设计等专项训练',
     'mode_type_name': '模型名称',
     'must_cover_key_points': '必须覆盖关键点',
     'must_mention_key_points': '必须提及关键点',
@@ -2681,6 +2682,7 @@ class L10n {
     'mode_mock_interview': 'Mock Interview',
     'practice_core': 'Core Practice',
     'practice_advanced': 'Advanced Practice',
+    'practice_advanced_hint': 'Follow-up / weakness / high-frequency / system design drills',
     'mode_mock_interview_official_follow_up_deep_enter_practice_knowle':
         'Mock interviewer follow-ups for deeper topic practice',
     'mode_mock_interview_group_volume_bias_good':

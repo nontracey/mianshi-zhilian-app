@@ -178,83 +178,99 @@ LayoutBuilder(
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 3,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: AppColors.textTertiary,
-                          borderRadius: BorderRadius.circular(1.5),
-                        ),
+                const SizedBox(height: 8),
+                // U-6：进阶模式默认折叠，首屏只突出 3 个核心模式，降低新用户决策成本。
+                // PageStorageKey 保证展开态在列表重建后不丢失。
+                Theme(
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    key: const PageStorageKey('practice_advanced_section'),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(top: 4, bottom: 4),
+                    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                    initiallyExpanded: false,
+                    leading: Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: AppColors.textTertiary,
+                        borderRadius: BorderRadius.circular(1.5),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.get('practice_advanced'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : AppColors.textPrimary,
-                        ),
+                    ),
+                    title: Text(
+                      l10n.get('practice_advanced'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.get('practice_advanced_hint'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white54 : Colors.grey,
+                      ),
+                    ),
+                    children: [
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          SizedBox(
+                            width: cardWidth,
+                            child: PracticeModeCard(
+                              icon: Icons.question_answer_outlined,
+                              title: l10n.get('follow_up_training'),
+                              subtitle: l10n.get(
+                                'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
+                              ),
+                              color: AppColors.categoryPurple,
+                              onTap: () =>
+                                  _startFollowUpTraining(context, scopedTopics),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: PracticeModeCard(
+                              icon: Icons.trending_down_outlined,
+                              title: l10n.get('weakness_training_pack'),
+                              subtitle: l10n.get(
+                                'needle_peer_weak_knowledge_point_progress_action_specialized_item_training',
+                              ),
+                              color: AppColors.danger,
+                              onTap: () => _startWeaknessTraining(context),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: PracticeModeCard(
+                              icon: Icons.local_fire_department_outlined,
+                              title: l10n.get('high_freq_sprint'),
+                              subtitle: l10n.get(
+                                'needle_peer_high_freq_interview_question_count_progress_action_accent',
+                              ),
+                              color: AppColors.warning,
+                              onTap: () => _startHighFrequencyTraining(
+                                  context, scopedTopics),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: PracticeModeCard(
+                              icon: Icons.architecture_outlined,
+                              title: l10n.get('system_design'),
+                              subtitle:
+                                  l10n.get('system_design_interview_practice'),
+                              color: AppColors.categoryAmber,
+                              onTap: () => _startSystemDesign(context),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: [
-                    SizedBox(
-                      width: cardWidth,
-                      child: PracticeModeCard(
-                        icon: Icons.question_answer_outlined,
-                        title: l10n.get('follow_up_training'),
-                        subtitle: l10n.get(
-                          'mode_mock_interview_official_follow_up_deep_enter_practice_knowle',
-                        ),
-                        color: AppColors.categoryPurple,
-                        onTap: () => _startFollowUpTraining(context, scopedTopics),
-                      ),
-                    ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: PracticeModeCard(
-                        icon: Icons.trending_down_outlined,
-                        title: l10n.get('weakness_training_pack'),
-                        subtitle: l10n.get(
-                          'needle_peer_weak_knowledge_point_progress_action_specialized_item_training',
-                        ),
-                        color: AppColors.danger,
-                        onTap: () => _startWeaknessTraining(context),
-                      ),
-                    ),
-                    SizedBox(
- width: cardWidth,
-                      child: PracticeModeCard(
-                        icon: Icons.local_fire_department_outlined,
-                        title: l10n.get('high_freq_sprint'),
-                        subtitle: l10n.get(
-                          'needle_peer_high_freq_interview_question_count_progress_action_accent',
-                        ),
-                        color: AppColors.warning,
-                        onTap: () =>
-                            _startHighFrequencyTraining(context, scopedTopics),
-                      ),
-                    ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: PracticeModeCard(
-                        icon: Icons.architecture_outlined,
-                        title: l10n.get('system_design'),
-                        subtitle: l10n.get('system_design_interview_practice'),
-                        color: AppColors.categoryAmber,
-                        onTap: () => _startSystemDesign(context),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             );
