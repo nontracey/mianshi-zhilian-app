@@ -392,11 +392,23 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   int get practiceStreakDays {
-    final dates = _attempts
-        .map(
-          (a) => DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day),
-        )
-        .toSet();
+    // 连续学习天数：不局限于"练习记录"，模拟面试与各知识点的最近练习时间
+    // 同样视为当日有学习行为，避免只做模拟面试/复习时口径过窄。
+    final dates = <DateTime>{
+      ..._attempts.map(
+        (a) => DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day),
+      ),
+      ..._mockSessions.map(
+        (s) => DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day),
+      ),
+      ..._progressMap.values
+          .where((p) => p.lastPracticeAt != null)
+          .map((p) => DateTime(
+                p.lastPracticeAt!.year,
+                p.lastPracticeAt!.month,
+                p.lastPracticeAt!.day,
+              )),
+    };
     var streak = 0;
     var cursor = DateTime.now();
     while (dates.contains(DateTime(cursor.year, cursor.month, cursor.day))) {
