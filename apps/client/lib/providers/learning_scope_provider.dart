@@ -257,15 +257,11 @@ class LearningScopeProvider extends ChangeNotifier {
 
   /// 删除路线；若当前正在使用该路线则自动退回全部领域。
   Future<void> deleteRoute(String routeId) async {
-    final deleted = _customRoutes.where((r) => r.id == routeId).toList();
     _customRoutes = _customRoutes.where((r) => r.id != routeId).toList();
     await _store.saveCustomRoutes(_customRoutes);
     // 写删除墓碑，确保下次同步时远端也移除该路线
     await _storage.recordDeletion('custom_routes', routeId);
-    // AI 路线删除时同步清除 AiRouteGenerator 独立缓存，避免重新生成时返回已删除的旧路线
-    if (deleted.any((r) => r.source == 'ai')) {
-      await _store.clearRouteCaches();
-    }
+    // A-7：custom_routes 已是唯一事实源，删除后无需再清理独立路线缓存。
     if (_scope.isRouteMode && _scope.routeId == routeId) {
       await setScope(const LearningScope.allDomains());
     } else {
@@ -296,6 +292,8 @@ class LearningScopeProvider extends ChangeNotifier {
   /// [legacyDomainId]：来自 `AppSettings.currentDomain` 的旧值，
   /// 仅在没有新键也没有旧路线键时作为单领域范围使用。
   Future<LearningScopeProvider> load({String? legacyDomainId}) async {
+    // A-7：路线缓存层已收敛到 custom_routes，清理历史遗留的 route_cache_* 键。
+    await _store.clearRouteCaches();
     _customRoutes = await _store.loadCustomRoutes();
     // 一次性清理历史重复 AI 路线（同 planSignature 保留最新的一条）
     final (deduped, discardedIds) = _deduplicateAiRoutes(_customRoutes);

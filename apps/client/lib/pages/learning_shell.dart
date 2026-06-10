@@ -21,7 +21,6 @@ import 'package:mianshi_zhilian/pages/practice/practice_page.dart';
 import 'package:mianshi_zhilian/pages/practice/recall_page.dart';
 import 'package:mianshi_zhilian/pages/practice/mock_interview_page.dart';
 import 'package:mianshi_zhilian/pages/practice/today_review_page.dart';
-import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/pages/prep/interview_prep_page.dart';
 import 'package:mianshi_zhilian/pages/mastery/mastery_page.dart';
 import 'package:mianshi_zhilian/pages/profile/profile_page.dart';
@@ -43,7 +42,6 @@ class _LearningShellState extends State<LearningShell> {
   int _selectedTopicInitialTab = 0;
   bool _isSidebarCollapsed = false;
   late AuthProvider _auth;
-  final _storage = StorageService();
 
   @override
   void initState() {
@@ -367,7 +365,7 @@ class _LearningShellState extends State<LearningShell> {
       // 只加载匹配领域的 topics（不再全量预加载）
       final domainIds = content.domains.map((d) => d.id).toList();
 
-      final generator = AiRouteGenerator(_storage, content.domains);
+      final generator = AiRouteGenerator(content.domains);
       final aiConfig = aiProvider.defaultConfig;
       final useAi = aiProvider.aiService.isConfigAvailable(aiConfig);
 
@@ -409,11 +407,12 @@ class _LearningShellState extends State<LearningShell> {
         plan: plan,
         allTopics: content.topics.values.toList(),
         progressProvider: progress,
-        contentVersion: content.contentVersion,
         aiService: aiProvider.aiService,
         contentProvider: content,
         aiConfig: aiConfig,
         forceRegenerate: forceRegenerate,
+        // custom_routes 作为唯一事实源：非强制重生时复用已有同目标路线
+        existingRoutes: scopeProvider.customRoutes,
       );
 
       // 通过 LearningScopeProvider 保存并去重（同 planSignature 的旧 AI 路线会被替换）
