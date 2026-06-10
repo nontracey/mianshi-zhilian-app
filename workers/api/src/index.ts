@@ -1871,7 +1871,7 @@ async function upsertCountMap(
 }
 
 function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data, null, 2), {
+  return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
