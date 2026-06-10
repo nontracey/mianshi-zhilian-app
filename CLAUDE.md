@@ -27,9 +27,12 @@ flutter run -d chrome                   # Run in browser
 flutter analyze --no-fatal-infos        # Static analysis
 python3 lib/l10n/check_l10n_keys.py     # l10n key consistency check
 flutter test                            # Run all tests
+flutter test test/integration/          # Business-layer end-to-end (real content pipeline)
 flutter test test/path/to_test.dart     # Run a single test
 flutter build web --release             # Build web
 ```
+
+**Testing strategy** (see [docs/testing.md](docs/testing.md)): prioritize business/data-layer end-to-end tests driven by realistic 3-domain content fixtures (`test/fixtures/content_full/` + `FakeContentClient`, which exercise the real `ContentApiService`/`ContentProvider` — not mocks). Keep full-page widget tests minimal (they're layout-fragile under the test viewport); cover only small key controls in `test/widget/`. Content (domains/topics/learningPaths/ids) is the single source of truth — tests must use content-shaped data.
 
 ### Cloudflare Worker (`workers/api/`)
 
