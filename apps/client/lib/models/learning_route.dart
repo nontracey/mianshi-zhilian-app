@@ -34,6 +34,24 @@ class LearningRoute {
         .toList();
   }
 
+  /// 真正参与的领域：有 phases 时按 phases 里出现的 domainId 推导（去重、保序），
+  /// 否则退回声明的 [domainIds]。
+  ///
+  /// 这样「声称的领域」永远等于「实际有内容的领域」，避免 domainIds 与 phases
+  /// 漂移导致目录出现空领域 tab、掌握度统计只显示部分领域等不一致问题。
+  List<String> get effectiveDomainIds {
+    final p = phases;
+    if (p == null || p.isEmpty) return domainIds;
+    final seen = <String>{};
+    final ordered = <String>[];
+    for (final phase in p) {
+      final d = phase.domainId;
+      if (d == null || d.isEmpty) continue;
+      if (seen.add(d)) ordered.add(d);
+    }
+    return ordered.isEmpty ? domainIds : ordered;
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,

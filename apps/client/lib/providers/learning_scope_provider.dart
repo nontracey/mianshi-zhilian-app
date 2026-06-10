@@ -131,7 +131,8 @@ class LearningScopeProvider extends ChangeNotifier {
       case ScopeKind.singleDomain:
         return _scope.domainId != null ? [_scope.domainId!] : [];
       case ScopeKind.route:
-        return activeRoute?.domainIds ?? [];
+        // 用 effectiveDomainIds：声称领域永远 = 实际有内容的领域，避免空领域 tab。
+        return activeRoute?.effectiveDomainIds ?? [];
       case ScopeKind.allDomains:
         return [];
     }

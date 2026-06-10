@@ -4,6 +4,7 @@ import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/learning_scope.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
+import 'package:mianshi_zhilian/services/route_composer.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/route_editor_dialog.dart';
@@ -350,9 +351,38 @@ class ScopeSelectorDialog extends StatelessWidget {
         availableDomains: allDomains,
         existingRoute: route,
         existingRouteNames: existingNames,
-        onSave: (updated) => scope.upsertRoute(updated),
+        onSave: (updated) => _saveEditedRoute(updated, scope, content),
       ),
     );
+  }
+
+  /// 保存编辑后的路线：按用户选择/排序的领域，用内容库 learningPath 重建 phases，
+  /// 保证「领域顺序调整后阶段顺序、目录、统计同步生效」，且结构始终来自内容契约。
+  Future<void> _saveEditedRoute(
+    LearningRoute updated,
+    LearningScopeProvider scope,
+    ContentProvider content,
+  ) async {
+    await content.ensureTopicsLoaded(updated.domainIds);
+    final phases = RouteComposer.composePhasesFromContent(
+      orderedDomainIds: updated.domainIds,
+      allDomains: content.domains,
+      getTopicById: content.getTopicById,
+    );
+    final effective = RouteComposer.domainsOf(phases);
+    final rebuilt = LearningRoute(
+      id: updated.id,
+      name: updated.name,
+      description: updated.description,
+      domainIds: effective.isNotEmpty ? effective : updated.domainIds,
+      phases: phases.isNotEmpty ? phases : updated.phases,
+      source: updated.source,
+      isDefault: updated.isDefault,
+      createdAt: updated.createdAt,
+      updatedAt: DateTime.now(),
+      planSignature: updated.planSignature,
+    );
+    await scope.upsertRoute(rebuilt, contentProvider: content);
   }
 
   void _confirmDelete(BuildContext context, LearningRoute route, LearningScopeProvider scope) {
