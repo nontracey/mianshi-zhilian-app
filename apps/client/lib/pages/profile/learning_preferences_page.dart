@@ -76,6 +76,27 @@ class LearningSettingsPanel extends StatelessWidget {
       title: l10n.get('study_settings'),
       icon: Icons.school_outlined,
       children: [
+        // 一键推荐默认：面向新手，一次性把推荐策略/权重/每日学习量
+        // 配置为均衡、开箱即用的组合，避免逐项摸索设置项。
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => onSettingsChanged(settings.copyWith(
+              recommendStrategy: 'smart',
+              lowScoreWeight: _presetWeights['balanced']![0],
+              overdueWeight: _presetWeights['balanced']![1],
+              highFrequencyWeight: _presetWeights['balanced']![2],
+              pathOrderWeight: _presetWeights['balanced']![3],
+              notPracticedWeight: _presetWeights['balanced']![4],
+              dailyNewCount: 3,
+              dailyReviewCount: 6,
+              prioritizePrerequisites: true,
+              allowSkipLowFrequency: false,
+            )),
+            icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+            label: Text(l10n.get('apply_recommended_defaults')),
+          ),
+        ),
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
           decoration: InputDecoration(
