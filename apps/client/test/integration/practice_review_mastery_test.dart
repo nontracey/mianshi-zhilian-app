@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mianshi_zhilian/models/learning_route.dart';
-import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
