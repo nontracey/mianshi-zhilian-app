@@ -405,6 +405,7 @@ class UpdateService {
       if (await file.exists()) {
         final alreadyValid = await verifySha256(filePath, platformUpdate.sha256);
         if (alreadyValid) {
+          await _cleanupOtherInstallers(tempDir.path, keepFileName: fileName);
           _lastAttempts = attempts;
           return (filePath, DownloadResult.success);
         }
@@ -423,6 +424,7 @@ class UpdateService {
       switch (result) {
         case _DownloadStatus.success:
           // 只记录成功的，前面的失败已在 HEAD 预检中记录
+          await _cleanupOtherInstallers(tempDir.path, keepFileName: fileName);
           _lastAttempts = attempts;
           return (filePath, DownloadResult.success);
         case _DownloadStatus.cancelled:
@@ -665,6 +667,34 @@ class UpdateService {
     }
   }
 
+  /// 清理临时目录里的历史安装包（跨版本累积），仅保留 [keepFileName]。
+  /// 匹配前缀 `mianshi-zhilian-v` 的本应用安装包，删除其余版本，避免占用空间。
+  Future<void> _cleanupOtherInstallers(
+    String dirPath, {
+    required String keepFileName,
+  }) async {
+    try {
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) return;
+      await for (final entity in dir.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.isNotEmpty
+            ? entity.uri.pathSegments.last
+            : '';
+        if (name == keepFileName) continue;
+        if (!name.startsWith('mianshi-zhilian-v')) continue;
+        try {
+          await entity.delete();
+          debugPrint('Cleaned up stale installer: $name');
+        } catch (_) {
+          // 单个文件删除失败不影响整体（可能正被占用）
+        }
+      }
+    } catch (e) {
+      debugPrint('Cleanup old installers failed: $e');
+    }
+  }
+
   /// 启动系统默认安装流程。
   ///
   /// Android 会打开 APK 安装确认，Windows 会启动 EXE 安装器，macOS 会打开 DMG。
@@ -672,6 +702,16 @@ class UpdateService {
     if (kIsWeb) return false;
     final result = await OpenFilex.open(filePath);
     return result.type == ResultType.done;
+  }
+
+  /// 静默删除一个文件（用于清理已安装/失效的安装包记录），失败忽略。
+  Future<void> deleteFileQuietly(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // 忽略：文件可能已被系统清理或正被占用
+    }
   }
 
   /// 校验文件的 SHA256

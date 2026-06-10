@@ -63,7 +63,7 @@ void main() {
     mockAi = MockAiService();
     mockStorage = MockStorageService();
     final domains = [_javaDomain(), _agentDomain()];
-    generator = AiRouteGenerator(mockStorage, domains);
+    generator = AiRouteGenerator(domains);
 
     // storage: cache miss by default
     when(mockStorage.load(any)).thenAnswer((_) async => null);

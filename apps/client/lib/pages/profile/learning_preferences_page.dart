@@ -48,6 +48,27 @@ class LearningSettingsPanel extends StatelessWidget {
   final AppSettings settings;
   final ValueChanged<AppSettings> onSettingsChanged;
 
+  // 三套智能推荐权重预设：[低分优先, 逾期优先, 高频优先, 路径顺序, 未练习]
+  static const Map<String, List<int>> _presetWeights = {
+    'conservative': [45, 30, 10, 10, 5],
+    'balanced': [35, 25, 25, 10, 5],
+    'aggressive': [20, 25, 40, 5, 10],
+  };
+
+  String _currentPreset(AppSettings s) {
+    for (final entry in _presetWeights.entries) {
+      final w = entry.value;
+      if (s.lowScoreWeight == w[0] &&
+          s.overdueWeight == w[1] &&
+          s.highFrequencyWeight == w[2] &&
+          s.pathOrderWeight == w[3] &&
+          s.notPracticedWeight == w[4]) {
+        return entry.key;
+      }
+    }
+    return 'balanced';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
@@ -55,6 +76,27 @@ class LearningSettingsPanel extends StatelessWidget {
       title: l10n.get('study_settings'),
       icon: Icons.school_outlined,
       children: [
+        // 一键推荐默认：面向新手，一次性把推荐策略/权重/每日学习量
+        // 配置为均衡、开箱即用的组合，避免逐项摸索设置项。
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => onSettingsChanged(settings.copyWith(
+              recommendStrategy: 'smart',
+              lowScoreWeight: _presetWeights['balanced']![0],
+              overdueWeight: _presetWeights['balanced']![1],
+              highFrequencyWeight: _presetWeights['balanced']![2],
+              pathOrderWeight: _presetWeights['balanced']![3],
+              notPracticedWeight: _presetWeights['balanced']![4],
+              dailyNewCount: 3,
+              dailyReviewCount: 6,
+              prioritizePrerequisites: true,
+              allowSkipLowFrequency: false,
+            )),
+            icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+            label: Text(l10n.get('apply_recommended_defaults')),
+          ),
+        ),
         DropdownButtonFormField<String>(
           initialValue: settings.recommendStrategy,
           decoration: InputDecoration(
@@ -89,6 +131,46 @@ class LearningSettingsPanel extends StatelessWidget {
             }
           },
         ),
+        // 智能推荐的权重设置默认沉睡，提供三套预设让用户一键启用，
+        // 而不必逐项调整 lowScoreWeight/overdueWeight 等隐藏权重。
+        if (settings.recommendStrategy == 'smart') ...[
+          const SizedBox(height: 12),
+          Text(
+            l10n.get('recommend_preset'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(
+                value: 'conservative',
+                label: Text(l10n.get('recommend_preset_conservative')),
+              ),
+              ButtonSegment(
+                value: 'balanced',
+                label: Text(l10n.get('recommend_preset_balanced')),
+              ),
+              ButtonSegment(
+                value: 'aggressive',
+                label: Text(l10n.get('recommend_preset_aggressive')),
+              ),
+            ],
+            selected: {_currentPreset(settings)},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) {
+              final preset = selection.first;
+              onSettingsChanged(settings.copyWith(
+                lowScoreWeight: _presetWeights[preset]![0],
+                overdueWeight: _presetWeights[preset]![1],
+                highFrequencyWeight: _presetWeights[preset]![2],
+                pathOrderWeight: _presetWeights[preset]![3],
+                notPracticedWeight: _presetWeights[preset]![4],
+              ));
+            },
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           children: [

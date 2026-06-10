@@ -36,7 +36,7 @@ void main() {
     test('initial state uses defaults and isLoading is false', () {
       expect(provider.settings.themeType, AppThemeType.system);
       expect(provider.settings.language, 'zh');
-      expect(provider.settings.recommendStrategy, 'low-score-first');
+      expect(provider.settings.recommendStrategy, 'smart');
       expect(provider.settings.currentDomain, 'java');
       expect(provider.settings.fontScale, 1.0);
       expect(provider.settings.cardDensity, 'comfortable');

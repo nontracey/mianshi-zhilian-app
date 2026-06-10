@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/services/credential_store.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'submit_ticket_page.dart';
@@ -21,7 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _storage = StorageService();
+  late final CredentialStore _credentials = CredentialStore(StorageService());
 
   bool _isRegister = false;
   bool _isLoading = false;
@@ -30,10 +31,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
   String? _error;
 
-  static const _savedUsernameKey = '_saved_login_username';
-  static const _savedPasswordKey = '_saved_login_password';
-  static const _rememberMeKey = '_saved_login_remember';
-
   @override
   void initState() {
     super.initState();
@@ -41,29 +38,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _loadSavedCredentials() async {
-    final remember = await _storage.load(_rememberMeKey) as bool? ?? false;
-    if (!remember) return;
-    final username = await _storage.load(_savedUsernameKey) as String? ?? '';
-    final password = await _storage.load(_savedPasswordKey) as String? ?? '';
+    if (!await _credentials.rememberMe) return;
+    final username = await _credentials.loadUsername();
+    // 密码：原生从安全存储读取；Web 恒为空（只记住用户名）。
+    final password = await _credentials.loadPassword();
     if (mounted) {
       setState(() {
-        _rememberMe = remember;
+        _rememberMe = true;
         _usernameController.text = username;
         _passwordController.text = password;
       });
     }
-  }
-
-  Future<void> _saveCredentials(String username, String password) async {
-    await _storage.save(_rememberMeKey, true);
-    await _storage.save(_savedUsernameKey, username);
-    await _storage.save(_savedPasswordKey, password);
-  }
-
-  Future<void> _clearSavedCredentials() async {
-    await _storage.save(_rememberMeKey, false);
-    await _storage.save(_savedUsernameKey, '');
-    await _storage.save(_savedPasswordKey, '');
   }
 
   @override
@@ -72,11 +57,6 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  // 防注入：过滤特殊字符
-  String _sanitizeInput(String input) {
-    return input.replaceAll(RegExp(r'[<>"\x27;\(\)]'), '').trim();
   }
 
   Future<void> _submit() async {
@@ -88,7 +68,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     final authProvider = context.read<AuthProvider>();
-    final username = _sanitizeInput(_usernameController.text);
+    // 后端使用参数化查询，无需客户端过滤；直接 trim 即可
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
     bool success;
 
@@ -99,11 +80,11 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (success && mounted) {
-      // 保存 / 清除记住的凭据
+      // 保存 / 清除记住的凭据（原生把密码写入系统安全存储；Web 仅存用户名）
       if (_rememberMe && !_isRegister) {
-        await _saveCredentials(username, password);
+        await _credentials.save(username, password);
       } else {
-        await _clearSavedCredentials();
+        await _credentials.clear();
       }
 
       setState(() => _isLoading = false);
@@ -165,6 +146,9 @@ class _LoginPageState extends State<LoginPage> {
                           }
                           if (value.trim().length < 3) {
                             return l10n.get('username_min_3_chars');
+                          }
+                          if (RegExp('[<>"\'();]').hasMatch(value)) {
+                            return l10n.get('username_invalid_chars');
                           }
                           return null;
                         },

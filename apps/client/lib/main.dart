@@ -19,6 +19,7 @@ import 'providers/progress_provider.dart';
 import 'providers/learning_scope_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/update_download_provider.dart';
 import 'services/analytics_service.dart';
 import 'services/app_log_service.dart';
 import 'services/data_sync_service.dart';
@@ -150,42 +151,52 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
       ),
       GoRoute(
         path: '/topic',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/recall',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/mock-interview',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/today-review',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/weakness-training',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/answer-versions',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/follow-up-training',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/high-frequency',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/system-design',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
         path: '/practice/project-dig',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
@@ -200,6 +211,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
       ),
       GoRoute(
         path: '/auth/submit-ticket',
+        redirect: (_, state) => state.extra == null ? '/' : null,
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
@@ -297,6 +309,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               LocalizationProvider(initialLanguage: widget.initialLanguage),
         ),
         Provider<AnalyticsService>.value(value: widget.analyticsService),
+        ChangeNotifierProvider(
+          create: (_) => UpdateDownloadProvider(widget.storage),
+        ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {

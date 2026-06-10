@@ -20,6 +20,12 @@ class DataSyncService {
   static const _timeout = Duration(seconds: 30);
   static const _uploadTimeout = Duration(seconds: 120);
 
+  // ETag from last WebDAV GET; sent as If-Match on next PUT to detect concurrent writes.
+  String? _webDavEtag;
+  // True when the last GET returned 404 (remote file absent): the next PUT sends
+  // If-None-Match:* so two devices creating the file simultaneously don't overwrite.
+  bool _webDavRemoteAbsent = false;
+
   void start() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -274,8 +280,14 @@ class DataSyncService {
     final base = _normalizeUrl(settings.webDavUrl);
     final uri = Uri.parse('$base/$_fileName');
     final response = await _webDavRequest('GET', uri, settings);
-    if (response.statusCode == 404) return null;
+    if (response.statusCode == 404) {
+      _webDavEtag = null;
+      _webDavRemoteAbsent = true;
+      return null;
+    }
     _ensureSuccess(response, 'WebDAV 下载失败');
+    _webDavEtag = response.headers['etag'];
+    _webDavRemoteAbsent = false;
     return json.decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -288,13 +300,33 @@ class DataSyncService {
     _require(settings.webDavPassword.isNotEmpty, '缺少 WebDAV 应用密码');
     final base = _normalizeUrl(settings.webDavUrl);
     final uri = Uri.parse('$base/$_fileName');
+    final etag = _webDavEtag;
+    // 优先 If-Match（已知 ETag）；远端确认不存在时用 If-None-Match:* 防止
+    // 两设备首次同步互相覆盖；状态未知时不带前置条件（保持兼容）。
+    final Map<String, String>? preconditionHeaders = etag != null
+        ? {'If-Match': etag}
+        : _webDavRemoteAbsent
+            ? {'If-None-Match': '*'}
+            : null;
     final response = await _webDavRequest(
       'PUT',
       uri,
       settings,
       body: const JsonEncoder.withIndent('  ').convert(package),
+      headers: preconditionHeaders,
     );
+    if (response.statusCode == 412) {
+      // 前置条件失败：另一设备已写入（If-Match 时被改、If-None-Match 时被创建）。
+      // 重置状态并抛出冲突，由 _uploadWithConflictRetry 重新下载合并后重试。
+      _webDavEtag = null;
+      _webDavRemoteAbsent = false;
+      throw const SyncConflictException();
+    }
     _ensureSuccess(response, 'WebDAV 上传失败');
+    // 上传成功后远端文件必然存在；按服务器返回更新 ETag。
+    _webDavRemoteAbsent = false;
+    final newEtag = response.headers['etag'];
+    if (newEtag != null) _webDavEtag = newEtag;
   }
 
   Future<void> _testWebDavConnection(SyncSettings settings) async {
@@ -561,7 +593,18 @@ class DataSyncService {
     // 每个设备保持自己的偏好，不跨设备同步。
     final merged = <String, dynamic>{...remoteData, ...localData};
 
-    merged['progress_map'] = _mergeProgressMap(
+    // 合并删除墓碑：取两侧各 id 的较晚时间戳，并 GC 60 天以上的旧墓碑。
+    final mergedDeletions = _mergeDeletions(
+      remoteData['deletions'],
+      localData['deletions'],
+    );
+    if (mergedDeletions.isNotEmpty) {
+      merged['deletions'] = mergedDeletions;
+    } else {
+      merged.remove('deletions');
+    }
+
+    merged['progress_map'] = mergeProgressMaps(
       remoteData['progress_map'],
       localData['progress_map'],
     );
@@ -573,7 +616,7 @@ class DataSyncService {
       'project_dig_projects',
       'custom_routes',
     ]) {
-      merged[key] = _mergeListById(remoteData[key], localData[key]);
+      merged[key] = _mergeListById(remoteData[key], localData[key], mergedDeletions, key);
     }
     merged['answer_versions'] = _mergeAnswerVersions(
       remoteData['answer_versions'],
@@ -593,65 +636,134 @@ class DataSyncService {
     };
   }
 
-  Map<String, dynamic> _mergeProgressMap(dynamic remote, dynamic local) {
+  /// 合并两侧 progress_map：按 `lastPracticeAt` 做 last-write-wins（取最近一次
+  /// 练习的版本），与其它集合的 LWW 口径一致——诚实反映"最近一次练习"，而非
+  /// 保留历史最高分。`practiceCount` 取两侧较大值（单调计数不回退）；时间戳缺失
+  /// 或并列时遵循本地优先。
+  @visibleForTesting
+  static Map<String, dynamic> mergeProgressMaps(dynamic remote, dynamic local) {
     final result = <String, dynamic>{};
     if (remote is Map) {
       result.addAll(remote.map((k, v) => MapEntry(k.toString(), v)));
     }
-    if (local is Map) {
-      for (final entry in local.entries) {
-        final topicId = entry.key.toString();
-        final localProgress = entry.value;
-        final remoteProgress = result[topicId];
-        if (localProgress is! Map) {
-          result[topicId] = localProgress;
-          continue;
-        }
-        if (remoteProgress is! Map) {
-          result[topicId] = localProgress;
-          continue;
-        }
-        final localScore = (localProgress['score'] as num?)?.toInt() ?? 0;
-        final remoteScore = (remoteProgress['score'] as num?)?.toInt() ?? 0;
-        if (localScore > remoteScore) {
-          result[topicId] = localProgress;
-        } else if (localScore == remoteScore) {
-          result[topicId] = {
-            ...remoteProgress,
-            ...localProgress,
-            'practiceCount': [
-              (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
-              (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
-            ].reduce((a, b) => a > b ? a : b),
-            'nextReviewAt': _earlierDateString(
-              remoteProgress['nextReviewAt'] as String?,
-              localProgress['nextReviewAt'] as String?,
-            ),
-          };
-        }
+    if (local is! Map) return result;
+
+    for (final entry in local.entries) {
+      final topicId = entry.key.toString();
+      final localProgress = entry.value;
+      final remoteProgress = result[topicId];
+      if (localProgress is! Map || remoteProgress is! Map) {
+        // 任一侧缺失或非 Map：本地优先。
+        result[topicId] = localProgress;
+        continue;
       }
+
+      final localTs = DateTime.tryParse('${localProgress['lastPracticeAt'] ?? ''}');
+      final remoteTs = DateTime.tryParse('${remoteProgress['lastPracticeAt'] ?? ''}');
+      final Map winner;
+      if (remoteTs == null) {
+        winner = localProgress; // 远端无时间戳 → 本地胜
+      } else if (localTs == null) {
+        winner = remoteProgress; // 本地无时间戳但远端有 → 远端胜
+      } else {
+        // 相同时间本地优先（!isBefore 即 local >= remote）。
+        winner = !localTs.isBefore(remoteTs) ? localProgress : remoteProgress;
+      }
+
+      final maxPractice = [
+        (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
+        (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
+      ].reduce((a, b) => a > b ? a : b);
+
+      result[topicId] = {...winner, 'practiceCount': maxPractice};
     }
     return result;
   }
 
-  /// custom_routes 合并策略：手动路线按 ID 合并，AI 路线仅保留本地版本。
-  List<dynamic>? _mergeListById(dynamic remote, dynamic local) {
+  /// 通用列表合并：LWW（按 updatedAt 取较新者，本地同 updatedAt 时优先）+ 墓碑过滤。
+  ///
+  /// [deletions] 是已合并的墓碑表 `{<collection>:<id>: <deletedAt ISO>}`。
+  /// 若某条目的 `updatedAt <= deletedAt`（或无 `updatedAt`），则视为已删除而剔除。
+  /// 删除后若有意重新创建（`updatedAt > deletedAt`），该条目正常保留。
+  List<dynamic>? _mergeListById(
+    dynamic remote,
+    dynamic local,
+    Map<String, String> deletions,
+    String collectionKey,
+  ) {
     if (remote == null && local == null) return null;
     final byId = <String, dynamic>{};
+
+    // remote 先写，local 后写（local 同 updatedAt 时覆盖 remote，即本地优先）
     void addAll(dynamic value) {
       if (value is! List) return;
       for (final item in value) {
-        if (item is Map && item['id'] != null) {
-          byId[item['id'].toString()] = item;
+        if (item is! Map) continue;
+        final id = item['id']?.toString();
+        if (id == null) {
+          byId['_anon_${byId.length}'] = item;
+          continue;
+        }
+        final existing = byId[id];
+        if (existing == null) {
+          byId[id] = item;
         } else {
-          byId['idx_${byId.length}'] = item;
+          // LWW: 保留 updatedAt 较晚的；相同时 local 覆盖（remote 先写则 local 会覆盖）
+          final existingAt = (existing as Map)['updatedAt'] as String?;
+          final itemAt = item['updatedAt'] as String?;
+          if (existingAt == null ||
+              (itemAt != null && itemAt.compareTo(existingAt) >= 0)) {
+            byId[id] = item;
+          }
         }
       }
     }
 
     addAll(remote);
     addAll(local);
+
+    // 应用墓碑：deletedAt >= item.updatedAt 时判定已删除
+    if (deletions.isNotEmpty) {
+      byId.removeWhere((id, item) {
+        if (id.startsWith('_anon_')) return false;
+        final deletedAt = deletions['$collectionKey:$id'];
+        if (deletedAt == null) return false;
+        final itemUpdatedAt = (item as Map)['updatedAt'] as String?;
+        if (itemUpdatedAt == null) return true;
+        return deletedAt.compareTo(itemUpdatedAt) >= 0;
+      });
+    }
+
     return byId.values.toList();
+  }
+
+  /// 合并两侧墓碑表：每个 id 取较晚的 deletedAt；同时 GC 60 天以上的旧条目。
+  Map<String, String> _mergeDeletions(dynamic remote, dynamic local) {
+    final result = <String, String>{};
+
+    void addAll(dynamic value) {
+      if (value is! Map) return;
+      for (final entry in value.entries) {
+        final key = entry.key.toString();
+        final ts = entry.value.toString();
+        final existing = result[key];
+        if (existing == null || ts.compareTo(existing) > 0) {
+          result[key] = ts;
+        }
+      }
+    }
+
+    addAll(remote);
+    addAll(local);
+
+    // GC: 移除超过 60 天的旧墓碑（所有设备理应已同步过）
+    final cutoff = DateTime.now().subtract(const Duration(days: 60));
+    result.removeWhere((_, value) {
+      final dt = DateTime.tryParse(value);
+      return dt != null && dt.isBefore(cutoff);
+    });
+
+    return result;
   }
 
   Map<String, dynamic>? _mergeAnswerVersions(dynamic remote, dynamic local) {
@@ -687,16 +799,6 @@ class DataSyncService {
     addAll(remote);
     addAll(local);
     return result;
-  }
-
-  String? _earlierDateString(String? a, String? b) {
-    if (a == null || a.isEmpty) return b;
-    if (b == null || b.isEmpty) return a;
-    final da = DateTime.tryParse(a);
-    final db = DateTime.tryParse(b);
-    if (da == null) return b;
-    if (db == null) return a;
-    return da.isBefore(db) ? a : b;
   }
 
   void _validateRepoSettings({

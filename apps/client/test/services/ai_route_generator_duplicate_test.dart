@@ -62,7 +62,7 @@ void main() {
       when(mockAi.isConfigAvailable(any)).thenReturn(false);
 
       final domains = [_javaDomain(), _agentDomain()];
-      final generator = AiRouteGenerator(mockStorage, domains);
+      final generator = AiRouteGenerator(domains);
       final storage = StorageService();
       final mockContentApi = MockContentApiService();
       when(mockContentApi.fetchManifest()).thenAnswer((_) async => {'domains': []});
@@ -115,7 +115,7 @@ void main() {
       when(mockAi.isConfigAvailable(any)).thenReturn(false);
 
       final domains = [_javaDomain(), _agentDomain()];
-      final generator = AiRouteGenerator(mockStorage, domains);
+      final generator = AiRouteGenerator(domains);
       final storage = StorageService();
       final mockContentApi = MockContentApiService();
       when(mockContentApi.fetchManifest()).thenAnswer((_) async => {'domains': []});

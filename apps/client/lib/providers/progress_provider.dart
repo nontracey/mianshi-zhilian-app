@@ -204,11 +204,12 @@ class ProgressProvider extends ChangeNotifier {
           domainTopics,
           availableTopicIds,
         );
-        result.sort((a, b) {
-          final scoreA = _recommendationScore(
-            a,
+        // Schwartzian transform: compute score once per topic, sort by cached value.
+        final scored = result.map((t) {
+          final s = _recommendationScore(
+            t,
             availableTopicIds: availableTopicIds,
-            prerequisiteDemand: prerequisiteDemand[a.id] ?? 0,
+            prerequisiteDemand: prerequisiteDemand[t.id] ?? 0,
             lowScoreWeight: lowScoreWeight,
             overdueWeight: overdueWeight,
             highFrequencyWeight: highFrequencyWeight,
@@ -217,20 +218,12 @@ class ProgressProvider extends ChangeNotifier {
             prioritizePrerequisites: prioritizePrerequisites,
             allowSkipLowFrequency: allowSkipLowFrequency,
           );
-          final scoreB = _recommendationScore(
-            b,
-            availableTopicIds: availableTopicIds,
-            prerequisiteDemand: prerequisiteDemand[b.id] ?? 0,
-            lowScoreWeight: lowScoreWeight,
-            overdueWeight: overdueWeight,
-            highFrequencyWeight: highFrequencyWeight,
-            pathOrderWeight: pathOrderWeight,
-            notPracticedWeight: notPracticedWeight,
-            prioritizePrerequisites: prioritizePrerequisites,
-            allowSkipLowFrequency: allowSkipLowFrequency,
-          );
-          return scoreB.compareTo(scoreA);
-        });
+          return (topic: t, score: s);
+        }).toList()
+          ..sort((a, b) => b.score.compareTo(a.score));
+        result
+          ..clear()
+          ..addAll(scored.map((e) => e.topic));
         break;
       case 'low-score-first':
         result.sort((a, b) {
@@ -358,6 +351,32 @@ class ProgressProvider extends ChangeNotifier {
     }).toList();
   }
 
+  /// 今日计划：依据备考目标的每日配额，从学习范围内组装"今日应学清单"。
+  /// - 复习项：今日到期（nextReviewAt <= 今天），按到期顺序取前 [reviewCount] 个；
+  /// - 新知识点：从未练习过的 topic，按内容侧 `Topic.order`（由浅到难）取前 [newCount] 个，
+  ///   不与复习项重复。
+  ///
+  /// 排序所有权遵循 L-3：新知识点默认顺序使用内容库维护的 order，App 不擅自重排。
+  ({List<Topic> reviewTopics, List<Topic> newTopics}) getTodayPlan(
+    List<Topic> scopedTopics, {
+    required int newCount,
+    required int reviewCount,
+  }) {
+    final reviewTopics =
+        getTodayReviewTopics(scopedTopics).take(reviewCount.clamp(0, 999)).toList();
+    final reviewIds = reviewTopics.map((t) => t.id).toSet();
+
+    final newCandidates = scopedTopics.where((t) {
+      if (reviewIds.contains(t.id)) return false;
+      final p = _progressMap[t.id];
+      return p == null || p.practiceCount == 0;
+    }).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    final newTopics = newCandidates.take(newCount.clamp(0, 999)).toList();
+    return (reviewTopics: reviewTopics, newTopics: newTopics);
+  }
+
   List<PracticeAttempt> getAttemptsForTopic(String topicId) =>
       _attempts.where((a) => a.topicId == topicId).toList();
 
@@ -399,11 +418,23 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   int get practiceStreakDays {
-    final dates = _attempts
-        .map(
-          (a) => DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day),
-        )
-        .toSet();
+    // 连续学习天数：不局限于"练习记录"，模拟面试与各知识点的最近练习时间
+    // 同样视为当日有学习行为，避免只做模拟面试/复习时口径过窄。
+    final dates = <DateTime>{
+      ..._attempts.map(
+        (a) => DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day),
+      ),
+      ..._mockSessions.map(
+        (s) => DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day),
+      ),
+      ..._progressMap.values
+          .where((p) => p.lastPracticeAt != null)
+          .map((p) => DateTime(
+                p.lastPracticeAt!.year,
+                p.lastPracticeAt!.month,
+                p.lastPracticeAt!.day,
+              )),
+    };
     var streak = 0;
     var cursor = DateTime.now();
     while (dates.contains(DateTime(cursor.year, cursor.month, cursor.day))) {

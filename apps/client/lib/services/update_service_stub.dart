@@ -262,6 +262,8 @@ class UpdateService {
 
   Future<bool> openInstaller(String filePath) async => false;
 
+  Future<void> deleteFileQuietly(String filePath) async {}
+
   Future<bool> verifySha256(String filePath, String expectedSha256) async =>
       false;
 

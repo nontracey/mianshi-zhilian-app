@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:collection/collection.dart';
 import '../models/ai_config.dart';
@@ -11,13 +10,12 @@ import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import '../services/ai_service.dart';
 import '../services/content_api_service.dart';
-import '../services/storage_service.dart';
 
 class AiRouteGenerator {
-  final StorageService _storage;
   final List<Domain> _allDomains;
 
-  AiRouteGenerator(this._storage, this._allDomains);
+  // A-7：路线生成不再持有独立缓存存储，custom_routes 是唯一事实源。
+  AiRouteGenerator(this._allDomains);
 
   /// 仅执行领域选择步骤（供调用方预加载 topics）
   Future<List<String>> selectDomainIds({
@@ -36,11 +34,16 @@ class AiRouteGenerator {
     required ContentProvider contentProvider,
     AiConfig? aiConfig,
     bool forceRegenerate = false,
-    String? contentVersion,
+    // A-7：custom_routes 是唯一事实源——非强制重生时直接复用调用方已持有的
+    // 同 planSignature 路线，不再维护独立的 route_cache_* 24h 缓存层。
+    List<LearningRoute> existingRoutes = const [],
   }) async {
     if (!forceRegenerate) {
-      final cached = await _loadCachedRoute(plan, contentVersion: contentVersion);
-      if (cached != null) return cached;
+      final sig = plan.signature;
+      final existing = existingRoutes.firstWhereOrNull(
+        (r) => r.source == 'ai' && r.planSignature == sig,
+      );
+      if (existing != null) return existing;
     }
 
     final useAi = aiService.isConfigAvailable(aiConfig);
@@ -53,19 +56,15 @@ class AiRouteGenerator {
           plan, selectedDomainIds, contentProvider, progressProvider, aiService, aiConfig,
         );
 
-        final route = _buildStructuredRoute(
+        return _buildStructuredRoute(
           plan, selectedDomainIds, relevantTopicIds, contentProvider, progressProvider,
         );
-        await _cacheRoute(plan, route, contentVersion: contentVersion);
-        return route;
       } catch (e) {
         debugPrint('AI route generation failed, using fallback: $e');
       }
     }
 
-    final route = _generateFallbackRoute(plan, allTopics, progressProvider, contentProvider);
-    await _cacheRoute(plan, route, contentVersion: contentVersion);
-    return route;
+    return _generateFallbackRoute(plan, allTopics, progressProvider, contentProvider);
   }
 
   Future<List<String>> _selectDomains(PrepPlan plan, AiService aiService, AiConfig aiConfig) async {
@@ -216,9 +215,9 @@ $topicLines
                 final topic = contentProvider.getTopicById(cacheKey);
                 if (topic == null) continue;
                 final tid = topic.id; // 使用 "java.jvm.xxx" 格式的 content ID
-                // 只包含 AI 选中且已掌握度低于 85 的
-                final score = progressProvider.getTopicProgress(tid)?.score ?? 0;
-                if (relevantTopicIds.contains(tid) && score < 85) {
+                // 全量纳入 AI 选中的 topic（含已掌握），掌握状态交展示层着色，
+                // 避免重新生成后掌握度分母缩减、进度被人为推高。
+                if (relevantTopicIds.contains(tid)) {
                   stepTopics.add(tid);
                 }
               }
@@ -241,7 +240,9 @@ $topicLines
       }
     }
 
-    final sig = _stableHash('${plan.targetRole}_${plan.techStack}_${plan.jobDescription}_${plan.interviewDate?.toIso8601String() ?? ''}');
+    // 签名所有权统一归 PrepPlan.signature（已 trim），确保 route.planSignature
+    // 与目标变更检测、去重逻辑使用完全一致的口径。
+    final sig = plan.signature;
     return LearningRoute(
       id: 'ai_$sig',
       name: plan.targetRole.isNotEmpty ? '${plan.targetRole} 备考路线' : 'AI 个性化路线',
@@ -267,25 +268,4 @@ $topicLines
     );
   }
 
-  Future<LearningRoute?> _loadCachedRoute(PrepPlan plan, {String? contentVersion}) async {
-    final cacheKey = _cacheKey(plan, contentVersion: contentVersion);
-    final data = await _storage.load(cacheKey);
-    if (data is Map<String, dynamic>) {
-      final cached = LearningRoute.fromJson(data);
-      if (DateTime.now().difference(cached.createdAt).inHours < 24) {
-        return cached;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _cacheRoute(PrepPlan plan, LearningRoute route, {String? contentVersion}) async {
-    await _storage.save(_cacheKey(plan, contentVersion: contentVersion), route.toJson());
-  }
-
-  String _cacheKey(PrepPlan plan, {String? contentVersion}) =>
-    'route_cache_${_stableHash('${plan.jobDescription}_${plan.targetRole}_${plan.techStack}_${plan.interviewDate?.toIso8601String() ?? ''}_${contentVersion ?? ''}')}';
-
-  static String _stableHash(String input) =>
-    sha256.convert(utf8.encode(input)).toString().substring(0, 16);
 }

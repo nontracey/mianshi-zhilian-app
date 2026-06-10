@@ -13,7 +13,7 @@ void main() {
       expect(restored.primaryColor, const Color(0xFF1A2B4A));
       expect(restored.accentColor, const Color(0xFF3078F0));
       expect(restored.language, 'zh');
-      expect(restored.recommendStrategy, 'low-score-first');
+      expect(restored.recommendStrategy, 'smart');
       expect(restored.currentDomain, 'java');
       expect(restored.compactLayout, false);
       expect(restored.dailyNewCount, 3);
@@ -537,7 +537,7 @@ void main() {
       expect(json, containsPair('primaryColor', 0xFF1A2B4A));
       expect(json, containsPair('accentColor', 0xFF3078F0));
       expect(json, containsPair('language', 'zh'));
-      expect(json, containsPair('recommendStrategy', 'low-score-first'));
+      expect(json, containsPair('recommendStrategy', 'smart'));
       expect(json, containsPair('currentDomain', 'java'));
       expect(json, containsPair('compactLayout', false));
       expect(json, containsPair('dailyNewCount', 3));

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mianshi_zhilian/generated/release_notes.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/providers/update_download_provider.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/app_version_service.dart';
 import 'package:mianshi_zhilian/services/route_resolver.dart';
@@ -56,7 +57,6 @@ class AboutPanelState extends State<AboutPanel> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
   bool _isChecking = false;
   String? _updateMessage;
-  StateSetter? _currentSetDialogState;
   AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
   DownloadSourceMode _downloadSourceMode = DownloadSourceMode.auto;
 
@@ -81,6 +81,12 @@ class AboutPanelState extends State<AboutPanel> {
       setState(() {
         _currentVersion = version;
       });
+      // 恢复此前下载好但尚未安装的安装包（文件仍在 + 版本仍较新才显示入口）。
+      if (!kIsWeb) {
+        await context
+            .read<UpdateDownloadProvider>()
+            .restore(version, _updateService);
+      }
     }
   }
 
@@ -250,7 +256,6 @@ class AboutPanelState extends State<AboutPanel> {
     }
 
     final platformUpdate = updateService.getPlatformUpdate(updateInfo);
-
     if (platformUpdate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -262,237 +267,155 @@ class AboutPanelState extends State<AboutPanel> {
       return;
     }
 
-    int received = 0;
-    int total = platformUpdate.size;
-    String currentSource = '';
-    bool dialogOpen = true;
-    final cancelToken = DownloadCancelToken();
+    // 安装权限在下载前确认（避免下完才发现没权限）。
+    final canInstall = await AppPermissionService.ensureInstallPackages(context);
+    if (!canInstall || !mounted) return;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          _currentSetDialogState = setDialogState;
-          return AlertDialog(
-            title: Text(l10n.get('download_update')),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  value: total > 0 ? received / total : null,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.getp('downloading_v_version_2', {
-                    'version': updateInfo.version,
-                  }),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                if (total > 0)
-                  Text(
-                    '${(received / total * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                if (currentSource.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.getp('downloading_from_source_2', {
-                      'source': currentSource,
-                    }),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  cancelToken.cancel();
-                  dialogOpen = false;
-                  Navigator.pop(ctx);
-                },
-                child: Text(l10n.get('cancel')),
-              ),
-            ],
-          );
-        },
-      ),
+    final download = context.read<UpdateDownloadProvider>();
+    // 下载交给全局控制器：切换页面也不会中断；进度在本页内联展示。
+    await download.startDownload(
+      service: updateService,
+      platformUpdate: platformUpdate,
+      version: updateInfo.version,
+      buildNumber: updateInfo.buildNumber,
     );
+    if (!mounted) return;
 
-    try {
-      final (filePath, downloadResult) = await updateService.downloadUpdate(
-        platformUpdate: platformUpdate,
-        version: updateInfo.version,
-        cancelToken: cancelToken,
-        onProgress: (r, t, source) {
-          received = r;
-          total = t;
-          currentSource = source;
-          if (mounted) {
-            _currentSetDialogState?.call(() {});
-          }
-        },
-      );
-
-      if (!mounted) return;
-
-      if (cancelToken.isCancelled) return;
-
-      if (filePath != null) {
-        final canInstall = await AppPermissionService.ensureInstallPackages(
-          context,
+    switch (download.lastResult) {
+      case DownloadResult.success:
+        // 下载完成且本页仍在前台：直接拉起安装；否则用户可从"已下载"入口安装。
+        await download.install();
+      case DownloadResult.networkError:
+        _showDownloadError(
+          l10n,
+          'download_fail_network_error_please_check_network_and_retry',
+          download.lastAttempts,
         );
-        if (!canInstall || !mounted) return;
-        await updateService.openInstaller(filePath);
-        if (!mounted) return;
-        _showInstallGuide(filePath, updateInfo.version);
-      } else {
-        final attempts = updateService.lastAttempts;
-        final String errorMessage;
-        switch (downloadResult) {
-          case DownloadResult.networkError:
-            errorMessage = _buildDownloadErrorMsg(
-              l10n,
-              'download_fail_network_error_please_check_network_and_retry',
-              attempts,
-            );
-          case DownloadResult.verificationFailed:
-            errorMessage = _buildDownloadErrorMsg(
-              l10n,
-              'download_fail_or_school_verify_not_open_pass_please_retry',
-              attempts,
-            );
-          case DownloadResult.cancelled:
-            return;
-          case DownloadResult.success:
-            errorMessage = '';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.danger,
-            duration: const Duration(seconds: 6),
-          ),
+      case DownloadResult.verificationFailed:
+        _showDownloadError(
+          l10n,
+          'download_fail_or_school_verify_not_open_pass_please_retry',
+          download.lastAttempts,
         );
-      }
-    } catch (e) {
-      debugPrint('Download error: $e');
-      if (mounted) {
-        final attempts = updateService.lastAttempts;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _buildDownloadErrorMsg(
-                l10n,
-                'download_fail_network_error_please_check_network_and_retry',
-                attempts,
-              ),
-            ),
-            backgroundColor: AppColors.danger,
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    } finally {
-      _currentSetDialogState = null;
-      if (mounted && dialogOpen) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Navigator.pop(context);
-          }
-        });
-      }
+      case DownloadResult.cancelled:
+      case null:
+        break;
     }
   }
 
-  void _showInstallGuide(String filePath, String version) {
-    final l10n = context.watch<LocalizationProvider>();
-    final ext = filePath.split('.').last.toLowerCase();
-    String instruction;
-    IconData icon;
-    switch (ext) {
-      case 'apk':
-        icon = Icons.android;
-        instruction =
-            l10n.get(
-              'download_complete_please_at_notification_bar_or_file_mana',
-            ) +
-            l10n.get(
-              'if_hint_un_known_come_source_please_at_settings_in_allow_8bb',
-            );
-        break;
-      case 'dmg':
-        icon = Icons.apple;
-        instruction = l10n.get(
-          'download_complete_please_type_open_dmg_file_will_application_6',
-        );
-        break;
-      case 'exe':
-        icon = Icons.desktop_windows;
-        instruction = l10n.get(
-          'download_complete_please_operate_action_exe_file_press_photo_direction_5bf',
-        );
-        break;
-      default:
-        icon = Icons.folder_open;
-        instruction = l10n.get(
-          'download_complete_please_at_file_management_device_in_find_5',
-        );
-        break;
-    }
+  void _showDownloadError(
+    LocalizationProvider l10n,
+    String baseKey,
+    List<DownloadAttempt> attempts,
+  ) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_buildDownloadErrorMsg(l10n, baseKey, attempts)),
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(icon, size: 40, color: AppColors.success),
-        title: Text(
-          l10n.getp('v_version_download_complete_2', {'version': version}),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(instruction),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+  /// 进行中下载的内联进度条。
+  Widget _buildDownloadingTile(
+    UpdateDownloadProvider download,
+    LocalizationProvider l10n,
+  ) {
+    final total = download.total;
+    final received = download.received;
+    final pct = total > 0 ? received / total : null;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.getp('downloading_v_version_2', {
+                    'version': download.readyVersionOrPending,
+                  }),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.folder_outlined, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      filePath,
-                      style: const TextStyle(fontSize: 11),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+              TextButton(
+                onPressed: download.cancel,
+                child: Text(l10n.get('cancel')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: pct),
+          const SizedBox(height: 6),
+          Text(
+            '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}'
+            '${download.source.isNotEmpty ? ' · ${download.source}' : ''}',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 已下载安装包的常驻入口：随时可再次打开安装，或删除安装包。
+  Widget _buildReadyToInstallTile(
+    UpdateDownloadProvider download,
+    LocalizationProvider l10n,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.download_done_outlined, color: AppColors.success),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.getp('installer_ready', {
+                    'version': download.readyVersion ?? '',
+                  }),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (download.filePath != null)
+                  Text(
+                    download.filePath!,
+                    style: const TextStyle(fontSize: 10),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.get('known_channel')),
+          ),
+          IconButton(
+            tooltip: l10n.get('delete_installer'),
+            icon: const Icon(Icons.delete_outline, size: 20),
+            onPressed: () => download.discard(),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final canInstall =
+                  await AppPermissionService.ensureInstallPackages(context);
+              if (!canInstall) return;
+              await download.install();
+            },
+            child: Text(l10n.get('install_now')),
           ),
         ],
       ),
@@ -517,6 +440,7 @@ class AboutPanelState extends State<AboutPanel> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
+    final download = context.watch<UpdateDownloadProvider>();
     return WorkPanel(
       title: l10n.get('about_interview_intelligence_training'),
       children: [
@@ -565,6 +489,10 @@ class AboutPanelState extends State<AboutPanel> {
             padding: EdgeInsets.only(top: 8),
             child: LinearProgressIndicator(),
           ),
+        // 下载进行中 / 已下载待安装的内联入口（切页不中断、随时可再次安装）。
+        if (download.isDownloading) _buildDownloadingTile(download, l10n),
+        if (download.readyVersion != null)
+          _buildReadyToInstallTile(download, l10n),
         const Divider(height: 32),
         Text(
           l10n.get('about_about'),

@@ -531,7 +531,6 @@ class CenterPanel extends StatefulWidget {
     required this.allDomains,
     required this.currentDomainId,
     required this.recommendedTopics,
-    required this.masteryPercent,
     required this.topicCount,
     required this.readiness,
     required this.streakDays,
@@ -552,7 +551,6 @@ class CenterPanel extends StatefulWidget {
   final List<Domain> allDomains;
   final String currentDomainId;
   final List<Topic> recommendedTopics;
-  final int masteryPercent;
   final int topicCount;
   final int readiness;
   final int streakDays;
@@ -1105,12 +1103,19 @@ class RightPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
 
-    final categoryMap = <String, List<Topic>>{};
+    // 路线模式跨多个领域：按领域拆解掌握度，而非按分类（分类名可能跨领域重名）
+    final groupMap = <String, List<Topic>>{};
+    final groupLabels = <String, String>{};
     for (final topic in scopedTopics) {
-      categoryMap.putIfAbsent(topic.category, () => []).add(topic);
+      final key = isRouteMode ? topic.domainId : topic.category;
+      groupMap.putIfAbsent(key, () => []).add(topic);
+      if (isRouteMode && !groupLabels.containsKey(key)) {
+        final domain = domains.where((d) => d.id == key).firstOrNull;
+        groupLabels[key] = domain?.title ?? key;
+      }
     }
 
-    final categories = categoryMap.entries.map((entry) {
+    final categories = groupMap.entries.map((entry) {
       final topics = entry.value;
       int totalScore = 0;
       int learnedCount = 0;
@@ -1122,7 +1127,8 @@ class RightPanel extends StatelessWidget {
         }
       }
       final avgScore = learnedCount == 0 ? 0 : (totalScore / learnedCount).round();
-      return CategoryMastery(name: entry.key, masteryPercent: avgScore);
+      final name = isRouteMode ? (groupLabels[entry.key] ?? entry.key) : entry.key;
+      return CategoryMastery(name: name, masteryPercent: avgScore);
     }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
 
     // 计算掌握程度百分比

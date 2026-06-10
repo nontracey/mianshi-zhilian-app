@@ -158,7 +158,7 @@ class NavigationRailPanel extends StatelessWidget {
                   _StatItem(
                     icon: Icons.access_time,
                     label: l10n.get('study_total_time_long'),
-                    value: '${totalHours.toStringAsFixed(1)} h',
+                    value: '约${totalHours.toStringAsFixed(1)} h',
                     trailing: todayHoursGrowth > 0
                         ? '+${todayHoursGrowth.toStringAsFixed(1)}h'
                         : null,

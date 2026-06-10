@@ -1,7 +1,7 @@
 name: mianshi_zhilian
 description: "面试智练 - AI 主动回忆学习工作台"
 publish_to: 'none'
-version: 0.1.6+165
+version: 0.1.6+166
 
 environment:
   sdk: ^3.11.5
@@ -18,12 +18,11 @@ dependencies:
   http: ^1.3.0
   provider: ^6.1.5
   shared_preferences: ^2.5.3
+  flutter_secure_storage: ^9.2.2
   path_provider: ^2.1.5
   intl: ^0.20.2
   url_launcher: ^6.3.1
   crypto: ^3.0.6
-  flutter_markdown: ^0.7.7+1
-  sqflite: ^2.4.2
   uuid: ^4.5.1
   google_fonts: ^6.2.1
   highlight: ^0.7.0
@@ -38,6 +37,7 @@ dependencies:
   archive: ^3.6.0
   connectivity_plus: ^6.1.5
   go_router: ^17.3.0
+  flutter_markdown_plus: ^1.0.7
 
 dev_dependencies:
   flutter_test:
