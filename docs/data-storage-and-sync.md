@@ -40,6 +40,18 @@
 - `project_library`、`project_dig_projects`：项目库与项目深挖资料。
 - `ai_configs`：AI 配置元数据。
 - `answer_versions_*`：回答草稿、AI 修改版、面试版等版本记录。
+- `deletions`：删除墓碑表 `{"<集合>:<id>": "<deletedAt ISO>"}`，用于让删除操作跨设备传播（见下文合并语义）。
+
+## 合并语义（本地优先 + 删除可传播）
+
+合并只发生在**合并层**（`DataSyncService._mergePackages` 等），与具体渠道解耦；新增同步方式无需改动合并算法。核心规则是 **last-write-wins + 删除墓碑**，远端永远不会让本地已删除项「复活」：
+
+- 列表类集合（`custom_routes` / `practice_attempts` / `sessions` / `mock_interview_sessions` / `project_library` / `project_dig_projects`）按实体 `id` 合并，同 id 取 `updatedAt` 较新者；相同则本地优先。
+- `progress_map` 按 `lastPracticeAt` 做 LWW（取最近一次练习的版本），`practiceCount` 取两侧较大值（单调不回退）。
+- 删除任一实体时写入 `deletions` 墓碑；合并时若某 id 的 `deletedAt >= updatedAt` 则判定已删除并剔除；删除后又有意重建（`updatedAt > deletedAt`）能正常恢复。墓碑超过 60 天后 GC。
+- 设备本地偏好（`learning_scope` / `settings` / `disabled_domains` 等）按 local-wins，不被远端覆盖。
+
+WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Match`、远端确认不存在时带 `If-None-Match: *`；服务器返回 412 即判定他端已写入，重新下载合并后重试（GitHub/Gitee 用 sha/409 等价机制）。
 
 同步时会按隐私设置脱敏：
 
@@ -55,6 +67,8 @@
 - `_analyticsBuffer`：待发送的轻量埋点缓冲。
 - 内容缓存：`topics_cache`、`domain_cache_*`、`content_version`、`domain_version_*` 等，用于减少内容库重复加载。
 - 登录 token、刷新 token、当前用户信息：用于账号登录状态，不通过普通数据同步快照同步。
+- 「记住密码」凭据：登录态本身由刷新令牌维持；勾选记住密码时，原生平台（Android/iOS/macOS/Windows）将密码存入操作系统安全存储（Keychain/Keystore/DPAPI），Web 端仅记住用户名、不存密码。该凭据只存本设备、绝不进入任何同步快照。
+- 已下载安装包记录：`downloaded_installer` 记录已校验安装包的本地路径与版本，供更新页常驻「已下载，点此安装」入口；属设备本地状态，不同步。
 
 ## 即时请求的数据与功能
 
