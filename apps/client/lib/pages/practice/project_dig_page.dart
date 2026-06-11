@@ -5,10 +5,72 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
+@visibleForTesting
+List<String> parseProjectTechStack(Object? value) {
+  if (value is List) {
+    return value
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+  return (value?.toString() ?? '')
+      .split(',')
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+}
+
+@visibleForTesting
+Map<String, dynamic> buildProjectPayload({
+  Map<String, dynamic>? existingProject,
+  required String name,
+  required String role,
+  required String scale,
+  required List<String> techStack,
+  required String background,
+  required String task,
+  required String action,
+  required String result,
+  DateTime? now,
+}) {
+  final timestamp = (now ?? DateTime.now()).toIso8601String();
+  final existingId = existingProject?['id']?.toString();
+  final existingCreatedAt = existingProject?['createdAt']?.toString();
+  return {
+    ...?existingProject,
+    'id': existingId != null && existingId.isNotEmpty
+        ? existingId
+        : (now ?? DateTime.now()).microsecondsSinceEpoch.toString(),
+    'name': name.trim(),
+    'role': role,
+    'scale': scale,
+    'techStack': techStack.join(', '),
+    'background': background.trim(),
+    'task': task.trim(),
+    'action': action.trim(),
+    'result': result.trim(),
+    'createdAt': existingCreatedAt != null && existingCreatedAt.isNotEmpty
+        ? existingCreatedAt
+        : timestamp,
+    'updatedAt': timestamp,
+  };
+}
+
 class ProjectDigPage extends StatefulWidget {
-  const ProjectDigPage({super.key, this.initialTechStack});
+  const ProjectDigPage({
+    super.key,
+    this.initialTechStack,
+    this.initialProject,
+    this.persistToSavedProjects = true,
+  });
 
   final List<String>? initialTechStack;
+  final Map<String, dynamic>? initialProject;
+
+  /// Whether this page should write to its own `project_dig_projects` quick list.
+  /// External owners such as [ProjectLibraryPage] can reuse the form without
+  /// duplicating edited records into the quick-practice list.
+  final bool persistToSavedProjects;
 
   @override
   State<ProjectDigPage> createState() => _ProjectDigPageState();
@@ -39,10 +101,29 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialTechStack != null) {
+    if (widget.initialProject != null) {
+      _applyInitialProject(widget.initialProject!);
+    } else if (widget.initialTechStack != null) {
       _selectedTechStack.addAll(widget.initialTechStack!);
     }
-    _loadSavedProjects();
+    if (widget.persistToSavedProjects) {
+      _loadSavedProjects();
+    }
+  }
+
+  void _applyInitialProject(Map<String, dynamic> project) {
+    _projectNameController.text = project['name']?.toString() ?? '';
+    _backgroundController.text = project['background']?.toString() ?? '';
+    _techDecisionController.text = project['task']?.toString() ?? '';
+    _difficultyController.text = project['action']?.toString() ?? '';
+    _resultController.text = project['result']?.toString() ?? '';
+    final role = project['role']?.toString();
+    if (role != null && role.isNotEmpty) _selectedRole = role;
+    final scale = project['scale']?.toString();
+    if (scale != null && scale.isNotEmpty) _selectedScale = scale;
+    _selectedTechStack
+      ..clear()
+      ..addAll(parseProjectTechStack(project['techStack']));
   }
 
   Future<void> _loadSavedProjects() async {
@@ -97,7 +178,7 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
           const SizedBox(height: 20),
 
           // 已保存的项目
-          if (_savedProjects.isNotEmpty) ...[
+          if (widget.persistToSavedProjects && _savedProjects.isNotEmpty) ...[
             _buildSavedProjects(context, isDark),
             const SizedBox(height: 20),
           ],
@@ -650,24 +731,32 @@ class _ProjectDigPageState extends State<ProjectDigPage> {
 
   Future<void> _saveAndPractice() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final project = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'name': _projectNameController.text,
-        'role': _selectedRole,
-        'scale': _selectedScale,
-        'techStack': _selectedTechStack.join(', '),
-        'background': _backgroundController.text,
-        'task': _techDecisionController.text,
-        'action': _difficultyController.text,
-        'result': _resultController.text,
-        'createdAt': DateTime.now().toIso8601String(),
-      };
+      final project = buildProjectPayload(
+        existingProject: widget.initialProject,
+        name: _projectNameController.text,
+        role: _selectedRole,
+        scale: _selectedScale,
+        techStack: _selectedTechStack,
+        background: _backgroundController.text,
+        task: _techDecisionController.text,
+        action: _difficultyController.text,
+        result: _resultController.text,
+      );
 
-      setState(() {
-        _savedProjects.add(project);
-      });
+      if (widget.persistToSavedProjects) {
+        setState(() {
+          final index = _savedProjects.indexWhere(
+            (p) => p['id'] == project['id'],
+          );
+          if (index >= 0) {
+            _savedProjects[index] = project;
+          } else {
+            _savedProjects.add(project);
+          }
+        });
 
-      await _saveProjects();
+        await _saveProjects();
+      }
 
       // 返回项目数据给调用方
       if (mounted) {

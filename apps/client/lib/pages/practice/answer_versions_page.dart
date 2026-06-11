@@ -41,12 +41,24 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     final data = await _storage.loadJsonList(_storageKey);
     setState(() {
       _versions.clear();
-      _versions.addAll(data);
+      _versions.addAll(data.map(_versionWithIdentity));
     });
   }
 
   Future<void> _saveVersions() async {
     await _storage.saveJsonList(_storageKey, _versions);
+  }
+
+  Map<String, dynamic> _versionWithIdentity(
+    Map<dynamic, dynamic> version, {
+    DateTime? now,
+  }) {
+    final timestamp = (now ?? DateTime.now()).toIso8601String();
+    final normalized = version.map((k, v) => MapEntry(k.toString(), v));
+    normalized['id'] = StorageService.answerVersionIdFor(normalized);
+    normalized['createdAt'] ??= timestamp;
+    normalized['updatedAt'] ??= normalized['createdAt'];
+    return normalized;
   }
 
   @override
@@ -475,11 +487,13 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
     }
 
     setState(() {
-      _versions.add({
-        'type': _selectedVersionType,
-        'content': _answerController.text.trim(),
-        'createdAt': DateTime.now().toString().substring(0, 16),
-      });
+      _versions.add(
+        _versionWithIdentity({
+          'type': _selectedVersionType,
+          'content': _answerController.text.trim(),
+          'createdAt': DateTime.now().toIso8601String(),
+        }),
+      );
     });
 
     await _saveVersions();
@@ -505,10 +519,15 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
           FilledButton(
             onPressed: () async {
               final messenger = ScaffoldMessenger.of(context);
+              final removed = Map<String, dynamic>.from(_versions[index]);
               setState(() {
                 _versions.removeAt(index);
               });
               await _saveVersions();
+              await _storage.recordAnswerVersionDeletion(
+                widget.topicId,
+                removed,
+              );
               if (!ctx.mounted) return;
               Navigator.of(ctx).pop();
               messenger.showSnackBar(
@@ -600,12 +619,14 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
             FilledButton(
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
+                final existing = _versionWithIdentity(_versions[index]);
                 setState(() {
                   _versions[index] = {
+                    ...existing,
                     'type': _selectedVersionType,
                     'content': _answerController.text.trim(),
-                    'createdAt': _versions[index]['createdAt'],
-                    'updatedAt': DateTime.now().toString().substring(0, 16),
+                    'createdAt': existing['createdAt'],
+                    'updatedAt': DateTime.now().toIso8601String(),
                   };
                 });
                 await _saveVersions();
@@ -788,12 +809,14 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
                   onPressed: () async {
                     // 保存为 AI 修改版
                     setState(() {
-                      _versions.add({
-                        'type': 'ai_modified',
-                        'content': improvedText,
-                        'createdAt': DateTime.now().toString().substring(0, 16),
-                        'source': 'ai_improve',
-                      });
+                      _versions.add(
+                        _versionWithIdentity({
+                          'type': 'ai_modified',
+                          'content': improvedText,
+                          'createdAt': DateTime.now().toIso8601String(),
+                          'source': 'ai_improve',
+                        }),
+                      );
                     });
                     await _saveVersions();
                     if (!ctx.mounted) return;
@@ -850,7 +873,9 @@ class _AnswerVersionsPageState extends State<AnswerVersionsPage> {
 
   Future<void> _setAsInterviewVersion(int index) async {
     setState(() {
+      _versions[index] = _versionWithIdentity(_versions[index]);
       _versions[index]['type'] = 'interview';
+      _versions[index]['updatedAt'] = DateTime.now().toIso8601String();
     });
     await _saveVersions();
     if (mounted) {

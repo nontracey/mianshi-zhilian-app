@@ -609,7 +609,7 @@ class DataManagementPanel extends StatelessWidget {
             title: Text(l10n.get('sync_ai_config_metadata')),
             subtitle: Text(l10n.get('sync_ai_config_metadata_desc')),
             onChanged: (value) => onSyncSettingsChanged(
-              syncSettings.copyWith(syncAiConfigMetadata: value ?? true),
+              syncSettings.copyWith(syncAiConfigMetadata: value ?? false),
             ),
           ),
         ],

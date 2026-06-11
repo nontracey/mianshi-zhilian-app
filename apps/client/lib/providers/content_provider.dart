@@ -17,12 +17,13 @@ class ContentProvider extends ChangeNotifier {
   Map<String, Topic> _topics = {};
   Map<String, dynamic>? _manifest;
   bool _isLoading = false;
-  int _loadingDomainCount = 0;  // 并发加载中的领域数；>0 即 isLoadingTopics
+  int _loadingDomainCount = 0; // 并发加载中的领域数；>0 即 isLoadingTopics
   bool _isCheckingUpdate = false;
   String? _error;
   List<String> _topicLoadFailures = [];
   String? _cachedContentVersion;
   int _loadEpoch = 0;
+
   /// 当前正在进行的同域加载 Future，避免 ensureTopicsLoaded 并发触发重复网络请求。
   final Map<String, Future<void>> _pendingDomainLoads = {};
 
@@ -78,18 +79,15 @@ class ContentProvider extends ChangeNotifier {
           .map((e) => Domain.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // 3. 逐个加载 domain 详情（含 categories）
-      final List<Domain> fullDomains = [];
-      for (final domain in baseDomains) {
-        if (epoch != _loadEpoch) return;
-        try {
-          final fullDomain = await _api.fetchDomain(
-            domain.id,
-            entry: domain.entry,
-          );
-          if (epoch != _loadEpoch) return;
-          fullDomains.add(
-            Domain(
+      // 3. 并发加载 domain 详情（含 categories），保持 manifest 顺序输出。
+      final fullDomains = await Future.wait(
+        baseDomains.map((domain) async {
+          try {
+            final fullDomain = await _api.fetchDomain(
+              domain.id,
+              entry: domain.entry,
+            );
+            return Domain(
               id: fullDomain.id,
               title: fullDomain.title,
               description: fullDomain.description,
@@ -102,13 +100,13 @@ class ContentProvider extends ChangeNotifier {
               topicCount: domain.topicCount,
               updatedAt: domain.updatedAt,
               color: fullDomain.color,
-            ),
-          );
-        } catch (e) {
-          debugPrint('Failed to load domain detail ${domain.id}: $e');
-          fullDomains.add(domain);
-        }
-      }
+            );
+          } catch (e) {
+            debugPrint('Failed to load domain detail ${domain.id}: $e');
+            return domain;
+          }
+        }),
+      );
       if (epoch != _loadEpoch) return;
       _domains = fullDomains;
 
@@ -222,10 +220,10 @@ class ContentProvider extends ChangeNotifier {
 
   Future<void> loadDomainTopics(String domainId) {
     // 同域并发去重：若该领域已在加载中，直接复用同一 Future，避免重复网络请求。
-    return _pendingDomainLoads[domainId] ??=
-        _loadDomainTopicsInternal(domainId).whenComplete(() {
-      _pendingDomainLoads.remove(domainId);
-    });
+    return _pendingDomainLoads[domainId] ??= _loadDomainTopicsInternal(domainId)
+        .whenComplete(() {
+          _pendingDomainLoads.remove(domainId);
+        });
   }
 
   Future<void> _loadDomainTopicsInternal(String domainId) async {

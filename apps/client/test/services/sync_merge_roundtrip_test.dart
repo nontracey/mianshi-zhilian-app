@@ -18,26 +18,25 @@ void main() {
   });
 
   Map<String, dynamic> route(String id, String updatedAt) => {
-        'id': id,
-        'name': id,
-        'domainIds': const ['java'],
-        'phases': const [],
-        'source': 'custom',
-        'createdAt': updatedAt,
-        'updatedAt': updatedAt,
-      };
+    'id': id,
+    'name': id,
+    'domainIds': const ['java'],
+    'phases': const [],
+    'source': 'custom',
+    'createdAt': updatedAt,
+    'updatedAt': updatedAt,
+  };
 
   Map<String, dynamic> pkg({
     List<Map<String, dynamic>> customRoutes = const [],
     Map<String, String> deletions = const {},
-  }) =>
-      {
-        'schemaVersion': 1,
-        'data': {
-          'custom_routes': customRoutes,
-          if (deletions.isNotEmpty) 'deletions': deletions,
-        },
-      };
+  }) => {
+    'schemaVersion': 1,
+    'data': {
+      'custom_routes': customRoutes,
+      if (deletions.isNotEmpty) 'deletions': deletions,
+    },
+  };
 
   List<String> mergedRouteIds(Map<String, dynamic> merged) {
     final list = (merged['data'] as Map)['custom_routes'] as List? ?? [];
@@ -48,10 +47,12 @@ void main() {
     test('远端独有项被保留（无墓碑时是并集）', () {
       final merged = sync.mergePackagesForTest(
         pkg(customRoutes: [route('A', '2026-01-01T00:00:00.000')]),
-        pkg(customRoutes: [
-          route('A', '2026-01-01T00:00:00.000'),
-          route('C', '2026-01-01T00:00:00.000'),
-        ]),
+        pkg(
+          customRoutes: [
+            route('A', '2026-01-01T00:00:00.000'),
+            route('C', '2026-01-01T00:00:00.000'),
+          ],
+        ),
       );
       expect(mergedRouteIds(merged), containsAll(['A', 'C']));
     });
@@ -63,10 +64,12 @@ void main() {
           customRoutes: [route('A', '2026-01-01T00:00:00.000')],
           deletions: {'custom_routes:C': '2026-06-01T00:00:00.000'},
         ),
-        pkg(customRoutes: [
-          route('A', '2026-01-01T00:00:00.000'),
-          route('C', '2026-01-01T00:00:00.000'), // 远端仍有旧的 C
-        ]),
+        pkg(
+          customRoutes: [
+            route('A', '2026-01-01T00:00:00.000'),
+            route('C', '2026-01-01T00:00:00.000'), // 远端仍有旧的 C
+          ],
+        ),
       );
       expect(mergedRouteIds(merged), ['A']);
       expect(mergedRouteIds(merged), isNot(contains('C')));
@@ -93,7 +96,8 @@ void main() {
         pkg(customRoutes: [route('A', '2026-07-01T00:00:00.000')]), // 本地较新
         pkg(customRoutes: [route('A', '2026-01-01T00:00:00.000')]), // 远端较旧
       );
-      final a = ((merged['data'] as Map)['custom_routes'] as List).single as Map;
+      final a =
+          ((merged['data'] as Map)['custom_routes'] as List).single as Map;
       expect(a['updatedAt'], '2026-07-01T00:00:00.000');
     });
   });
@@ -110,28 +114,32 @@ void main() {
       await storage.saveCustomRoutes([route('A', '2026-01-01T00:00:00.000')]);
       await storage.recordDeletion('custom_routes', 'B');
 
-      final localExport =
-          await storage.exportSyncPackage(const SyncSettings(method: 'webdav'));
+      final localExport = await storage.exportSyncPackage(
+        const SyncSettings(method: 'webdav'),
+      );
       // 远端仍持有 A、B
-      final remote = pkg(customRoutes: [
-        route('A', '2026-01-01T00:00:00.000'),
-        route('B', '2026-01-01T00:00:00.000'),
-      ]);
+      final remote = pkg(
+        customRoutes: [
+          route('A', '2026-01-01T00:00:00.000'),
+          route('B', '2026-01-01T00:00:00.000'),
+        ],
+      );
 
-      final merged =
-          DataSyncService(storage).mergePackagesForTest(localExport, remote);
+      final merged = DataSyncService(
+        storage,
+      ).mergePackagesForTest(localExport, remote);
       expect(mergedRouteIds(merged), ['A'], reason: 'B 已删，墓碑应让远端副本也消失');
     });
   });
 
   group('progress_map 清空墓碑（P0-3）', () {
     Map<String, dynamic> prog(String id, String lastAt) => {
-          'topicId': id,
-          'score': 80,
-          'status': 'learning',
-          'practiceCount': 2,
-          'lastPracticeAt': lastAt,
-        };
+      'topicId': id,
+      'score': 80,
+      'status': 'learning',
+      'practiceCount': 2,
+      'lastPracticeAt': lastAt,
+    };
 
     test('清空墓碑 + 远端旧进度 → 不复活', () {
       final merged = DataSyncService.mergeProgressMaps(
@@ -152,23 +160,22 @@ void main() {
     });
 
     test('无墓碑 → 正常合并保留', () {
-      final merged = DataSyncService.mergeProgressMaps(
-        {'java.a': prog('java.a', '2026-01-01T00:00:00.000')},
-        <String, dynamic>{},
-      );
+      final merged = DataSyncService.mergeProgressMaps({
+        'java.a': prog('java.a', '2026-01-01T00:00:00.000'),
+      }, <String, dynamic>{});
       expect(merged.containsKey('java.a'), isTrue);
     });
   });
 
   group('practice_attempts 删除墓碑（P0-3）', () {
     Map<String, dynamic> attempt(String id) => {
-          'id': id,
-          'topicId': 'java.a',
-          'mode': 'recall',
-          'question': 'q',
-          'answer': 'a',
-          'createdAt': '2026-01-01T00:00:00.000',
-        };
+      'id': id,
+      'topicId': 'java.a',
+      'mode': 'recall',
+      'question': 'q',
+      'answer': 'a',
+      'createdAt': '2026-01-01T00:00:00.000',
+    };
 
     test('删除墓碑 → 远端副本不复活', () {
       final merged = sync.mergePackagesForTest(
@@ -186,50 +193,130 @@ void main() {
           },
         },
       );
-      final list =
-          (merged['data'] as Map)['practice_attempts'] as List? ?? [];
+      final list = (merged['data'] as Map)['practice_attempts'] as List? ?? [];
       expect(list, isEmpty);
+    });
+  });
+
+  group('answer_versions 删除墓碑', () {
+    test('删除 legacy 版本后远端旧副本不复活', () {
+      final version = {
+        'type': 'draft',
+        'content': 'answer v1',
+        'createdAt': '2026-01-01T00:00:00.000',
+      };
+      final versionId = StorageService.answerVersionIdFor(version);
+      final collection = StorageService.answerVersionDeletionCollection(
+        'java.a',
+      );
+
+      final merged = sync.mergePackagesForTest(
+        {
+          'schemaVersion': 1,
+          'data': {
+            'answer_versions': {'java.a': <Map<String, dynamic>>[]},
+            'deletions': {'$collection:$versionId': '2026-06-01T00:00:00.000'},
+          },
+        },
+        {
+          'schemaVersion': 1,
+          'data': {
+            'answer_versions': {
+              'java.a': [version],
+            },
+          },
+        },
+      );
+
+      expect((merged['data'] as Map).containsKey('answer_versions'), isFalse);
+    });
+
+    test('删除后新版本 updatedAt 晚于墓碑时保留', () {
+      final version = {
+        'id': 'v1',
+        'type': 'draft',
+        'content': 'answer v2',
+        'createdAt': '2026-07-01T00:00:00.000',
+        'updatedAt': '2026-07-01T00:00:00.000',
+      };
+      final collection = StorageService.answerVersionDeletionCollection(
+        'java.a',
+      );
+
+      final merged = sync.mergePackagesForTest(
+        {
+          'schemaVersion': 1,
+          'data': {
+            'answer_versions': {
+              'java.a': [version],
+            },
+            'deletions': {'$collection:v1': '2026-06-01T00:00:00.000'},
+          },
+        },
+        {'schemaVersion': 1, 'data': <String, dynamic>{}},
+      );
+
+      final answerVersions =
+          ((merged['data'] as Map)['answer_versions'] as Map)['java.a'] as List;
+      expect(answerVersions.single['id'], 'v1');
     });
   });
 
   group('单例键 LWW（P1-6）', () {
     Map<String, dynamic> singletonPkg(String key, dynamic value) => {
-          'schemaVersion': 1,
-          'data': {key: value},
-        };
+      'schemaVersion': 1,
+      'data': {key: value},
+    };
 
     dynamic mergedSingleton(Map<String, dynamic> m, String key) =>
         (m['data'] as Map)[key];
 
     test('prep_plan 取 updatedAt 较新者（远端更新 → 远端胜）', () {
       final merged = sync.mergePackagesForTest(
-        singletonPkg('prep_plan',
-            {'targetRole': '本地旧', 'updatedAt': '2026-01-01T00:00:00.000'}),
-        singletonPkg('prep_plan',
-            {'targetRole': '远端新', 'updatedAt': '2026-06-01T00:00:00.000'}),
+        singletonPkg('prep_plan', {
+          'targetRole': '本地旧',
+          'updatedAt': '2026-01-01T00:00:00.000',
+        }),
+        singletonPkg('prep_plan', {
+          'targetRole': '远端新',
+          'updatedAt': '2026-06-01T00:00:00.000',
+        }),
       );
-      expect((mergedSingleton(merged, 'prep_plan') as Map)['targetRole'], '远端新');
+      expect(
+        (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'],
+        '远端新',
+      );
     });
 
     test('local_profile 取 updatedAt 较新者（本地更新 → 本地胜）', () {
       final merged = sync.mergePackagesForTest(
-        singletonPkg('local_profile',
-            {'nickname': '本地新', 'updatedAt': '2026-06-01T00:00:00.000'}),
-        singletonPkg('local_profile',
-            {'nickname': '远端旧', 'updatedAt': '2026-01-01T00:00:00.000'}),
+        singletonPkg('local_profile', {
+          'nickname': '本地新',
+          'updatedAt': '2026-06-01T00:00:00.000',
+        }),
+        singletonPkg('local_profile', {
+          'nickname': '远端旧',
+          'updatedAt': '2026-01-01T00:00:00.000',
+        }),
       );
       expect(
-          (mergedSingleton(merged, 'local_profile') as Map)['nickname'], '本地新');
+        (mergedSingleton(merged, 'local_profile') as Map)['nickname'],
+        '本地新',
+      );
     });
 
     test('一侧缺失时保留另一侧', () {
       final merged = sync.mergePackagesForTest(
         {'schemaVersion': 1, 'data': <String, dynamic>{}},
-        singletonPkg('prep_plan',
-            {'targetRole': '远端独有', 'updatedAt': '2026-06-01T00:00:00.000'}),
+        singletonPkg('prep_plan', {
+          'targetRole': '远端独有',
+          'updatedAt': '2026-06-01T00:00:00.000',
+        }),
       );
       expect(
-          (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'], '远端独有');
+        (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'],
+        '远端独有',
+      );
     });
   });
 
@@ -258,8 +345,9 @@ void main() {
 
       await storage.clearPracticeData();
 
-      final localExport =
-          await storage.exportSyncPackage(const SyncSettings(method: 'webdav'));
+      final localExport = await storage.exportSyncPackage(
+        const SyncSettings(method: 'webdav'),
+      );
       final remote = {
         'schemaVersion': 1,
         'data': {
@@ -285,15 +373,14 @@ void main() {
         },
       };
 
-      final merged =
-          DataSyncService(storage).mergePackagesForTest(localExport, remote);
+      final merged = DataSyncService(
+        storage,
+      ).mergePackagesForTest(localExport, remote);
       final attempts =
           (merged['data'] as Map)['practice_attempts'] as List? ?? [];
-      final progressMap =
-          (merged['data'] as Map)['progress_map'] as Map? ?? {};
+      final progressMap = (merged['data'] as Map)['progress_map'] as Map? ?? {};
       expect(attempts, isEmpty, reason: '清空后练习记录不应复活');
-      expect(progressMap.containsKey('java.a'), isFalse,
-          reason: '清空后进度不应复活');
+      expect(progressMap.containsKey('java.a'), isFalse, reason: '清空后进度不应复活');
     });
   });
 }

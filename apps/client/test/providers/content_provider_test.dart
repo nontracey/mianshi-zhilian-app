@@ -34,9 +34,12 @@ class MockContentApiService extends ContentApiService {
   final Map<String, Map<String, dynamic>> _topicResponses = {};
   Completer<Map<String, dynamic>>? _manifestBlocker;
   bool _blockerConsumed = false;
+  Duration domainFetchDelay = Duration.zero;
+  int _activeDomainFetches = 0;
+  int maxConcurrentDomainFetches = 0;
 
   MockContentApiService()
-      : super(baseUrl: 'http://test.com', httpClient: _MockHttpClient());
+    : super(baseUrl: 'http://test.com', httpClient: _MockHttpClient());
 
   void setManifestResponse(Map<String, dynamic>? manifest) {
     _manifestResponse = manifest;
@@ -76,9 +79,20 @@ class MockContentApiService extends ContentApiService {
 
   @override
   Future<Domain> fetchDomain(String domainId, {String? entry}) async {
-    final json = _domainResponses[domainId];
-    if (json == null) throw Exception('No domain response for $domainId');
-    return Domain.fromJson(json);
+    _activeDomainFetches++;
+    if (_activeDomainFetches > maxConcurrentDomainFetches) {
+      maxConcurrentDomainFetches = _activeDomainFetches;
+    }
+    try {
+      if (domainFetchDelay > Duration.zero) {
+        await Future<void>.delayed(domainFetchDelay);
+      }
+      final json = _domainResponses[domainId];
+      if (json == null) throw Exception('No domain response for $domainId');
+      return Domain.fromJson(json);
+    } finally {
+      _activeDomainFetches--;
+    }
   }
 
   @override
@@ -147,6 +161,47 @@ void main() {
       expect(provider.domains[0].id, 'java');
       expect(provider.domains[1].id, 'agent');
       expect(provider.manifest, isNotNull);
+    });
+
+    test('loads domain details concurrently while preserving order', () async {
+      api.domainFetchDelay = const Duration(milliseconds: 20);
+      api.setManifestResponse({
+        'domains': [
+          {
+            'id': 'java',
+            'title': 'Java',
+            'description': 'Java desc',
+            'topicCount': 5,
+          },
+          {
+            'id': 'agent',
+            'title': 'Agent',
+            'description': 'Agent desc',
+            'topicCount': 3,
+          },
+          {
+            'id': 'python',
+            'title': 'Python',
+            'description': 'Python desc',
+            'topicCount': 4,
+          },
+        ],
+        'contentVersion': null,
+        'defaultDomain': 'nonexistent',
+      });
+      for (final id in ['java', 'agent', 'python']) {
+        api.setDomainResponse(id, {
+          'id': id,
+          'title': '$id Full',
+          'description': '$id full desc',
+          'categories': [],
+        });
+      }
+
+      await provider.loadContent();
+
+      expect(provider.domains.map((d) => d.id), ['java', 'agent', 'python']);
+      expect(api.maxConcurrentDomainFetches, greaterThan(1));
     });
 
     test('isLoading true during load, false after', () async {

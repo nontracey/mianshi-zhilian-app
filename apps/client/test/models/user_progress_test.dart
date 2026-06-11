@@ -101,21 +101,13 @@ void main() {
     });
 
     test('fromJson with score as double does not crash', () {
-      final json = {
-        'topicId': 't1',
-        'score': 80.5,
-        'status': 'mastered',
-      };
+      final json = {'topicId': 't1', 'score': 80.5, 'status': 'mastered'};
       final restored = TopicProgress.fromJson(json);
       expect(restored.score, 80);
     });
 
     test('fromJson missing practiceCount defaults to 0', () {
-      final json = {
-        'topicId': 't1',
-        'score': 100,
-        'status': 'new',
-      };
+      final json = {'topicId': 't1', 'score': 100, 'status': 'new'};
       final restored = TopicProgress.fromJson(json);
       expect(restored.practiceCount, 0);
     });
@@ -210,7 +202,10 @@ void main() {
       expect(restored.missedPoints, ['garbage collection details']);
       expect(restored.wrongPoints, ['classloader hierarchy']);
       expect(restored.errorTags, ['jvm']);
-      expect(restored.improvedAnswer, 'Java Virtual Machine executes bytecode...');
+      expect(
+        restored.improvedAnswer,
+        'Java Virtual Machine executes bytecode...',
+      );
       expect(restored.nextAction, 'review_gc');
       expect(restored.aiConfigId, 'ai-gpt-4');
       expect(restored.aiEvaluated, true);
@@ -419,10 +414,7 @@ void main() {
     });
 
     test('fromJson missing scenario defaults to mixed', () {
-      final json = {
-        'id': 'mock-4',
-        'startedAt': '2025-06-08T10:00:00.000',
-      };
+      final json = {'id': 'mock-4', 'startedAt': '2025-06-08T10:00:00.000'};
       final restored = MockInterviewSession.fromJson(json);
       expect(restored.scenario, 'mixed');
     });
@@ -490,10 +482,7 @@ void main() {
         nickname: 'old',
         avatarSeed: 'old_seed',
       );
-      final modified = original.copyWith(
-        nickname: 'new',
-        emailBound: true,
-      );
+      final modified = original.copyWith(nickname: 'new', emailBound: true);
       expect(modified.nickname, 'new');
       expect(modified.avatarSeed, 'old_seed');
       expect(modified.emailBound, true);
@@ -515,6 +504,7 @@ void main() {
       expect(restored.webDavUrl, '');
       expect(restored.githubToken, '');
       expect(restored.giteeToken, '');
+      expect(restored.syncAiConfigMetadata, false);
     });
 
     test('round-trip with webdav method', () {
@@ -614,6 +604,7 @@ void main() {
       expect(restored.autoSyncIntervalMinutes, 5);
       expect(restored.lastSyncAt, isNull);
       expect(restored.lastSyncStatus, 'local_mode');
+      expect(restored.syncAiConfigMetadata, false);
     });
 
     test('isAutomaticMethod returns true for webdav, github, gitee', () {
@@ -645,7 +636,10 @@ void main() {
     });
 
     test('copyWith with null keeps original values', () {
-      final original = const SyncSettings(method: 'github', githubToken: 'keep-me');
+      final original = const SyncSettings(
+        method: 'github',
+        githubToken: 'keep-me',
+      );
       final modified = original.copyWith(method: 'webdav');
       expect(modified.method, 'webdav');
       expect(modified.githubToken, 'keep-me');
@@ -674,10 +668,7 @@ void main() {
     });
 
     test('hasTarget works with company alone', () {
-      final plan = PrepPlan(
-        company: '阿里',
-        updatedAt: DateTime.now(),
-      );
+      final plan = PrepPlan(company: '阿里', updatedAt: DateTime.now());
       expect(plan.hasTarget, isTrue);
     });
 

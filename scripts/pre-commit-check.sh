@@ -62,14 +62,30 @@ else
 fi
 echo ""
 
-# 7. Worker 类型检查
-echo "☁️ Step 7/7: 运行 Worker 类型检查..."
+# 7. Worker 迁移覆盖检查
+echo "🗄️ Step 7/8: 检查 Worker D1 迁移覆盖..."
 cd "$REPO_ROOT"
 npm ci --prefix workers/api
+if npm run --prefix workers/api check:migrations; then
+  echo "✅ Worker D1 迁移覆盖检查通过"
+else
+  echo "❌ Worker D1 迁移覆盖检查失败，请补齐 init-db.sql"
+  exit 1
+fi
+echo ""
+
+# 8. Worker 类型检查与测试
+echo "☁️ Step 8/8: 运行 Worker 类型检查与测试..."
 if npm run --prefix workers/api typecheck; then
   echo "✅ Worker 类型检查通过"
 else
   echo "❌ Worker 类型检查失败，请修复上面的问题"
+  exit 1
+fi
+if npm test --prefix workers/api; then
+  echo "✅ Worker 测试通过"
+else
+  echo "❌ Worker 测试失败，请修复上面的问题"
   exit 1
 fi
 echo ""

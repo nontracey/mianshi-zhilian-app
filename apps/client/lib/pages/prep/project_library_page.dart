@@ -5,6 +5,29 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/pages/practice/project_dig_page.dart';
 import '../../providers/localization_provider.dart';
 
+Map<String, dynamic> normalizeProjectLibraryRecord(
+  Map<String, dynamic> project, {
+  Map<String, dynamic>? fallback,
+  DateTime? now,
+}) {
+  final timestamp = (now ?? DateTime.now()).toIso8601String();
+  final merged = <String, dynamic>{...?fallback, ...project};
+  final id = merged['id']?.toString();
+  final createdAt = merged['createdAt']?.toString();
+  return {
+    ...merged,
+    'id': id != null && id.isNotEmpty
+        ? id
+        : (now ?? DateTime.now()).microsecondsSinceEpoch.toString(),
+    'createdAt': createdAt != null && createdAt.isNotEmpty
+        ? createdAt
+        : timestamp,
+    'updatedAt': merged['updatedAt']?.toString().isNotEmpty == true
+        ? merged['updatedAt']
+        : timestamp,
+  };
+}
+
 class ProjectLibraryPage extends StatefulWidget {
   const ProjectLibraryPage({super.key});
 
@@ -36,9 +59,8 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   }
 
   Future<void> _addProject(Map<String, dynamic> project) async {
-    project['id'] = DateTime.now().millisecondsSinceEpoch.toString();
-    project['createdAt'] = DateTime.now().toIso8601String();
-    setState(() => _projects.add(project));
+    final normalized = normalizeProjectLibraryRecord(project);
+    setState(() => _projects.add(normalized));
     await _saveProjects();
   }
 
@@ -344,9 +366,9 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   void _navigateToAddProject(BuildContext context) {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const ProjectDigPage()))
-        .then((result) {
+        .then((result) async {
           if (result != null && result is Map<String, dynamic>) {
-            _addProject(result);
+            await _addProject(result);
           }
         });
   }
@@ -357,13 +379,24 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
     Map<String, dynamic> project,
   ) {
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const ProjectDigPage()))
-        .then((result) {
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ProjectDigPage(
+              initialProject: Map<String, dynamic>.from(project),
+              persistToSavedProjects: false,
+            ),
+          ),
+        )
+        .then((result) async {
           if (result != null && result is Map<String, dynamic>) {
+            final normalized = normalizeProjectLibraryRecord(
+              result,
+              fallback: _projects[index],
+            );
             setState(() {
-              _projects[index] = {..._projects[index], ...result};
+              _projects[index] = normalized;
             });
-            _saveProjects();
+            await _saveProjects();
           }
         });
   }
