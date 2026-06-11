@@ -36,8 +36,9 @@ class RouteComposer {
           final step = lp.steps[i];
           final stepTopics = <String>[];
           for (final catId in step.categoryIds) {
-            final category =
-                domain.categories.where((c) => c.id == catId).firstOrNull;
+            final category = domain.categories
+                .where((c) => c.id == catId)
+                .firstOrNull;
             if (category == null) continue;
             for (final topicRef in category.topics) {
               final topic = resolveTopic(topicRef);
@@ -46,19 +47,21 @@ class RouteComposer {
             }
           }
           if (stepTopics.isEmpty) continue;
-          phases.add(RoutePhase(
-            id: '${domainId}_lp${lp.id}_s$i',
-            focus: step.title.isNotEmpty
-                ? step.title
-                : '${domain.title} ${lp.title} 第${i + 1}阶段',
-            description: step.description,
-            topicIds: stepTopics,
-            categoryIds: step.categoryIds,
-            prerequisiteSteps: step.prerequisiteSteps,
-            estimatedHours: step.estimatedHours,
-            type: i == lp.steps.length - 1 ? 'practice' : 'learn',
-            domainId: domainId,
-          ));
+          phases.add(
+            RoutePhase(
+              id: '${domainId}_lp${lp.id}_s$i',
+              focus: step.title.isNotEmpty
+                  ? step.title
+                  : '${domain.title} ${lp.title} 第${i + 1}阶段',
+              description: step.description,
+              topicIds: stepTopics,
+              categoryIds: step.categoryIds,
+              prerequisiteSteps: step.prerequisiteSteps,
+              estimatedHours: step.estimatedHours,
+              type: i == lp.steps.length - 1 ? 'practice' : 'learn',
+              domainId: domainId,
+            ),
+          );
         }
       }
     }
@@ -89,5 +92,27 @@ class RouteComposer {
       if (seen.add(d)) ordered.add(d);
     }
     return ordered;
+  }
+
+  /// 将路线阶段投影到指定 topic 集合，保留阶段顺序并丢弃空阶段。
+  ///
+  /// 用于目录页在路线视图中叠加领域/搜索/难度等筛选：阶段结构仍来自路线，
+  /// 但每个阶段只展示当前筛选范围内的 topic。
+  static List<RoutePhase> filterPhasesByTopicIds(
+    List<RoutePhase> phases,
+    Iterable<String> topicIds,
+  ) {
+    final allowed = topicIds.toSet();
+    if (allowed.isEmpty) return const [];
+
+    final filtered = <RoutePhase>[];
+    for (final phase in phases) {
+      final phaseTopicIds = phase.topicIds
+          .where(allowed.contains)
+          .toList(growable: false);
+      if (phaseTopicIds.isEmpty) continue;
+      filtered.add(phase.copyWith(topicIds: phaseTopicIds));
+    }
+    return filtered;
   }
 }

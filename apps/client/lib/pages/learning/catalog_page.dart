@@ -7,9 +7,9 @@ import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
-import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/route_composer.dart';
 import 'package:mianshi_zhilian/widgets/skeleton_loader.dart';
 import 'package:mianshi_zhilian/widgets/scope_selector_dialog.dart';
 
@@ -224,6 +224,14 @@ class _CatalogPageState extends State<CatalogPage> {
 
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
+    // 单领域路线视图仍使用领域 learningPath；只有跨领域「全部」视图需要串联 route phases。
+    final useCrossDomainRoutePhases =
+        isRouteScoped &&
+        isCrossDomain &&
+        _crossDomainAllSelected &&
+        _roadmapView &&
+        scope.scopePhases != null &&
+        scope.scopePhases!.isNotEmpty;
 
     if (contentProvider.isLoadingTopics) {
       return Padding(
@@ -291,9 +299,7 @@ class _CatalogPageState extends State<CatalogPage> {
               },
               child: sortedTopics.isEmpty
                   ? _buildEmptyState(context)
-                  : (scope.isRouteMode &&
-                            scope.scopePhases != null &&
-                            scope.scopePhases!.isNotEmpty
+                  : (useCrossDomainRoutePhases
                         ? _buildPhasedTopicList(
                             context,
                             currentDomain ??
@@ -1097,15 +1103,10 @@ class _CatalogPageState extends State<CatalogPage> {
     final allTopics = context.read<ContentProvider>().topics;
     final isCrossDomain = scopeProvider.isCrossDomain;
 
-    List<RoutePhase> displayPhases;
-    if (isCrossDomain && _routeScopeOnly) {
-      displayPhases = phases;
-    } else {
-      final topicSet = topics.map((t) => t.id).toSet();
-      displayPhases = phases
-          .where((p) => p.topicIds.any((id) => topicSet.contains(id)))
-          .toList();
-    }
+    final displayPhases = RouteComposer.filterPhasesByTopicIds(
+      phases,
+      topics.map((t) => t.id),
+    );
 
     if (displayPhases.isEmpty) {
       return _buildTopicList(
@@ -1154,8 +1155,9 @@ class _CatalogPageState extends State<CatalogPage> {
 
         var mastered = 0;
         for (final t in phaseTopics) {
-          if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85)
+          if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85) {
             mastered++;
+          }
         }
         final total = phase.topicIds.length;
         final allDone = mastered == total && total > 0;
@@ -1474,8 +1476,9 @@ class _CatalogPageState extends State<CatalogPage> {
                         Builder(
                           builder: (ctx) {
                             final sp = ctx.read<LearningScopeProvider>();
-                            if (!_isCrossDomainRouteMode(sp))
+                            if (!_isCrossDomainRouteMode(sp)) {
                               return const SizedBox.shrink();
+                            }
                             final cp = ctx.read<ContentProvider>();
                             final domainName =
                                 cp.domains
