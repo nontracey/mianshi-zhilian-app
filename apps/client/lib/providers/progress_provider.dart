@@ -100,15 +100,26 @@ class ProgressProvider extends ChangeNotifier {
 
   Future<void> addAttempt(PracticeAttempt attempt) async {
     _attempts.insert(0, attempt);
-    await _storage.savePracticeAttempts(_attempts);
+    try {
+      await _storage.savePracticeAttemptsStrict(_attempts);
+    } catch (_) {
+      _attempts.removeWhere((a) => a.id == attempt.id);
+      rethrow;
+    }
     notifyListeners();
   }
 
   Future<void> deleteAttempt(String attemptId) async {
+    final previous = List<PracticeAttempt>.from(_attempts);
     _attempts.removeWhere((attempt) => attempt.id == attemptId);
-    await _storage.savePracticeAttempts(_attempts);
-    // 写删除墓碑，否则下次同步会从远端并集里复活已删除的练习记录。
-    await _storage.recordDeletion('practice_attempts', attemptId);
+    try {
+      await _storage.savePracticeAttemptsStrict(_attempts);
+      // 写删除墓碑，否则下次同步会从远端并集里复活已删除的练习记录。
+      await _storage.recordDeletion('practice_attempts', attemptId);
+    } catch (_) {
+      _attempts = previous;
+      rethrow;
+    }
     notifyListeners();
   }
 

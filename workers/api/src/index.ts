@@ -1364,7 +1364,10 @@ async function handleChangePassword(
       return json({ error: "请输入原密码和新密码" }, 400);
     }
 
-    if (!new_password_hash || new_password_hash.length < 10) {
+    if (
+      !isClientPasswordHash(old_password_hash) ||
+      !isClientPasswordHash(new_password_hash)
+    ) {
       return json({ error: "新密码哈希格式无效" }, 400);
     }
 
@@ -1543,8 +1546,8 @@ async function handleAdminResetPassword(
     // 只接受客户端预哈希的 password_hash（PBKDF2(password, static_salt)），
     // 不再接受明文密码，与 login 保持一致。
     const clientKey = asString(body.password_hash, 200);
-    if (!clientKey || clientKey.length < 6)
-      return json({ error: "请提供 password_hash，密码至少 6 个字符" }, 400);
+    if (!isClientPasswordHash(clientKey))
+      return json({ error: "password_hash 格式无效" }, 400);
     await initDatabase(env.DB);
     const target = (await env.DB.prepare(
       "SELECT id, username FROM users WHERE id = ?",

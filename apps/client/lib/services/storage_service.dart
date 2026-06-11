@@ -1,11 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/ai_config.dart';
 import '../models/user_progress.dart';
 import '../models/app_settings.dart';
+
+class StorageWriteException implements Exception {
+  StorageWriteException(this.key, this.cause);
+
+  final String key;
+  final Object cause;
+
+  @override
+  String toString() => 'StorageWriteException($key): $cause';
+}
 
 /// Web + 通用存储服务，使用 SharedPreferences 替代 dart:io File
 class StorageService {
@@ -16,7 +27,9 @@ class StorageService {
   /// 全局存储写入失败信号。[StorageService] 在多处被实例化（SharedPreferences
   /// 底层共享），故用 static notifier 广播：写入失败（如 Web localStorage 配额
   /// 超限）时置为失败的 key，根部 UI 监听后提示用户「数据可能未保存」。
-  static final ValueNotifier<String?> writeFailure = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> writeFailure = ValueNotifier<String?>(
+    null,
+  );
 
   static const _syncDirtyKey = '_syncDirty';
   static const _syncDirtyAtKey = '_syncDirtyAt';
@@ -64,6 +77,16 @@ class StorageService {
   }
 
   Future<void> save(String key, dynamic data) async {
+    await _save(key, data, strict: false);
+  }
+
+  /// 与 [save] 相同，但写入失败会抛 [StorageWriteException]。
+  /// 用于练习记录等不能让调用方误以为已经持久化成功的关键路径。
+  Future<void> saveStrict(String key, dynamic data) async {
+    await _save(key, data, strict: true);
+  }
+
+  Future<void> _save(String key, dynamic data, {required bool strict}) async {
     try {
       final prefs = await _instance;
       await prefs.setString(key, json.encode(data));
@@ -75,6 +98,9 @@ class StorageService {
       // 广播写入失败，让根部 UI 提示用户数据可能未保存（静默吞掉会让用户
       // 在配额超限后毫无察觉地持续丢失练习数据）。
       writeFailure.value = key;
+      if (strict) {
+        throw StorageWriteException(key, e);
+      }
     }
   }
 
@@ -128,6 +154,15 @@ class StorageService {
 
   Future<void> savePracticeAttempts(List<PracticeAttempt> attempts) async {
     await save('practice_attempts', attempts.map((a) => a.toJson()).toList());
+  }
+
+  Future<void> savePracticeAttemptsStrict(
+    List<PracticeAttempt> attempts,
+  ) async {
+    await saveStrict(
+      'practice_attempts',
+      attempts.map((a) => a.toJson()).toList(),
+    );
   }
 
   Future<List<PracticeAttempt>> loadPracticeAttempts() async {
@@ -281,9 +316,11 @@ class StorageService {
   Future<int> clearCacheData() async {
     final prefs = await _instance;
     final keys = prefs.getKeys();
-    final cacheKeys = keys.where(
-      (k) => k.startsWith('content_cache_') || k.startsWith('route_cache_'),
-    ).toList();
+    final cacheKeys = keys
+        .where(
+          (k) => k.startsWith('content_cache_') || k.startsWith('route_cache_'),
+        )
+        .toList();
     for (final k in cacheKeys) {
       await prefs.remove(k);
     }
@@ -391,6 +428,27 @@ class StorageService {
     deletions['$collection:$id'] = DateTime.now().toIso8601String();
     _gcDeletions(deletions);
     await save('deletions', deletions);
+  }
+
+  static String answerVersionDeletionCollection(String topicId) =>
+      'answer_versions:$topicId';
+
+  static String answerVersionIdFor(Map<dynamic, dynamic> version) {
+    final existing = version['id']?.toString();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final raw =
+        '${version['type'] ?? ''}|${version['content'] ?? ''}|${version['createdAt'] ?? ''}';
+    return 'legacy_${sha1.convert(utf8.encode(raw)).toString().substring(0, 16)}';
+  }
+
+  Future<void> recordAnswerVersionDeletion(
+    String topicId,
+    Map<dynamic, dynamic> version,
+  ) async {
+    await recordDeletion(
+      answerVersionDeletionCollection(topicId),
+      answerVersionIdFor(version),
+    );
   }
 
   /// 批量记录删除墓碑，仅一次读改写。[entries] 为 `(collection, id)` 列表。

@@ -1,8 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _FailingAttemptStorage extends StorageService {
+  @override
+  Future<void> savePracticeAttemptsStrict(
+    List<PracticeAttempt> attempts,
+  ) async {
+    throw StorageWriteException('practice_attempts', 'quota exceeded');
+  }
+}
 
 void main() {
   group('递进复习间隔（P1-7）', () {
@@ -111,24 +121,72 @@ void main() {
     expect(after.first.id, advanced.id);
   });
 
+  test('addAttempt rethrows storage failure and rolls back memory', () async {
+    final provider = ProgressProvider(_FailingAttemptStorage());
+    final attempt = PracticeAttempt(
+      id: 'attempt-1',
+      topicId: 'java.a',
+      mode: 'recall',
+      question: 'q',
+      answer: 'a',
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+    await expectLater(
+      provider.addAttempt(attempt),
+      throwsA(isA<StorageWriteException>()),
+    );
+    expect(provider.attempts, isEmpty);
+  });
+
   group('getTodayPlan', () {
     List<Topic> buildTopics() => const [
-          Topic(id: 'java.a', domain: 'java', category: 'core', title: 'A', summary: 'A', order: 1),
-          Topic(id: 'java.b', domain: 'java', category: 'core', title: 'B', summary: 'B', order: 2),
-          Topic(id: 'java.c', domain: 'java', category: 'core', title: 'C', summary: 'C', order: 3),
-          Topic(id: 'java.d', domain: 'java', category: 'core', title: 'D', summary: 'D', order: 4),
-        ];
+      Topic(
+        id: 'java.a',
+        domain: 'java',
+        category: 'core',
+        title: 'A',
+        summary: 'A',
+        order: 1,
+      ),
+      Topic(
+        id: 'java.b',
+        domain: 'java',
+        category: 'core',
+        title: 'B',
+        summary: 'B',
+        order: 2,
+      ),
+      Topic(
+        id: 'java.c',
+        domain: 'java',
+        category: 'core',
+        title: 'C',
+        summary: 'C',
+        order: 3,
+      ),
+      Topic(
+        id: 'java.d',
+        domain: 'java',
+        category: 'core',
+        title: 'D',
+        summary: 'D',
+        order: 4,
+      ),
+    ];
 
-    test('new topics are never-practiced, ordered by Topic.order, capped by newCount',
-        () async {
-      SharedPreferences.setMockInitialValues({});
-      final provider = ProgressProvider(StorageService());
-      final topics = buildTopics();
+    test(
+      'new topics are never-practiced, ordered by Topic.order, capped by newCount',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final provider = ProgressProvider(StorageService());
+        final topics = buildTopics();
 
-      final plan = provider.getTodayPlan(topics, newCount: 2, reviewCount: 5);
-      expect(plan.newTopics.map((t) => t.id), ['java.a', 'java.b']);
-      expect(plan.reviewTopics, isEmpty);
-    });
+        final plan = provider.getTodayPlan(topics, newCount: 2, reviewCount: 5);
+        expect(plan.newTopics.map((t) => t.id), ['java.a', 'java.b']);
+        expect(plan.reviewTopics, isEmpty);
+      },
+    );
 
     test('practiced topics are excluded from new list', () async {
       SharedPreferences.setMockInitialValues({});
@@ -145,7 +203,8 @@ void main() {
       // 直接 seed 一条已到期（nextReviewAt 在昨天）的进度，模拟到期复习项
       final yesterday = DateTime.now().subtract(const Duration(days: 1));
       SharedPreferences.setMockInitialValues({
-        'progress_map': '''
+        'progress_map':
+            '''
 {"java.a":{"topicId":"java.a","score":50,"status":"learning","practiceCount":1,"nextReviewAt":"${yesterday.toIso8601String()}"}}
 ''',
       });
@@ -161,8 +220,11 @@ void main() {
     test('zero quotas yield empty plan', () async {
       SharedPreferences.setMockInitialValues({});
       final provider = ProgressProvider(StorageService());
-      final plan =
-          provider.getTodayPlan(buildTopics(), newCount: 0, reviewCount: 0);
+      final plan = provider.getTodayPlan(
+        buildTopics(),
+        newCount: 0,
+        reviewCount: 0,
+      );
       expect(plan.newTopics, isEmpty);
       expect(plan.reviewTopics, isEmpty);
     });
