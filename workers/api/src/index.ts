@@ -527,17 +527,6 @@ async function getUserIdFromRequest(
   return payload?.userId || null;
 }
 
-async function getOptionalUserIdFromRequest(
-  request: Request,
-  env: Env,
-): Promise<string | null> {
-  try {
-    return await getUserIdFromRequest(request, env);
-  } catch {
-    return null;
-  }
-}
-
 async function getActiveUserFromRequest(
   request: Request,
   env: Env,
@@ -852,6 +841,31 @@ async function initDatabase(db: D1Database): Promise<void> {
     db,
     `CREATE INDEX IF NOT EXISTS idx_visit_events_occurred ON app_visit_events(occurred_at)`,
     "idx visit_events occurred",
+  );
+  await execSafely(
+    db,
+    `UPDATE analytics_batches SET user_id = NULL WHERE user_id IS NOT NULL`,
+    "privacy analytics_batches user_id",
+  );
+  await execSafely(
+    db,
+    `UPDATE daily_visit_stats SET user_id = NULL WHERE user_id IS NOT NULL`,
+    "privacy daily_visit_stats user_id",
+  );
+  await execSafely(
+    db,
+    `UPDATE daily_section_stats SET user_id = NULL WHERE user_id IS NOT NULL`,
+    "privacy daily_section_stats user_id",
+  );
+  await execSafely(
+    db,
+    `UPDATE daily_feature_stats SET user_id = NULL WHERE user_id IS NOT NULL`,
+    "privacy daily_feature_stats user_id",
+  );
+  await execSafely(
+    db,
+    `DELETE FROM analytics_batches WHERE received_at < datetime('now', '-30 days')`,
+    "privacy analytics_batches retention",
   );
 
   await execSafely(
@@ -1510,6 +1524,16 @@ function normalizeTicket(row: any): any {
   };
 }
 
+function normalizePasswordResetTicketReceipt(row: any): any {
+  const ticket = normalizeTicket(row);
+  return {
+    id: ticket.id,
+    type: ticket.type,
+    status: ticket.status,
+    created_at: ticket.created_at,
+  };
+}
+
 function isUuidLike(value: string): boolean {
   return /^[a-zA-Z0-9_-]{8,80}$/.test(value);
 }
@@ -1676,7 +1700,7 @@ async function handleCreatePasswordResetTicket(
 
     return json({
       success: true,
-      ticket: normalizeTicket(
+      ticket: normalizePasswordResetTicketReceipt(
         await env.DB.prepare("SELECT id, user_id, account_username, contact, type, subject, description, image_urls, status, admin_reply, created_at, resolved_at FROM tickets WHERE id = ?")
           .bind(id)
           .first(),
@@ -1761,7 +1785,7 @@ async function handleAnalyticsBatch(
       .first();
     if (existing) return json({ success: true, deduped: true });
 
-    const userId = await getOptionalUserIdFromRequest(request, env);
+    const analyticsUserId: string | null = null;
     const platform = asString(body.platform, 40) || "unknown";
     const appVersion = asString(body.app_version, 40) || "unknown";
     const osVersion = asString(body.os_version, 80) || "unknown";
@@ -1775,7 +1799,7 @@ async function handleAnalyticsBatch(
     const statements: D1PreparedStatement[] = [
       env.DB.prepare(
         `INSERT INTO analytics_batches (batch_id, device_id, user_id) VALUES (?, ?, ?)`,
-      ).bind(batchId, deviceId, userId),
+      ).bind(batchId, deviceId, analyticsUserId),
     ];
 
     for (const day of days) {
@@ -1797,7 +1821,7 @@ async function handleAnalyticsBatch(
         INSERT INTO daily_visit_stats (date, device_id, user_id, platform, app_version, open_count, duration_seconds, last_seen_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT(date, device_id) DO UPDATE SET
-          user_id = COALESCE(excluded.user_id, daily_visit_stats.user_id),
+          user_id = excluded.user_id,
           platform = excluded.platform,
           app_version = excluded.app_version,
           open_count = daily_visit_stats.open_count + excluded.open_count,
@@ -1807,7 +1831,7 @@ async function handleAnalyticsBatch(
         ).bind(
           date,
           deviceId,
-          userId,
+          analyticsUserId,
           platform,
           appVersion,
           openCount,
@@ -1822,7 +1846,7 @@ async function handleAnalyticsBatch(
           "section",
           date,
           deviceId,
-          userId,
+          analyticsUserId,
           day.section_counts,
           ANALYTICS_SECTIONS,
         ),
@@ -1832,7 +1856,7 @@ async function handleAnalyticsBatch(
           "feature",
           date,
           deviceId,
-          userId,
+          analyticsUserId,
           day.feature_counts,
           ANALYTICS_FEATURES,
         ),
@@ -1845,7 +1869,7 @@ async function handleAnalyticsBatch(
       INSERT INTO user_devices (device_id, user_id, platform, app_version, os_version, device_model, first_seen_at, last_seen_at, visit_count, total_duration_seconds)
       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
       ON CONFLICT(device_id) DO UPDATE SET
-        user_id = COALESCE(excluded.user_id, user_devices.user_id),
+        user_id = COALESCE(user_devices.user_id, excluded.user_id),
         platform = excluded.platform,
         app_version = excluded.app_version,
         os_version = excluded.os_version,
@@ -1856,7 +1880,7 @@ async function handleAnalyticsBatch(
     `,
       ).bind(
         deviceId,
-        userId,
+        analyticsUserId,
         platform,
         appVersion,
         osVersion,
@@ -1898,7 +1922,7 @@ function countMapStatements(
       INSERT INTO ${table} (date, device_id, user_id, ${column}, count)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(date, device_id, ${column}) DO UPDATE SET
-        user_id = COALESCE(excluded.user_id, ${table}.user_id),
+        user_id = excluded.user_id,
         count = ${table}.count + excluded.count
     `,
         )
@@ -1928,6 +1952,7 @@ export {
   isUuidLike,
   asString,
   parseImageUrls,
+  normalizePasswordResetTicketReceipt,
   normalizeUpdateManifest,
 };
 

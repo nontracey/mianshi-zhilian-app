@@ -695,6 +695,15 @@ class StorageService {
           await prefs.setString(entry.key, json.encode(merged));
           continue;
         }
+        if (entry.key == 'sessions') {
+          final merged = await _mergePracticeSessionsForImport(
+            entry.value,
+            syncSettings: syncSettings,
+            preserveLocalSensitiveData: preserveLocalSensitiveData,
+          );
+          await prefs.setString(entry.key, json.encode(merged));
+          continue;
+        }
         if (entry.key == 'mock_interview_sessions') {
           final merged = await _mergeMockSessionsForImport(
             entry.value,
@@ -740,6 +749,12 @@ class StorageService {
           value = await _restoreRedactedSyncSettings(value);
         } else if (key == 'ai_configs' && value is List) {
           value = await _restoreRedactedAiConfigs(value);
+          final configs = value
+              .whereType<Map>()
+              .map((item) => AiConfig.fromJson(item.cast<String, dynamic>()))
+              .toList();
+          await saveAiConfigs(configs);
+          continue;
         }
         try {
           if (value is String) {
@@ -1058,6 +1073,9 @@ class StorageService {
     if (key == 'practice_attempts' && !syncSettings.syncFullPracticeText) {
       return _sanitizePracticeAttempts(value);
     }
+    if (key == 'sessions' && !syncSettings.syncFullPracticeText) {
+      return _sanitizePracticeSessions(value);
+    }
     if (key == 'mock_interview_sessions' &&
         !syncSettings.syncFullPracticeText &&
         value is List) {
@@ -1086,6 +1104,14 @@ class StorageService {
       return stripped;
     }
     return value;
+  }
+
+  dynamic _sanitizePracticeSessions(dynamic value) {
+    if (value is! List) return value;
+    return value.map((item) {
+      if (item is! Map<String, dynamic>) return item;
+      return {...item, 'feedback': null};
+    }).toList();
   }
 
   dynamic _sanitizePracticeAttempts(dynamic value) {
@@ -1120,6 +1146,39 @@ class StorageService {
       final id = imported['id'] as String?;
       final local = id == null ? null : currentById[id];
       return _preserveAttemptSensitiveFields(imported, local);
+    }).toList();
+  }
+
+  Future<dynamic> _mergePracticeSessionsForImport(
+    dynamic incoming, {
+    required SyncSettings? syncSettings,
+    required bool preserveLocalSensitiveData,
+  }) async {
+    if (incoming is! List) return incoming;
+    if (!_shouldPreserveSensitiveData(
+      syncSettings,
+      preserveLocalSensitiveData,
+    )) {
+      return incoming;
+    }
+
+    final current = await loadSessions();
+    final feedbackById = {
+      for (final session in current)
+        if (session.feedback != null && session.feedback!.isNotEmpty)
+          session.id: session.feedback!,
+    };
+
+    return incoming.map((item) {
+      if (item is! Map) return item;
+      final imported = item.map((k, v) => MapEntry(k.toString(), v));
+      final id = imported['id'] as String?;
+      final localFeedback = id == null ? null : feedbackById[id];
+      if (localFeedback != null &&
+          ((imported['feedback'] as String?) ?? '').isEmpty) {
+        imported['feedback'] = localFeedback;
+      }
+      return imported;
     }).toList();
   }
 

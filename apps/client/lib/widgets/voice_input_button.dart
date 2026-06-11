@@ -18,6 +18,7 @@ import 'package:mianshi_zhilian/services/app_permission_service.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/model_downloader.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_factory.dart';
 import 'package:mianshi_zhilian/services/on_device_stt/on_device_stt_service.dart';
+import 'package:mianshi_zhilian/services/sensitive_data_redactor.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 
 enum VoiceInputState {
@@ -287,7 +288,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
             }
           },
         );
-        if (!_isCurrentSession(sessionId)) break;
+        if (!_isCurrentSession(sessionId)) {
+          if (chunkPath != null) unawaited(deleteFileAtPath(chunkPath));
+          break;
+        }
         if (chunkPath == null) {
           if (_running) continue;
           break;
@@ -401,8 +405,15 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
           error: e,
         ),
       );
-      if (chunkPath != null) {
-        try { await deleteFileAtPath(chunkPath); } catch (_) {}
+      String? stoppedPath;
+      try {
+        stoppedPath = await _recorder.stop();
+      } catch (_) {}
+      for (final path in {stoppedPath, chunkPath}) {
+        if (path == null || path.isEmpty) continue;
+        try {
+          await deleteFileAtPath(path);
+        } catch (_) {}
       }
       if (_running) rethrow;
       return null;
@@ -504,7 +515,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
             }
           },
         );
-        if (!_isCurrentSession(sessionId)) break;
+        if (!_isCurrentSession(sessionId)) {
+          if (chunkPath != null) unawaited(deleteFileAtPath(chunkPath));
+          break;
+        }
         if (chunkPath == null) {
           if (_running) continue;
           break;
@@ -821,11 +835,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
   }
 
   String _safeErrorText(Object error) {
-    final text = error.toString();
-    final redacted = text.replaceAll(
-      RegExp(r'sk-[A-Za-z0-9_\-]{8,}'),
-      'sk-***',
-    );
+    final redacted = SensitiveDataRedactor.redact(error.toString());
     return redacted.length > 120
         ? '${redacted.substring(0, 120)}...'
         : redacted;

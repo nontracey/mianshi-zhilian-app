@@ -55,9 +55,9 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 
 同步时会按隐私设置脱敏：
 
-- 默认不上传完整练习回答文本，`practice_attempts.answer` 会清空，`improvedAnswer` 会置空，`answer_versions_*` 不会进入同步快照。
-- 默认隐私模式下，同步回写本机时会保留本机已有的完整练习回答，避免传输用脱敏快照反向覆盖本地内容。
-- 默认同步备考目标和项目库；关闭后不会同步可能包含公司、JD、岗位、项目细节的数据。
+- 默认不上传完整练习回答文本，`practice_attempts.answer` 会清空，`improvedAnswer` 会置空，`sessions.feedback` 会置空，`answer_versions_*` 不会进入同步快照。
+- 默认隐私模式下，同步回写本机时会保留本机已有的完整练习回答和 session feedback，避免传输用脱敏快照反向覆盖本地内容。
+- 默认不同步备考目标和项目库；用户显式开启后才会同步可能包含公司、JD、岗位、项目细节的数据。
 - 默认不同步 AI 配置元数据，避免把私有 Base URL、模型名或网关信息写入第三方同步目标。用户显式开启后只同步名称、Base URL、模型、能力标签等元数据，不同步 API Key；导入远端 AI 配置时，会尽量保留本地已有 key。
 
 ## 本地保存但不属于业务同步快照的数据
@@ -65,6 +65,7 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 - `sync_settings`：同步方式、WebDAV/GitHub/Gitee 配置、本地同步状态。该配置只保存在当前设备。
 - `_syncDirty`、`_syncDirtyAt`、`_syncDeviceId`：同步脏标记和设备标识。
 - `_analyticsBuffer`：待发送的轻量埋点缓冲。
+- 本地诊断日志：仅保存在本机，导出/查看前会脱敏常见 Key、Authorization、token/password/secret 字段和本机用户目录路径；正式版不再把普通 `debugPrint` 写入用户可见日志。
 - 内容缓存：`topics_cache`、`domain_cache_*`、`content_version`、`domain_version_*` 等，用于减少内容库重复加载。
 - AI 配置 API Key：原生平台优先写入系统安全存储（Keychain/Keystore/DPAPI），Web 端受平台限制仍保存在本地浏览器存储；不进入同步快照和完整导出明文。
 - 登录 token、刷新 token、当前用户信息：用于账号登录状态，不通过普通数据同步快照同步。
@@ -81,7 +82,7 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 - 登录、刷新登录、设备绑定。
 - 工单提交：优先提交到远端；失败时会保存本地 ticket，稍后可再同步。
 - 版本检查、更新包下载、镜像线路切换。
-- 轻量使用统计：本地缓冲后发送，不包含完整练习回答。
+- 轻量使用统计：本地缓冲后发送，不包含完整练习回答或 API Key；Worker 统计聚合表不保存登录用户 id。
 
 ## 清空数据
 

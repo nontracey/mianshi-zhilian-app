@@ -15,6 +15,16 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final storage = StorageService();
+        await storage.saveSessions([
+          PracticeSession(
+            id: 'session-1',
+            topicId: 'topic-1',
+            startedAt: DateTime(2026, 1, 2, 9),
+            completedAt: DateTime(2026, 1, 2, 10),
+            score: 80,
+            feedback: 'private feedback quotes my answer',
+          ),
+        ]);
         await storage.savePracticeAttempts([
           PracticeAttempt(
             id: 'attempt-1',
@@ -37,9 +47,11 @@ void main() {
         final package = await storage.exportSyncPackage(const SyncSettings());
         final data = package['data'] as Map<String, dynamic>;
         final attempts = data['practice_attempts'] as List<dynamic>;
+        final sessions = data['sessions'] as List<dynamic>;
 
         expect(attempts.single['answer'], isEmpty);
         expect(attempts.single['improvedAnswer'], isNull);
+        expect(sessions.single['feedback'], isNull);
         expect(data.containsKey('answer_versions'), isFalse);
       },
     );
@@ -140,6 +152,16 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final storage = StorageService();
+        await storage.saveSessions([
+          PracticeSession(
+            id: 'session-1',
+            topicId: 'topic-1',
+            startedAt: DateTime(2026, 1, 2, 9),
+            completedAt: DateTime(2026, 1, 2, 10),
+            score: 80,
+            feedback: 'private feedback quotes my answer',
+          ),
+        ]);
         await storage.savePracticeAttempts([
           PracticeAttempt(
             id: 'attempt-1',
@@ -164,10 +186,15 @@ void main() {
         );
         final data = package['data'] as Map<String, dynamic>;
         final attempts = data['practice_attempts'] as List<dynamic>;
+        final sessions = data['sessions'] as List<dynamic>;
         final answerVersions = data['answer_versions'] as Map<String, dynamic>;
 
         expect(attempts.single['answer'], 'private answer');
         expect(attempts.single['improvedAnswer'], 'private improved answer');
+        expect(
+          sessions.single['feedback'],
+          'private feedback quotes my answer',
+        );
         expect(
           answerVersions['topic-1'].single['content'],
           'private answer version',
@@ -180,6 +207,16 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final storage = StorageService();
+        await storage.saveSessions([
+          PracticeSession(
+            id: 'session-1',
+            topicId: 'topic-1',
+            startedAt: DateTime(2026, 1, 2, 9),
+            completedAt: DateTime(2026, 1, 2, 10),
+            score: 70,
+            feedback: 'local private feedback',
+          ),
+        ]);
         await storage.savePracticeAttempts([
           PracticeAttempt(
             id: 'attempt-1',
@@ -197,6 +234,16 @@ void main() {
             'schemaVersion': 1,
             'app': 'mianshi-zhilian',
             'data': {
+              'sessions': [
+                {
+                  'id': 'session-1',
+                  'topicId': 'topic-1',
+                  'startedAt': DateTime(2026, 1, 2, 9).toIso8601String(),
+                  'completedAt': DateTime(2026, 1, 2, 10).toIso8601String(),
+                  'score': 90,
+                  'feedback': null,
+                },
+              ],
               'practice_attempts': [
                 {
                   'id': 'attempt-1',
@@ -226,6 +273,9 @@ void main() {
         expect(attempts.single.answer, 'local private answer');
         expect(attempts.single.improvedAnswer, 'local private improved answer');
         expect(attempts.single.score, 88);
+        final sessions = await storage.loadSessions();
+        expect(sessions.single.feedback, 'local private feedback');
+        expect(sessions.single.score, 90);
       },
     );
   });

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../l10n/l10n.dart';
 import '../models/ai_config.dart';
 import 'app_log_service.dart';
+import 'sensitive_data_redactor.dart';
 
 class AiTestResult {
   final bool success;
@@ -338,21 +339,23 @@ class AiService {
   Future<String> sendMessage(String prompt, {required AiConfig config}) async {
     final url =
         '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${config.apiKey}',
-      },
-      body: json.encode({
-        'model': config.model,
-        'messages': [
-          {'role': 'user', 'content': prompt},
-        ],
-        'temperature': 0.3,
-        'max_tokens': 1000,
-      }),
-    ).timeout(const Duration(seconds: 30));
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.apiKey}',
+          },
+          body: json.encode({
+            'model': config.model,
+            'messages': [
+              {'role': 'user', 'content': prompt},
+            ],
+            'temperature': 0.3,
+            'max_tokens': 1000,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final body = json.decode(response.body) as Map<String, dynamic>;
@@ -665,7 +668,7 @@ score 范围 0-100，level 为 skilled(>=85)/familiar(>=60)/unfamiliar(<60)。''
   }
 
   static String _safeErrorDetail(Object error) {
-    final text = error.toString();
+    final text = SensitiveDataRedactor.redact(error.toString());
     return text.length > 160 ? '${text.substring(0, 160)}...' : text;
   }
 
@@ -777,11 +780,7 @@ class AiServiceException implements Exception {
   }
 
   static String _redact(String text) {
-    return text
-        .replaceAll(RegExp(r'sk-[A-Za-z0-9_\-]{8,}'), 'sk-***')
-        .replaceAll(RegExp(r'AIza[A-Za-z0-9_\-]{30,}'), 'AIza***')
-        .replaceAll(RegExp(r'Bearer\s+[A-Za-z0-9._~+/=\-]{8,}'), 'Bearer [redacted]')
-        .replaceAll(RegExp(r'(api[_\-]?key["\s:=]+)[^,\s"]{8,}', caseSensitive: false), r'$1[redacted]');
+    return SensitiveDataRedactor.redact(text);
   }
 
   @override
