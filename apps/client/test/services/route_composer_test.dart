@@ -13,11 +13,13 @@ void main() {
         .map((e) => Category(id: e.key, title: e.key, topics: e.value))
         .toList();
     final steps = catTopics.keys
-        .map((catId) => LearningPathStep(
-              title: '阶段 $catId',
-              description: '',
-              categoryIds: [catId],
-            ))
+        .map(
+          (catId) => LearningPathStep(
+            title: '阶段 $catId',
+            description: '',
+            categoryIds: [catId],
+          ),
+        )
         .toList();
     return Domain(
       id: id,
@@ -25,7 +27,12 @@ void main() {
       description: '',
       categories: cats,
       learningPaths: [
-        LearningPath(id: '$id-path', title: '$title 路线', description: '', steps: steps),
+        LearningPath(
+          id: '$id-path',
+          title: '$title 路线',
+          description: '',
+          steps: steps,
+        ),
       ],
     );
   }
@@ -41,12 +48,48 @@ void main() {
   });
 
   final topicByRef = <String, Topic>{
-    'topics/java/jvm-1.json': const Topic(id: 'java.jvm.jvm-1', domain: 'java', category: 'jvm', title: 'JVM1', summary: ''),
-    'topics/java/jvm-2.json': const Topic(id: 'java.jvm.jvm-2', domain: 'java', category: 'jvm', title: 'JVM2', summary: ''),
-    'topics/java/col-1.json': const Topic(id: 'java.collections.col-1', domain: 'java', category: 'collections', title: 'Col1', summary: ''),
-    'topics/agent/llm-1.json': const Topic(id: 'agent.llm.llm-1', domain: 'agent', category: 'llm', title: 'LLM1', summary: ''),
-    'topics/agent/rag-1.json': const Topic(id: 'agent.rag.rag-1', domain: 'agent', category: 'rag', title: 'RAG1', summary: ''),
-    'topics/agent/rag-2.json': const Topic(id: 'agent.rag.rag-2', domain: 'agent', category: 'rag', title: 'RAG2', summary: ''),
+    'topics/java/jvm-1.json': const Topic(
+      id: 'java.jvm.jvm-1',
+      domain: 'java',
+      category: 'jvm',
+      title: 'JVM1',
+      summary: '',
+    ),
+    'topics/java/jvm-2.json': const Topic(
+      id: 'java.jvm.jvm-2',
+      domain: 'java',
+      category: 'jvm',
+      title: 'JVM2',
+      summary: '',
+    ),
+    'topics/java/col-1.json': const Topic(
+      id: 'java.collections.col-1',
+      domain: 'java',
+      category: 'collections',
+      title: 'Col1',
+      summary: '',
+    ),
+    'topics/agent/llm-1.json': const Topic(
+      id: 'agent.llm.llm-1',
+      domain: 'agent',
+      category: 'llm',
+      title: 'LLM1',
+      summary: '',
+    ),
+    'topics/agent/rag-1.json': const Topic(
+      id: 'agent.rag.rag-1',
+      domain: 'agent',
+      category: 'rag',
+      title: 'RAG1',
+      summary: '',
+    ),
+    'topics/agent/rag-2.json': const Topic(
+      id: 'agent.rag.rag-2',
+      domain: 'agent',
+      category: 'rag',
+      title: 'RAG2',
+      summary: '',
+    ),
   };
 
   // resolveTopic 直接按 ref 命中（绕过 cacheKey 转换，专注组装逻辑）
@@ -92,16 +135,57 @@ void main() {
       expect(phasesB.first.domainId, 'agent');
     });
 
-    test('a selected domain with no loaded topics is dropped (no empty tab)', () {
-      // agent 的 topic 都解析不到 → agent 不产出 phases
-      Topic? javaOnly(String ref) =>
-          ref.startsWith('topics/java/') ? topicByRef[ref] : null;
+    test(
+      'a selected domain with no loaded topics is dropped (no empty tab)',
+      () {
+        // agent 的 topic 都解析不到 → agent 不产出 phases
+        Topic? javaOnly(String ref) =>
+            ref.startsWith('topics/java/') ? topicByRef[ref] : null;
+        final phases = RouteComposer.composePhases(
+          orderedDomainIds: ['java', 'agent'],
+          allDomains: [java, agent],
+          resolveTopic: javaOnly,
+        );
+        expect(RouteComposer.domainsOf(phases), ['java']);
+      },
+    );
+  });
+
+  group('filterPhasesByTopicIds', () {
+    test('projects a cross-domain route onto the selected topic set', () {
       final phases = RouteComposer.composePhases(
         orderedDomainIds: ['java', 'agent'],
         allDomains: [java, agent],
-        resolveTopic: javaOnly,
+        resolveTopic: resolve,
       );
-      expect(RouteComposer.domainsOf(phases), ['java']);
+
+      final filtered = RouteComposer.filterPhasesByTopicIds(phases, [
+        'agent.rag.rag-2',
+        'java.jvm.jvm-1',
+        'java.collections.col-1',
+      ]);
+
+      expect(filtered.map((p) => p.domainId).toList(), [
+        'java',
+        'java',
+        'agent',
+      ]);
+      expect(filtered.expand((p) => p.topicIds).toList(), [
+        'java.jvm.jvm-1',
+        'java.collections.col-1',
+        'agent.rag.rag-2',
+      ]);
+      expect(filtered.every((p) => p.topicIds.isNotEmpty), isTrue);
+    });
+
+    test('returns no phases for an empty selected topic set', () {
+      final phases = RouteComposer.composePhases(
+        orderedDomainIds: ['java', 'agent'],
+        allDomains: [java, agent],
+        resolveTopic: resolve,
+      );
+
+      expect(RouteComposer.filterPhasesByTopicIds(phases, const []), isEmpty);
     });
   });
 
@@ -110,7 +194,8 @@ void main() {
       final phases = RouteComposer.composePhases(
         orderedDomainIds: ['java', 'agent'],
         allDomains: [java, agent],
-        resolveTopic: (ref) => ref.startsWith('topics/java/') ? topicByRef[ref] : null,
+        resolveTopic: (ref) =>
+            ref.startsWith('topics/java/') ? topicByRef[ref] : null,
       );
       // 声称 3 个领域，但只有 java 有 phases
       final route = LearningRoute(
