@@ -57,7 +57,11 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   Future<void> updateTopicProgress(String topicId, {required int score}) async {
-    final status = computeMastery(topicId, progressMap: _progressMap, attempts: _attempts);
+    final status = computeMastery(
+      topicId,
+      progressMap: _progressMap,
+      attempts: _attempts,
+    );
     await updateProgress(topicId, score, status.name);
   }
 
@@ -82,7 +86,10 @@ class ProgressProvider extends ChangeNotifier {
     } else {
       interval = 1;
     }
-    return (nextReviewAt: now.add(Duration(days: interval)), intervalDays: interval);
+    return (
+      nextReviewAt: now.add(Duration(days: interval)),
+      intervalDays: interval,
+    );
   }
 
   Future<void> addSession(PracticeSession session) async {
@@ -243,8 +250,7 @@ class ProgressProvider extends ChangeNotifier {
             allowSkipLowFrequency: allowSkipLowFrequency,
           );
           return (topic: t, score: s);
-        }).toList()
-          ..sort((a, b) => b.score.compareTo(a.score));
+        }).toList()..sort((a, b) => b.score.compareTo(a.score));
         result
           ..clear()
           ..addAll(scored.map((e) => e.topic));
@@ -386,16 +392,16 @@ class ProgressProvider extends ChangeNotifier {
     required int newCount,
     required int reviewCount,
   }) {
-    final reviewTopics =
-        getTodayReviewTopics(scopedTopics).take(reviewCount.clamp(0, 999)).toList();
+    final reviewTopics = getTodayReviewTopics(
+      scopedTopics,
+    ).take(reviewCount.clamp(0, 999)).toList();
     final reviewIds = reviewTopics.map((t) => t.id).toSet();
 
     final newCandidates = scopedTopics.where((t) {
       if (reviewIds.contains(t.id)) return false;
       final p = _progressMap[t.id];
       return p == null || p.practiceCount == 0;
-    }).toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+    }).toList()..sort((a, b) => a.order.compareTo(b.order));
 
     final newTopics = newCandidates.take(newCount.clamp(0, 999)).toList();
     return (reviewTopics: reviewTopics, newTopics: newTopics);
@@ -403,6 +409,13 @@ class ProgressProvider extends ChangeNotifier {
 
   List<PracticeAttempt> getAttemptsForTopic(String topicId) =>
       _attempts.where((a) => a.topicId == topicId).toList();
+
+  RecallPrompt? recallPromptForTopic(Topic topic, {String? mode}) {
+    return topic.recallPromptAt(
+      getAttemptsForTopic(topic.id).length,
+      mode: mode,
+    );
+  }
 
   List<PracticeAttempt> get lowScoreAttempts =>
       _attempts.where((a) => (a.score ?? 100) < 60).toList();
@@ -453,11 +466,13 @@ class ProgressProvider extends ChangeNotifier {
       ),
       ..._progressMap.values
           .where((p) => p.lastPracticeAt != null)
-          .map((p) => DateTime(
-                p.lastPracticeAt!.year,
-                p.lastPracticeAt!.month,
-                p.lastPracticeAt!.day,
-              )),
+          .map(
+            (p) => DateTime(
+              p.lastPracticeAt!.year,
+              p.lastPracticeAt!.month,
+              p.lastPracticeAt!.day,
+            ),
+          ),
     };
     var streak = 0;
     var cursor = DateTime.now();
@@ -562,18 +577,20 @@ class ProgressProvider extends ChangeNotifier {
     if (progress.score < 60) return MasteryStatus.new_;
 
     if (progress.score >= 85) {
-      final scoredAttempts = attempts
-          .where((a) => a.topicId == topicId && a.score != null)
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final scoredAttempts =
+          attempts
+              .where((a) => a.topicId == topicId && a.score != null)
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       final highScoreAttempts = scoredAttempts
           .where((a) => a.score! >= 85)
           .toList();
 
       if (highScoreAttempts.length >= 2) {
-        final gap = highScoreAttempts[0].createdAt
-            .difference(highScoreAttempts[1].createdAt);
+        final gap = highScoreAttempts[0].createdAt.difference(
+          highScoreAttempts[1].createdAt,
+        );
         if (gap.inHours >= 1) return MasteryStatus.skilled;
       }
       return MasteryStatus.learning;
@@ -586,7 +603,9 @@ class ProgressProvider extends ChangeNotifier {
     required List<String> routeTopicIds,
     required List<Topic> allTopics,
   }) {
-    final scopedTopics = allTopics.where((t) => routeTopicIds.contains(t.id)).toList();
+    final scopedTopics = allTopics
+        .where((t) => routeTopicIds.contains(t.id))
+        .toList();
     if (scopedTopics.isEmpty) return 0;
 
     final hasScored = scopedTopics.any(
@@ -594,29 +613,32 @@ class ProgressProvider extends ChangeNotifier {
     );
     if (!hasScored && _mockSessions.isEmpty) return 0;
 
-    final avgScore = scopedTopics
-        .map((t) => _progressMap[t.id]?.score ?? 0)
-        .fold<int>(0, (sum, s) => sum + s) /
+    final avgScore =
+        scopedTopics
+            .map((t) => _progressMap[t.id]?.score ?? 0)
+            .fold<int>(0, (sum, s) => sum + s) /
         scopedTopics.length;
 
-    final relevantMocks = _mockSessions.where(
-      (s) => s.topicIds.any((id) => routeTopicIds.contains(id)),
-    ).toList();
+    final relevantMocks = _mockSessions
+        .where((s) => s.topicIds.any((id) => routeTopicIds.contains(id)))
+        .toList();
 
     final mockCount = relevantMocks.take(3).length;
     final mockAvg = relevantMocks.isEmpty
         ? avgScore
         : relevantMocks
-              .take(3)
-              .map((s) => s.averageScore)
-              .fold<int>(0, (a, b) => a + b) /
-          mockCount;
+                  .take(3)
+                  .map((s) => s.averageScore)
+                  .fold<int>(0, (a, b) => a + b) /
+              mockCount;
 
     final streakBonus = (practiceStreakDays.clamp(0, 14) * 1.5).round();
-    final reviewPenalty = (getTodayReviewTopics(scopedTopics).length.clamp(0, 10) * 2);
+    final reviewPenalty =
+        (getTodayReviewTopics(scopedTopics).length.clamp(0, 10) * 2);
 
     return ((avgScore * 0.50 + mockAvg * 0.35 + streakBonus) - reviewPenalty)
-        .round().clamp(0, 100);
+        .round()
+        .clamp(0, 100);
   }
 
   /// 导出所有进度数据

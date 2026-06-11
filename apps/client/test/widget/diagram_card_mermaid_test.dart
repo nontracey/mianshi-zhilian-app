@@ -7,6 +7,34 @@ import 'package:mianshi_zhilian/pages/learning/topic_detail_cards.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 
 void main() {
+  testWidgets('CodeCard renders line highlight notes', (tester) async {
+    final card = LearningCard(
+      type: 'code',
+      title: '代码高亮',
+      language: 'java',
+      content: 'class Demo {\\n  void run() {}\\n}',
+      highlights: [
+        {'line': 2, 'note': '这里是需要重点解释的调用入口。'},
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: SizedBox(width: 640, child: CodeCard(card: card)),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('JAVA'), findsOneWidget);
+    expect(find.textContaining('L2: 这里是需要重点解释的调用入口。'), findsOneWidget);
+  });
+
   testWidgets('DiagramCard renders Mermaid flowcharts as diagram nodes', (
     tester,
   ) async {

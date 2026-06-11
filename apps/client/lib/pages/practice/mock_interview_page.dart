@@ -49,6 +49,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
   _InterviewStage _stage = _InterviewStage.main;
   String? _followUpQuestion;
   final List<Map<String, String>> _followUpHistory = [];
+  final Map<String, int> _recallPromptSeeds = {};
 
   late DateTime _questionStartTime;
   final List<int> _questionDurations = [];
@@ -71,16 +72,26 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
         return topic.leetcodeUrl == null && topic.interviewFrequency != 'low';
       case 'systemDesign':
         return topic.tags.any((t) => t.toLowerCase() == 'system-design') ||
-               topic.category.toLowerCase() == 'system-design' ||
-               topic.category.toLowerCase() == '架构';
+            topic.category.toLowerCase() == 'system-design' ||
+            topic.category.toLowerCase() == '架构';
       case 'code':
         return topic.leetcodeUrl != null ||
-               topic.category.toLowerCase() == 'algorithm';
+            topic.category.toLowerCase() == 'algorithm';
       case 'project':
         return false;
       default:
         return true;
     }
+  }
+
+  RecallPrompt? _selectedRecallPrompt(Topic topic) {
+    final seed = _recallPromptSeeds.putIfAbsent(topic.id, () {
+      return context
+          .read<ProgressProvider>()
+          .getAttemptsForTopic(topic.id)
+          .length;
+    });
+    return topic.recallPromptAt(seed);
   }
 
   void _onScenarioChanged(String value) {
@@ -192,12 +203,12 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
 
     try {
       final aiProvider = context.read<AiProvider>();
+      final recallPrompt = _selectedRecallPrompt(topic);
+      final mainQuestion = recallPrompt?.prompt ?? topic.title;
       final result = await aiProvider.evaluateAnswer(
         usageTag: 'mockInterview',
         topicId: topic.id,
-        question: topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.prompt
-            : topic.title,
+        question: mainQuestion,
         userAnswer: contextualAnswer,
         rubric: topic.rubric,
       );
@@ -213,9 +224,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             _followUpQuestion = result['followUp'] as String;
             _followUpHistory.add({
               'question': _stage == _InterviewStage.main
-                  ? (topic.recallPrompts.isNotEmpty
-                        ? topic.recallPrompts.first.prompt
-                        : topic.title)
+                  ? mainQuestion
                   : (_followUpQuestion ?? ''),
               'answer': answer,
             });
@@ -238,9 +247,7 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
               'topicTitle': topic.title,
               'score': scoreForDisplay,
               'answer': answer,
-              'question': topic.recallPrompts.isNotEmpty
-                  ? topic.recallPrompts.first.prompt
-                  : topic.title,
+              'question': mainQuestion,
               'summary': result['summary'] ?? '',
               'missedPoints': result['missedPoints'] ?? [],
               'wrongPoints':
@@ -258,13 +265,9 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
             PracticeAttempt(
               id: DateTime.now().microsecondsSinceEpoch.toString(),
               topicId: topic.id,
-              promptId: topic.recallPrompts.isNotEmpty
-                  ? topic.recallPrompts.first.id
-                  : '',
+              promptId: recallPrompt?.id ?? '',
               mode: 'mockInterview',
-              question: topic.recallPrompts.isNotEmpty
-                  ? topic.recallPrompts.first.prompt
-                  : topic.title,
+              question: mainQuestion,
               answer: contextualAnswer,
               createdAt: DateTime.now(),
               score: result['score'] as int?,
@@ -637,11 +640,10 @@ class _MockInterviewPageState extends State<MockInterviewPage> {
     };
     final displayQuestion =
         _followUpQuestion ??
-        (topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.prompt
-            : l10n.getp('please_explain_title_core_concept_2', {
-                'title': topic.title,
-              }));
+        (_selectedRecallPrompt(topic)?.prompt ??
+            l10n.getp('please_explain_title_core_concept_2', {
+              'title': topic.title,
+            }));
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(

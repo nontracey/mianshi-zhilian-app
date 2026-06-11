@@ -12,9 +12,10 @@ import 'package:mianshi_zhilian/pages/practice/answer_versions_page.dart';
 // ── 问题面板 ──────────────────────────────────────────────
 
 class QuestionPanel extends StatelessWidget {
-  const QuestionPanel({super.key, required this.topic});
+  const QuestionPanel({super.key, required this.topic, this.recallPrompt});
 
-  final dynamic topic;
+  final Topic topic;
+  final RecallPrompt? recallPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +66,10 @@ class QuestionPanel extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : l10n.getp('please_use_self_word_explain_title_core_cont_2', {
-                    'title': topic.title,
-                  }),
+            recallPrompt?.prompt ??
+                l10n.getp('please_use_self_word_explain_title_core_cont_2', {
+                  'title': topic.title,
+                }),
             style: const TextStyle(fontSize: 15, height: 1.6),
           ),
           if (topic.interviewerFocus?.isNotEmpty == true) ...[
@@ -275,7 +275,11 @@ class AiReadinessNotice extends StatelessWidget {
 // ── 模型选择器 ──────────────────────────────────────────────
 
 class ModelSelector extends StatelessWidget {
-  const ModelSelector({super.key, required this.selectedId, required this.onChanged});
+  const ModelSelector({
+    super.key,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
   final String? selectedId;
   final ValueChanged<String?> onChanged;
@@ -516,7 +520,11 @@ class AnswerInputField extends StatelessWidget {
 // ── 进度指示器 ──────────────────────────────────────────────
 
 class PracticeProgress extends StatelessWidget {
-  const PracticeProgress({super.key, required this.current, required this.total});
+  const PracticeProgress({
+    super.key,
+    required this.current,
+    required this.total,
+  });
 
   final int current;
   final int total;
@@ -887,9 +895,9 @@ class EvaluationResultPanelState extends State<EvaluationResultPanel> {
                   extra: AnswerVersionsPage(
                     topicId: widget.topic!.id,
                     topicTitle: widget.topic!.title,
-                    question: widget.topic!.recallPrompts.isNotEmpty
-                        ? widget.topic!.recallPrompts.first.prompt
-                        : widget.topic!.title,
+                    question:
+                        widget.topic!.recallPromptAt(0)?.prompt ??
+                        widget.topic!.title,
                   ),
                 );
               },

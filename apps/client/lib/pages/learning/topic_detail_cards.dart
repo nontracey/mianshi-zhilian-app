@@ -457,7 +457,13 @@ class CodeCard extends StatelessWidget {
 
     return WorkPanel(
       title: card.title,
-      children: [HighlightedCode(code: parsed.code, language: parsed.language)],
+      children: [
+        HighlightedCode(
+          code: parsed.code,
+          language: parsed.language,
+          highlights: card.highlights,
+        ),
+      ],
     );
   }
 }
@@ -498,10 +504,15 @@ class AsciiDiagramView extends StatelessWidget {
 // ── 语法高亮代码组件 ─────────────────────────────────────────
 
 class HighlightedCode extends StatelessWidget {
-  const HighlightedCode({required this.code, this.language = 'java'});
+  const HighlightedCode({
+    required this.code,
+    this.language = 'java',
+    this.highlights = const [],
+  });
 
   final String code;
   final String language;
+  final List<Map<String, dynamic>> highlights;
 
   static const _keywordColor = AppColors.syntaxKeyword;
   static const _stringColor = AppColors.syntaxString;
@@ -709,9 +720,94 @@ class HighlightedCode extends StatelessWidget {
     return tokens;
   }
 
+  Map<int, String> _highlightNotes() {
+    final notes = <int, String>{};
+    for (final highlight in highlights) {
+      final line = (highlight['line'] as num?)?.toInt();
+      final startLine =
+          (highlight['startLine'] as num?)?.toInt() ??
+          (highlight['start'] as num?)?.toInt() ??
+          line;
+      final endLine =
+          (highlight['endLine'] as num?)?.toInt() ??
+          (highlight['end'] as num?)?.toInt() ??
+          startLine;
+      if (startLine == null || endLine == null) continue;
+      final note =
+          (highlight['note'] ?? highlight['label'] ?? highlight['title'] ?? '')
+              .toString()
+              .trim();
+      for (var current = startLine; current <= endLine; current += 1) {
+        notes[current] = note;
+      }
+    }
+    return notes;
+  }
+
+  Widget _buildCodeLine(
+    BuildContext context,
+    String line,
+    int lineNumber,
+    Map<int, String> notes,
+  ) {
+    final note = notes[lineNumber];
+    final isHighlighted = note != null;
+    final row = Container(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? AppColors.warning.withValues(alpha: 0.13)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 42,
+            child: Text(
+              '$lineNumber',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: 12,
+                height: 1.6,
+                color: isHighlighted
+                    ? AppColors.warning
+                    : AppColors.syntaxComment.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          SelectableText.rich(
+            TextSpan(
+              children: _tokenize(line.isEmpty ? ' ' : line)
+                  .map(
+                    (token) => TextSpan(
+                      text: token.text,
+                      style: TextStyle(
+                        fontFamily: 'JetBrainsMono',
+                        fontSize: 13,
+                        height: 1.6,
+                        color: token.color,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!isHighlighted || note.isEmpty) return row;
+    return Tooltip(message: note, child: row);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tokens = _tokenize(code);
+    final notes = _highlightNotes();
+    final lines = code.split('\n');
 
     return Container(
       width: double.infinity,
@@ -743,24 +839,48 @@ class HighlightedCode extends StatelessWidget {
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: SelectableText.rich(
-              TextSpan(
-                children: tokens
-                    .map(
-                      (token) => TextSpan(
-                        text: token.text,
-                        style: TextStyle(
-                          fontFamily: 'JetBrainsMono',
-                          fontSize: 13,
-                          height: 1.6,
-                          color: token.color,
-                        ),
-                      ),
-                    )
-                    .toList(),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 560),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < lines.length; i += 1)
+                    _buildCodeLine(context, lines[i], i + 1, notes),
+                ],
               ),
             ),
           ),
+          if (notes.entries.any((entry) => entry.value.isNotEmpty)) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final entry in notes.entries)
+                  if (entry.value.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Text(
+                        'L${entry.key}: ${entry.value}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ],
         ],
       ),
     );
