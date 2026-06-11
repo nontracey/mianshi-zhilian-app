@@ -1,11 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/ai_config.dart';
 import '../models/user_progress.dart';
 import '../models/app_settings.dart';
+
+class StorageWriteException implements Exception {
+  StorageWriteException(this.key, this.cause);
+
+  final String key;
+  final Object cause;
+
+  @override
+  String toString() => 'StorageWriteException($key): $cause';
+}
 
 /// Web + 通用存储服务，使用 SharedPreferences 替代 dart:io File
 class StorageService {
@@ -16,12 +28,17 @@ class StorageService {
   /// 全局存储写入失败信号。[StorageService] 在多处被实例化（SharedPreferences
   /// 底层共享），故用 static notifier 广播：写入失败（如 Web localStorage 配额
   /// 超限）时置为失败的 key，根部 UI 监听后提示用户「数据可能未保存」。
-  static final ValueNotifier<String?> writeFailure = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> writeFailure = ValueNotifier<String?>(
+    null,
+  );
 
   static const _syncDirtyKey = '_syncDirty';
   static const _syncDirtyAtKey = '_syncDirtyAt';
   static const _deviceIdKey = '_syncDeviceId';
   static const _analyticsBufferKey = '_analyticsBuffer';
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   /// 完整导出（[exportAllData]）对敏感字段写入的占位符。导入时遇到此值
   /// 不覆盖本地真实凭据，避免备份恢复把 apiKey/token 损坏为字面量。
@@ -64,6 +81,16 @@ class StorageService {
   }
 
   Future<void> save(String key, dynamic data) async {
+    await _save(key, data, strict: false);
+  }
+
+  /// 与 [save] 相同，但写入失败会抛 [StorageWriteException]。
+  /// 用于练习记录等不能让调用方误以为已经持久化成功的关键路径。
+  Future<void> saveStrict(String key, dynamic data) async {
+    await _save(key, data, strict: true);
+  }
+
+  Future<void> _save(String key, dynamic data, {required bool strict}) async {
     try {
       final prefs = await _instance;
       await prefs.setString(key, json.encode(data));
@@ -75,6 +102,9 @@ class StorageService {
       // 广播写入失败，让根部 UI 提示用户数据可能未保存（静默吞掉会让用户
       // 在配额超限后毫无察觉地持续丢失练习数据）。
       writeFailure.value = key;
+      if (strict) {
+        throw StorageWriteException(key, e);
+      }
     }
   }
 
@@ -91,15 +121,112 @@ class StorageService {
   }
 
   Future<void> saveAiConfigs(List<AiConfig> configs) async {
-    await save('ai_configs', configs.map((c) => c.toJson()).toList());
+    final existingIds = _aiConfigIds(await load('ai_configs'));
+    final nextIds = configs.map((c) => c.id).toSet();
+    final payload = <Map<String, dynamic>>[];
+
+    for (final config in configs) {
+      final json = config.toJson();
+      if (!kIsWeb && config.apiKey.isNotEmpty) {
+        final wroteSecurely = await _writeAiConfigApiKey(
+          config.id,
+          config.apiKey,
+        );
+        if (wroteSecurely) json['apiKey'] = '';
+      }
+      payload.add(json);
+    }
+
+    if (!kIsWeb) {
+      for (final removedId in existingIds.difference(nextIds)) {
+        await _deleteAiConfigApiKey(removedId);
+      }
+    }
+
+    await save('ai_configs', payload);
+    if (!_suppressSyncDirty &&
+        (await loadSyncSettings()).syncAiConfigMetadata) {
+      await markSyncDirty();
+    }
   }
 
   Future<List<AiConfig>> loadAiConfigs() async {
     final data = await load('ai_configs');
     if (data == null) return [];
-    return (data as List)
+    final configs = (data as List)
         .map((e) => AiConfig.fromJson(e as Map<String, dynamic>))
         .toList();
+    if (kIsWeb) return configs;
+
+    var shouldSanitizePrefs = false;
+    final hydrated = <AiConfig>[];
+    for (final config in configs) {
+      final secureApiKey = await _readAiConfigApiKey(config.id);
+      if (secureApiKey != null && secureApiKey.isNotEmpty) {
+        hydrated.add(config.copyWith(apiKey: secureApiKey));
+        if (config.apiKey.isNotEmpty) shouldSanitizePrefs = true;
+        continue;
+      }
+
+      if (config.apiKey.isNotEmpty) {
+        final migrated = await _writeAiConfigApiKey(config.id, config.apiKey);
+        if (migrated) shouldSanitizePrefs = true;
+      }
+      hydrated.add(config);
+    }
+
+    if (shouldSanitizePrefs) {
+      await _saveAiConfigMetadataOnly(hydrated);
+    }
+    return hydrated;
+  }
+
+  Set<String> _aiConfigIds(dynamic value) {
+    if (value is! List) return {};
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map((item) => item['id'] as String?)
+        .whereType<String>()
+        .toSet();
+  }
+
+  String _aiConfigApiKeySecureKey(String id) => 'ai_config_api_key_$id';
+
+  Future<bool> _writeAiConfigApiKey(String id, String apiKey) async {
+    try {
+      await _secureStorage.write(
+        key: _aiConfigApiKeySecureKey(id),
+        value: apiKey,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> _readAiConfigApiKey(String id) async {
+    try {
+      return await _secureStorage.read(key: _aiConfigApiKeySecureKey(id));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteAiConfigApiKey(String id) async {
+    try {
+      await _secureStorage.delete(key: _aiConfigApiKeySecureKey(id));
+    } catch (_) {}
+  }
+
+  Future<void> _saveAiConfigMetadataOnly(List<AiConfig> configs) async {
+    await save(
+      'ai_configs',
+      configs.map((config) {
+        final json = config.toJson();
+        json['apiKey'] = '';
+        return json;
+      }).toList(),
+    );
   }
 
   Future<void> saveProgressMap(Map<String, TopicProgress> map) async {
@@ -128,6 +255,15 @@ class StorageService {
 
   Future<void> savePracticeAttempts(List<PracticeAttempt> attempts) async {
     await save('practice_attempts', attempts.map((a) => a.toJson()).toList());
+  }
+
+  Future<void> savePracticeAttemptsStrict(
+    List<PracticeAttempt> attempts,
+  ) async {
+    await saveStrict(
+      'practice_attempts',
+      attempts.map((a) => a.toJson()).toList(),
+    );
   }
 
   Future<List<PracticeAttempt>> loadPracticeAttempts() async {
@@ -281,9 +417,11 @@ class StorageService {
   Future<int> clearCacheData() async {
     final prefs = await _instance;
     final keys = prefs.getKeys();
-    final cacheKeys = keys.where(
-      (k) => k.startsWith('content_cache_') || k.startsWith('route_cache_'),
-    ).toList();
+    final cacheKeys = keys
+        .where(
+          (k) => k.startsWith('content_cache_') || k.startsWith('route_cache_'),
+        )
+        .toList();
     for (final k in cacheKeys) {
       await prefs.remove(k);
     }
@@ -393,6 +531,27 @@ class StorageService {
     await save('deletions', deletions);
   }
 
+  static String answerVersionDeletionCollection(String topicId) =>
+      'answer_versions:$topicId';
+
+  static String answerVersionIdFor(Map<dynamic, dynamic> version) {
+    final existing = version['id']?.toString();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final raw =
+        '${version['type'] ?? ''}|${version['content'] ?? ''}|${version['createdAt'] ?? ''}';
+    return 'legacy_${sha1.convert(utf8.encode(raw)).toString().substring(0, 16)}';
+  }
+
+  Future<void> recordAnswerVersionDeletion(
+    String topicId,
+    Map<dynamic, dynamic> version,
+  ) async {
+    await recordDeletion(
+      answerVersionDeletionCollection(topicId),
+      answerVersionIdFor(version),
+    );
+  }
+
   /// 批量记录删除墓碑，仅一次读改写。[entries] 为 `(collection, id)` 列表。
   /// 用于「清空练习数据」等一次删多个集合多条记录的场景。
   Future<void> recordDeletions(Iterable<(String, String)> entries) async {
@@ -451,7 +610,7 @@ class StorageService {
       'updatedAt': DateTime.now().toIso8601String(),
       'deviceId': deviceId,
       'contentEnv': appSettings.contentEnv.key,
-      'contentVersion': ?contentVersion,
+      'contentVersion': contentVersion,
       'data': data,
     }, syncSettings);
   }
@@ -536,6 +695,15 @@ class StorageService {
           await prefs.setString(entry.key, json.encode(merged));
           continue;
         }
+        if (entry.key == 'sessions') {
+          final merged = await _mergePracticeSessionsForImport(
+            entry.value,
+            syncSettings: syncSettings,
+            preserveLocalSensitiveData: preserveLocalSensitiveData,
+          );
+          await prefs.setString(entry.key, json.encode(merged));
+          continue;
+        }
         if (entry.key == 'mock_interview_sessions') {
           final merged = await _mergeMockSessionsForImport(
             entry.value,
@@ -551,6 +719,7 @@ class StorageService {
           continue;
         }
         if (entry.key == 'ai_configs') {
+          if (syncSettings?.syncAiConfigMetadata != true) continue;
           final merged = await _mergeAiConfigsForImport(entry.value);
           await prefs.setString(entry.key, json.encode(merged));
           continue;
@@ -580,6 +749,12 @@ class StorageService {
           value = await _restoreRedactedSyncSettings(value);
         } else if (key == 'ai_configs' && value is List) {
           value = await _restoreRedactedAiConfigs(value);
+          final configs = value
+              .whereType<Map>()
+              .map((item) => AiConfig.fromJson(item.cast<String, dynamic>()))
+              .toList();
+          await saveAiConfigs(configs);
+          continue;
         }
         try {
           if (value is String) {
@@ -869,6 +1044,7 @@ class StorageService {
   }
 
   bool _isSyncRelevantKey(String key) {
+    if (key == 'ai_configs') return false;
     if (_syncKeys.contains(key)) return true;
     return _syncPrefixes.any(key.startsWith);
   }
@@ -896,6 +1072,9 @@ class StorageService {
     }
     if (key == 'practice_attempts' && !syncSettings.syncFullPracticeText) {
       return _sanitizePracticeAttempts(value);
+    }
+    if (key == 'sessions' && !syncSettings.syncFullPracticeText) {
+      return _sanitizePracticeSessions(value);
     }
     if (key == 'mock_interview_sessions' &&
         !syncSettings.syncFullPracticeText &&
@@ -925,6 +1104,14 @@ class StorageService {
       return stripped;
     }
     return value;
+  }
+
+  dynamic _sanitizePracticeSessions(dynamic value) {
+    if (value is! List) return value;
+    return value.map((item) {
+      if (item is! Map<String, dynamic>) return item;
+      return {...item, 'feedback': null};
+    }).toList();
   }
 
   dynamic _sanitizePracticeAttempts(dynamic value) {
@@ -959,6 +1146,39 @@ class StorageService {
       final id = imported['id'] as String?;
       final local = id == null ? null : currentById[id];
       return _preserveAttemptSensitiveFields(imported, local);
+    }).toList();
+  }
+
+  Future<dynamic> _mergePracticeSessionsForImport(
+    dynamic incoming, {
+    required SyncSettings? syncSettings,
+    required bool preserveLocalSensitiveData,
+  }) async {
+    if (incoming is! List) return incoming;
+    if (!_shouldPreserveSensitiveData(
+      syncSettings,
+      preserveLocalSensitiveData,
+    )) {
+      return incoming;
+    }
+
+    final current = await loadSessions();
+    final feedbackById = {
+      for (final session in current)
+        if (session.feedback != null && session.feedback!.isNotEmpty)
+          session.id: session.feedback!,
+    };
+
+    return incoming.map((item) {
+      if (item is! Map) return item;
+      final imported = item.map((k, v) => MapEntry(k.toString(), v));
+      final id = imported['id'] as String?;
+      final localFeedback = id == null ? null : feedbackById[id];
+      if (localFeedback != null &&
+          ((imported['feedback'] as String?) ?? '').isEmpty) {
+        imported['feedback'] = localFeedback;
+      }
+      return imported;
     }).toList();
   }
 

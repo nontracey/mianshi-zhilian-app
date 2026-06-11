@@ -8,6 +8,7 @@ import {
   isUuidLike,
   asString,
   parseImageUrls,
+  normalizePasswordResetTicketReceipt,
   normalizeUpdateManifest,
 } from "../src/index";
 
@@ -135,6 +136,36 @@ describe("parseImageUrls", () => {
   });
   it("丢弃非法协议", () => {
     expect(parseImageUrls(["javascript:alert(1)", "ftp://x"])).toEqual([]);
+  });
+});
+
+describe("normalizePasswordResetTicketReceipt", () => {
+  it("不回显联系方式、说明和图片等敏感字段", () => {
+    const receipt = normalizePasswordResetTicketReceipt({
+      id: "ticket-1",
+      user_id: null,
+      account_username: "alice",
+      contact: "alice@example.com",
+      type: "password_reset",
+      subject: "密码重置申请",
+      description: "我的账号说明包含私人信息",
+      image_urls: JSON.stringify(["data:image/png;base64,AAAA"]),
+      status: "pending",
+      admin_reply: null,
+      created_at: "2026-06-11 10:00:00",
+      resolved_at: null,
+    });
+
+    expect(receipt).toEqual({
+      id: "ticket-1",
+      type: "password_reset",
+      status: "pending",
+      created_at: "2026-06-11 10:00:00",
+    });
+    expect(receipt).not.toHaveProperty("contact");
+    expect(receipt).not.toHaveProperty("description");
+    expect(receipt).not.toHaveProperty("image_urls");
+    expect(receipt).not.toHaveProperty("account_username");
   });
 });
 

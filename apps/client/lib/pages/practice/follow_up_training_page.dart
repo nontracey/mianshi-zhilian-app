@@ -154,7 +154,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     final aiProvider = context.read<AiProvider>();
     if (!aiProvider.hasAnyConfig) {
       // 没有启用任何 AI 配置，保存为本地练习
-      _saveLocalAnswer(answer);
+      await _saveLocalAnswer(answer);
       return;
     }
 
@@ -257,22 +257,32 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     }
   }
 
-  void _saveLocalAnswer(String answer) {
+  Future<void> _saveLocalAnswer(String answer) async {
     final topic = _getCurrentTopic();
-    setState(() {
-      _answers.add({
-        'topicId': topic?.id,
-        'question': _getCurrentQuestion(),
-        'answer': answer,
-        'score': null,
-        'isFollowUp': _currentFollowUpIndex >= 0,
-        'followUpIndex': _currentFollowUpIndex,
+    final question = _getCurrentQuestion();
+    try {
+      await _persistAttempt(topic, question, answer, {'aiUnavailable': true});
+      if (!mounted) return;
+      setState(() {
+        _answers.add({
+          'topicId': topic?.id,
+          'question': question,
+          'answer': answer,
+          'score': null,
+          'isFollowUp': _currentFollowUpIndex >= 0,
+          'followUpIndex': _currentFollowUpIndex,
+        });
+        _evaluationResult = {
+          'local': true,
+          'message': L10n.get('saved_as_local_practice', L10n.currentLanguage),
+        };
       });
-      _evaluationResult = {
-        'local': true,
-        'message': L10n.get('saved_as_local_practice', L10n.currentLanguage),
-      };
-    });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.get('storage_write_failed'))));
+    }
   }
 
   @override

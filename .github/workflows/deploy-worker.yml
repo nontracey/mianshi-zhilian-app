@@ -31,6 +31,7 @@ jobs:
           cache: npm
           cache-dependency-path: workers/api/package-lock.json
       - run: npm ci
+      - run: npm run check:migrations
 
       - name: Prepare config
         id: config
@@ -59,6 +60,19 @@ jobs:
             sed -i "s/PLACEHOLDER_KV_NAMESPACE_ID/$KV_PROD_ID/" wrangler.toml
             echo "has_staging=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Apply D1 schema
+        if: steps.config.outputs.has_staging == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          DB_NAME="mianshi-zhilian-db"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            DB_NAME="mianshi-zhilian-db-staging"
+          fi
+          npx wrangler d1 execute "$DB_NAME" --remote --file=./init-db.sql
 
       - name: Deploy to Cloudflare Pages
         if: steps.config.outputs.has_staging == 'true'

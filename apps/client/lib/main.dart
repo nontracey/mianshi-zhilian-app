@@ -50,7 +50,7 @@ void main() async {
   debugPrint = (String? message, {int? wrapWidth}) {
     if (!kReleaseMode) originalDebugPrint(message, wrapWidth: wrapWidth);
     final text = message;
-    if (text != null && text.trim().isNotEmpty) {
+    if (!kReleaseMode && text != null && text.trim().isNotEmpty) {
       unawaited(AppLog.debug(text, source: 'debugPrint'));
     }
   };
@@ -387,4 +387,3 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
     );
   }
 }
-

@@ -326,8 +326,8 @@ class DataSyncService {
     final Map<String, String>? preconditionHeaders = etag != null
         ? {'If-Match': etag}
         : _webDavRemoteAbsent
-            ? {'If-None-Match': '*'}
-            : null;
+        ? {'If-None-Match': '*'}
+        : null;
     final response = await _webDavRequest(
       'PUT',
       uri,
@@ -559,19 +559,23 @@ class DataSyncService {
     if (sha != null) body['sha'] = sha;
     final response = sha == null
         ? await http
-            .post(
-              uri.replace(queryParameters: {'access_token': settings.giteeToken}),
-              headers: {'Content-Type': 'application/json'},
-              body: json.encode(body),
-            )
-            .timeout(_uploadTimeout)
+              .post(
+                uri.replace(
+                  queryParameters: {'access_token': settings.giteeToken},
+                ),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(body),
+              )
+              .timeout(_uploadTimeout)
         : await http
-            .put(
-              uri.replace(queryParameters: {'access_token': settings.giteeToken}),
-              headers: {'Content-Type': 'application/json'},
-              body: json.encode(body),
-            )
-            .timeout(_uploadTimeout);
+              .put(
+                uri.replace(
+                  queryParameters: {'access_token': settings.giteeToken},
+                ),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(body),
+              )
+              .timeout(_uploadTimeout);
     if (response.statusCode == 409) throw const SyncConflictException();
     _ensureSuccess(response, 'Gitee 上传失败');
   }
@@ -606,8 +610,7 @@ class DataSyncService {
   Map<String, dynamic> mergePackagesForTest(
     Map<String, dynamic> local,
     Map<String, dynamic>? remote,
-  ) =>
-      _mergePackages(local, remote);
+  ) => _mergePackages(local, remote);
 
   Map<String, dynamic> _mergePackages(
     Map<String, dynamic> local,
@@ -656,11 +659,17 @@ class DataSyncService {
       'project_dig_projects',
       'custom_routes',
     ]) {
-      merged[key] = _mergeListById(remoteData[key], localData[key], mergedDeletions, key);
+      merged[key] = _mergeListById(
+        remoteData[key],
+        localData[key],
+        mergedDeletions,
+        key,
+      );
     }
     merged['answer_versions'] = _mergeAnswerVersions(
       remoteData['answer_versions'],
       localData['answer_versions'],
+      mergedDeletions,
     );
 
     return {
@@ -681,10 +690,12 @@ class DataSyncService {
   dynamic _pickByUpdatedAt(dynamic remote, dynamic local) {
     if (remote == null) return local;
     if (local == null) return remote;
-    final remoteTs =
-        remote is Map ? DateTime.tryParse('${remote['updatedAt'] ?? ''}') : null;
-    final localTs =
-        local is Map ? DateTime.tryParse('${local['updatedAt'] ?? ''}') : null;
+    final remoteTs = remote is Map
+        ? DateTime.tryParse('${remote['updatedAt'] ?? ''}')
+        : null;
+    final localTs = local is Map
+        ? DateTime.tryParse('${local['updatedAt'] ?? ''}')
+        : null;
     if (remoteTs == null) return local;
     if (localTs == null) return remote;
     return !localTs.isBefore(remoteTs) ? local : remote;
@@ -720,10 +731,12 @@ class DataSyncService {
           continue;
         }
 
-        final localTs =
-            DateTime.tryParse('${localProgress['lastPracticeAt'] ?? ''}');
-        final remoteTs =
-            DateTime.tryParse('${remoteProgress['lastPracticeAt'] ?? ''}');
+        final localTs = DateTime.tryParse(
+          '${localProgress['lastPracticeAt'] ?? ''}',
+        );
+        final remoteTs = DateTime.tryParse(
+          '${remoteProgress['lastPracticeAt'] ?? ''}',
+        );
         final Map winner;
         if (remoteTs == null) {
           winner = localProgress; // 远端无时间戳 → 本地胜
@@ -842,39 +855,102 @@ class DataSyncService {
     return result;
   }
 
-  Map<String, dynamic>? _mergeAnswerVersions(dynamic remote, dynamic local) {
+  Map<String, dynamic>? _mergeAnswerVersions(
+    dynamic remote,
+    dynamic local,
+    Map<String, String> deletions,
+  ) {
     if (remote == null && local == null) return null;
     final result = <String, dynamic>{};
     if (remote is Map) {
-      result.addAll(remote.map((k, v) => MapEntry(k.toString(), v)));
-    }
-    if (local is Map) {
-      for (final entry in local.entries) {
-        result[entry.key.toString()] = _mergeVersionList(
-          result[entry.key.toString()],
+      for (final entry in remote.entries) {
+        final topicId = entry.key.toString();
+        result[topicId] = _mergeVersionList(
+          null,
           entry.value,
+          topicId,
+          deletions,
         );
       }
     }
-    return result;
+    if (local is Map) {
+      for (final entry in local.entries) {
+        final topicId = entry.key.toString();
+        result[topicId] = _mergeVersionList(
+          result[topicId],
+          entry.value,
+          topicId,
+          deletions,
+        );
+      }
+    }
+    result.removeWhere((_, value) => value is List && value.isEmpty);
+    return result.isEmpty ? null : result;
   }
 
-  List<dynamic> _mergeVersionList(dynamic remote, dynamic local) {
-    final seen = <String>{};
-    final result = <dynamic>[];
+  List<dynamic> _mergeVersionList(
+    dynamic remote,
+    dynamic local,
+    String topicId,
+    Map<String, String> deletions,
+  ) {
+    final byId = <String, Map<String, dynamic>>{};
     void addAll(dynamic value) {
       if (value is! List) return;
       for (final item in value) {
-        final key = item is Map
-            ? '${item['type']}|${item['content']}|${item['createdAt']}'
-            : item.toString();
-        if (seen.add(key)) result.add(item);
+        if (item is! Map) continue;
+        final normalized = item.map((k, v) => MapEntry(k.toString(), v));
+        final id = StorageService.answerVersionIdFor(normalized);
+        normalized['id'] = id;
+        normalized['updatedAt'] ??= normalized['createdAt'];
+        final existing = byId[id];
+        if (existing == null || _isVersionNewer(existing, normalized)) {
+          byId[id] = normalized;
+        }
       }
     }
 
     addAll(remote);
     addAll(local);
-    return result;
+    if (deletions.isNotEmpty) {
+      final collection = StorageService.answerVersionDeletionCollection(
+        topicId,
+      );
+      byId.removeWhere((id, item) {
+        final deletedAt = deletions['$collection:$id'];
+        if (deletedAt == null) return false;
+        final deleted = DateTime.tryParse(deletedAt);
+        final updated = _versionUpdatedAt(item);
+        if (deleted == null || updated == null) return true;
+        return !updated.isAfter(deleted);
+      });
+    }
+    return byId.values.toList()..sort((a, b) {
+      final aAt = _versionUpdatedAt(a);
+      final bAt = _versionUpdatedAt(b);
+      if (aAt == null && bAt == null) return 0;
+      if (aAt == null) return 1;
+      if (bAt == null) return -1;
+      return bAt.compareTo(aAt);
+    });
+  }
+
+  bool _isVersionNewer(
+    Map<String, dynamic> existing,
+    Map<String, dynamic> candidate,
+  ) {
+    final existingAt = _versionUpdatedAt(existing);
+    final candidateAt = _versionUpdatedAt(candidate);
+    if (existingAt == null) return true;
+    if (candidateAt == null) return false;
+    return !candidateAt.isBefore(existingAt);
+  }
+
+  DateTime? _versionUpdatedAt(Map<String, dynamic> item) {
+    final updatedAt = item['updatedAt']?.toString();
+    final createdAt = item['createdAt']?.toString();
+    return DateTime.tryParse(updatedAt ?? '') ??
+        DateTime.tryParse(createdAt ?? '');
   }
 
   void _validateRepoSettings({

@@ -305,22 +305,36 @@ class _VoiceDiagnosticSheetState extends State<VoiceDiagnosticSheet> {
     final tempDir = await getTemporaryDirectory();
     final chunkPath =
         '${tempDir.path}/voice_diag_${DateTime.now().millisecondsSinceEpoch}.wav';
-    await _recorder.start(
-      const RecordConfig(
-        encoder: AudioEncoder.wav,
-        sampleRate: 16000,
-        numChannels: 1,
-      ),
-      path: chunkPath,
-    );
-    await Future.delayed(const Duration(seconds: 3));
-    final path = await _recorder.stop();
-    if (path == null || path.isEmpty) {
-      throw StateError('Recorder returned empty path');
+    String? stoppedPath;
+    var stopped = false;
+    try {
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: chunkPath,
+      );
+      await Future.delayed(const Duration(seconds: 3));
+      stoppedPath = await _recorder.stop();
+      stopped = true;
+      if (stoppedPath == null || stoppedPath.isEmpty) {
+        throw StateError('Recorder returned empty path');
+      }
+      return await readBytesFromPath(stoppedPath);
+    } finally {
+      if (!stopped) {
+        try {
+          stoppedPath = await _recorder.stop();
+        } catch (_) {}
+      }
+      final path = stoppedPath;
+      final pathToDelete = path != null && path.isNotEmpty ? path : chunkPath;
+      try {
+        await deleteFileAtPath(pathToDelete);
+      } catch (_) {}
     }
-    final bytes = await readBytesFromPath(path);
-    unawaited(deleteFileAtPath(path));
-    return bytes;
   }
 
   Float32List? _wavBytesToFloat32List(Uint8List bytes) {

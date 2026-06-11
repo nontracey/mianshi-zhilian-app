@@ -242,7 +242,10 @@ Future<void> _runAiChunkLoop(int sessionId, AiProvider aiProvider, AiConfig conf
   try {
     while (_isCurrentRecordingSession(sessionId)) {
       final chunkPath = await _recordVadChunk();
-      if (!_isCurrentSession(sessionId)) break;
+      if (!_isCurrentSession(sessionId)) {
+        if (chunkPath != null) unawaited(deleteFileAtPath(chunkPath));
+        break;
+      }
       if (chunkPath == null) { if (_running) continue; break; }
       _enqueueTranscription(_VoiceChunkJob.ai(
         sessionId: sessionId, chunkPath: chunkPath,
@@ -271,6 +274,7 @@ Future<String> _transcribeAiChunk(AiProvider aiProvider, AiConfig config, String
 
 - 读取 WAV 文件字节 → 删除临时文件 → 调用 `AiProvider.transcribeAudio`（请求 `/audio/transcriptions` 或 `/chat/completions` 音频输入端点）。
 - 转写结果经 `_cleanTranscriptionText` 清洗后传入 `_emitText`。
+- 如果 session 在录制块返回后已经失效，生产者会立即删除该 chunk，不再进入队列。
 
 ## 6. 本机 sherpa-onnx 离线流水线
 
@@ -485,7 +489,7 @@ String _messageKeyForError(Object error) {
 
 - `_consumerRunning` / `_producerRunning` 分别跟踪两个线程，防止竞态。
 - `_finishSessionIfReady()` 只在两个线程都停止且队列为空时才进入 idle。
-- 所有文件操作（读、删）包裹在 `try/catch` 中，不因临时文件清理失败而阻塞流程。
+- 所有文件操作（读、删）包裹在 `try/catch` 中，不因临时文件清理失败而阻塞流程。VAD/诊断录音异常路径会先尽力 stop 录音器，再删除 stop 返回路径和原始临时路径。
 
 ---
 

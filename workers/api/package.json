@@ -7,6 +7,7 @@
     "dev": "wrangler pages dev src/",
     "deploy": "wrangler pages deploy --project-name=mianshi-zhilian-api src/",
     "typecheck": "tsc --noEmit",
+    "check:migrations": "node scripts/check-db-schema.mjs",
     "test": "vitest run"
   },
   "devDependencies": {

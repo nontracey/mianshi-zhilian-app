@@ -57,6 +57,7 @@ jobs:
           cache: npm
           cache-dependency-path: workers/api/package-lock.json
       - run: npm ci
+      - run: npm run check:migrations
       - run: npm run typecheck 2>/dev/null || npx tsc --noEmit
       - run: npm test
       - run: npm run lint 2>/dev/null || echo 'lint not configured, skipping'

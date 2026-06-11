@@ -862,12 +862,16 @@ class _RecallPageState extends State<RecallPage> {
             (v) => v['content'] == improvedAnswer && v['type'] == 'ai_modified',
           );
           if (!alreadySaved) {
-            versions.add({
+            final createdAt = DateTime.now().toIso8601String();
+            final version = {
               'type': 'ai_modified',
               'content': improvedAnswer,
-              'createdAt': DateTime.now().toString().substring(0, 16),
+              'createdAt': createdAt,
+              'updatedAt': createdAt,
               'source': 'auto_eval',
-            });
+            };
+            version['id'] = StorageService.answerVersionIdFor(version);
+            versions.add(version);
             await storage.saveJsonList(versionsKey, versions);
           }
         }

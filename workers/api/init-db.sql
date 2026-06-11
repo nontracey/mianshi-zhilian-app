@@ -1,9 +1,24 @@
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  nickname TEXT,
+  role TEXT DEFAULT 'user',
+  is_disabled INTEGER DEFAULT 0,
+  disabled_at TEXT DEFAULT NULL,
+  updated_at TEXT DEFAULT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_login_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   token_hash TEXT UNIQUE NOT NULL,
   expires_at TEXT NOT NULL,
   revoked_at TEXT,
+  rotated_to TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   last_used_at TEXT,
   FOREIGN KEY (user_id) REFERENCES users(id)
