@@ -39,13 +39,18 @@ class ProgressProvider extends ChangeNotifier {
 
   Future<void> updateProgress(String topicId, int score, String status) async {
     final existing = _progressMap[topicId];
+    final review = _calculateNextReview(
+      score,
+      existing?.reviewIntervalDays ?? 0,
+    );
     _progressMap[topicId] = TopicProgress(
       topicId: topicId,
       score: score,
       status: status,
       practiceCount: (existing?.practiceCount ?? 0) + 1,
       lastPracticeAt: DateTime.now(),
-      nextReviewAt: _calculateNextReview(score),
+      nextReviewAt: review.nextReviewAt,
+      reviewIntervalDays: review.intervalDays,
     );
     await _storage.saveProgressMap(_progressMap);
     notifyListeners();
@@ -56,12 +61,28 @@ class ProgressProvider extends ChangeNotifier {
     await updateProgress(topicId, score, status.name);
   }
 
-  DateTime _calculateNextReview(int score) {
+  /// 递进式间隔重复（遗忘曲线）：
+  /// - 高分（≥85）沿 3→7→14→30 阶梯前进，掌握越牢复习越稀疏；
+  /// - 中分（60–84）固定 3 天常规复习；
+  /// - 低分（<60）重置为 1 天，明日再练。
+  /// 返回下次复习时间与本次采用的间隔天数（写入 [TopicProgress.reviewIntervalDays]）。
+  static const _reviewLadder = [3, 7, 14, 30];
+
+  ({DateTime nextReviewAt, int intervalDays}) _calculateNextReview(
+    int score,
+    int currentIntervalDays,
+  ) {
     final now = DateTime.now();
-    // Simple spaced repetition: higher score = longer interval
-    if (score >= 85) return now.add(const Duration(days: 7));
-    if (score >= 60) return now.add(const Duration(days: 3));
-    return now.add(const Duration(days: 1));
+    int interval;
+    if (score >= 85) {
+      final nextIdx = _reviewLadder.indexWhere((d) => d > currentIntervalDays);
+      interval = nextIdx < 0 ? _reviewLadder.last : _reviewLadder[nextIdx];
+    } else if (score >= 60) {
+      interval = 3;
+    } else {
+      interval = 1;
+    }
+    return (nextReviewAt: now.add(Duration(days: interval)), intervalDays: interval);
   }
 
   Future<void> addSession(PracticeSession session) async {
@@ -79,6 +100,8 @@ class ProgressProvider extends ChangeNotifier {
   Future<void> deleteAttempt(String attemptId) async {
     _attempts.removeWhere((attempt) => attempt.id == attemptId);
     await _storage.savePracticeAttempts(_attempts);
+    // 写删除墓碑，否则下次同步会从远端并集里复活已删除的练习记录。
+    await _storage.recordDeletion('practice_attempts', attemptId);
     notifyListeners();
   }
 
@@ -104,8 +127,9 @@ class ProgressProvider extends ChangeNotifier {
   }
 
   Future<void> updateLocalProfile(LocalProfile profile) async {
-    _localProfile = profile;
-    await _storage.saveLocalProfile(profile);
+    // 盖上修改时间，供同步按 last-write-wins 跨设备收敛。
+    _localProfile = profile.copyWith(updatedAt: DateTime.now());
+    await _storage.saveLocalProfile(_localProfile);
     notifyListeners();
   }
 

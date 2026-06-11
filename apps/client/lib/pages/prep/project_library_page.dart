@@ -43,8 +43,14 @@ class _ProjectLibraryPageState extends State<ProjectLibraryPage> {
   }
 
   Future<void> _deleteProject(int index) async {
+    final removed = _projects[index];
     setState(() => _projects.removeAt(index));
     await _saveProjects();
+    // 写删除墓碑，否则开启同步后已删除的项目会从远端并集复活。
+    final id = removed['id']?.toString();
+    if (id != null && id.isNotEmpty) {
+      await _storage.recordDeletion('project_library', id);
+    }
   }
 
   @override

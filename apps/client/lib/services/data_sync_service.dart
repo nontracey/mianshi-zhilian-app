@@ -71,6 +71,8 @@ class DataSyncService {
 
     _running = true;
     try {
+      // 记录导出前的 dirty 时间戳，用于检测上传/下载窗口期是否有新本地改动。
+      final dirtyAtBefore = await _storage.getSyncDirtyAt();
       final localPackage = await _storage.exportSyncPackage(settings);
       final remotePackage = await channel.download();
       final mergedPackage = _storage.sanitizeSyncPackage(
@@ -83,12 +85,23 @@ class DataSyncService {
         localPackage,
         mergedPackage,
       );
+      // 上传期间（最长 120s）用户可能新增了练习记录。导入前把合并包与「当前
+      // 最新本地状态」再合并一次（本地优先），避免窗口期新数据被旧快照覆盖丢失。
+      final latestLocalPackage = await _storage.exportSyncPackage(settings);
+      final importPackage = _storage.sanitizeSyncPackage(
+        _mergePackages(latestLocalPackage, mergedPackage),
+        settings,
+      );
       await _storage.importSyncPackage(
-        mergedPackage,
+        importPackage,
         syncSettings: settings,
         preserveLocalSensitiveData: true,
       );
-      await _storage.clearSyncDirty();
+      // 仅当窗口期没有新的本地改动时才清 dirty；否则保留，下次同步上传新数据。
+      final dirtyAtAfter = await _storage.getSyncDirtyAt();
+      if (dirtyAtAfter == dirtyAtBefore) {
+        await _storage.clearSyncDirty();
+      }
       await _storage.setLastSyncTime(DateTime.now());
       await _storage.saveSyncSettings(
         settings.copyWith(
@@ -127,8 +140,15 @@ class DataSyncService {
     try {
       final remotePackage = await channel.download();
       if (remotePackage != null) {
+        // 拉取也必须走合并而非直接覆盖：否则定时 pull 会用远端整盘覆盖本地，
+        // 把拉取等待期间用户新增的练习删掉，并反向冲掉本设备偏好（违反 local-first）。
+        final localPackage = await _storage.exportSyncPackage(settings);
+        final importPackage = _storage.sanitizeSyncPackage(
+          _mergePackages(localPackage, remotePackage),
+          settings,
+        );
         await _storage.importSyncPackage(
-          _storage.sanitizeSyncPackage(remotePackage, settings),
+          importPackage,
           syncSettings: settings,
           preserveLocalSensitiveData: true,
         );
@@ -601,6 +621,17 @@ class DataSyncService {
     // 每个设备保持自己的偏好，不跨设备同步。
     final merged = <String, dynamic>{...remoteData, ...localData};
 
+    // prep_plan / local_profile 是应跨设备收敛的单例：按 updatedAt 取较新者，
+    // 否则 local-wins 会让一台设备的修改永远传不到另一台。
+    for (final key in ['prep_plan', 'local_profile']) {
+      final picked = _pickByUpdatedAt(remoteData[key], localData[key]);
+      if (picked != null) {
+        merged[key] = picked;
+      } else {
+        merged.remove(key);
+      }
+    }
+
     // 合并删除墓碑：取两侧各 id 的较晚时间戳，并 GC 60 天以上的旧墓碑。
     final mergedDeletions = _mergeDeletions(
       remoteData['deletions'],
@@ -615,6 +646,7 @@ class DataSyncService {
     merged['progress_map'] = mergeProgressMaps(
       remoteData['progress_map'],
       localData['progress_map'],
+      mergedDeletions,
     );
     for (final key in [
       'practice_attempts',
@@ -644,46 +676,82 @@ class DataSyncService {
     };
   }
 
+  /// 单例对象按 `updatedAt` 取较新者；任一侧缺失时返回另一侧；时间戳缺失或
+  /// 并列时本地优先。
+  dynamic _pickByUpdatedAt(dynamic remote, dynamic local) {
+    if (remote == null) return local;
+    if (local == null) return remote;
+    final remoteTs =
+        remote is Map ? DateTime.tryParse('${remote['updatedAt'] ?? ''}') : null;
+    final localTs =
+        local is Map ? DateTime.tryParse('${local['updatedAt'] ?? ''}') : null;
+    if (remoteTs == null) return local;
+    if (localTs == null) return remote;
+    return !localTs.isBefore(remoteTs) ? local : remote;
+  }
+
   /// 合并两侧 progress_map：按 `lastPracticeAt` 做 last-write-wins（取最近一次
   /// 练习的版本），与其它集合的 LWW 口径一致——诚实反映"最近一次练习"，而非
   /// 保留历史最高分。`practiceCount` 取两侧较大值（单调计数不回退）；时间戳缺失
   /// 或并列时遵循本地优先。
+  ///
+  /// [deletions] 为已合并的墓碑表。`progress_map:<topicId>` 墓碑表示该知识点进度
+  /// 被主动清空（如「清空练习数据」）；若该 topic 的 `lastPracticeAt <= deletedAt`
+  /// （或缺失）则剔除，避免清空后从远端并集复活。删除后重新练习（更晚的
+  /// lastPracticeAt）会正常保留。
   @visibleForTesting
-  static Map<String, dynamic> mergeProgressMaps(dynamic remote, dynamic local) {
+  static Map<String, dynamic> mergeProgressMaps(
+    dynamic remote,
+    dynamic local, [
+    Map<String, String> deletions = const {},
+  ]) {
     final result = <String, dynamic>{};
     if (remote is Map) {
       result.addAll(remote.map((k, v) => MapEntry(k.toString(), v)));
     }
-    if (local is! Map) return result;
+    if (local is Map) {
+      for (final entry in local.entries) {
+        final topicId = entry.key.toString();
+        final localProgress = entry.value;
+        final remoteProgress = result[topicId];
+        if (localProgress is! Map || remoteProgress is! Map) {
+          // 任一侧缺失或非 Map：本地优先。
+          result[topicId] = localProgress;
+          continue;
+        }
 
-    for (final entry in local.entries) {
-      final topicId = entry.key.toString();
-      final localProgress = entry.value;
-      final remoteProgress = result[topicId];
-      if (localProgress is! Map || remoteProgress is! Map) {
-        // 任一侧缺失或非 Map：本地优先。
-        result[topicId] = localProgress;
-        continue;
+        final localTs =
+            DateTime.tryParse('${localProgress['lastPracticeAt'] ?? ''}');
+        final remoteTs =
+            DateTime.tryParse('${remoteProgress['lastPracticeAt'] ?? ''}');
+        final Map winner;
+        if (remoteTs == null) {
+          winner = localProgress; // 远端无时间戳 → 本地胜
+        } else if (localTs == null) {
+          winner = remoteProgress; // 本地无时间戳但远端有 → 远端胜
+        } else {
+          // 相同时间本地优先（!isBefore 即 local >= remote）。
+          winner = !localTs.isBefore(remoteTs) ? localProgress : remoteProgress;
+        }
+
+        final maxPractice = [
+          (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
+          (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
+        ].reduce((a, b) => a > b ? a : b);
+
+        result[topicId] = {...winner, 'practiceCount': maxPractice};
       }
+    }
 
-      final localTs = DateTime.tryParse('${localProgress['lastPracticeAt'] ?? ''}');
-      final remoteTs = DateTime.tryParse('${remoteProgress['lastPracticeAt'] ?? ''}');
-      final Map winner;
-      if (remoteTs == null) {
-        winner = localProgress; // 远端无时间戳 → 本地胜
-      } else if (localTs == null) {
-        winner = remoteProgress; // 本地无时间戳但远端有 → 远端胜
-      } else {
-        // 相同时间本地优先（!isBefore 即 local >= remote）。
-        winner = !localTs.isBefore(remoteTs) ? localProgress : remoteProgress;
-      }
-
-      final maxPractice = [
-        (remoteProgress['practiceCount'] as num?)?.toInt() ?? 0,
-        (localProgress['practiceCount'] as num?)?.toInt() ?? 0,
-      ].reduce((a, b) => a > b ? a : b);
-
-      result[topicId] = {...winner, 'practiceCount': maxPractice};
+    if (deletions.isNotEmpty) {
+      result.removeWhere((topicId, progress) {
+        final deletedAt = deletions['progress_map:$topicId'];
+        if (deletedAt == null) return false;
+        if (progress is! Map) return true;
+        final ts = progress['lastPracticeAt'] as String?;
+        if (ts == null) return true;
+        return deletedAt.compareTo(ts) >= 0;
+      });
     }
     return result;
   }

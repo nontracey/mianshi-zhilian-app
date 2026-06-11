@@ -5,6 +5,55 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  group('递进复习间隔（P1-7）', () {
+    test('连续高分沿 3→7→14→30 阶梯递进', () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = ProgressProvider(StorageService());
+      await provider.loadProgress();
+
+      final intervals = <int>[];
+      for (var i = 0; i < 5; i++) {
+        await provider.updateProgress('java.a', 90, 'skilled');
+        intervals.add(provider.getProgress('java.a')!.reviewIntervalDays);
+      }
+      // 首次 3 天，之后 7、14、30，封顶 30。
+      expect(intervals, [3, 7, 14, 30, 30]);
+    });
+
+    test('中分固定 3 天，低分重置为 1 天', () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = ProgressProvider(StorageService());
+      await provider.loadProgress();
+
+      await provider.updateProgress('java.a', 90, 'skilled'); // 3
+      await provider.updateProgress('java.a', 90, 'skilled'); // 7
+      expect(provider.getProgress('java.a')!.reviewIntervalDays, 7);
+
+      await provider.updateProgress('java.a', 50, 'new'); // 低分重置
+      expect(provider.getProgress('java.a')!.reviewIntervalDays, 1);
+
+      await provider.updateProgress('java.a', 70, 'learning'); // 中分固定 3
+      expect(provider.getProgress('java.a')!.reviewIntervalDays, 3);
+
+      // 重新高分从阶梯起点之后前进（currentInterval=3 → 7）。
+      await provider.updateProgress('java.a', 90, 'skilled');
+      expect(provider.getProgress('java.a')!.reviewIntervalDays, 7);
+    });
+
+    test('nextReviewAt 与间隔天数一致', () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = ProgressProvider(StorageService());
+      await provider.loadProgress();
+
+      await provider.updateProgress('java.a', 90, 'skilled');
+      final p = provider.getProgress('java.a')!;
+      final days = p.nextReviewAt!.difference(DateTime.now()).inDays;
+      // 间隔 3 天，允许 1 天误差（跨午夜/执行耗时）。
+      expect(days, inInclusiveRange(2, 3));
+      expect(p.reviewIntervalDays, 3);
+    });
+  });
+
   test(
     'readiness remains zero before any scored progress or mock interview',
     () {
