@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/ai_config.dart';
@@ -35,6 +36,9 @@ class StorageService {
   static const _syncDirtyAtKey = '_syncDirtyAt';
   static const _deviceIdKey = '_syncDeviceId';
   static const _analyticsBufferKey = '_analyticsBuffer';
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   /// 完整导出（[exportAllData]）对敏感字段写入的占位符。导入时遇到此值
   /// 不覆盖本地真实凭据，避免备份恢复把 apiKey/token 损坏为字面量。
@@ -117,15 +121,108 @@ class StorageService {
   }
 
   Future<void> saveAiConfigs(List<AiConfig> configs) async {
-    await save('ai_configs', configs.map((c) => c.toJson()).toList());
+    final existingIds = _aiConfigIds(await load('ai_configs'));
+    final nextIds = configs.map((c) => c.id).toSet();
+    final payload = <Map<String, dynamic>>[];
+
+    for (final config in configs) {
+      final json = config.toJson();
+      if (!kIsWeb && config.apiKey.isNotEmpty) {
+        final wroteSecurely = await _writeAiConfigApiKey(
+          config.id,
+          config.apiKey,
+        );
+        if (wroteSecurely) json['apiKey'] = '';
+      }
+      payload.add(json);
+    }
+
+    if (!kIsWeb) {
+      for (final removedId in existingIds.difference(nextIds)) {
+        await _deleteAiConfigApiKey(removedId);
+      }
+    }
+
+    await save('ai_configs', payload);
   }
 
   Future<List<AiConfig>> loadAiConfigs() async {
     final data = await load('ai_configs');
     if (data == null) return [];
-    return (data as List)
+    final configs = (data as List)
         .map((e) => AiConfig.fromJson(e as Map<String, dynamic>))
         .toList();
+    if (kIsWeb) return configs;
+
+    var shouldSanitizePrefs = false;
+    final hydrated = <AiConfig>[];
+    for (final config in configs) {
+      final secureApiKey = await _readAiConfigApiKey(config.id);
+      if (secureApiKey != null && secureApiKey.isNotEmpty) {
+        hydrated.add(config.copyWith(apiKey: secureApiKey));
+        if (config.apiKey.isNotEmpty) shouldSanitizePrefs = true;
+        continue;
+      }
+
+      if (config.apiKey.isNotEmpty) {
+        final migrated = await _writeAiConfigApiKey(config.id, config.apiKey);
+        if (migrated) shouldSanitizePrefs = true;
+      }
+      hydrated.add(config);
+    }
+
+    if (shouldSanitizePrefs) {
+      await _saveAiConfigMetadataOnly(hydrated);
+    }
+    return hydrated;
+  }
+
+  Set<String> _aiConfigIds(dynamic value) {
+    if (value is! List) return {};
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map((item) => item['id'] as String?)
+        .whereType<String>()
+        .toSet();
+  }
+
+  String _aiConfigApiKeySecureKey(String id) => 'ai_config_api_key_$id';
+
+  Future<bool> _writeAiConfigApiKey(String id, String apiKey) async {
+    try {
+      await _secureStorage.write(
+        key: _aiConfigApiKeySecureKey(id),
+        value: apiKey,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> _readAiConfigApiKey(String id) async {
+    try {
+      return await _secureStorage.read(key: _aiConfigApiKeySecureKey(id));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteAiConfigApiKey(String id) async {
+    try {
+      await _secureStorage.delete(key: _aiConfigApiKeySecureKey(id));
+    } catch (_) {}
+  }
+
+  Future<void> _saveAiConfigMetadataOnly(List<AiConfig> configs) async {
+    await save(
+      'ai_configs',
+      configs.map((config) {
+        final json = config.toJson();
+        json['apiKey'] = '';
+        return json;
+      }).toList(),
+    );
   }
 
   Future<void> saveProgressMap(Map<String, TopicProgress> map) async {

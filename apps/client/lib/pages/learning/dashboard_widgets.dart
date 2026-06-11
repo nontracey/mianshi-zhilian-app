@@ -10,39 +10,49 @@ import 'package:mianshi_zhilian/utils/mastery_utils.dart';
 // ── 下一步最佳行动组件 ──
 
 class NextBestAction extends StatelessWidget {
-  const NextBestAction({super.key, required this.weakTopics, required this.onTopicTap});
+  const NextBestAction({
+    super.key,
+    required this.reviewTopics,
+    required this.weakTopics,
+    required this.newTopics,
+    required this.onTopicTap,
+    this.onReview,
+  });
 
+  final List<Topic> reviewTopics;
   final List<Topic> weakTopics;
+  final List<Topic> newTopics;
   final ValueChanged<String> onTopicTap;
+  final VoidCallback? onReview;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    if (weakTopics.isEmpty) {
+    final action = _selectAction(l10n);
+    if (action == null) {
       return EmptyState(message: l10n.get('temporary_no_recommend_action'));
     }
 
-    final nextTopic = weakTopics.first;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.lightbulb_outline, size: 16, color: AppColors.accent),
+            Icon(action.icon, size: 16, color: action.color),
             const SizedBox(width: 8),
             Text(
-              l10n.get('recommend_task'),
+              action.heading,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
-                color: AppColors.accent,
+                color: action.color,
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         InkWell(
-          onTap: () => onTopicTap(nextTopic.id),
+          onTap: action.onPressed,
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -51,15 +61,13 @@ class NextBestAction extends StatelessWidget {
                 context,
               ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: action.color.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  nextTopic.title,
+                  action.topic.title,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -67,7 +75,7 @@ class NextBestAction extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  nextTopic.domain,
+                  action.topic.domain,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -78,25 +86,24 @@ class NextBestAction extends StatelessWidget {
                   children: [
                     ActionTag(
                       icon: Icons.access_time,
-                      text: l10n.get('pre_plan_use_time_25_min'),
+                      text: l10n.getp('minutes_min_2', {
+                        'minutes': action.topic.estimatedMinutes,
+                      }),
                     ),
                     const SizedBox(width: 12),
-                    ActionTag(
-                      icon: Icons.quiz_outlined,
-                      text: l10n.get('exam_point_6'),
-                    ),
+                    ActionTag(icon: action.tagIcon, text: action.tagText),
                   ],
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () => onTopicTap(nextTopic.id),
+                    onPressed: action.onPressed,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
+                      backgroundColor: action.color,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(l10n.get('start_study')),
+                    child: Text(action.buttonText),
                   ),
                 ),
               ],
@@ -106,6 +113,68 @@ class NextBestAction extends StatelessWidget {
       ],
     );
   }
+
+  _NextAction? _selectAction(LocalizationProvider l10n) {
+    if (reviewTopics.isNotEmpty) {
+      return _NextAction(
+        topic: reviewTopics.first,
+        heading: l10n.get('recommend_task'),
+        buttonText: l10n.get('start_review'),
+        tagText: l10n.get('pending_review'),
+        icon: Icons.rate_review_outlined,
+        tagIcon: Icons.event_available_outlined,
+        color: AppColors.warning,
+        onPressed: onReview ?? () => onTopicTap(reviewTopics.first.id),
+      );
+    }
+    if (weakTopics.isNotEmpty) {
+      return _NextAction(
+        topic: weakTopics.first,
+        heading: l10n.get('recommend_task'),
+        buttonText: l10n.get('start_study'),
+        tagText: l10n.get('demand_review'),
+        icon: Icons.lightbulb_outline,
+        tagIcon: Icons.report_problem_outlined,
+        color: AppColors.accent,
+        onPressed: () => onTopicTap(weakTopics.first.id),
+      );
+    }
+    if (newTopics.isNotEmpty) {
+      return _NextAction(
+        topic: newTopics.first,
+        heading: l10n.get('recommend_task'),
+        buttonText: l10n.get('start_study'),
+        tagText: l10n.get('daily_new_learn'),
+        icon: Icons.auto_stories_outlined,
+        tagIcon: Icons.fiber_new_outlined,
+        color: AppColors.accent,
+        onPressed: () => onTopicTap(newTopics.first.id),
+      );
+    }
+    return null;
+  }
+}
+
+class _NextAction {
+  const _NextAction({
+    required this.topic,
+    required this.heading,
+    required this.buttonText,
+    required this.tagText,
+    required this.icon,
+    required this.tagIcon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final Topic topic;
+  final String heading;
+  final String buttonText;
+  final String tagText;
+  final IconData icon;
+  final IconData tagIcon;
+  final Color color;
+  final VoidCallback onPressed;
 }
 
 class ActionTag extends StatelessWidget {
@@ -1389,21 +1458,41 @@ class PhaseCard extends StatelessWidget {
             children: [
               Icon(statusIcon, size: 16, color: statusColor),
               const SizedBox(width: 6),
-              Text(statusText,
-                  style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: statusColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               if (isCurrent) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(l10n.get('current_phase'), style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                  child: Text(
+                    l10n.get('current_phase'),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                 ),
               ],
               const Spacer(),
-              Text('$masteredTopics/$totalTopics', style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '$masteredTopics/$totalTopics',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -1414,31 +1503,53 @@ class PhaseCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: fraction,
               minHeight: 6,
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
             ),
           ),
-          if (topicIds != null && topicTitles != null && topicIds!.isNotEmpty) ...[
+          if (topicIds != null &&
+              topicTitles != null &&
+              topicIds!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
               spacing: 4,
               runSpacing: 2,
-              children: topicIds!.take(6).map((id) => InkWell(
-                onTap: onTopicTap != null ? () => onTopicTap!(id) : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    (topicTitles![id]?.isNotEmpty == true) ? topicTitles![id]! : l10n.get('knowledge_point'),
-                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
-                  ),
-                ),
-              )).toList(),
+              children: topicIds!
+                  .take(6)
+                  .map(
+                    (id) => InkWell(
+                      onTap: onTopicTap != null ? () => onTopicTap!(id) : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          (topicTitles![id]?.isNotEmpty == true)
+                              ? topicTitles![id]!
+                              : l10n.get('knowledge_point'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
             if (topicIds!.length > 6)
-              Text(l10n.getp('more_count', {'count': topicIds!.length - 6}), style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+              Text(
+                l10n.getp('more_count', {'count': topicIds!.length - 6}),
+                style: TextStyle(fontSize: 10, color: AppColors.textTertiary),
+              ),
           ],
           if (onPractice != null) ...[
             const SizedBox(height: 8),

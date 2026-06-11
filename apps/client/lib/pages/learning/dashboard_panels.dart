@@ -371,7 +371,9 @@ class LeftPanel extends StatelessWidget {
     }
 
     // 非路线模式下，未开始学习时显示引导
-    if (!isRouteMode && filteredDueTopics.isEmpty && filteredWeakTopics.isEmpty) {
+    if (!isRouteMode &&
+        filteredDueTopics.isEmpty &&
+        filteredWeakTopics.isEmpty) {
       return _buildNewUserGuidance(context, l10n, isDark);
     }
 
@@ -405,11 +407,11 @@ class LeftPanel extends StatelessWidget {
                     onTap: () => onTopicTap(topic.id),
                   );
                 }),
-                if (filteredDueTopics.length > 5)
-                  TextButton(
-                    onPressed: onReview,
-                    child: Text(l10n.get('check_view_all_review')),
-                  ),
+              if (filteredDueTopics.length > 5)
+                TextButton(
+                  onPressed: onReview,
+                  child: Text(l10n.get('check_view_all_review')),
+                ),
             ],
           ),
         ),
@@ -439,7 +441,11 @@ class LeftPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildStartGuidance(BuildContext context, LocalizationProvider l10n, bool isDark) {
+  Widget _buildStartGuidance(
+    BuildContext context,
+    LocalizationProvider l10n,
+    bool isDark,
+  ) {
     return PanelCard(
       title: l10n.get('route_start_guidance'),
       icon: Icons.rocket_launch_outlined,
@@ -488,7 +494,11 @@ class LeftPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildNewUserGuidance(BuildContext context, LocalizationProvider l10n, bool isDark) {
+  Widget _buildNewUserGuidance(
+    BuildContext context,
+    LocalizationProvider l10n,
+    bool isDark,
+  ) {
     return PanelCard(
       title: l10n.get('start_learning_journey'),
       icon: Icons.auto_stories_outlined,
@@ -595,11 +605,11 @@ class CenterPanelState extends State<CenterPanel> {
     // 路线模式 + 有路线领域 → 按路线顺序过滤
     if (scope.isRouteMode && scope.scopeDomainIds.isNotEmpty) {
       final routeDomainIds = scope.scopeDomainIds;
-      domains = domains
-          .where((d) => routeDomainIds.contains(d.id))
-          .toList();
+      domains = domains.where((d) => routeDomainIds.contains(d.id)).toList();
       domains.sort(
-        (a, b) => routeDomainIds.indexOf(a.id).compareTo(routeDomainIds.indexOf(b.id)),
+        (a, b) => routeDomainIds
+            .indexOf(a.id)
+            .compareTo(routeDomainIds.indexOf(b.id)),
       );
     } else if (scope.isSingleDomain && scope.scopeDomainIds.isNotEmpty) {
       // 单领域模式 → 只显示该领域
@@ -611,7 +621,9 @@ class CenterPanelState extends State<CenterPanel> {
   }
 
   List<Domain> _allEnabledDomains() {
-    return widget.allDomains.where((d) => !_disabledIds.contains(d.id)).toList();
+    return widget.allDomains
+        .where((d) => !_disabledIds.contains(d.id))
+        .toList();
   }
 
   @override
@@ -624,7 +636,10 @@ class CenterPanelState extends State<CenterPanel> {
 
     // 路线模式有阶段时，确保路线所涉及的领域 topics 已加载（避免 PhaseCard 显示"知识点"占位）
     // 不仅检查 domain 的 topic 计数，还检查阶段引用的具体 topic ID 是否已加载
-    if (scope.isRouteMode && route != null && route.phases != null && route.phases!.isNotEmpty) {
+    if (scope.isRouteMode &&
+        route != null &&
+        route.phases != null &&
+        route.phases!.isNotEmpty) {
       final allTopics = widget.contentProvider.topics;
       final routeDomainIds = route.domainIds;
       final missingDomainIds = <String>{};
@@ -687,13 +702,19 @@ class CenterPanelState extends State<CenterPanel> {
                     isSelected: domain.id == widget.currentDomainId,
                     onTap: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                     },
                     onViewCatalog: () {
                       widget.onDomainChanged(domain.id);
-                      if (widget.contentProvider.getLoadedTopicCount(domain.id) == 0) {
+                      if (widget.contentProvider.getLoadedTopicCount(
+                            domain.id,
+                          ) ==
+                          0) {
                         widget.contentProvider.loadDomainTopics(domain.id);
                       }
                       widget.onViewDomainCatalog(domain.id);
@@ -704,7 +725,9 @@ class CenterPanelState extends State<CenterPanel> {
           ),
         ),
         // AI 路线生成/管理按钮（仅路线模式显示）
-        if (scope.isRouteMode && (widget.onGenerateAiRoute != null || widget.onRegenerateAiRoute != null))
+        if (scope.isRouteMode &&
+            (widget.onGenerateAiRoute != null ||
+                widget.onRegenerateAiRoute != null))
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -715,15 +738,20 @@ class CenterPanelState extends State<CenterPanel> {
                     child: Row(
                       children: [
                         SizedBox(
-                          width: 16, height: 16,
+                          width: 16,
+                          height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                         const SizedBox(width: 8),
-                        Text(l10n.get('generating_route'), style: const TextStyle(fontSize: 13)),
+                        Text(
+                          l10n.get('generating_route'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
                       ],
                     ),
                   )
-                else if (route?.source == 'ai' && widget.onRegenerateAiRoute != null) ...[
+                else if (route?.source == 'ai' &&
+                    widget.onRegenerateAiRoute != null) ...[
                   OutlinedButton.icon(
                     onPressed: _onGeneratePressed,
                     icon: const Icon(Icons.refresh, size: 16),
@@ -735,7 +763,9 @@ class CenterPanelState extends State<CenterPanel> {
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: Text(l10n.get('edit_route')),
                   ),
-                ] else if (widget.progressProvider.prepPlan.hasTarget && widget.onGenerateAiRoute != null) ...[                  FilledButton.tonalIcon(
+                ] else if (widget.progressProvider.prepPlan.hasTarget &&
+                    widget.onGenerateAiRoute != null) ...[
+                  FilledButton.tonalIcon(
                     onPressed: _onGeneratePressed,
                     icon: const Icon(Icons.auto_awesome, size: 16),
                     label: Text(l10n.get('generate_ai_route')),
@@ -761,10 +791,10 @@ class CenterPanelState extends State<CenterPanel> {
                     // 根据宽度决定每行几个卡片
                     final cardWidth = constraints.maxWidth > 900
                         ? (constraints.maxWidth - 36) /
-                               4 // 一行4个
+                              4 // 一行4个
                         : constraints.maxWidth > 600
                         ? (constraints.maxWidth - 24) /
-                               3 // 一行3个
+                              3 // 一行3个
                         : (constraints.maxWidth - 12) / 2; // 一行2个
 
                     return Wrap(
@@ -840,10 +870,10 @@ class CenterPanelState extends State<CenterPanel> {
                 fontWeight: FontWeight.w900,
                 color: topicIds.isNotEmpty
                     ? (totalMastered * 100 ~/ topicIds.length >= 85
-                        ? AppColors.success
-                        : totalMastered * 100 ~/ topicIds.length >= 50
-                            ? AppColors.warning
-                            : AppColors.textTertiary)
+                          ? AppColors.success
+                          : totalMastered * 100 ~/ topicIds.length >= 50
+                          ? AppColors.warning
+                          : AppColors.textTertiary)
                     : AppColors.textTertiary,
               ),
             ),
@@ -855,11 +885,13 @@ class CenterPanelState extends State<CenterPanel> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: topicIds.isNotEmpty ? totalMastered / topicIds.length : 0,
+                      value: topicIds.isNotEmpty
+                          ? totalMastered / topicIds.length
+                          : 0,
                       minHeight: 8,
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -905,8 +937,11 @@ class CenterPanelState extends State<CenterPanel> {
     final phases = route.phases ?? [];
     final byDomain = <String, List<RoutePhase>>{};
     for (final p in phases) {
-      final firstTopic = p.topicIds.isNotEmpty ? allTopics[p.topicIds.first] : null;
-      final did = p.domainId ??
+      final firstTopic = p.topicIds.isNotEmpty
+          ? allTopics[p.topicIds.first]
+          : null;
+      final did =
+          p.domainId ??
           (firstTopic?.domainId ?? route.domainIds.firstOrNull ?? '');
       byDomain.putIfAbsent(did, () => []).add(p);
     }
@@ -944,12 +979,10 @@ class CenterPanelState extends State<CenterPanel> {
               const SizedBox(width: 10),
               Text(
                 domainTitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(
-                        color: domainColor,
-                        fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: domainColor,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -969,30 +1002,36 @@ class CenterPanelState extends State<CenterPanel> {
           final allDone = mastered == pids.length && pids.isNotEmpty;
           final inProgress = practiced > 0 && !allDone;
           return PhaseCard(
-            name: p.focus.isNotEmpty ? p.focus : '$domainTitle ${l10n.get('phases_suffix')} ${e.value.indexOf(p) + 1}',
+            name: p.focus.isNotEmpty
+                ? p.focus
+                : '$domainTitle ${l10n.get('phases_suffix')} ${e.value.indexOf(p) + 1}',
             totalTopics: pids.length,
             masteredTopics: mastered,
             statusText: allDone
                 ? l10n.get('skilled_training')
-                : (inProgress ? l10n.get('progress_action_in') : l10n.get('un_start')),
+                : (inProgress
+                      ? l10n.get('progress_action_in')
+                      : l10n.get('un_start')),
             statusColor: allDone
                 ? AppColors.success
                 : (inProgress ? AppColors.warning : AppColors.textTertiary),
             statusIcon: allDone
                 ? Icons.check_circle
-                : (inProgress ? Icons.trending_up : Icons.radio_button_unchecked),
+                : (inProgress
+                      ? Icons.trending_up
+                      : Icons.radio_button_unchecked),
             isCurrent: inProgress,
             topicIds: pids,
             topicTitles: ptitles,
-            onTap: pids.isNotEmpty
-                ? () => widget.onTopicTap(pids.first)
-                : null,
+            onTap: pids.isNotEmpty ? () => widget.onTopicTap(pids.first) : null,
             onTopicTap: (id) {
               if (id != null) widget.onTopicTap(id);
             },
             onPractice: inProgress
                 ? () {
-                    final firstTopic = pids.isNotEmpty ? allTopics[pids.first] : null;
+                    final firstTopic = pids.isNotEmpty
+                        ? allTopics[pids.first]
+                        : null;
                     widget.onDomainChanged(
                       firstTopic?.domainId ?? route.domainIds.firstOrNull ?? '',
                     );
@@ -1006,7 +1045,10 @@ class CenterPanelState extends State<CenterPanel> {
   }
 
   Future<void> _showRouteSelector(BuildContext context) async {
-    ScopeSelectorDialog.show(context, onGenerateAiRoute: widget.onGenerateAiRoute);
+    ScopeSelectorDialog.show(
+      context,
+      onGenerateAiRoute: widget.onGenerateAiRoute,
+    );
   }
 
   void _showManageDomains(BuildContext context) {
@@ -1031,8 +1073,12 @@ class CenterPanelState extends State<CenterPanel> {
 
   Future<void> Function()? get _generateRouteAsync {
     // 优先用 regenerate，否则用 generate
-    if (widget.onRegenerateAiRoute != null) return () async => widget.onRegenerateAiRoute!.call();
-    if (widget.onGenerateAiRoute != null) return () async => widget.onGenerateAiRoute!.call();
+    if (widget.onRegenerateAiRoute != null) {
+      return () async => widget.onRegenerateAiRoute!.call();
+    }
+    if (widget.onGenerateAiRoute != null) {
+      return () async => widget.onGenerateAiRoute!.call();
+    }
     return null;
   }
 
@@ -1062,7 +1108,11 @@ class CenterPanelState extends State<CenterPanel> {
         existingRoute: route,
         existingRouteNames: allRouteNames,
         onSave: (updatedRoute) async {
-          await scope.upsertRoute(updatedRoute, activate: true, contentProvider: widget.contentProvider);
+          await scope.upsertRoute(
+            updatedRoute,
+            activate: true,
+            contentProvider: widget.contentProvider,
+          );
         },
       ),
     );
@@ -1078,9 +1128,12 @@ class RightPanel extends StatelessWidget {
     required this.domains,
     required this.masteryPercent,
     required this.readiness,
+    required this.reviewTopics,
     required this.weakTopics,
+    required this.newTopics,
     required this.recentAttempts,
     required this.onTopicTap,
+    this.onReview,
     required this.onDomainChanged,
     required this.progressProvider,
     required this.scopedTopics,
@@ -1091,9 +1144,12 @@ class RightPanel extends StatelessWidget {
   final List<Domain> domains;
   final int masteryPercent;
   final int readiness;
+  final List<Topic> reviewTopics;
   final List<Topic> weakTopics;
+  final List<Topic> newTopics;
   final List<PracticeAttempt> recentAttempts;
   final ValueChanged<String> onTopicTap;
+  final VoidCallback? onReview;
   final ValueChanged<String> onDomainChanged;
   final ProgressProvider progressProvider;
   final List<Topic> scopedTopics;
@@ -1126,8 +1182,12 @@ class RightPanel extends StatelessWidget {
           learnedCount++;
         }
       }
-      final avgScore = learnedCount == 0 ? 0 : (totalScore / learnedCount).round();
-      final name = isRouteMode ? (groupLabels[entry.key] ?? entry.key) : entry.key;
+      final avgScore = learnedCount == 0
+          ? 0
+          : (totalScore / learnedCount).round();
+      final name = isRouteMode
+          ? (groupLabels[entry.key] ?? entry.key)
+          : entry.key;
       return CategoryMastery(name: name, masteryPercent: avgScore);
     }).toList()..sort((a, b) => b.masteryPercent.compareTo(a.masteryPercent));
 
@@ -1187,12 +1247,14 @@ class RightPanel extends StatelessWidget {
           title: l10n.get('next_step_best_action'),
           icon: Icons.lightbulb_outline,
           child: NextBestAction(
+            reviewTopics: reviewTopics,
             weakTopics: weakTopics,
+            newTopics: newTopics,
             onTopicTap: onTopicTap,
+            onReview: onReview,
           ),
         ),
       ],
     );
   }
-
-  }
+}

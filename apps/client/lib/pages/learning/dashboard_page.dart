@@ -116,7 +116,11 @@ class DashboardPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_stories_outlined, size: 48, color: Colors.grey.shade400),
+              Icon(
+                Icons.auto_stories_outlined,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(height: 12),
               Text(
                 contentProvider.topicLoadFailures.isNotEmpty
@@ -127,7 +131,8 @@ class DashboardPage extends StatelessWidget {
               if (contentProvider.topicLoadFailures.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 FilledButton.tonalIcon(
-                  onPressed: () => contentProvider.loadDomainTopics(currentDomainId),
+                  onPressed: () =>
+                      contentProvider.loadDomainTopics(currentDomainId),
                   icon: const Icon(Icons.refresh, size: 18),
                   label: Text(l10n.get('retry')),
                 ),
@@ -139,7 +144,10 @@ class DashboardPage extends StatelessWidget {
     }
 
     final domainProgress = isRouteFocused
-        ? (masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider), topicCount: scopedTopics.length)
+        ? (
+            masteryPercent: _calcMasteryPercent(scopedTopics, progressProvider),
+            topicCount: scopedTopics.length,
+          )
         : progressProvider.getDomainProgress(
             currentDomainId,
             contentProvider.topics.values.toList(),
@@ -172,6 +180,11 @@ class DashboardPage extends StatelessWidget {
 
     final weakTopics = progressProvider.getWeakTopics(scopedTopics, limit: 5);
     final recentAttempts = progressProvider.recentAttempts.take(5).toList();
+    final todayPlan = progressProvider.getTodayPlan(
+      scopedTopics,
+      newCount: settingsProvider.settings.dailyNewCount,
+      reviewCount: settingsProvider.settings.dailyReviewCount,
+    );
     final dueTopics = progressProvider.getTodayReviewTopics(scopedTopics);
 
     return Padding(
@@ -182,124 +195,50 @@ class DashboardPage extends StatelessWidget {
           if (scope.routeStale)
             _buildRouteStaleBanner(context)
           else if (!scope.isRouteMode && plan.hasTarget)
-            _buildTargetBanner(
-              context,
-              plan,
-              progressProvider.getTodayPlan(
-                scopedTopics,
-                newCount: settingsProvider.settings.dailyNewCount,
-                reviewCount: settingsProvider.settings.dailyReviewCount,
-              ),
-            ),
+            _buildTargetBanner(context, plan, todayPlan),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 1200;
-          final isMedium =
-              constraints.maxWidth >= 800 && constraints.maxWidth < 1200;
+                final isWide = constraints.maxWidth >= 1200;
+                final isMedium =
+                    constraints.maxWidth >= 800 && constraints.maxWidth < 1200;
 
-          if (isWide) {
-            // 三栏布局
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 左侧栏：今日复习队列、薄弱知识点TOP5
-                Expanded(
-                  flex: 2,
-                    child: SingleChildScrollView(
-                       padding: const EdgeInsets.only(bottom: 16),
-                       child: LeftPanel(
-                         dueTopics: dueTopics,
-                         weakTopics: weakTopics,
-                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
-                         isRouteMode: scope.isRouteMode,
-                         routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
-                         onStartLearning: onNavigateToCatalog,
-                         onTopicTap: onTopicTap,
-                         onReview: onReview,
-                         progressProvider: progressProvider,
-                       ),
-                     ),
-                   ),
-                   const SizedBox(width: 16),
-                   // 中间栏：当前学习路线、领域知识卡片
-                  Expanded(
-                    flex: 3,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: CenterPanel(
-                        currentDomain: currentDomain,
-                        allDomains: domains,
-                        currentDomainId: currentDomainId,
-                        recommendedTopics: recommendedTopics,
-                        topicCount: topicCount,
-                        readiness: readiness,
-                        streakDays: progressProvider.streakDays,
-                        onDomainChanged: onDomainChanged,
-                        onTopicTap: onTopicTap,
-                        onViewDomainCatalog: onViewDomainCatalog,
-                        onPractice: onPractice,
-                        onReview: onReview,
-                        onMockInterview: onMockInterview,
-                        contentProvider: contentProvider,
-                        progressProvider: progressProvider,
-                        settingsProvider: settingsProvider,
-                        onGenerateAiRoute: onGenerateAiRoute,
-                        onRegenerateAiRoute: onRegenerateAiRoute,
+                if (isWide) {
+                  // 三栏布局
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 左侧栏：今日复习队列、薄弱知识点TOP5
+                      Expanded(
+                        flex: 2,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: LeftPanel(
+                            dueTopics: dueTopics,
+                            weakTopics: weakTopics,
+                            routeTopicIds: scope.isRouteMode
+                                ? scope.scopeTopicIds
+                                : null,
+                            isRouteMode: scope.isRouteMode,
+                            routeFirstTopicId:
+                                scope.isRouteMode &&
+                                    scope.scopeTopicIds.isNotEmpty
+                                ? scope.scopeTopicIds.first
+                                : null,
+                            onStartLearning: onNavigateToCatalog,
+                            onTopicTap: onTopicTap,
+                            onReview: onReview,
+                            progressProvider: progressProvider,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // 右侧栏：掌握度概览、下一步最佳行动、最近AI反馈
-                  Expanded(
-                    flex: 2,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: RightPanel(
-                         currentDomainId: currentDomainId,
-                         domains: domains,
-                         masteryPercent: masteryPercent,
-                         readiness: readiness,
-                         weakTopics: weakTopics,
-                         recentAttempts: recentAttempts,
-                         onTopicTap: onTopicTap,
-                         onDomainChanged: onDomainChanged,
-                         progressProvider: progressProvider,
-                         scopedTopics: scopedTopics,
-                         isRouteMode: scope.isRouteMode,
-                       ),
-                    ),
-                  ),
-              ],
-            );
-          } else if (isMedium) {
-            // 两栏布局
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: LeftPanel(
-                         dueTopics: dueTopics,
-                         weakTopics: weakTopics,
-                         routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
-                         isRouteMode: scope.isRouteMode,
-                         routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
-                         onStartLearning: onNavigateToCatalog,
-                         onTopicTap: onTopicTap,
-                         onReview: onReview,
-                         progressProvider: progressProvider,
-                       ),
-                     ),
-                   ),
-                   const SizedBox(width: 16),
-                   Expanded(
-                     child: SingleChildScrollView(
-                       padding: const EdgeInsets.only(bottom: 16),
-                       child: Column(
-                        children: [
-                          CenterPanel(
+                      const SizedBox(width: 16),
+                      // 中间栏：当前学习路线、领域知识卡片
+                      Expanded(
+                        flex: 3,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: CenterPanel(
                             currentDomain: currentDomain,
                             allDomains: domains,
                             currentDomainId: currentDomainId,
@@ -319,87 +258,180 @@ class DashboardPage extends StatelessWidget {
                             onGenerateAiRoute: onGenerateAiRoute,
                             onRegenerateAiRoute: onRegenerateAiRoute,
                           ),
-                          const SizedBox(height: 16),
-                          RightPanel(
-                             currentDomainId: currentDomainId,
-                             domains: domains,
-                             masteryPercent: masteryPercent,
-                             readiness: readiness,
-                             weakTopics: weakTopics,
-                             recentAttempts: recentAttempts,
-                             onTopicTap: onTopicTap,
-                             onDomainChanged: onDomainChanged,
-                             progressProvider: progressProvider,
-                             scopedTopics: scopedTopics,
-                             isRouteMode: scope.isRouteMode,
-                           ),
-                        ],
+                        ),
                       ),
+                      const SizedBox(width: 16),
+                      // 右侧栏：掌握度概览、下一步最佳行动、最近AI反馈
+                      Expanded(
+                        flex: 2,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: RightPanel(
+                            currentDomainId: currentDomainId,
+                            domains: domains,
+                            masteryPercent: masteryPercent,
+                            readiness: readiness,
+                            reviewTopics: todayPlan.reviewTopics,
+                            weakTopics: weakTopics,
+                            newTopics: todayPlan.newTopics,
+                            recentAttempts: recentAttempts,
+                            onTopicTap: onTopicTap,
+                            onReview: onReview,
+                            onDomainChanged: onDomainChanged,
+                            progressProvider: progressProvider,
+                            scopedTopics: scopedTopics,
+                            isRouteMode: scope.isRouteMode,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                } else if (isMedium) {
+                  // 两栏布局
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: LeftPanel(
+                            dueTopics: dueTopics,
+                            weakTopics: weakTopics,
+                            routeTopicIds: scope.isRouteMode
+                                ? scope.scopeTopicIds
+                                : null,
+                            isRouteMode: scope.isRouteMode,
+                            routeFirstTopicId:
+                                scope.isRouteMode &&
+                                    scope.scopeTopicIds.isNotEmpty
+                                ? scope.scopeTopicIds.first
+                                : null,
+                            onStartLearning: onNavigateToCatalog,
+                            onTopicTap: onTopicTap,
+                            onReview: onReview,
+                            progressProvider: progressProvider,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            children: [
+                              CenterPanel(
+                                currentDomain: currentDomain,
+                                allDomains: domains,
+                                currentDomainId: currentDomainId,
+                                recommendedTopics: recommendedTopics,
+                                topicCount: topicCount,
+                                readiness: readiness,
+                                streakDays: progressProvider.streakDays,
+                                onDomainChanged: onDomainChanged,
+                                onTopicTap: onTopicTap,
+                                onViewDomainCatalog: onViewDomainCatalog,
+                                onPractice: onPractice,
+                                onReview: onReview,
+                                onMockInterview: onMockInterview,
+                                contentProvider: contentProvider,
+                                progressProvider: progressProvider,
+                                settingsProvider: settingsProvider,
+                                onGenerateAiRoute: onGenerateAiRoute,
+                                onRegenerateAiRoute: onRegenerateAiRoute,
+                              ),
+                              const SizedBox(height: 16),
+                              RightPanel(
+                                currentDomainId: currentDomainId,
+                                domains: domains,
+                                masteryPercent: masteryPercent,
+                                readiness: readiness,
+                                reviewTopics: todayPlan.reviewTopics,
+                                weakTopics: weakTopics,
+                                newTopics: todayPlan.newTopics,
+                                recentAttempts: recentAttempts,
+                                onTopicTap: onTopicTap,
+                                onReview: onReview,
+                                onDomainChanged: onDomainChanged,
+                                progressProvider: progressProvider,
+                                scopedTopics: scopedTopics,
+                                isRouteMode: scope.isRouteMode,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  // 单栏布局（移动端）
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        LeftPanel(
+                          dueTopics: dueTopics,
+                          weakTopics: weakTopics,
+                          routeTopicIds: scope.isRouteMode
+                              ? scope.scopeTopicIds
+                              : null,
+                          isRouteMode: scope.isRouteMode,
+                          routeFirstTopicId:
+                              scope.isRouteMode &&
+                                  scope.scopeTopicIds.isNotEmpty
+                              ? scope.scopeTopicIds.first
+                              : null,
+                          onStartLearning: onNavigateToCatalog,
+                          onTopicTap: onTopicTap,
+                          onReview: onReview,
+                          progressProvider: progressProvider,
+                        ),
+                        const SizedBox(height: 16),
+                        CenterPanel(
+                          currentDomain: currentDomain,
+                          allDomains: domains,
+                          currentDomainId: currentDomainId,
+                          recommendedTopics: recommendedTopics,
+                          topicCount: topicCount,
+                          readiness: readiness,
+                          streakDays: progressProvider.streakDays,
+                          onDomainChanged: onDomainChanged,
+                          onTopicTap: onTopicTap,
+                          onViewDomainCatalog: onViewDomainCatalog,
+                          onPractice: onPractice,
+                          onReview: onReview,
+                          onMockInterview: onMockInterview,
+                          contentProvider: contentProvider,
+                          progressProvider: progressProvider,
+                          settingsProvider: settingsProvider,
+                          onGenerateAiRoute: onGenerateAiRoute,
+                          onRegenerateAiRoute: onRegenerateAiRoute,
+                        ),
+                        const SizedBox(height: 16),
+                        RightPanel(
+                          currentDomainId: currentDomainId,
+                          domains: domains,
+                          masteryPercent: masteryPercent,
+                          readiness: readiness,
+                          reviewTopics: todayPlan.reviewTopics,
+                          weakTopics: weakTopics,
+                          newTopics: todayPlan.newTopics,
+                          recentAttempts: recentAttempts,
+                          onTopicTap: onTopicTap,
+                          onReview: onReview,
+                          onDomainChanged: onDomainChanged,
+                          progressProvider: progressProvider,
+                          scopedTopics: scopedTopics,
+                          isRouteMode: scope.isRouteMode,
+                        ),
+                      ],
                     ),
-                  ),
-              ],
-            );
-          } else {
-            // 单栏布局（移动端）
-            return SingleChildScrollView(
-              child: Column(
-                children: [
-                  LeftPanel(
-                    dueTopics: dueTopics,
-                    weakTopics: weakTopics,
-                    routeTopicIds: scope.isRouteMode ? scope.scopeTopicIds : null,
-                    isRouteMode: scope.isRouteMode,
-                    routeFirstTopicId: scope.isRouteMode && scope.scopeTopicIds.isNotEmpty ? scope.scopeTopicIds.first : null,
-                         onStartLearning: onNavigateToCatalog,
-                    onTopicTap: onTopicTap,
-                    onReview: onReview,
-                    progressProvider: progressProvider,
-                  ),
-                  const SizedBox(height: 16),
-                  CenterPanel(
-                    currentDomain: currentDomain,
-                    allDomains: domains,
-                    currentDomainId: currentDomainId,
-                    recommendedTopics: recommendedTopics,
-                    topicCount: topicCount,
-                    readiness: readiness,
-                    streakDays: progressProvider.streakDays,
-                    onDomainChanged: onDomainChanged,
-                    onTopicTap: onTopicTap,
-                    onViewDomainCatalog: onViewDomainCatalog,
-                    onPractice: onPractice,
-                    onReview: onReview,
-                    onMockInterview: onMockInterview,
-                    contentProvider: contentProvider,
-                    progressProvider: progressProvider,
-                    settingsProvider: settingsProvider,
-                    onGenerateAiRoute: onGenerateAiRoute,
-                    onRegenerateAiRoute: onRegenerateAiRoute,
-                  ),
-                  const SizedBox(height: 16),
-                  RightPanel(
-                    currentDomainId: currentDomainId,
-                    domains: domains,
-                    masteryPercent: masteryPercent,
-                    readiness: readiness,
-                    weakTopics: weakTopics,
-                    recentAttempts: recentAttempts,
-                    onTopicTap: onTopicTap,
-                    onDomainChanged: onDomainChanged,
-                    progressProvider: progressProvider,
-                    scopedTopics: scopedTopics,
-                    isRouteMode: scope.isRouteMode,
-                  ),
-                ],
-              ),
-            );
-          }
-        },
+                  );
+                }
+              },
+            ),
+          ),
+        ],
       ),
-    ),
-  ],
-),
-);
+    );
   }
 
   Widget _buildRouteStaleBanner(BuildContext context) {
@@ -415,12 +447,19 @@ class DashboardPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_outlined, size: 18, color: AppColors.warning),
+          Icon(
+            Icons.warning_amber_outlined,
+            size: 18,
+            color: AppColors.warning,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               l10n.get('route_stale_hint'),
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white70 : AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -429,15 +468,21 @@ class DashboardPage extends StatelessWidget {
               context.read<LearningScopeProvider>().clearRouteStale();
               onRegenerateAiRoute?.call();
             },
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
-            child: Text(l10n.get('update_route'), style: TextStyle(color: AppColors.warning, fontSize: 13)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            child: Text(
+              l10n.get('update_route'),
+              style: TextStyle(color: AppColors.warning, fontSize: 13),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 16),
             color: AppColors.warning,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            onPressed: () => context.read<LearningScopeProvider>().clearRouteStale(),
+            onPressed: () =>
+                context.read<LearningScopeProvider>().clearRouteStale(),
           ),
         ],
       ),
@@ -461,101 +506,109 @@ class DashboardPage extends StatelessWidget {
     return GestureDetector(
       onTap: onPrepNavigation,
       child: Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.accent.withValues(alpha: 0.08),
-            isDark ? const Color(0xFF1A1D23) : const Color(0xFFF8F9FA),
-          ],
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.accent.withValues(alpha: 0.08),
+              isDark ? const Color(0xFF1A1D23) : const Color(0xFFF8F9FA),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.work_outline, color: AppColors.accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  plan.targetRole.isNotEmpty
-                      ? '${plan.targetRole}${plan.techStack.isNotEmpty ? ' · ${plan.techStack}' : ''}'
-                      : l10n.get('interview_target'),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  days != null
-                      ? (days > 0 ? l10n.getp('days_until_interview', {'days': days}) : l10n.get('interview_day_already_to'))
-                      : l10n.get('interview_target_set'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white54 : Colors.grey,
-                  ),
-                ),
-                if (hasTodayPlan) ...[
-                  const SizedBox(height: 4),
+        child: Row(
+          children: [
+            const Icon(Icons.work_outline, color: AppColors.accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    l10n.getp('today_plan_summary', {
-                      'new': todayPlan.newTopics.length,
-                      'review': todayPlan.reviewTopics.length,
-                    }),
+                    plan.targetRole.isNotEmpty
+                        ? '${plan.targetRole}${plan.techStack.isNotEmpty ? ' · ${plan.techStack}' : ''}'
+                        : l10n.get('interview_target'),
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    days != null
+                        ? (days > 0
+                              ? l10n.getp('days_until_interview', {
+                                  'days': days,
+                                })
+                              : l10n.get('interview_day_already_to'))
+                        : l10n.get('interview_target_set'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.grey,
+                    ),
+                  ),
+                  if (hasTodayPlan) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.getp('today_plan_summary', {
+                        'new': todayPlan.newTopics.length,
+                        'review': todayPlan.reviewTopics.length,
+                      }),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ),
-          if (days != null && days > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '$days',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                  color: AppColors.warning,
+            ),
+            if (days != null && days > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$days',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    color: AppColors.warning,
+                  ),
                 ),
               ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: isDark ? Colors.white54 : Colors.grey,
+              ),
+              onPressed: () {
+                final progress = context.read<ProgressProvider>();
+                showPlanEditDialog(context, progress, plan, l10n);
+              },
+              tooltip: l10n.get('edit'),
             ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: Icon(
-              Icons.edit_outlined,
-              size: 18,
-              color: isDark ? Colors.white54 : Colors.grey,
-            ),
-            onPressed: () {
-              final progress = context.read<ProgressProvider>();
-              showPlanEditDialog(context, progress, plan, l10n);
-            },
-            tooltip: l10n.get('edit'),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  static int _calcMasteryPercent(List<Topic> topics, ProgressProvider progress) {
+  static int _calcMasteryPercent(
+    List<Topic> topics,
+    ProgressProvider progress,
+  ) {
     if (topics.isEmpty) return 0;
     double totalScore = 0;
     int count = 0;

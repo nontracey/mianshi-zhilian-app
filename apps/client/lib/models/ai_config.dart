@@ -208,7 +208,7 @@ class AiConfig {
     name: json['name'] as String,
     providerType: json['providerType'] as String? ?? 'openai_compatible',
     baseUrl: json['baseUrl'] as String,
-    apiKey: json['apiKey'] as String,
+    apiKey: json['apiKey'] as String? ?? '',
     model: json['model'] as String,
     isDefault: json['isDefault'] as bool? ?? false,
     enabled: json['enabled'] as bool? ?? true,
