@@ -10,10 +10,7 @@ import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 class FollowUpTrainingPage extends StatefulWidget {
-  const FollowUpTrainingPage({
-    super.key,
-    required this.topicIds,
-  });
+  const FollowUpTrainingPage({super.key, required this.topicIds});
 
   final List<String> topicIds;
 
@@ -32,6 +29,7 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
   bool _showHint = false;
   int _hintLevel = 0; // 0: 未显示, 1: 方向提示, 2: 关键词, 3: 结构提示
   final List<Map<String, dynamic>> _answers = [];
+  final Map<String, int> _recallPromptSeeds = {};
   bool _isCompleted = false;
 
   @override
@@ -56,15 +54,24 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
     return topic.followUps[_currentFollowUpIndex];
   }
 
+  RecallPrompt? _getCurrentRecallPrompt() {
+    final topic = _getCurrentTopic();
+    if (topic == null) return null;
+    final seed = _recallPromptSeeds.putIfAbsent(topic.id, () {
+      return context
+          .read<ProgressProvider>()
+          .getAttemptsForTopic(topic.id)
+          .length;
+    });
+    return topic.recallPromptAt(seed);
+  }
+
   String _getCurrentQuestion() {
     final topic = _getCurrentTopic();
     if (topic == null) return '';
 
     if (_currentFollowUpIndex < 0) {
-      // 初始问题
-      return topic.recallPrompts.isNotEmpty
-          ? topic.recallPrompts.first.prompt
-          : topic.title;
+      return _getCurrentRecallPrompt()?.prompt ?? topic.title;
     }
 
     final followUp = _getCurrentFollowUp();
@@ -216,6 +223,9 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
       PracticeAttempt(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         topicId: topicId,
+        promptId: _currentFollowUpIndex < 0
+            ? _getCurrentRecallPrompt()?.id ?? ''
+            : '',
         mode: 'follow_up',
         question: question,
         answer: answer,
@@ -223,12 +233,13 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         score: score,
         level: result['level'] as String?,
         summary: result['summary'] as String?,
-        missedPoints: (result['missedPoints'] as List<dynamic>?)
+        missedPoints:
+            (result['missedPoints'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             [],
-        wrongPoints: ((result['wrongPoints'] ?? result['errorPoints'])
-                    as List<dynamic>?)
+        wrongPoints:
+            ((result['wrongPoints'] ?? result['errorPoints']) as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             [],
@@ -257,7 +268,10 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
         'isFollowUp': _currentFollowUpIndex >= 0,
         'followUpIndex': _currentFollowUpIndex,
       });
-      _evaluationResult = {'local': true, 'message': L10n.get('saved_as_local_practice', L10n.currentLanguage)};
+      _evaluationResult = {
+        'local': true,
+        'message': L10n.get('saved_as_local_practice', L10n.currentLanguage),
+      };
     });
   }
 

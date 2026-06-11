@@ -218,6 +218,16 @@ class Topic {
     if (recommendWeight >= 80) return 'high_frequency';
     return null;
   }
+
+  RecallPrompt? recallPromptAt(int seed, {String? mode}) {
+    if (recallPrompts.isEmpty) return null;
+    final preferred = mode == null
+        ? recallPrompts
+        : recallPrompts.where((prompt) => prompt.mode == mode).toList();
+    final source = preferred.isNotEmpty ? preferred : recallPrompts;
+    final index = seed.abs() % source.length;
+    return source[index];
+  }
 }
 
 class RecallPrompt {

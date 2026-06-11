@@ -40,6 +40,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
   bool _isEvaluating = false;
   bool _isVoiceListening = false;
   Map<String, dynamic>? _evaluationResult;
+  int? _recallPromptSeed;
 
   @override
   void initState() {
@@ -61,6 +62,14 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     super.dispose();
   }
 
+  RecallPrompt? _selectedRecallPrompt() {
+    _recallPromptSeed ??= context
+        .read<ProgressProvider>()
+        .getAttemptsForTopic(widget.topic.id)
+        .length;
+    return widget.topic.recallPromptAt(_recallPromptSeed!);
+  }
+
   @override
   Widget build(BuildContext context) {
     final topic = widget.topic;
@@ -71,13 +80,15 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTopBar(context, topic, isDesktop),
-        Builder(builder: (ctx) {
-          final scope = ctx.watch<LearningScopeProvider>();
-          if (scope.isRouteMode && scope.scopeTopicIds.isNotEmpty) {
-            return _buildRouteNav(ctx, scope.scopeTopicIds);
-          }
-          return const SizedBox.shrink();
-        }),
+        Builder(
+          builder: (ctx) {
+            final scope = ctx.watch<LearningScopeProvider>();
+            if (scope.isRouteMode && scope.scopeTopicIds.isNotEmpty) {
+              return _buildRouteNav(ctx, scope.scopeTopicIds);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
         Expanded(
           child: isDesktop
               ? _buildDesktopLayout(context, topic)
@@ -176,14 +187,22 @@ class _TopicDetailPageState extends State<TopicDetailPage>
     if (currentIdx < 0) return const SizedBox.shrink();
     final hasPrev = currentIdx > 0;
     final hasNext = currentIdx < ids.length - 1;
-    final prevTitle = hasPrev ? contentProvider.findTopic(ids[currentIdx - 1])?.title ?? '' : '';
-    final nextTitle = hasNext ? contentProvider.findTopic(ids[currentIdx + 1])?.title ?? '' : '';
+    final prevTitle = hasPrev
+        ? contentProvider.findTopic(ids[currentIdx - 1])?.title ?? ''
+        : '';
+    final nextTitle = hasNext
+        ? contentProvider.findTopic(ids[currentIdx + 1])?.title ?? ''
+        : '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.accent.withValues(alpha: 0.06) : AppColors.accent.withValues(alpha: 0.04),
-        border: Border(bottom: BorderSide(color: AppColors.accent.withValues(alpha: 0.12))),
+        color: isDark
+            ? AppColors.accent.withValues(alpha: 0.06)
+            : AppColors.accent.withValues(alpha: 0.04),
+        border: Border(
+          bottom: BorderSide(color: AppColors.accent.withValues(alpha: 0.12)),
+        ),
       ),
       child: Row(
         children: [
@@ -194,7 +213,11 @@ class _TopicDetailPageState extends State<TopicDetailPage>
               'current': '${currentIdx + 1}',
               'total': '${ids.length}',
             }),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accent,
+            ),
           ),
           const Spacer(),
           if (hasPrev)
@@ -383,11 +406,11 @@ class _TopicDetailPageState extends State<TopicDetailPage>
 
     try {
       final topic = widget.topic;
+      final recallPrompt = _selectedRecallPrompt();
+      final question = recallPrompt?.prompt ?? topic.title;
       final result = await aiProvider.evaluateAnswer(
         topicId: topic.id,
-        question: topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.prompt
-            : topic.title,
+        question: question,
         userAnswer: answer,
         rubric: topic.rubric,
       );
@@ -403,13 +426,9 @@ class _TopicDetailPageState extends State<TopicDetailPage>
           PracticeAttempt(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
             topicId: topic.id,
-            promptId: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.id
-                : '',
+            promptId: recallPrompt?.id ?? '',
             mode: 'topicDetailRecall',
-            question: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : topic.title,
+            question: question,
             answer: answer,
             createdAt: DateTime.now(),
             score: result['score'] as int?,
@@ -507,7 +526,11 @@ class _RouteNavButton extends StatelessWidget {
               Flexible(
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: accentColor),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: accentColor,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),

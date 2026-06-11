@@ -7,6 +7,7 @@ import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/models/ai_config.dart';
+import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/widgets/voice_input_button.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
@@ -38,6 +39,7 @@ class _RecallPageState extends State<RecallPage> {
   bool _voiceTranscribed = false;
   bool _isVoiceListening = false;
   final _voiceTranscriptController = TextEditingController();
+  final Map<String, int> _recallPromptSeeds = {};
 
   // 流式输出相关
   String _streamingContent = '';
@@ -77,9 +79,10 @@ class _RecallPageState extends State<RecallPage> {
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isDesktop = screenWidth >= 900;
+    final recallPrompt = _selectedRecallPrompt(topic);
     final content = isDesktop
-        ? _buildDesktopLayout(context, topic, aiProvider)
-        : _buildMobileLayout(context, topic, aiProvider);
+        ? _buildDesktopLayout(context, topic, recallPrompt, aiProvider)
+        : _buildMobileLayout(context, topic, recallPrompt, aiProvider);
 
     return Material(
       color: Theme.of(context).colorScheme.surface,
@@ -90,7 +93,8 @@ class _RecallPageState extends State<RecallPage> {
   // ── 桌面端分栏布局 ──
   Widget _buildDesktopLayout(
     BuildContext context,
-    dynamic topic,
+    Topic topic,
+    RecallPrompt? recallPrompt,
     AiProvider aiProvider,
   ) {
     return Row(
@@ -102,7 +106,7 @@ class _RecallPageState extends State<RecallPage> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              QuestionPanel(topic: topic),
+              QuestionPanel(topic: topic, recallPrompt: recallPrompt),
               if (topic.rubric != null) ...[
                 const SizedBox(height: 16),
                 RubricPanel(rubric: topic.rubric!),
@@ -156,7 +160,8 @@ class _RecallPageState extends State<RecallPage> {
   // ── 移动端布局 ──
   Widget _buildMobileLayout(
     BuildContext context,
-    dynamic topic,
+    Topic topic,
+    RecallPrompt? recallPrompt,
     AiProvider aiProvider,
   ) {
     return Column(
@@ -171,15 +176,12 @@ class _RecallPageState extends State<RecallPage> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              QuestionPanel(topic: topic),
+              QuestionPanel(topic: topic, recallPrompt: recallPrompt),
               const SizedBox(height: 16),
               _buildInputSection(context, aiProvider),
               if (_evaluationResult != null) ...[
                 const SizedBox(height: 16),
-                EvaluationResultPanel(
-                  result: _evaluationResult!,
-                  topic: topic,
-                ),
+                EvaluationResultPanel(result: _evaluationResult!, topic: topic),
               ],
               const SizedBox(height: 80), // 底部留空给操作条
             ],
@@ -209,6 +211,17 @@ class _RecallPageState extends State<RecallPage> {
     return aiProvider.enabledConfigs
         .where((config) => config.id == selectedConfigId)
         .firstOrNull;
+  }
+
+  RecallPrompt? _selectedRecallPrompt(Topic topic) {
+    final seed = _recallPromptSeeds.putIfAbsent(topic.id, () {
+      return context
+          .read<ProgressProvider>()
+          .getAttemptsForTopic(topic.id)
+          .length;
+    });
+    final mode = _inputMode == 'code' ? 'code' : null;
+    return topic.recallPromptAt(seed, mode: mode);
   }
 
   // ── 输入区域（共享） ──
@@ -733,6 +746,8 @@ class _RecallPageState extends State<RecallPage> {
       final topicId = widget.topicIds[_currentIndex];
       final topic = contentProvider.findTopic(topicId);
       if (topic == null) return;
+      final recallPrompt = _selectedRecallPrompt(topic);
+      final question = recallPrompt?.prompt ?? topic.title;
       final enabledConfigs = aiProvider.enabledConfigs;
       final aiConfigId =
           _selectedAiConfigId ??
@@ -743,9 +758,7 @@ class _RecallPageState extends State<RecallPage> {
       final streamResult = aiProvider.evaluateAnswerStream(
         aiConfigId: aiConfigId,
         topicId: topicId,
-        question: topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.prompt
-            : topic.title,
+        question: question,
         userAnswer: answer,
         rubric: topic.rubric,
         imageBytes: _selectedImageBytes,
@@ -799,13 +812,9 @@ class _RecallPageState extends State<RecallPage> {
           PracticeAttempt(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
             topicId: topicId,
-            promptId: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.id
-                : '',
+            promptId: recallPrompt?.id ?? '',
             mode: _inputMode == 'code' ? 'code' : 'recall',
-            question: topic.recallPrompts.isNotEmpty
-                ? topic.recallPrompts.first.prompt
-                : topic.title,
+            question: question,
             answer: answer,
             createdAt: DateTime.now(),
             score: result['score'] as int?,
@@ -887,6 +896,8 @@ class _RecallPageState extends State<RecallPage> {
     final topicId = widget.topicIds[_currentIndex];
     final topic = contentProvider.findTopic(topicId);
     if (topic == null) return;
+    final recallPrompt = _selectedRecallPrompt(topic);
+    final question = recallPrompt?.prompt ?? topic.title;
     final enabledConfigs = aiProvider.enabledConfigs;
     final aiConfigId =
         _selectedAiConfigId ??
@@ -896,13 +907,9 @@ class _RecallPageState extends State<RecallPage> {
       PracticeAttempt(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         topicId: topicId,
-        promptId: topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.id
-            : '',
+        promptId: recallPrompt?.id ?? '',
         mode: _inputMode == 'code' ? 'code' : 'recall',
-        question: topic.recallPrompts.isNotEmpty
-            ? topic.recallPrompts.first.prompt
-            : topic.title,
+        question: question,
         answer: answer,
         createdAt: DateTime.now(),
         summary: error.toString(),
