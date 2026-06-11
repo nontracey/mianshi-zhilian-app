@@ -35,19 +35,28 @@ class ContentSourcePage extends StatelessWidget {
           onProdUrlChanged: settingsProvider.setCustomProdContentUrl,
           onApplyChanged: () async {
             final contentProvider = context.read<ContentProvider>();
-            await contentProvider.clearAllDomainCache();
-            await contentProvider.switchContentEnv(
-              settingsProvider.settings.contentBaseUrl,
-              currentDomainId: settingsProvider.settings.currentDomain,
-            );
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
+            final messenger = ScaffoldMessenger.of(context);
+            // 立即反馈：点击后马上提示，避免网络拉取期间"点了没反应"。
+            messenger.showSnackBar(
               SnackBar(
                 content: Text(
                   l10n.get(
                     'cache_already_clear_correct_at_restart_new_loading_current_domai',
                   ),
                 ),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            await contentProvider.clearAllDomainCache();
+            await contentProvider.switchContentEnv(
+              settingsProvider.settings.contentBaseUrl,
+              currentDomainId: settingsProvider.settings.currentDomain,
+            );
+            if (!context.mounted) return;
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(l10n.get('content_reload_done')),
+                duration: const Duration(seconds: 2),
               ),
             );
           },
@@ -72,8 +81,9 @@ class ProfileSubPage extends StatelessWidget {
   }
 }
 
-class ContentEnvPanel extends StatelessWidget {
+class ContentEnvPanel extends StatefulWidget {
   const ContentEnvPanel({
+    super.key,
     required this.settings,
     required this.userRole,
     required this.onEnvChanged,
@@ -89,28 +99,67 @@ class ContentEnvPanel extends StatelessWidget {
   final ValueChanged<String?> onTestUrlChanged;
   final ValueChanged<String?> onDraftUrlChanged;
   final ValueChanged<String?> onProdUrlChanged;
-  final VoidCallback onApplyChanged;
+  final Future<void> Function() onApplyChanged;
+
+  @override
+  State<ContentEnvPanel> createState() => _ContentEnvPanelState();
+}
+
+class _ContentEnvPanelState extends State<ContentEnvPanel> {
+  late final TextEditingController _testController;
+  late final TextEditingController _draftController;
+  late final TextEditingController _prodController;
+
+  @override
+  void initState() {
+    super.initState();
+    _testController = TextEditingController(
+      text: widget.settings.customTestContentUrl ?? '',
+    );
+    _draftController = TextEditingController(
+      text: widget.settings.customDraftContentUrl ?? '',
+    );
+    _prodController = TextEditingController(
+      text: widget.settings.customProdContentUrl ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(ContentEnvPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 仅当外部值与当前输入框内容不一致时才同步，避免每次输入都覆盖、光标跳动。
+    _syncController(_testController, widget.settings.customTestContentUrl);
+    _syncController(_draftController, widget.settings.customDraftContentUrl);
+    _syncController(_prodController, widget.settings.customProdContentUrl);
+  }
+
+  void _syncController(TextEditingController controller, String? value) {
+    final next = value ?? '';
+    if (controller.text != next) {
+      controller.text = next;
+    }
+  }
+
+  @override
+  void dispose() {
+    _testController.dispose();
+    _draftController.dispose();
+    _prodController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final testController = TextEditingController(
-      text: settings.customTestContentUrl ?? '',
-    );
-    final draftController = TextEditingController(
-      text: settings.customDraftContentUrl ?? '',
-    );
-    final prodController = TextEditingController(
-      text: settings.customProdContentUrl ?? '',
-    );
+    final settings = widget.settings;
+    final userRole = widget.userRole;
 
     return WorkPanel(
       title: l10n.get('knowledge_source_config'),
       icon: Icons.cloud_outlined,
-      trailing: FilledButton.tonalIcon(
-        onPressed: onApplyChanged,
-        icon: const Icon(Icons.refresh),
-        label: Text(l10n.get('application_and_restart_load')),
+      trailing: _ApplyReloadButton(
+        label: l10n.get('application_and_restart_load'),
+        onPressed: widget.onApplyChanged,
       ),
       children: [
         SegmentedButton<ContentEnv>(
@@ -133,7 +182,7 @@ class ContentEnvPanel extends StatelessWidget {
             ),
           ],
           selected: {settings.contentEnv},
-          onSelectionChanged: (value) => onEnvChanged(value.first),
+          onSelectionChanged: (value) => widget.onEnvChanged(value.first),
         ),
         const SizedBox(height: 16),
         Container(
@@ -187,13 +236,14 @@ class ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         TextField(
-          controller: testController,
+          controller: _testController,
           decoration: InputDecoration(
             hintText: l10n.get('custom_test_version_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
-          onChanged: (value) => onTestUrlChanged(value.isEmpty ? null : value),
+          onChanged: (value) =>
+              widget.onTestUrlChanged(value.isEmpty ? null : value),
         ),
         const SizedBox(height: 16),
         Text(
@@ -216,13 +266,14 @@ class ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         TextField(
-          controller: draftController,
+          controller: _draftController,
           decoration: InputDecoration(
             hintText: l10n.get('custom_draft_version_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
-          onChanged: (value) => onDraftUrlChanged(value.isEmpty ? null : value),
+          onChanged: (value) =>
+              widget.onDraftUrlChanged(value.isEmpty ? null : value),
         ),
         const SizedBox(height: 16),
         Text(
@@ -234,13 +285,14 @@ class ContentEnvPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         TextField(
-          controller: prodController,
+          controller: _prodController,
           decoration: InputDecoration(
             hintText: l10n.get('custom_production_version_url'),
             isDense: true,
             border: OutlineInputBorder(),
           ),
-          onChanged: (value) => onProdUrlChanged(value.isEmpty ? null : value),
+          onChanged: (value) =>
+              widget.onProdUrlChanged(value.isEmpty ? null : value),
         ),
       ],
     );
@@ -260,5 +312,46 @@ class ContentEnvPanel extends StatelessWidget {
     }
     final stage = settings.contentEnv.routeStage;
     return '${RouteResolver.appApiPrimary}/content/$stage / ${RouteResolver.appApiBackup}/content/$stage';
+  }
+}
+
+/// 「应用并重新加载」按钮：执行期间显示 loading 并禁用，
+/// 给出即时反馈，避免网络拉取耗时导致"点了没反应"。
+class _ApplyReloadButton extends StatefulWidget {
+  const _ApplyReloadButton({required this.label, required this.onPressed});
+
+  final String label;
+  final Future<void> Function() onPressed;
+
+  @override
+  State<_ApplyReloadButton> createState() => _ApplyReloadButtonState();
+}
+
+class _ApplyReloadButtonState extends State<_ApplyReloadButton> {
+  bool _loading = false;
+
+  Future<void> _handle() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await widget.onPressed();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      onPressed: _loading ? null : _handle,
+      icon: _loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh),
+      label: Text(widget.label),
+    );
   }
 }

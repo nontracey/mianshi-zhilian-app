@@ -184,6 +184,9 @@ class DashboardPage extends StatelessWidget {
       scopedTopics,
       newCount: settingsProvider.settings.dailyNewCount,
       reviewCount: settingsProvider.settings.dailyReviewCount,
+      // 路线模式下 scopedTopics 已按路线顺序排列，保留它，
+      // 让"今日学习/下一步最佳行动"跟随路线而非内容全局 order。
+      preserveScopeOrder: scope.isRouteMode,
     );
     final dueTopics = progressProvider.getTodayReviewTopics(scopedTopics);
 

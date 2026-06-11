@@ -195,21 +195,32 @@ class _CatalogPageState extends State<CatalogPage> {
             .toList();
       }
     } else if (isRouteScoped) {
-      final domainTopicsRaw = contentProvider.getTopicsByDomain(currentDomainId);
-      domainTopics = domainTopicsRaw.where((t) => routeTopicIds.contains(t.id)).toList();
+      final domainTopicsRaw = contentProvider.getTopicsByDomain(
+        currentDomainId,
+      );
+      domainTopics = domainTopicsRaw
+          .where((t) => routeTopicIds.contains(t.id))
+          .toList();
     } else {
       domainTopics = contentProvider.getTopicsByDomain(currentDomainId);
     }
 
-    final routeProgressTopics = isRouteScoped ? domainTopics : contentProvider.topics.values.toList();
+    final routeProgressTopics = isRouteScoped
+        ? domainTopics
+        : contentProvider.topics.values.toList();
     final domainProgress = isRouteScoped && isCrossDomain
-        ? (masteryPercent: _calcMasteryPercent(domainTopics, progressProvider), topicCount: domainTopics.length)
+        ? (
+            masteryPercent: _calcMasteryPercent(domainTopics, progressProvider),
+            topicCount: domainTopics.length,
+          )
         : progressProvider.getDomainProgress(
             currentDomainId,
             routeProgressTopics,
           );
     final masteryPercent = domainProgress.masteryPercent;
-    final totalTopics = isRouteScoped ? domainTopics.length : (currentDomain?.topicCount ?? domainTopics.length);
+    final totalTopics = isRouteScoped
+        ? domainTopics.length
+        : (currentDomain?.topicCount ?? domainTopics.length);
 
     final filteredTopics = _applyFilters(domainTopics, progressProvider);
     final sortedTopics = _sortTopics(filteredTopics, progressProvider);
@@ -218,10 +229,13 @@ class _CatalogPageState extends State<CatalogPage> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
-          children: List.generate(6, (_) => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: SkeletonTopicRow(),
-          )),
+          children: List.generate(
+            6,
+            (_) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: SkeletonTopicRow(),
+            ),
+          ),
         ),
       );
     }
@@ -232,7 +246,16 @@ class _CatalogPageState extends State<CatalogPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isCrossDomainRouteMode)
-            _buildCrossDomainHeader(context, domains, contentProvider, isDark, masteryPercent, totalTopics, scope, currentDomainId)
+            _buildCrossDomainHeader(
+              context,
+              domains,
+              contentProvider,
+              isDark,
+              masteryPercent,
+              totalTopics,
+              scope,
+              currentDomainId,
+            )
           else
             _buildCompactHeader(
               context,
@@ -255,34 +278,40 @@ class _CatalogPageState extends State<CatalogPage> {
             const SizedBox(height: 12),
           ],
 
-Expanded(
+          Expanded(
             child: RefreshIndicator(
               onRefresh: () {
                 // 跨域路线模式下刷新所有路线领域
                 if (isCrossDomainRouteMode && scope.scopeDomainIds.isNotEmpty) {
-                  return contentProvider.ensureTopicsLoaded(scope.scopeDomainIds);
+                  return contentProvider.ensureTopicsLoaded(
+                    scope.scopeDomainIds,
+                  );
                 }
                 return contentProvider.loadDomainTopics(currentDomainId);
               },
               child: sortedTopics.isEmpty
                   ? _buildEmptyState(context)
                   : (scope.isRouteMode &&
-                          scope.scopePhases != null &&
-                          scope.scopePhases!.isNotEmpty
-                      ? _buildPhasedTopicList(
-                          context,
-                          currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
-                          sortedTopics,
-                          progressProvider,
-                          isDark,
-                        )
-                      : _buildTopicList(
-                          context,
-                          currentDomain ?? domains.firstOrNull ?? Domain(id: '', title: '', description: ''),
-                          sortedTopics,
-                          progressProvider,
-                          isDark,
-                        )),
+                            scope.scopePhases != null &&
+                            scope.scopePhases!.isNotEmpty
+                        ? _buildPhasedTopicList(
+                            context,
+                            currentDomain ??
+                                domains.firstOrNull ??
+                                Domain(id: '', title: '', description: ''),
+                            sortedTopics,
+                            progressProvider,
+                            isDark,
+                          )
+                        : _buildTopicList(
+                            context,
+                            currentDomain ??
+                                domains.firstOrNull ??
+                                Domain(id: '', title: '', description: ''),
+                            sortedTopics,
+                            progressProvider,
+                            isDark,
+                          )),
             ),
           ),
         ],
@@ -319,7 +348,12 @@ Expanded(
               children: [
                 Row(
                   children: [
-                    _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
+                    _buildDomainDropdown(
+                      domains,
+                      contentProvider,
+                      scope,
+                      currentDomainId,
+                    ),
                     const SizedBox(width: 8),
                     ScopeSelectorChip(),
                     const SizedBox(width: 12),
@@ -339,7 +373,12 @@ Expanded(
               children: [
                 Row(
                   children: [
-                    _buildDomainDropdown(domains, contentProvider, scope, currentDomainId),
+                    _buildDomainDropdown(
+                      domains,
+                      contentProvider,
+                      scope,
+                      currentDomainId,
+                    ),
                     const SizedBox(width: 8),
                     ScopeSelectorChip(),
                     const SizedBox(width: 8),
@@ -405,7 +444,19 @@ Expanded(
     LearningScopeProvider scope,
     String currentDomainId,
   ) {
-    final routeDomains = domains.where((d) => scope.scopeDomainIds.contains(d.id)).toList();
+    final routeDomains = domains
+        .where((d) => scope.scopeDomainIds.contains(d.id))
+        .toList();
+
+    // 统计路线内各领域的知识点数量，展示在标签上，让筛选更直观。
+    final routeTopics = scope.scopeTopicIds
+        .map((id) => contentProvider.findTopic(id))
+        .whereType<Topic>()
+        .toList();
+    final domainCounts = <String, int>{};
+    for (final t in routeTopics) {
+      domainCounts[t.domainId] = (domainCounts[t.domainId] ?? 0) + 1;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -436,26 +487,36 @@ Expanded(
                 _buildDomainTab(
                   label: l10n.get('all_topics'),
                   selected: _crossDomainAllSelected,
+                  count: routeTopics.length,
                   onTap: () => setState(() => _crossDomainAllSelected = true),
                   isDark: isDark,
                   isAll: true,
                 ),
                 const SizedBox(width: 6),
-                ...routeDomains.map((d) => Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _buildDomainTab(
-                    label: d.title,
-                    selected: currentDomainId == d.id,
-                    onTap: () {
-                      setState(() => _crossDomainAllSelected = false);
-                      widget.onDomainChanged(d.id);
-                      if (contentProvider.getLoadedTopicCount(d.id) == 0) {
-                        contentProvider.loadDomainTopics(d.id);
-                      }
-                    },
-                    isDark: isDark,
+                ...routeDomains.map(
+                  (d) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _buildDomainTab(
+                      label: d.title,
+                      selected:
+                          !_crossDomainAllSelected && currentDomainId == d.id,
+                      count: domainCounts[d.id] ?? 0,
+                      onTap: () {
+                        // 再次点击已选领域 → 回到「全部」，让筛选可顺手切回全貌。
+                        final backToAll =
+                            !_crossDomainAllSelected && currentDomainId == d.id;
+                        setState(() => _crossDomainAllSelected = backToAll);
+                        if (!backToAll) {
+                          widget.onDomainChanged(d.id);
+                          if (contentProvider.getLoadedTopicCount(d.id) == 0) {
+                            contentProvider.loadDomainTopics(d.id);
+                          }
+                        }
+                      },
+                      isDark: isDark,
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -471,8 +532,12 @@ Expanded(
     required bool selected,
     required VoidCallback onTap,
     required bool isDark,
+    int? count,
     bool isAll = false,
   }) {
+    final fgColor = selected
+        ? Colors.white
+        : (isDark ? Colors.white70 : Colors.grey.shade700);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -502,11 +567,31 @@ Expanded(
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.grey.shade700),
+                color: fgColor,
               ),
             ),
+            if (count != null) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : (isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.06)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: fgColor,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -690,7 +775,11 @@ Expanded(
     );
   }
 
-Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvider scope) {
+  Widget _buildRouteBanner(
+    BuildContext context,
+    bool isDark,
+    LearningScopeProvider scope,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -717,7 +806,11 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                           'topicCount': '${scope.scopeTopicIds.length}',
                         })
                       : l10n.get('route_mode'),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -733,7 +826,9 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
               ),
               const SizedBox(width: 4),
               Text(
-                l10n.getp('knowledge_points_in_route', {'count': scope.scopeTopicIds.length}),
+                l10n.getp('knowledge_points_in_route', {
+                  'count': scope.scopeTopicIds.length,
+                }),
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white54 : Colors.grey,
@@ -1014,7 +1109,12 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
 
     if (displayPhases.isEmpty) {
       return _buildTopicList(
-        context, currentDomain, topics, progressProvider, isDark);
+        context,
+        currentDomain,
+        topics,
+        progressProvider,
+        isDark,
+      );
     }
 
     final domains = context.read<ContentProvider>().domains;
@@ -1025,7 +1125,8 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
       var allDone = true;
       for (final tid in p.topicIds) {
         final t = allTopics[tid];
-        if (t != null && (progressProvider.getTopicProgress(tid)?.score ?? 0) < 85) {
+        if (t != null &&
+            (progressProvider.getTopicProgress(tid)?.score ?? 0) < 85) {
           allDone = false;
           break;
         }
@@ -1041,7 +1142,8 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
       itemCount: displayPhases.length,
       itemBuilder: (context, index) {
         final phase = displayPhases[index];
-        final phaseDomainId = phase.domainId ??
+        final phaseDomainId =
+            phase.domainId ??
             (phase.topicIds.isNotEmpty
                 ? allTopics[phase.topicIds.first]?.domainId
                 : null);
@@ -1052,7 +1154,8 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
 
         var mastered = 0;
         for (final t in phaseTopics) {
-          if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85) mastered++;
+          if ((progressProvider.getTopicProgress(t.id)?.score ?? 0) >= 85)
+            mastered++;
         }
         final total = phase.topicIds.length;
         final allDone = mastered == total && total > 0;
@@ -1060,13 +1163,15 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
         final isCurrent = currentPhaseIndex == index;
         final isCollapsed = _collapsedPhases.contains(phase.id);
 
-        final showDomainHeader = isCrossDomain &&
+        final showDomainHeader =
+            isCrossDomain &&
             phaseDomainId != null &&
             phaseDomainId != lastDomainId;
         lastDomainId = phaseDomainId;
 
         final domainTitle = phaseDomainId != null
-            ? domains.where((d) => d.id == phaseDomainId).firstOrNull?.title ?? phaseDomainId
+            ? domains.where((d) => d.id == phaseDomainId).firstOrNull?.title ??
+                  phaseDomainId
             : null;
 
         return Column(
@@ -1108,15 +1213,26 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 margin: const EdgeInsets.only(bottom: 6),
                 decoration: BoxDecoration(
                   color: isCurrent
-                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
-                      : (isDark ? const Color(0xFF1A1D23) : const Color(0xFFF5F5F5)),
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.06)
+                      : (isDark
+                            ? const Color(0xFF1A1D23)
+                            : const Color(0xFFF5F5F5)),
                   borderRadius: BorderRadius.circular(8),
                   border: isCurrent
-                      ? Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2))
+                      ? Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.2),
+                        )
                       : null,
                 ),
                 child: Row(
@@ -1132,7 +1248,9 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            phase.focus.isNotEmpty ? phase.focus : '${l10n.get('phases_suffix')} ${index + 1}',
+                            phase.focus.isNotEmpty
+                                ? phase.focus
+                                : '${l10n.get('phases_suffix')} ${index + 1}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -1159,7 +1277,9 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                                 '$mastered/$total',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isDark ? Colors.white54 : AppColors.textTertiary,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : AppColors.textTertiary,
                                 ),
                               ),
                             ],
@@ -1169,21 +1289,30 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: allDone
                             ? AppColors.success.withValues(alpha: 0.12)
                             : inProgress
-                                ? AppColors.warning.withValues(alpha: 0.12)
-                                : Colors.transparent,
+                            ? AppColors.warning.withValues(alpha: 0.12)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        allDone ? l10n.get('skilled_training') : inProgress ? l10n.get('progress_action_in') : '',
+                        allDone
+                            ? l10n.get('skilled_training')
+                            : inProgress
+                            ? l10n.get('progress_action_in')
+                            : '',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: allDone ? AppColors.success : AppColors.warning,
+                          color: allDone
+                              ? AppColors.success
+                              : AppColors.warning,
                         ),
                       ),
                     ),
@@ -1192,7 +1321,9 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
               ),
             ),
             if (!isCollapsed)
-              ...phaseTopics.map((t) => _buildTopicCard(context, t, progressProvider, isDark)),
+              ...phaseTopics.map(
+                (t) => _buildTopicCard(context, t, progressProvider, isDark),
+              ),
           ],
         );
       },
@@ -1340,15 +1471,25 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        Builder(builder: (ctx) {
-                          final sp = ctx.read<LearningScopeProvider>();
-                          if (!_isCrossDomainRouteMode(sp)) return const SizedBox.shrink();
-                          final cp = ctx.read<ContentProvider>();
-                          final domainName = cp.domains
-                              .where((d) => d.id == topic.domainId)
-                              .firstOrNull?.title ?? topic.domainId;
-                          return _buildMiniTag(domainName, AppColors.accent, isDark);
-                        }),
+                        Builder(
+                          builder: (ctx) {
+                            final sp = ctx.read<LearningScopeProvider>();
+                            if (!_isCrossDomainRouteMode(sp))
+                              return const SizedBox.shrink();
+                            final cp = ctx.read<ContentProvider>();
+                            final domainName =
+                                cp.domains
+                                    .where((d) => d.id == topic.domainId)
+                                    .firstOrNull
+                                    ?.title ??
+                                topic.domainId;
+                            return _buildMiniTag(
+                              domainName,
+                              AppColors.accent,
+                              isDark,
+                            );
+                          },
+                        ),
                         if (difficultyLabel.isNotEmpty)
                           _buildMiniTag(
                             difficultyLabel,
@@ -1506,7 +1647,10 @@ Widget _buildRouteBanner(BuildContext context, bool isDark, LearningScopeProvide
     return l10n.getp('n_day_after_2', {'n': diff.inDays});
   }
 
-  static int _calcMasteryPercent(List<Topic> topics, ProgressProvider progress) {
+  static int _calcMasteryPercent(
+    List<Topic> topics,
+    ProgressProvider progress,
+  ) {
     if (topics.isEmpty) return 0;
     double totalScore = 0;
     int count = 0;

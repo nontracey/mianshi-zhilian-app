@@ -228,5 +228,72 @@ void main() {
       expect(plan.newTopics, isEmpty);
       expect(plan.reviewTopics, isEmpty);
     });
+
+    test(
+      'preserveScopeOrder keeps incoming (route) order, not Topic.order',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final provider = ProgressProvider(StorageService());
+        // 模拟路线顺序：传入顺序与 Topic.order 相反（d,c,b,a）
+        final routeOrdered = buildTopics().reversed.toList();
+        final plan = provider.getTodayPlan(
+          routeOrdered,
+          newCount: 3,
+          reviewCount: 5,
+          preserveScopeOrder: true,
+        );
+        // 路线模式下应保留路线顺序，而非回退到内容全局 order
+        expect(plan.newTopics.map((t) => t.id), ['java.d', 'java.c', 'java.b']);
+      },
+    );
   });
+
+  test(
+    'allowSkipLowFrequency penalizes low-frequency only when enabled',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = ProgressProvider(StorageService());
+      // 两个未练习项，低频项 base 略高（recommendWeight 更大）。
+      const lowTopic = Topic(
+        id: 'java.low',
+        domain: 'java',
+        category: 'core',
+        title: 'Low',
+        summary: 'Low',
+        order: 1,
+        recommendWeight: 60,
+        interviewFrequency: 'low',
+      );
+      const midTopic = Topic(
+        id: 'java.mid',
+        domain: 'java',
+        category: 'core',
+        title: 'Mid',
+        summary: 'Mid',
+        order: 2,
+        recommendWeight: 50,
+        interviewFrequency: 'medium',
+      );
+
+      // 关闭（默认）：不惩罚低频，base 更高的低频项排前。
+      final off = provider.getRecommendedTopics(
+        'java',
+        [lowTopic, midTopic],
+        'smart',
+        prioritizePrerequisites: false,
+        allowSkipLowFrequency: false,
+      );
+      expect(off.first.id, 'java.low');
+
+      // 开启「允许跳过低频」：低频被扣分下沉，中频项排前。
+      final on = provider.getRecommendedTopics(
+        'java',
+        [lowTopic, midTopic],
+        'smart',
+        prioritizePrerequisites: false,
+        allowSkipLowFrequency: true,
+      );
+      expect(on.first.id, 'java.mid');
+    },
+  );
 }

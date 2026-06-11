@@ -105,109 +105,129 @@ class _LearningShellState extends State<LearningShell> {
       return const OnboardingScreen();
     }
 
-    return Scaffold(
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(
-            child: Row(
-              children: [
-                if (wide)
-                  NavigationRailPanel(
-                    section: _section,
-                    onSelect: _setSection,
-                    currentDomain: settings.settings.currentDomain,
-                    topicCount: content.topics.length,
-                    streakDays: progress.streakDays,
-                    totalHours: progress.totalHours,
-                    todayHoursGrowth: progress.todayHoursGrowth,
-                    isCollapsed: _isSidebarCollapsed,
-                    onToggleCollapse: () =>
-                        setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
-                  ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      HeaderBar(
-                        title: _sectionTitle(_section, l10n),
-                        sectionIndex: _section.index,
-                        onProfile: () => _setSection(AppSection.profile),
-                        onTopicTap: (topicId) => setState(() {
-                          _selectedTopicId = topicId;
-                          _selectedTopicInitialTab = 0;
-                        }),
-                        onContentStageChanged: (contentEnv) async {
-                          final authProvider = context.read<AuthProvider>();
-                          final userRole = authProvider.userRole;
-                          if (!userRole.allowedContentEnvs.contains(contentEnv.key)) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  userRole == UserRole.guest
-                                      ? l10n.get(
-                                          'login_after_optional_check_view_test_version_content',
-                                        )
-                                      : l10n.get(
-                                          'demand_key_management_member_permission_check_view_draft_con',
-                                        ),
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            return;
-                          }
+    // Shell 内部用 _section / _selectedTopicId 切页（非 go_router 路由栈），
+    // 所以系统返回键/侧滑返回没有可 pop 的路由，会直接最小化 App。
+    // 用 PopScope 拦截：先关闭知识点详情，再回到学习首页，最后才允许退出。
+    final canPop = _selectedTopicId == null && _section == AppSection.dashboard;
 
-                          await settings.setContentEnv(contentEnv);
-                          if (!context.mounted) return;
-                          final contentProvider = context.read<ContentProvider>();
-                          await contentProvider.switchContentEnv(
-                            settings.settings.contentBaseUrl,
-                            currentDomainId: settings.settings.currentDomain,
-                          );
-                        },
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_selectedTopicId != null) {
+          setState(() => _selectedTopicId = null);
+        } else if (_section != AppSection.dashboard) {
+          _setSection(AppSection.dashboard);
+        }
+      },
+      child: Scaffold(
+        body: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: Row(
+                children: [
+                  if (wide)
+                    NavigationRailPanel(
+                      section: _section,
+                      onSelect: _setSection,
+                      currentDomain: settings.settings.currentDomain,
+                      topicCount: content.topics.length,
+                      streakDays: progress.streakDays,
+                      totalHours: progress.totalHours,
+                      todayHoursGrowth: progress.todayHoursGrowth,
+                      isCollapsed: _isSidebarCollapsed,
+                      onToggleCollapse: () => setState(
+                        () => _isSidebarCollapsed = !_isSidebarCollapsed,
                       ),
-                      Expanded(child: _buildCurrentPage(wide)),
-                    ],
+                    ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        HeaderBar(
+                          title: _sectionTitle(_section, l10n),
+                          sectionIndex: _section.index,
+                          onProfile: () => _setSection(AppSection.profile),
+                          onTopicTap: (topicId) => setState(() {
+                            _selectedTopicId = topicId;
+                            _selectedTopicInitialTab = 0;
+                          }),
+                          onContentStageChanged: (contentEnv) async {
+                            final authProvider = context.read<AuthProvider>();
+                            final userRole = authProvider.userRole;
+                            if (!userRole.allowedContentEnvs.contains(
+                              contentEnv.key,
+                            )) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    userRole == UserRole.guest
+                                        ? l10n.get(
+                                            'login_after_optional_check_view_test_version_content',
+                                          )
+                                        : l10n.get(
+                                            'demand_key_management_member_permission_check_view_draft_con',
+                                          ),
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+
+                            await settings.setContentEnv(contentEnv);
+                            if (!context.mounted) return;
+                            final contentProvider = context
+                                .read<ContentProvider>();
+                            await contentProvider.switchContentEnv(
+                              settings.settings.contentBaseUrl,
+                              currentDomainId: settings.settings.currentDomain,
+                            );
+                          },
+                        ),
+                        Expanded(child: _buildCurrentPage(wide)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+        bottomNavigationBar: wide
+            ? null
+            : NavigationBar(
+                selectedIndex: _section.index,
+                onDestinationSelected: (i) => _setSection(AppSection.values[i]),
+                destinations: [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    label: l10n.get('study'),
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.menu_book_outlined),
+                    label: l10n.get('catalog'),
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.psychology_alt_outlined),
+                    label: l10n.get('practice'),
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.flag_outlined),
+                    label: l10n.get('interview'),
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.bar_chart_outlined),
+                    label: l10n.get('mastery'),
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline),
+                    label: l10n.get('settings'),
+                  ),
+                ],
+              ),
       ),
-      bottomNavigationBar: wide
-          ? null
-          : NavigationBar(
-              selectedIndex: _section.index,
-              onDestinationSelected: (i) => _setSection(AppSection.values[i]),
-              destinations: [
-                NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  label: l10n.get('study'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.menu_book_outlined),
-                  label: l10n.get('catalog'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.psychology_alt_outlined),
-                  label: l10n.get('practice'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.flag_outlined),
-                  label: l10n.get('interview'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.bar_chart_outlined),
-                  label: l10n.get('mastery'),
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  label: l10n.get('settings'),
-                ),
-              ],
-            ),
     );
   }
 
@@ -230,10 +250,7 @@ class _LearningShellState extends State<LearningShell> {
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
-      child: KeyedSubtree(
-        key: ValueKey(_section),
-        child: _currentPage(),
-      ),
+      child: KeyedSubtree(key: ValueKey(_section), child: _currentPage()),
     );
   }
 
@@ -245,7 +262,9 @@ class _LearningShellState extends State<LearningShell> {
     return switch (_section) {
       AppSection.dashboard => DashboardPage(
         onDomainChanged: (id) {
-          settings.updateSettings(settings.settings.copyWith(currentDomain: id));
+          settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          );
           if (content.getLoadedTopicCount(id) == 0) {
             content.loadDomainTopics(id);
           }
@@ -275,7 +294,9 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.catalog => CatalogPage(
         onDomainChanged: (id) {
-          settings.updateSettings(settings.settings.copyWith(currentDomain: id));
+          settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          );
           if (content.getLoadedTopicCount(id) == 0) {
             content.loadDomainTopics(id);
           }
@@ -291,7 +312,10 @@ class _LearningShellState extends State<LearningShell> {
       ),
       AppSection.practice => PracticePage(
         onDailyReview: () {
-          context.push('/practice/today-review', extra: const TodayReviewPage());
+          context.push(
+            '/practice/today-review',
+            extra: const TodayReviewPage(),
+          );
         },
         onRandomQuiz: (domainId) {
           final List<String> topicIds;
@@ -302,9 +326,12 @@ class _LearningShellState extends State<LearningShell> {
             }).toList()..shuffle();
             topicIds = routeInDomain.isNotEmpty
                 ? routeInDomain
-                : (content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle());
+                : (content.getTopicsByDomain(domainId).map((t) => t.id).toList()
+                    ..shuffle());
           } else {
-            topicIds = content.getTopicsByDomain(domainId).map((t) => t.id).toList()..shuffle();
+            topicIds =
+                content.getTopicsByDomain(domainId).map((t) => t.id).toList()
+                  ..shuffle();
           }
           context.push(
             '/practice/recall',
@@ -328,7 +355,9 @@ class _LearningShellState extends State<LearningShell> {
           _selectedTopicInitialTab = 1;
         }),
         onStartPractice: () {
-          final topicIds = scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
+          final topicIds =
+              scope.resolveScopedTopics(content).map((t) => t.id).toList()
+                ..shuffle();
           context.push(
             '/practice/recall',
             extra: RecallPage(topicIds: topicIds.take(5).toList()),
@@ -339,8 +368,13 @@ class _LearningShellState extends State<LearningShell> {
     };
   }
 
-  void _startMockInterview(ContentProvider content, SettingsProvider settings, LearningScopeProvider scope) {
-    final topicIds = scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
+  void _startMockInterview(
+    ContentProvider content,
+    SettingsProvider settings,
+    LearningScopeProvider scope,
+  ) {
+    final topicIds =
+        scope.resolveScopedTopics(content).map((t) => t.id).toList()..shuffle();
     context.push(
       '/practice/mock-interview',
       extra: MockInterviewPage(
@@ -373,7 +407,11 @@ class _LearningShellState extends State<LearningShell> {
       if (!plan.hasTarget) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.read<LocalizationProvider>().get('set_target_first'))),
+            SnackBar(
+              content: Text(
+                context.read<LocalizationProvider>().get('set_target_first'),
+              ),
+            ),
           );
         }
         return;
@@ -386,75 +424,79 @@ class _LearningShellState extends State<LearningShell> {
       final aiConfig = aiProvider.defaultConfig;
       final useAi = aiProvider.aiService.isConfigAvailable(aiConfig);
 
-    // 无可用 AI 配置时提前告知用户
-    if (!useAi && forceRegenerate) {
-      if (mounted) {
-        final l10n = context.read<LocalizationProvider>();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('no_ai_config_available'))),
-        );
+      // 无可用 AI 配置时提前告知用户
+      if (!useAi && forceRegenerate) {
+        if (mounted) {
+          final l10n = context.read<LocalizationProvider>();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.get('no_ai_config_available'))),
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    if (useAi) {
-      // AI 选领域后再加载对应 topics，避免全量预加载
-      try {
-        final selectedDomainIds = await generator.selectDomainIds(
-          plan: plan,
-          aiService: aiProvider.aiService,
-          aiConfig: aiConfig!,
-        );
-        await content.ensureTopicsLoaded(selectedDomainIds);
-      } catch (_) {
-        // AI 选领域失败，加载全部领域作为兜底
+      if (useAi) {
+        // AI 选领域后再加载对应 topics，避免全量预加载
+        try {
+          final selectedDomainIds = await generator.selectDomainIds(
+            plan: plan,
+            aiService: aiProvider.aiService,
+            aiConfig: aiConfig!,
+          );
+          await content.ensureTopicsLoaded(selectedDomainIds);
+        } catch (_) {
+          // AI 选领域失败，加载全部领域作为兜底
+          try {
+            await content.ensureTopicsLoaded(domainIds);
+          } catch (_) {}
+        }
+      } else {
+        // 无 AI 时加载全部领域
         try {
           await content.ensureTopicsLoaded(domainIds);
         } catch (_) {}
       }
-    } else {
-      // 无 AI 时加载全部领域
+
       try {
-        await content.ensureTopicsLoaded(domainIds);
-      } catch (_) {}
-    }
-
-    try {
-      final route = await generator.generateRoute(
-        plan: plan,
-        allTopics: content.topics.values.toList(),
-        progressProvider: progress,
-        aiService: aiProvider.aiService,
-        contentProvider: content,
-        aiConfig: aiConfig,
-        forceRegenerate: forceRegenerate,
-        // custom_routes 作为唯一事实源：非强制重生时复用已有同目标路线
-        existingRoutes: scopeProvider.customRoutes,
-      );
-
-      // 通过 LearningScopeProvider 保存并去重（同 planSignature 的旧 AI 路线会被替换）
-      if (mounted) {
-        final scopeProvider = context.read<LearningScopeProvider>();
-        await scopeProvider.upsertRoute(route, activate: true, contentProvider: content);
-        // 记录生成时的 plan 签名，以便后续检测目标是否变更
-        scopeProvider.notifyPlanChanged(plan.signature);
-        scopeProvider.clearRouteStale();
-        final l10n = context.read<LocalizationProvider>();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.get('route_generated_success')),
-            duration: const Duration(seconds: 2),
-          ),
+        final route = await generator.generateRoute(
+          plan: plan,
+          allTopics: content.topics.values.toList(),
+          progressProvider: progress,
+          aiService: aiProvider.aiService,
+          contentProvider: content,
+          aiConfig: aiConfig,
+          forceRegenerate: forceRegenerate,
+          // custom_routes 作为唯一事实源：非强制重生时复用已有同目标路线
+          existingRoutes: scopeProvider.customRoutes,
         );
+
+        // 通过 LearningScopeProvider 保存并去重（同 planSignature 的旧 AI 路线会被替换）
+        if (mounted) {
+          final scopeProvider = context.read<LearningScopeProvider>();
+          await scopeProvider.upsertRoute(
+            route,
+            activate: true,
+            contentProvider: content,
+          );
+          // 记录生成时的 plan 签名，以便后续检测目标是否变更
+          scopeProvider.notifyPlanChanged(plan.signature);
+          scopeProvider.clearRouteStale();
+          final l10n = context.read<LocalizationProvider>();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.get('route_generated_success')),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          final l10n = context.read<LocalizationProvider>();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.get('route_generate_failed'))),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        final l10n = context.read<LocalizationProvider>();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('route_generate_failed'))),
-        );
-      }
-    }
     } finally {
       scopeProvider.setGeneratingRoute(false);
     }
