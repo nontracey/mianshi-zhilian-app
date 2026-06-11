@@ -7,12 +7,14 @@ import 'package:mianshi_zhilian/providers/auth_provider.dart';
 import 'package:mianshi_zhilian/widgets/offline_banner.dart';
 import 'package:mianshi_zhilian/widgets/onboarding_screen.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
+import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/services/analytics_service.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/pages/learning/dashboard_page.dart';
 import 'package:mianshi_zhilian/pages/learning/catalog_page.dart';
@@ -54,12 +56,27 @@ class _LearningShellState extends State<LearningShell> {
     _auth = context.read<AuthProvider>();
     _auth.autoLogoutReason.removeListener(_onAutoLogout);
     _auth.autoLogoutReason.addListener(_onAutoLogout);
+    StorageService.writeFailure.removeListener(_onStorageWriteFailure);
+    StorageService.writeFailure.addListener(_onStorageWriteFailure);
   }
 
   @override
   void dispose() {
     _auth.autoLogoutReason.removeListener(_onAutoLogout);
+    StorageService.writeFailure.removeListener(_onStorageWriteFailure);
     super.dispose();
+  }
+
+  void _onStorageWriteFailure() {
+    if (StorageService.writeFailure.value == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(L10n.get('storage_write_failed', L10n.currentLanguage)),
+        duration: const Duration(seconds: 6),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    StorageService.writeFailure.value = null;
   }
 
   void _onAutoLogout() {

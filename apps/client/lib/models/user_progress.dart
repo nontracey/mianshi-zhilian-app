@@ -10,6 +10,10 @@ class TopicProgress {
   final DateTime? lastPracticeAt;
   final DateTime? nextReviewAt;
 
+  /// 当前复习间隔天数（间隔重复用）。0 表示尚未排期/旧数据，
+  /// 由 [ProgressProvider] 在每次练习后按遗忘曲线递进。
+  final int reviewIntervalDays;
+
   const TopicProgress({
     required this.topicId,
     required this.score,
@@ -17,6 +21,7 @@ class TopicProgress {
     this.practiceCount = 0,
     this.lastPracticeAt,
     this.nextReviewAt,
+    this.reviewIntervalDays = 0,
   });
 
   TopicProgress copyWith({
@@ -26,6 +31,7 @@ class TopicProgress {
     int? practiceCount,
     DateTime? lastPracticeAt,
     DateTime? nextReviewAt,
+    int? reviewIntervalDays,
   }) => TopicProgress(
     topicId: topicId ?? this.topicId,
     score: score ?? this.score,
@@ -33,6 +39,7 @@ class TopicProgress {
     practiceCount: practiceCount ?? this.practiceCount,
     lastPracticeAt: lastPracticeAt ?? this.lastPracticeAt,
     nextReviewAt: nextReviewAt ?? this.nextReviewAt,
+    reviewIntervalDays: reviewIntervalDays ?? this.reviewIntervalDays,
   );
 
   factory TopicProgress.fromJson(Map<String, dynamic> json) => TopicProgress(
@@ -46,6 +53,7 @@ class TopicProgress {
     nextReviewAt: json['nextReviewAt'] != null
         ? DateTime.parse(json['nextReviewAt'] as String)
         : null,
+    reviewIntervalDays: (json['reviewIntervalDays'] as num?)?.toInt() ?? 0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +63,7 @@ class TopicProgress {
     'practiceCount': practiceCount,
     'lastPracticeAt': lastPracticeAt?.toIso8601String(),
     'nextReviewAt': nextReviewAt?.toIso8601String(),
+    'reviewIntervalDays': reviewIntervalDays,
   };
 }
 
@@ -382,6 +391,10 @@ class LocalProfile {
   final bool emailBound;
   final bool wechatBound;
 
+  /// 最近一次修改时间，用于同步时的 last-write-wins 合并（跨设备收敛）。
+  /// 旧数据可能为 null，合并时按"最旧"处理（本地优先回退）。
+  final DateTime? updatedAt;
+
   const LocalProfile({
     this.nickname = '本地用户',
     this.avatarSeed = 'local',
@@ -389,6 +402,7 @@ class LocalProfile {
     this.email = '',
     this.emailBound = false,
     this.wechatBound = false,
+    this.updatedAt,
   });
 
   /// 创建一个随机种子默认头像的本地用户配置。
@@ -406,6 +420,9 @@ class LocalProfile {
     email: json['email'] as String? ?? '',
     emailBound: json['emailBound'] as bool? ?? false,
     wechatBound: json['wechatBound'] as bool? ?? false,
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.tryParse(json['updatedAt'] as String)
+        : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -415,6 +432,7 @@ class LocalProfile {
     'email': email,
     'emailBound': emailBound,
     'wechatBound': wechatBound,
+    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
   };
 
   LocalProfile copyWith({
@@ -424,6 +442,7 @@ class LocalProfile {
     String? email,
     bool? emailBound,
     bool? wechatBound,
+    DateTime? updatedAt,
   }) => LocalProfile(
     nickname: nickname ?? this.nickname,
     avatarSeed: avatarSeed ?? this.avatarSeed,
@@ -431,6 +450,7 @@ class LocalProfile {
     email: email ?? this.email,
     emailBound: emailBound ?? this.emailBound,
     wechatBound: wechatBound ?? this.wechatBound,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
 }
 

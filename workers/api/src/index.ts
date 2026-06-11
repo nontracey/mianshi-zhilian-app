@@ -58,8 +58,10 @@ export default {
       return handleLogin(request, env);
     }
 
-    // 刷新登录态
+    // 刷新登录态（每 IP 每分钟最多 30 次，防刷新接口被滥用）
     if (url.pathname === "/auth/refresh" && request.method === "POST") {
+      const limited = await checkRateLimit(request, env, "refresh", 30, 60);
+      if (limited) return limited;
       return handleRefreshToken(request, env);
     }
 
@@ -634,12 +636,23 @@ async function initDatabase(db: D1Database): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`,
     "idx refresh_tokens user",
   );
-  // 宽限期轮换：记录旋转出的新 token ID，允许旧 token 在 ~60s 内重试
-  await execSafely(
-    db,
-    `ALTER TABLE refresh_tokens ADD COLUMN rotated_to TEXT`,
-    "migrate refresh_tokens rotated_to",
-  );
+  // 宽限期轮换：记录旋转出的新 token ID，允许旧 token 在 ~60s 内重试。
+  // 先查列是否存在再 ALTER，避免每次冷启动都执行必失败的 DDL（与 users 迁移一致）。
+  try {
+    const cols = (await db
+      .prepare(`PRAGMA table_info(refresh_tokens)`)
+      .all()) as any;
+    const columns = new Set((cols.results as any[]).map((c: any) => c.name));
+    if (!columns.has("rotated_to")) {
+      await execSafely(
+        db,
+        `ALTER TABLE refresh_tokens ADD COLUMN rotated_to TEXT`,
+        "migrate refresh_tokens rotated_to",
+      );
+    }
+  } catch (e) {
+    console.error("initDatabase refresh_tokens migration error:", e);
+  }
 
   await execSafely(
     db,
@@ -999,6 +1012,12 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       return json({ error: "用户名长度需要 3-20 个字符" }, 400);
     }
 
+    // 客户端应发送 PBKDF2 派生的 base64 哈希（44 字符）。校验形状可挡住
+    // 绕过客户端直连、提交弱口令明文的请求。
+    if (!isClientPasswordHash(password_hash)) {
+      return json({ error: "密码哈希格式无效" }, 400);
+    }
+
     // 初始化数据库表
     await initDatabase(env.DB);
 
@@ -1051,9 +1070,19 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     });
   } catch (e) {
     console.error("Register error:", e);
-    const message = e instanceof Error ? e.message : "注册失败";
-    return json({ error: message }, 500);
+    // 不向客户端透传内部错误细节（如配置缺失），仅记录到日志。
+    return json({ error: "注册失败，请稍后重试" }, 500);
   }
+}
+
+// 客户端密码哈希应为 PBKDF2-SHA256(32B) 的 base64，长度 40-64 且仅 base64 字符。
+function isClientPasswordHash(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.length >= 40 &&
+    value.length <= 64 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(value)
+  );
 }
 
 // 用户登录
@@ -1136,8 +1165,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     });
   } catch (e) {
     console.error("Login error:", e);
-    const message = e instanceof Error ? e.message : "登录失败";
-    return json({ error: message }, 500);
+    // 不向客户端透传内部错误细节，仅记录到日志。
+    return json({ error: "登录失败，请稍后重试" }, 500);
   }
 }
 
@@ -1738,14 +1767,13 @@ async function handleAnalyticsBatch(
     let totalOpen = 0;
     let totalDuration = 0;
 
-    await env.DB.prepare(
-      `
-      INSERT INTO analytics_batches (batch_id, device_id, user_id)
-      VALUES (?, ?, ?)
-    `,
-    )
-      .bind(batchId, deviceId, userId)
-      .run();
+    // 收集所有写入，最后用 db.batch() 原子执行：要么全成功、batch_id 落库（重试
+    // 被 dedup 拒绝）；要么整体回滚、batch_id 未落库（客户端重试不会重复累加统计）。
+    const statements: D1PreparedStatement[] = [
+      env.DB.prepare(
+        `INSERT INTO analytics_batches (batch_id, device_id, user_id) VALUES (?, ?, ?)`,
+      ).bind(batchId, deviceId, userId),
+    ];
 
     for (const day of days) {
       const date = asString(day.date, 10);
@@ -1760,8 +1788,9 @@ async function handleAnalyticsBatch(
       );
       totalOpen += openCount;
       totalDuration += durationSeconds;
-      await env.DB.prepare(
-        `
+      statements.push(
+        env.DB.prepare(
+          `
         INSERT INTO daily_visit_stats (date, device_id, user_id, platform, app_version, open_count, duration_seconds, last_seen_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT(date, device_id) DO UPDATE SET
@@ -1772,8 +1801,7 @@ async function handleAnalyticsBatch(
           duration_seconds = MIN(86400, daily_visit_stats.duration_seconds + excluded.duration_seconds),
           last_seen_at = datetime('now')
       `,
-      )
-        .bind(
+        ).bind(
           date,
           deviceId,
           userId,
@@ -1781,33 +1809,36 @@ async function handleAnalyticsBatch(
           appVersion,
           openCount,
           durationSeconds,
-        )
-        .run();
-
-      await upsertCountMap(
-        env.DB,
-        "daily_section_stats",
-        "section",
-        date,
-        deviceId,
-        userId,
-        day.section_counts,
-        ANALYTICS_SECTIONS,
+        ),
       );
-      await upsertCountMap(
-        env.DB,
-        "daily_feature_stats",
-        "feature",
-        date,
-        deviceId,
-        userId,
-        day.feature_counts,
-        ANALYTICS_FEATURES,
+
+      statements.push(
+        ...countMapStatements(
+          env.DB,
+          "daily_section_stats",
+          "section",
+          date,
+          deviceId,
+          userId,
+          day.section_counts,
+          ANALYTICS_SECTIONS,
+        ),
+        ...countMapStatements(
+          env.DB,
+          "daily_feature_stats",
+          "feature",
+          date,
+          deviceId,
+          userId,
+          day.feature_counts,
+          ANALYTICS_FEATURES,
+        ),
       );
     }
 
-    await env.DB.prepare(
-      `
+    statements.push(
+      env.DB.prepare(
+        `
       INSERT INTO user_devices (device_id, user_id, platform, app_version, os_version, device_model, first_seen_at, last_seen_at, visit_count, total_duration_seconds)
       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
       ON CONFLICT(device_id) DO UPDATE SET
@@ -1820,8 +1851,7 @@ async function handleAnalyticsBatch(
         visit_count = user_devices.visit_count + excluded.visit_count,
         total_duration_seconds = user_devices.total_duration_seconds + excluded.total_duration_seconds
     `,
-    )
-      .bind(
+      ).bind(
         deviceId,
         userId,
         platform,
@@ -1830,8 +1860,10 @@ async function handleAnalyticsBatch(
         deviceModel,
         totalOpen,
         totalDuration,
-      )
-      .run();
+      ),
+    );
+
+    await env.DB.batch(statements);
 
     return json({ success: true });
   } catch (e) {
@@ -1840,7 +1872,7 @@ async function handleAnalyticsBatch(
   }
 }
 
-async function upsertCountMap(
+function countMapStatements(
   db: D1Database,
   table: string,
   column: string,
@@ -1849,25 +1881,28 @@ async function upsertCountMap(
   userId: string | null,
   value: any,
   allowed: Set<string>,
-): Promise<void> {
-  if (!value || typeof value !== "object") return;
+): D1PreparedStatement[] {
+  if (!value || typeof value !== "object") return [];
+  const statements: D1PreparedStatement[] = [];
   for (const [key, rawCount] of Object.entries(value).slice(0, 20)) {
     if (!allowed.has(key)) continue;
     const count = Math.max(0, Math.min(Number(rawCount) || 0, 1000));
     if (count === 0) continue;
-    await db
-      .prepare(
-        `
+    statements.push(
+      db
+        .prepare(
+          `
       INSERT INTO ${table} (date, device_id, user_id, ${column}, count)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(date, device_id, ${column}) DO UPDATE SET
         user_id = COALESCE(excluded.user_id, ${table}.user_id),
         count = ${table}.count + excluded.count
     `,
-      )
-      .bind(date, deviceId, userId, key, count)
-      .run();
+        )
+        .bind(date, deviceId, userId, key, count),
+    );
   }
+  return statements;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -1879,6 +1914,19 @@ function json(data: unknown, status = 200): Response {
     },
   });
 }
+
+// 纯函数导出，供单元测试覆盖（auth/validators 等无需 Workers 运行时绑定）。
+export {
+  hashPassword,
+  verifyPassword,
+  generateToken,
+  verifyToken,
+  isClientPasswordHash,
+  isUuidLike,
+  asString,
+  parseImageUrls,
+  normalizeUpdateManifest,
+};
 
 interface Env {
   CONTENT_PRIMARY_BASE_URL?: string;

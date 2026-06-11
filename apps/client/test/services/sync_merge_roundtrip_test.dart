@@ -123,4 +123,177 @@ void main() {
       expect(mergedRouteIds(merged), ['A'], reason: 'B 已删，墓碑应让远端副本也消失');
     });
   });
+
+  group('progress_map 清空墓碑（P0-3）', () {
+    Map<String, dynamic> prog(String id, String lastAt) => {
+          'topicId': id,
+          'score': 80,
+          'status': 'learning',
+          'practiceCount': 2,
+          'lastPracticeAt': lastAt,
+        };
+
+    test('清空墓碑 + 远端旧进度 → 不复活', () {
+      final merged = DataSyncService.mergeProgressMaps(
+        {'java.a': prog('java.a', '2026-01-01T00:00:00.000')},
+        <String, dynamic>{}, // 本地已清空
+        {'progress_map:java.a': '2026-06-01T00:00:00.000'},
+      );
+      expect(merged.containsKey('java.a'), isFalse);
+    });
+
+    test('删除后重新练习（lastPracticeAt 晚于墓碑）→ 恢复', () {
+      final merged = DataSyncService.mergeProgressMaps(
+        <String, dynamic>{},
+        {'java.a': prog('java.a', '2026-07-01T00:00:00.000')},
+        {'progress_map:java.a': '2026-06-01T00:00:00.000'},
+      );
+      expect(merged.containsKey('java.a'), isTrue);
+    });
+
+    test('无墓碑 → 正常合并保留', () {
+      final merged = DataSyncService.mergeProgressMaps(
+        {'java.a': prog('java.a', '2026-01-01T00:00:00.000')},
+        <String, dynamic>{},
+      );
+      expect(merged.containsKey('java.a'), isTrue);
+    });
+  });
+
+  group('practice_attempts 删除墓碑（P0-3）', () {
+    Map<String, dynamic> attempt(String id) => {
+          'id': id,
+          'topicId': 'java.a',
+          'mode': 'recall',
+          'question': 'q',
+          'answer': 'a',
+          'createdAt': '2026-01-01T00:00:00.000',
+        };
+
+    test('删除墓碑 → 远端副本不复活', () {
+      final merged = sync.mergePackagesForTest(
+        {
+          'schemaVersion': 1,
+          'data': {
+            'practice_attempts': <Map<String, dynamic>>[],
+            'deletions': {'practice_attempts:at1': '2026-06-01T00:00:00.000'},
+          },
+        },
+        {
+          'schemaVersion': 1,
+          'data': {
+            'practice_attempts': [attempt('at1')],
+          },
+        },
+      );
+      final list =
+          (merged['data'] as Map)['practice_attempts'] as List? ?? [];
+      expect(list, isEmpty);
+    });
+  });
+
+  group('单例键 LWW（P1-6）', () {
+    Map<String, dynamic> singletonPkg(String key, dynamic value) => {
+          'schemaVersion': 1,
+          'data': {key: value},
+        };
+
+    dynamic mergedSingleton(Map<String, dynamic> m, String key) =>
+        (m['data'] as Map)[key];
+
+    test('prep_plan 取 updatedAt 较新者（远端更新 → 远端胜）', () {
+      final merged = sync.mergePackagesForTest(
+        singletonPkg('prep_plan',
+            {'targetRole': '本地旧', 'updatedAt': '2026-01-01T00:00:00.000'}),
+        singletonPkg('prep_plan',
+            {'targetRole': '远端新', 'updatedAt': '2026-06-01T00:00:00.000'}),
+      );
+      expect((mergedSingleton(merged, 'prep_plan') as Map)['targetRole'], '远端新');
+    });
+
+    test('local_profile 取 updatedAt 较新者（本地更新 → 本地胜）', () {
+      final merged = sync.mergePackagesForTest(
+        singletonPkg('local_profile',
+            {'nickname': '本地新', 'updatedAt': '2026-06-01T00:00:00.000'}),
+        singletonPkg('local_profile',
+            {'nickname': '远端旧', 'updatedAt': '2026-01-01T00:00:00.000'}),
+      );
+      expect(
+          (mergedSingleton(merged, 'local_profile') as Map)['nickname'], '本地新');
+    });
+
+    test('一侧缺失时保留另一侧', () {
+      final merged = sync.mergePackagesForTest(
+        {'schemaVersion': 1, 'data': <String, dynamic>{}},
+        singletonPkg('prep_plan',
+            {'targetRole': '远端独有', 'updatedAt': '2026-06-01T00:00:00.000'}),
+      );
+      expect(
+          (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'], '远端独有');
+    });
+  });
+
+  group('clearPracticeData 端到端（P0-3）', () {
+    test('清空写墓碑 → 与持有旧数据的远端合并后不复活', () async {
+      final storage = StorageService();
+      await storage.savePracticeAttempts([
+        PracticeAttempt(
+          id: 'at1',
+          topicId: 'java.a',
+          mode: 'recall',
+          question: 'q',
+          answer: 'a',
+          createdAt: DateTime.parse('2026-01-01T00:00:00.000'),
+        ),
+      ]);
+      await storage.saveProgressMap({
+        'java.a': TopicProgress(
+          topicId: 'java.a',
+          score: 80,
+          status: 'learning',
+          practiceCount: 1,
+          lastPracticeAt: DateTime.parse('2026-01-01T00:00:00.000'),
+        ),
+      });
+
+      await storage.clearPracticeData();
+
+      final localExport =
+          await storage.exportSyncPackage(const SyncSettings(method: 'webdav'));
+      final remote = {
+        'schemaVersion': 1,
+        'data': {
+          'practice_attempts': [
+            {
+              'id': 'at1',
+              'topicId': 'java.a',
+              'mode': 'recall',
+              'question': 'q',
+              'answer': 'a',
+              'createdAt': '2026-01-01T00:00:00.000',
+            },
+          ],
+          'progress_map': {
+            'java.a': {
+              'topicId': 'java.a',
+              'score': 80,
+              'status': 'learning',
+              'practiceCount': 1,
+              'lastPracticeAt': '2026-01-01T00:00:00.000',
+            },
+          },
+        },
+      };
+
+      final merged =
+          DataSyncService(storage).mergePackagesForTest(localExport, remote);
+      final attempts =
+          (merged['data'] as Map)['practice_attempts'] as List? ?? [];
+      final progressMap =
+          (merged['data'] as Map)['progress_map'] as Map? ?? {};
+      expect(attempts, isEmpty, reason: '清空后练习记录不应复活');
+      expect(progressMap.containsKey('java.a'), isFalse,
+          reason: '清空后进度不应复活');
+    });
+  });
 }

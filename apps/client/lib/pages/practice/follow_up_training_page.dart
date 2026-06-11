@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
@@ -174,6 +176,9 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
             'followUpIndex': _currentFollowUpIndex,
           });
         });
+        // 持久化为练习记录并更新掌握度/复习排期，使追问训练对掌握度、薄弱检测、
+        // 连续天数可见（此前该模式评估结果不落任何数据）。
+        await _persistAttempt(topic, question, answer, result);
       }
     } catch (e) {
       if (mounted) {
@@ -189,6 +194,55 @@ class _FollowUpTrainingPageState extends State<FollowUpTrainingPage> {
       if (mounted) {
         setState(() => _isEvaluating = false);
       }
+    }
+  }
+
+  /// 将一次追问训练评估落为练习记录，并在 AI 给出有效分数时更新掌握度。
+  /// 沿用 recall_page 的写法，mode 标记为 'follow_up'。
+  Future<void> _persistAttempt(
+    Topic? topic,
+    String question,
+    String answer,
+    Map<String, dynamic> result,
+  ) async {
+    final topicId = topic?.id ?? '';
+    if (topicId.isEmpty) return;
+    final progressProvider = context.read<ProgressProvider>();
+    final aiProvider = context.read<AiProvider>();
+    final score = result['score'] as int?;
+    final aiEvaluated = result['aiUnavailable'] != true;
+
+    await progressProvider.addAttempt(
+      PracticeAttempt(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        topicId: topicId,
+        mode: 'follow_up',
+        question: question,
+        answer: answer,
+        createdAt: DateTime.now(),
+        score: score,
+        level: result['level'] as String?,
+        summary: result['summary'] as String?,
+        missedPoints: (result['missedPoints'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
+        wrongPoints: ((result['wrongPoints'] ?? result['errorPoints'])
+                    as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
+        improvedAnswer:
+            (result['improvedAnswer'] ?? result['optimizedAnswer']) as String?,
+        nextAction: result['nextAction'] as String?,
+        aiConfigId: aiProvider.defaultConfig?.id,
+        aiEvaluated: aiEvaluated,
+        localOnly: !aiEvaluated,
+        analysisStatus: aiEvaluated && score != null ? 'success' : 'unanalysed',
+      ),
+    );
+    if (aiEvaluated && score != null) {
+      await progressProvider.updateTopicProgress(topicId, score: score);
     }
   }
 

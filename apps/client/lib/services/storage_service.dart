@@ -13,10 +13,25 @@ class StorageService {
   bool _suppressSyncDirty = false;
   Future<void> _analyticsWriteQueue = Future.value();
 
+  /// 全局存储写入失败信号。[StorageService] 在多处被实例化（SharedPreferences
+  /// 底层共享），故用 static notifier 广播：写入失败（如 Web localStorage 配额
+  /// 超限）时置为失败的 key，根部 UI 监听后提示用户「数据可能未保存」。
+  static final ValueNotifier<String?> writeFailure = ValueNotifier<String?>(null);
+
   static const _syncDirtyKey = '_syncDirty';
   static const _syncDirtyAtKey = '_syncDirtyAt';
   static const _deviceIdKey = '_syncDeviceId';
   static const _analyticsBufferKey = '_analyticsBuffer';
+
+  /// 完整导出（[exportAllData]）对敏感字段写入的占位符。导入时遇到此值
+  /// 不覆盖本地真实凭据，避免备份恢复把 apiKey/token 损坏为字面量。
+  static const _redactedPlaceholder = '[redacted]';
+  // 完整导出中需要脱敏的 sync_settings 凭据字段。
+  static const _redactedSyncSettingFields = {
+    'webDavPassword',
+    'githubToken',
+    'giteeToken',
+  };
 
   static const Set<String> _syncKeys = {
     'progress_map',
@@ -57,6 +72,9 @@ class StorageService {
       }
     } catch (e) {
       debugPrint('StorageService.save($key) failed: $e');
+      // 广播写入失败，让根部 UI 提示用户数据可能未保存（静默吞掉会让用户
+      // 在配额超限后毫无察觉地持续丢失练习数据）。
+      writeFailure.value = key;
     }
   }
 
@@ -194,8 +212,21 @@ class StorageService {
 
     for (final key in keys) {
       if (key == 'app_logs') continue;
-      final value = prefs.getString(key);
-      if (value != null) {
+      Object? rawValue;
+      try {
+        rawValue = prefs.getString(key);
+      } catch (_) {
+        // 非字符串键（bool/int/double/List<String> 等运行态值）：直接导出原值，
+        // 否则 getString 对它们抛 type-cast，使整个导出失败（用过同步即触发）。
+        rawValue = prefs.get(key);
+      }
+      if (rawValue == null) continue;
+      if (rawValue is! String) {
+        exportData['data'][key] = rawValue;
+        continue;
+      }
+      final value = rawValue;
+      {
         try {
           exportData['data'][key] = json.decode(value);
           if (key == 'ai_configs' && exportData['data'][key] is List) {
@@ -203,26 +234,33 @@ class StorageService {
               item,
             ) {
               if (item is Map<String, dynamic>) {
-                return {...item, 'apiKey': '[redacted]'};
+                return {...item, 'apiKey': _redactedPlaceholder};
               }
               return item;
             }).toList();
           }
           if (key == 'sync_settings' &&
               exportData['data'][key] is Map<String, dynamic>) {
-            exportData['data'][key] = {
+            // 脱敏所有同步通道凭据（WebDAV 密码、GitHub/Gitee token），
+            // 避免随备份文件明文导出。
+            final settings = {
               ...(exportData['data'][key] as Map<String, dynamic>),
-              'webDavPassword': '[redacted]',
             };
+            for (final field in _redactedSyncSettingFields) {
+              if (settings.containsKey(field)) {
+                settings[field] = _redactedPlaceholder;
+              }
+            }
+            exportData['data'][key] = settings;
           }
           if (key == 'auth_token') {
-            exportData['data'][key] = '[redacted]';
+            exportData['data'][key] = _redactedPlaceholder;
           }
           if (key == 'auth_refresh_token') {
-            exportData['data'][key] = '[redacted]';
+            exportData['data'][key] = _redactedPlaceholder;
           }
           if (key == 'auth_user') {
-            exportData['data'][key] = '[redacted]';
+            exportData['data'][key] = _redactedPlaceholder;
           }
         } catch (_) {
           exportData['data'][key] = value;
@@ -266,8 +304,23 @@ class StorageService {
   }
 
   /// 仅清除学习/练习产生的数据，保留 AI 配置、同步配置、内容缓存和个人资料。
+  ///
+  /// 清空前为每条记录写删除墓碑，确保开启同步时不会从远端并集里复活
+  /// （否则「清空练习数据」在多设备下整体无效）。
   Future<void> clearPracticeData() async {
     final prefs = await _instance;
+
+    final attempts = await loadPracticeAttempts();
+    final sessions = await loadSessions();
+    final mockSessions = await loadMockInterviewSessions();
+    final progressMap = await loadProgressMap();
+    await recordDeletions([
+      for (final a in attempts) ('practice_attempts', a.id),
+      for (final s in sessions) ('sessions', s.id),
+      for (final m in mockSessions) ('mock_interview_sessions', m.id),
+      for (final topicId in progressMap.keys) ('progress_map', topicId),
+    ]);
+
     for (final key in [
       'progress_map',
       'sessions',
@@ -336,6 +389,18 @@ class StorageService {
   Future<void> recordDeletion(String collection, String id) async {
     final deletions = await loadDeletions();
     deletions['$collection:$id'] = DateTime.now().toIso8601String();
+    _gcDeletions(deletions);
+    await save('deletions', deletions);
+  }
+
+  /// 批量记录删除墓碑，仅一次读改写。[entries] 为 `(collection, id)` 列表。
+  /// 用于「清空练习数据」等一次删多个集合多条记录的场景。
+  Future<void> recordDeletions(Iterable<(String, String)> entries) async {
+    final deletions = await loadDeletions();
+    final now = DateTime.now().toIso8601String();
+    for (final (collection, id) in entries) {
+      deletions['$collection:$id'] = now;
+    }
     _gcDeletions(deletions);
     await save('deletions', deletions);
   }
@@ -497,24 +562,69 @@ class StorageService {
     }
   }
 
-  /// 从 Map 导入数据到本地存储
+  /// 从 Map 导入数据到本地存储。
+  ///
+  /// 备份文件中被 [exportAllData] 脱敏的敏感字段（值为 [_redactedPlaceholder]）
+  /// 不会覆盖本地真实凭据：顶层占位符整键跳过，sync_settings/ai_configs 内嵌
+  /// 占位符回填本地现有值。避免「导出再导入」把 apiKey/token 损坏为字面量。
   Future<void> importAllData(Map<String, dynamic> data) async {
     final prefs = await _instance;
     _suppressSyncDirty = true;
-    for (final entry in data.entries) {
-      final key = entry.key;
-      final value = entry.value;
-      try {
-        if (value is String) {
-          await prefs.setString(key, value);
-        } else {
-          await prefs.setString(key, json.encode(value));
+    try {
+      for (final entry in data.entries) {
+        final key = entry.key;
+        var value = entry.value;
+        // 顶层敏感键被脱敏 → 保留本地真实值，不写入占位符。
+        if (value == _redactedPlaceholder) continue;
+        if (key == 'sync_settings' && value is Map) {
+          value = await _restoreRedactedSyncSettings(value);
+        } else if (key == 'ai_configs' && value is List) {
+          value = await _restoreRedactedAiConfigs(value);
         }
-      } catch (e) {
-        debugPrint('importAllData: skip key=$key, error=$e');
+        try {
+          if (value is String) {
+            await prefs.setString(key, value);
+          } else {
+            await prefs.setString(key, json.encode(value));
+          }
+        } catch (e) {
+          debugPrint('importAllData: skip key=$key, error=$e');
+        }
+      }
+    } finally {
+      _suppressSyncDirty = false;
+    }
+  }
+
+  /// 将 sync_settings 中被脱敏的凭据字段回填为本地现有值。
+  Future<Map<String, dynamic>> _restoreRedactedSyncSettings(
+    Map<dynamic, dynamic> incoming,
+  ) async {
+    final result = incoming.map((k, v) => MapEntry(k.toString(), v));
+    final localJson = (await loadSyncSettings()).toJson();
+    for (final field in _redactedSyncSettingFields) {
+      if (result[field] == _redactedPlaceholder) {
+        result[field] = localJson[field];
       }
     }
-    _suppressSyncDirty = false;
+    return result;
+  }
+
+  /// 将 ai_configs 中被脱敏的 apiKey 回填为本地同 id 配置的真实值。
+  Future<List<dynamic>> _restoreRedactedAiConfigs(
+    List<dynamic> incoming,
+  ) async {
+    final current = await loadAiConfigs();
+    final keysById = {for (final config in current) config.id: config.apiKey};
+    return incoming.map((item) {
+      if (item is! Map) return item;
+      final normalized = item.map((k, v) => MapEntry(k.toString(), v));
+      if (normalized['apiKey'] == _redactedPlaceholder) {
+        final id = normalized['id'] as String?;
+        normalized['apiKey'] = (id == null ? null : keysById[id]) ?? '';
+      }
+      return normalized;
+    }).toList();
   }
 
   /// 记录上次同步时间
@@ -538,6 +648,13 @@ class StorageService {
   Future<bool> hasSyncDirty() async {
     final prefs = await _instance;
     return prefs.getBool(_syncDirtyKey) ?? false;
+  }
+
+  /// 最近一次 [markSyncDirty] 的时间戳（ISO）。用于同步窗口期检测：
+  /// 导出后若该值变化，说明期间有新本地改动，不应清除 dirty 标记。
+  Future<String?> getSyncDirtyAt() async {
+    final prefs = await _instance;
+    return prefs.getString(_syncDirtyAtKey);
   }
 
   Future<void> clearSyncDirty() async {
