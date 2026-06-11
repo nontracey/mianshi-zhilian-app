@@ -37,14 +37,15 @@ jobs:
               continue
             fi
 
-            ids=$(echo "$resp" | python3 -c "
+            ids=$(echo "$resp" | python3 << 'PYEOF' 2>/dev/null
 import json, sys, os
 branch = os.environ['BRANCH']
 for d in json.load(sys.stdin).get('result', []):
     meta = d.get('deployment_trigger', {}).get('metadata', {})
     if meta.get('branch', '') == branch:
         print(d['id'])
-" 2>/dev/null)
+PYEOF
+)
 
             if [ -z "$ids" ]; then
               echo "No preview deployments found for $project (branch: $BRANCH)"
