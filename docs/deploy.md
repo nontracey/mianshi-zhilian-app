@@ -8,7 +8,7 @@
 |--------|---------|------|
 | `CI` | PR 和 `main` push | `flutter pub get`、`flutter analyze`、`flutter test`、`flutter build web --release` |
 | `Deploy web` | `main` push 且 `apps/client/**` 变更 | 构建 Flutter Web 后通过 `wrangler pages deploy` 部署到 Cloudflare Pages |
-| `Deploy worker` | `main` push 且 `workers/api/**` 变更 | 通过 `wrangler pages deploy` 部署 Cloudflare Pages Functions (API) |
+| `Deploy worker` | `main` push 且 `workers/api/**` 变更 | 检查 D1 schema 覆盖，执行 `init-db.sql`，再通过 `wrangler pages deploy` 部署 Cloudflare Pages Functions (API) |
 | `Deploy content` | 内容仓库 `main` push | 验证内容格式后部署到 Cloudflare Pages |
 | `Release` | 推送 `v*` tag | 并行构建各平台安装包并上传到 GitHub Releases |
 
@@ -64,7 +64,10 @@
 |--------|------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token，需要 Pages 和 Workers 权限 |
 | `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio 后台使用同一个 D1 |
+| `D1_STAGING_DATABASE_ID` | PR 预览环境使用的 D1 数据库 ID |
 | `JWT_SECRET` | 用户认证 JWT 签名密钥，需要在 Cloudflare Pages Dashboard 中手动配置为加密环境变量 |
+| `KV_NAMESPACE_ID` | 生产 Worker KV 命名空间 ID |
+| `KV_STAGING_NAMESPACE_ID` | PR 预览环境 Worker KV 命名空间 ID |
 | `ANDROID_RELEASE_KEYSTORE_BASE64` | 可选，Android 正式签名 keystore 的 base64 内容 |
 | `ANDROID_RELEASE_STORE_PASSWORD` | 可选，Android keystore 密码 |
 | `ANDROID_RELEASE_KEY_ALIAS` | 可选，Android 签名 key alias |
@@ -109,10 +112,12 @@ npx wrangler d1 create mianshi-zhilian-db --location apac
 
 App Worker 仍坚持本地优先：学习记录、AI 配置和用户自定义同步目标优先留在本地，平台侧不强制接管练习明细。Worker 只维护平台账号、工单、访问聚合统计和安全限制。
 
-新增 D1 表由 Worker 启动时按需迁移：
+新增 D1 表以 `workers/api/init-db.sql` 作为幂等 schema 基线。`Deploy worker` 会在部署 Pages Functions 前执行 `npm run check:migrations`，确认 Worker 代码中的表、索引和补列都已覆盖到 `init-db.sql`；随后执行 `wrangler d1 execute <db> --remote --file=./init-db.sql`。本地提交前的 `./scripts/pre-commit-check.sh` 也会跑同一个迁移覆盖检查，避免功能上线后缺表。
 
 | 表 | 说明 |
 | --- | --- |
+| `users` | 平台账号、昵称、角色、禁用状态和最后登录时间 |
+| `refresh_tokens` | 刷新令牌、轮换关系和撤销状态 |
 | `tickets` | 登录用户反馈/问题工单，以及未登录密码重置工单 |
 | `user_devices` | 安装级设备 ID 与用户绑定关系，支持一用户多设备 |
 | `daily_visit_stats` | 按天、设备聚合访问次数和访问时长 |
