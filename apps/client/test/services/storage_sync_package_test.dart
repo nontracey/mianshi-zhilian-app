@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
@@ -57,6 +58,81 @@ void main() {
 
       expect(package['contentEnv'], 'staging');
       expect(package['contentVersion'], 'content-2026-06-05');
+    });
+
+    test('default export skips AI config metadata', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      await storage.saveAiConfigs([
+        const AiConfig(
+          id: 'ai-1',
+          name: 'Private Gateway',
+          baseUrl: 'https://ai.internal.example.com',
+          apiKey: 'sk-secret',
+          model: 'gpt-4o',
+        ),
+      ]);
+
+      final package = await storage.exportSyncPackage(const SyncSettings());
+      final data = package['data'] as Map<String, dynamic>;
+
+      expect(data.containsKey('ai_configs'), isFalse);
+    });
+
+    test('opt-in export syncs AI metadata without apiKey', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      await storage.saveAiConfigs([
+        const AiConfig(
+          id: 'ai-1',
+          name: 'Private Gateway',
+          baseUrl: 'https://ai.internal.example.com',
+          apiKey: 'sk-secret',
+          model: 'gpt-4o',
+        ),
+      ]);
+
+      final package = await storage.exportSyncPackage(
+        const SyncSettings(syncAiConfigMetadata: true),
+      );
+      final data = package['data'] as Map<String, dynamic>;
+      final configs = data['ai_configs'] as List<dynamic>;
+
+      expect(configs.single['name'], 'Private Gateway');
+      expect(configs.single['apiKey'], isEmpty);
+    });
+
+    test('default import ignores remote AI config metadata', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      await storage.saveAiConfigs([
+        const AiConfig(
+          id: 'local-ai',
+          name: 'Local AI',
+          baseUrl: 'https://local.example.com',
+          apiKey: 'local-secret',
+          model: 'local-model',
+        ),
+      ]);
+
+      await storage.importSyncPackage({
+        'schemaVersion': 1,
+        'app': 'mianshi-zhilian',
+        'data': {
+          'ai_configs': [
+            {
+              'id': 'remote-ai',
+              'name': 'Remote AI',
+              'baseUrl': 'https://remote.example.com',
+              'apiKey': '',
+              'model': 'remote-model',
+            },
+          ],
+        },
+      }, syncSettings: const SyncSettings());
+
+      final configs = await storage.loadAiConfigs();
+      expect(configs.map((c) => c.id), ['local-ai']);
     });
 
     test(

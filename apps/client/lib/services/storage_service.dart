@@ -144,6 +144,10 @@ class StorageService {
     }
 
     await save('ai_configs', payload);
+    if (!_suppressSyncDirty &&
+        (await loadSyncSettings()).syncAiConfigMetadata) {
+      await markSyncDirty();
+    }
   }
 
   Future<List<AiConfig>> loadAiConfigs() async {
@@ -606,7 +610,7 @@ class StorageService {
       'updatedAt': DateTime.now().toIso8601String(),
       'deviceId': deviceId,
       'contentEnv': appSettings.contentEnv.key,
-      'contentVersion': ?contentVersion,
+      'contentVersion': contentVersion,
       'data': data,
     }, syncSettings);
   }
@@ -706,6 +710,7 @@ class StorageService {
           continue;
         }
         if (entry.key == 'ai_configs') {
+          if (syncSettings?.syncAiConfigMetadata != true) continue;
           final merged = await _mergeAiConfigsForImport(entry.value);
           await prefs.setString(entry.key, json.encode(merged));
           continue;
@@ -1024,6 +1029,7 @@ class StorageService {
   }
 
   bool _isSyncRelevantKey(String key) {
+    if (key == 'ai_configs') return false;
     if (_syncKeys.contains(key)) return true;
     return _syncPrefixes.any(key.startsWith);
   }

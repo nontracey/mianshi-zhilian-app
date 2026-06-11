@@ -350,7 +350,8 @@ class PrepPlan {
 
   /// 用于检测目标变化的签名（稳定哈希，跨进程一致）
   String get signature {
-    final input = '${targetRole.trim()}_${techStack.trim()}_${jobDescription.trim()}_${interviewDate?.toIso8601String() ?? ''}';
+    final input =
+        '${targetRole.trim()}_${techStack.trim()}_${jobDescription.trim()}_${interviewDate?.toIso8601String() ?? ''}';
     return sha256.convert(utf8.encode(input)).toString().substring(0, 16);
   }
 
@@ -415,7 +416,8 @@ class LocalProfile {
 
   factory LocalProfile.fromJson(Map<String, dynamic> json) => LocalProfile(
     nickname: json['nickname'] as String? ?? '本地用户',
-    avatarSeed: json['avatarSeed'] as String? ?? 'guest_${Random().nextInt(1000000)}',
+    avatarSeed:
+        json['avatarSeed'] as String? ?? 'guest_${Random().nextInt(1000000)}',
     avatarUrl: json['avatarUrl'] as String?,
     email: json['email'] as String? ?? '',
     emailBound: json['emailBound'] as bool? ?? false,
@@ -497,7 +499,7 @@ class SyncSettings {
     this.autoSyncIntervalMinutes = 5,
     this.syncFullPracticeText = false,
     this.syncPrivatePrepData = false,
-    this.syncAiConfigMetadata = true,
+    this.syncAiConfigMetadata = false,
     this.lastSyncAt,
     this.lastSyncStatus = 'local_mode',
   });
@@ -524,7 +526,7 @@ class SyncSettings {
         (json['autoSyncIntervalMinutes'] as num?)?.toInt() ?? 5,
     syncFullPracticeText: json['syncFullPracticeText'] as bool? ?? false,
     syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? false,
-    syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? true,
+    syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? false,
     lastSyncAt: json['lastSyncAt'] != null
         ? DateTime.parse(json['lastSyncAt'] as String)
         : null,
