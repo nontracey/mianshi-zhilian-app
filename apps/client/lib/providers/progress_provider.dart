@@ -322,8 +322,10 @@ class ProgressProvider extends ChangeNotifier {
     final pathPart =
         (10000 - topic.order).clamp(0, 10000) * pathOrderWeight ~/ 100;
     final notPracticedPart = progress == null ? 100 * notPracticedWeight : 0;
+    // 「允许跳过低频」开启时，才对低频考点扣分（下沉/跳过）；
+    // 关闭（默认）时不惩罚，低频考点正常参与推荐。
     final lowFrequencyPenalty =
-        !allowSkipLowFrequency && topic.interviewFrequency == 'low' ? 500 : 0;
+        allowSkipLowFrequency && topic.interviewFrequency == 'low' ? 500 : 0;
     final unreadyPrerequisitePenalty = prioritizePrerequisites
         ? _unreadyPrerequisiteCount(topic, availableTopicIds) * 2500
         : 0;
@@ -394,14 +396,17 @@ class ProgressProvider extends ChangeNotifier {
 
   /// 今日计划：依据备考目标的每日配额，从学习范围内组装"今日应学清单"。
   /// - 复习项：今日到期（nextReviewAt <= 今天），按到期顺序取前 [reviewCount] 个；
-  /// - 新知识点：从未练习过的 topic，按内容侧 `Topic.order`（由浅到难）取前 [newCount] 个，
-  ///   不与复习项重复。
+  /// - 新知识点：从未练习过的 topic，取前 [newCount] 个，不与复习项重复。
   ///
-  /// 排序所有权遵循 L-3：新知识点默认顺序使用内容库维护的 order，App 不擅自重排。
+  /// 排序所有权遵循 L-3：App 不擅自重排。
+  /// - 默认（[preserveScopeOrder]=false）：按内容库维护的 `Topic.order`（由浅到难）；
+  /// - 路线模式（[preserveScopeOrder]=true）：保留传入 [scopedTopics] 的顺序，
+  ///   即学习路线本身的阶段/步骤顺序，使"今日学习/下一步最佳行动"与路线一致。
   ({List<Topic> reviewTopics, List<Topic> newTopics}) getTodayPlan(
     List<Topic> scopedTopics, {
     required int newCount,
     required int reviewCount,
+    bool preserveScopeOrder = false,
   }) {
     final reviewTopics = getTodayReviewTopics(
       scopedTopics,
@@ -412,7 +417,10 @@ class ProgressProvider extends ChangeNotifier {
       if (reviewIds.contains(t.id)) return false;
       final p = _progressMap[t.id];
       return p == null || p.practiceCount == 0;
-    }).toList()..sort((a, b) => a.order.compareTo(b.order));
+    }).toList();
+    if (!preserveScopeOrder) {
+      newCandidates.sort((a, b) => a.order.compareTo(b.order));
+    }
 
     final newTopics = newCandidates.take(newCount.clamp(0, 999)).toList();
     return (reviewTopics: reviewTopics, newTopics: newTopics);

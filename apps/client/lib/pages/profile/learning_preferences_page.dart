@@ -81,18 +81,20 @@ class LearningSettingsPanel extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
-            onPressed: () => onSettingsChanged(settings.copyWith(
-              recommendStrategy: 'smart',
-              lowScoreWeight: _presetWeights['balanced']![0],
-              overdueWeight: _presetWeights['balanced']![1],
-              highFrequencyWeight: _presetWeights['balanced']![2],
-              pathOrderWeight: _presetWeights['balanced']![3],
-              notPracticedWeight: _presetWeights['balanced']![4],
-              dailyNewCount: 3,
-              dailyReviewCount: 6,
-              prioritizePrerequisites: true,
-              allowSkipLowFrequency: false,
-            )),
+            onPressed: () => onSettingsChanged(
+              settings.copyWith(
+                recommendStrategy: 'smart',
+                lowScoreWeight: _presetWeights['balanced']![0],
+                overdueWeight: _presetWeights['balanced']![1],
+                highFrequencyWeight: _presetWeights['balanced']![2],
+                pathOrderWeight: _presetWeights['balanced']![3],
+                notPracticedWeight: _presetWeights['balanced']![4],
+                dailyNewCount: 3,
+                dailyReviewCount: 6,
+                prioritizePrerequisites: true,
+                allowSkipLowFrequency: false,
+              ),
+            ),
             icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
             label: Text(l10n.get('apply_recommended_defaults')),
           ),
@@ -138,8 +140,8 @@ class LearningSettingsPanel extends StatelessWidget {
           Text(
             l10n.get('recommend_preset'),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           SegmentedButton<String>(
@@ -161,13 +163,15 @@ class LearningSettingsPanel extends StatelessWidget {
             showSelectedIcon: false,
             onSelectionChanged: (selection) {
               final preset = selection.first;
-              onSettingsChanged(settings.copyWith(
-                lowScoreWeight: _presetWeights[preset]![0],
-                overdueWeight: _presetWeights[preset]![1],
-                highFrequencyWeight: _presetWeights[preset]![2],
-                pathOrderWeight: _presetWeights[preset]![3],
-                notPracticedWeight: _presetWeights[preset]![4],
-              ));
+              onSettingsChanged(
+                settings.copyWith(
+                  lowScoreWeight: _presetWeights[preset]![0],
+                  overdueWeight: _presetWeights[preset]![1],
+                  highFrequencyWeight: _presetWeights[preset]![2],
+                  pathOrderWeight: _presetWeights[preset]![3],
+                  notPracticedWeight: _presetWeights[preset]![4],
+                ),
+              );
             },
           ),
         ],
@@ -205,6 +209,8 @@ class LearningSettingsPanel extends StatelessWidget {
         SwitchListTile(
           value: settings.allowSkipLowFrequency,
           title: Text(l10n.get('allow_skip_pass_low_freq_knowledge')),
+          subtitle: Text(l10n.get('allow_skip_low_freq_desc')),
+          isThreeLine: true,
           onChanged: (value) => onSettingsChanged(
             settings.copyWith(allowSkipLowFrequency: value),
           ),
