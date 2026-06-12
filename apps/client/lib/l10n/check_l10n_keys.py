@@ -22,6 +22,11 @@ from dataclasses import dataclass
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 L10N_FILE = os.path.join(PROJECT_DIR, "l10n", "l10n.dart")
+L10N_PART_FILES = (
+    os.path.join(PROJECT_DIR, "l10n", "l10n_zh.dart"),
+    os.path.join(PROJECT_DIR, "l10n", "l10n_en.dart"),
+)
+L10N_SOURCE_FILES = {os.path.realpath(L10N_FILE), *(os.path.realpath(path) for path in L10N_PART_FILES)}
 CLIENT_DIR = PROJECT_DIR
 
 DEFAULT_LOCALE = "_zh"
@@ -83,12 +88,20 @@ def _has_direct_chinese(text: str) -> tuple[bool, str]:
 
 
 def _section_lines(content: str, map_name: str) -> tuple[int, list[str]]:
-    marker = f"  static const {map_name} = {{"
+    markers = (
+        f"  static const {map_name} = {{",
+        f"const {map_name} = <String, String>{{",
+        f"const {map_name} = {{",
+    )
+    marker = next((candidate for candidate in markers if candidate in content), "")
     start = content.find(marker)
     if start < 0:
         raise ValueError(f"Cannot find locale map {map_name}")
     line_start = content[:start].count("\n") + 1
-    end = content.find("\n  };", start)
+    end = content.find("\n};", start)
+    indented_end = content.find("\n  };", start)
+    if indented_end >= 0 and (end < 0 or indented_end < end):
+        end = indented_end
     if end < 0:
         raise ValueError(f"Cannot find end of locale map {map_name}")
     return line_start, content[start:end].splitlines()
@@ -184,7 +197,7 @@ def check_consumer_files(locale_entries: dict[str, dict[str, Entry]]) -> list[st
             if not filename.endswith(".dart"):
                 continue
             path = os.path.join(root, filename)
-            if os.path.samefile(path, L10N_FILE):
+            if os.path.realpath(path) in L10N_SOURCE_FILES:
                 continue
 
             with open(path, "r", encoding="utf-8") as file:
@@ -242,8 +255,11 @@ def check_hardcoded_ui_text(rel: str, file_content: str) -> list[str]:
 
 
 def main() -> int:
-    with open(L10N_FILE, "r", encoding="utf-8") as file:
-        content = file.read()
+    content_parts = []
+    for path in (L10N_FILE, *L10N_PART_FILES):
+        with open(path, "r", encoding="utf-8") as file:
+            content_parts.append(file.read())
+    content = "\n".join(content_parts)
 
     errors: list[str] = []
     locale_entries, l10n_errors = check_l10n_file(content)

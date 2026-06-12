@@ -102,6 +102,7 @@ class ProgressProvider extends ChangeNotifier {
     _attempts.insert(0, attempt);
     try {
       await _storage.savePracticeAttemptsStrict(_attempts);
+      _attempts = StorageService.retainedPracticeAttempts(_attempts);
     } catch (_) {
       _attempts.removeWhere((a) => a.id == attempt.id);
       rethrow;

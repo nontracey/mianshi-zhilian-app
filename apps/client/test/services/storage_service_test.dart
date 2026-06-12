@@ -3,6 +3,7 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/ai_config.dart';
+import 'package:mianshi_zhilian/models/user_progress.dart';
 
 void main() {
   group('save / load round-trip', () {
@@ -212,6 +213,41 @@ void main() {
       await storage.saveDisabledDomains(['flutter']);
       final loaded = await storage.loadDisabledDomains();
       expect(loaded, ['flutter']);
+    });
+  });
+
+  group('practice attempt retention', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    PracticeAttempt attempt(int index) {
+      return PracticeAttempt(
+        id: 'attempt-$index',
+        topicId: 'topic-${index % 3}',
+        mode: 'recall',
+        question: 'Question $index',
+        answer: 'Answer $index',
+        createdAt: DateTime(2026, 1, 1).add(Duration(minutes: index)),
+      );
+    }
+
+    test('keeps recent attempts active and archives overflow', () async {
+      final storage = StorageService();
+      final total = StorageService.practiceAttemptsRetainLimit + 2;
+
+      await storage.savePracticeAttempts(List.generate(total, attempt));
+
+      final active = await storage.loadPracticeAttempts();
+      final archived = await storage.loadArchivedPracticeAttempts();
+      final export = await storage.exportAllData();
+      final exportedData = export['data'] as Map<String, dynamic>;
+
+      expect(active.length, StorageService.practiceAttemptsRetainLimit);
+      expect(active.first.id, 'attempt-${total - 1}');
+      expect(active.last.id, 'attempt-2');
+      expect(archived.map((a) => a.id), ['attempt-1', 'attempt-0']);
+      expect(exportedData['practice_attempts_archive'], isA<List<dynamic>>());
     });
   });
 }
