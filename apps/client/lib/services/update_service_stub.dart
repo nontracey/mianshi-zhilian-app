@@ -148,16 +148,35 @@ class DownloadAttempt {
   }
 }
 
+class UpdateDownloadProgress {
+  const UpdateDownloadProgress({
+    required this.received,
+    required this.total,
+    required this.sourceLabel,
+    required this.bytesPerSecond,
+  });
+
+  final int received;
+  final int total;
+  final String sourceLabel;
+  final double bytesPerSecond;
+
+  double? get fraction => total > 0 ? (received / total).clamp(0.0, 1.0) : null;
+}
+
 typedef DownloadProgressCallback =
-    void Function(int received, int total, String sourceLabel);
+    void Function(UpdateDownloadProgress progress);
 
 class DownloadCancelToken {
   bool _isCancelled = false;
+  bool _keepPartialDownload = false;
   http.Client? _client;
 
   bool get isCancelled => _isCancelled;
+  bool get keepPartialDownload => _keepPartialDownload;
 
-  void cancel() {
+  void cancel({bool keepPartialDownload = false}) {
+    _keepPartialDownload = keepPartialDownload;
     _isCancelled = true;
     _client?.close();
   }
@@ -191,7 +210,7 @@ class UpdateService {
         EndpointService.appApi,
         'GET',
         '/update.json',
-        timeout: const Duration(seconds: 15),
+        timeout: const Duration(seconds: 8),
       );
       if (response.statusCode != 200) {
         return CheckUpdateResult.error(localVersion: currentVersion);
@@ -243,12 +262,26 @@ class UpdateService {
         urls.add(mirror);
       }
     }
-    return switch (downloadSourceMode) {
-      DownloadSourceMode.githubOnly => githubUrl.isEmpty ? [] : [githubUrl],
-      DownloadSourceMode.mirrorFirst =>
-        mirrorPrefix.isEmpty ? urls : [urls[1], urls[0], ...urls.skip(2)],
-      _ => urls,
-    };
+    if (downloadSourceMode == DownloadSourceMode.githubOnly) {
+      return githubUrl.isEmpty ? [] : [githubUrl];
+    }
+    if (downloadSourceMode == DownloadSourceMode.mirrorFirst) {
+      final ordered = <String>[];
+      void add(String url) {
+        if (url.isNotEmpty && !ordered.contains(url)) ordered.add(url);
+      }
+
+      if (githubUrl.isNotEmpty && mirrorPrefix.isNotEmpty) {
+        add('$mirrorPrefix/$githubUrl');
+      }
+      if (githubUrl.isNotEmpty) add('$defaultMirrorPrefix/$githubUrl');
+      for (final mirror in platformUpdate.mirrors) {
+        add(mirror.trim());
+      }
+      add(githubUrl);
+      return ordered;
+    }
+    return urls;
   }
 
   Future<(String?, DownloadResult)> downloadUpdate({
@@ -271,6 +304,14 @@ class UpdateService {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  static String formatSpeed(double bytesPerSecond) {
+    if (bytesPerSecond <= 0) return '0 KB/s';
+    if (bytesPerSecond < 1024 * 1024) {
+      return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${(bytesPerSecond / 1024 / 1024).toStringAsFixed(1)} MB/s';
   }
 
   bool _isNewerVersion({

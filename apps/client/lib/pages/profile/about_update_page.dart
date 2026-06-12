@@ -59,14 +59,17 @@ class AboutPanelState extends State<AboutPanel> {
   String? _updateMessage;
   AppBuildInfo _currentVersion = AppBuildInfo.compileTime;
   DownloadSourceMode _downloadSourceMode = DownloadSourceMode.auto;
+  UpdateInfo? _activeUpdateInfo;
 
-  UpdateService get _updateService {
+  UpdateService _createUpdateService({DownloadSourceMode? sourceMode}) {
     final settings = context.read<SettingsProvider>().settings;
     return UpdateService(
       customMirrorPrefix: settings.customGithubMirror,
-      downloadSourceMode: _downloadSourceMode,
+      downloadSourceMode: sourceMode ?? _downloadSourceMode,
     );
   }
+
+  UpdateService get _updateService => _createUpdateService();
 
   @override
   void initState() {
@@ -83,9 +86,10 @@ class AboutPanelState extends State<AboutPanel> {
       });
       // 恢复此前下载好但尚未安装的安装包（文件仍在 + 版本仍较新才显示入口）。
       if (!kIsWeb) {
-        await context
-            .read<UpdateDownloadProvider>()
-            .restore(version, _updateService);
+        await context.read<UpdateDownloadProvider>().restore(
+          version,
+          _updateService,
+        );
       }
     }
   }
@@ -238,9 +242,13 @@ class AboutPanelState extends State<AboutPanel> {
     );
   }
 
-  Future<void> _downloadUpdate(UpdateInfo updateInfo) async {
+  Future<void> _downloadUpdate(
+    UpdateInfo updateInfo, {
+    bool ensureInstallPermission = true,
+    DownloadSourceMode? sourceModeOverride,
+  }) async {
     final l10n = context.read<LocalizationProvider>();
-    final updateService = _updateService;
+    final updateService = _createUpdateService(sourceMode: sourceModeOverride);
 
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -268,11 +276,17 @@ class AboutPanelState extends State<AboutPanel> {
     }
 
     // 安装权限在下载前确认（避免下完才发现没权限）。
-    final canInstall = await AppPermissionService.ensureInstallPackages(context);
-    if (!canInstall || !mounted) return;
+    if (ensureInstallPermission) {
+      final canInstall = await AppPermissionService.ensureInstallPackages(
+        context,
+      );
+      if (!canInstall || !mounted) return;
+    }
 
     final download = context.read<UpdateDownloadProvider>();
     // 下载交给全局控制器：切换页面也不会中断；进度在本页内联展示。
+    if (!mounted) return;
+    setState(() => _activeUpdateInfo = updateInfo);
     await download.startDownload(
       service: updateService,
       platformUpdate: platformUpdate,
@@ -347,6 +361,11 @@ class AboutPanelState extends State<AboutPanel> {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+              TextButton.icon(
+                onPressed: () => _showOneShotSourceDialog(download),
+                icon: const Icon(Icons.route_outlined, size: 16),
+                label: Text(l10n.get('switch_download_route')),
+              ),
               TextButton(
                 onPressed: download.cancel,
                 child: Text(l10n.get('cancel')),
@@ -358,12 +377,101 @@ class AboutPanelState extends State<AboutPanel> {
           const SizedBox(height: 6),
           Text(
             '${UpdateService.formatSize(received)} / ${UpdateService.formatSize(total)}'
-            '${download.source.isNotEmpty ? ' · ${download.source}' : ''}',
+            '${download.source.isNotEmpty ? ' · ${download.source}' : ''}'
+            ' · ${UpdateService.formatSpeed(download.bytesPerSecond)}',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
           ),
+          if (download.shouldSuggestSourceSwitch) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    l10n.get('download_slow_switch_hint'),
+                    style: const TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _showOneShotSourceDialog(UpdateDownloadProvider download) async {
+    final l10n = context.read<LocalizationProvider>();
+    final selected = await showDialog<DownloadSourceMode>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l10n.get('download_route_dialog_title')),
+        children: [
+          for (final mode in const [
+            DownloadSourceMode.mirrorFirst,
+            DownloadSourceMode.auto,
+            DownloadSourceMode.githubFirst,
+            DownloadSourceMode.githubOnly,
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, mode),
+              child: Row(
+                children: [
+                  Icon(
+                    mode == DownloadSourceMode.githubOnly
+                        ? Icons.public_outlined
+                        : Icons.route_outlined,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_downloadModeLabel(l10n, mode))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted || !download.isDownloading) return;
+    await _switchCurrentDownloadSource(selected);
+  }
+
+  Future<void> _switchCurrentDownloadSource(DownloadSourceMode mode) async {
+    final updateInfo = _activeUpdateInfo;
+    if (updateInfo == null) return;
+    final download = context.read<UpdateDownloadProvider>();
+    if (!download.isDownloading) return;
+
+    await download.cancelAndWait(keepPartialDownload: true);
+    if (!mounted) return;
+    unawaited(
+      _downloadUpdate(
+        updateInfo,
+        ensureInstallPermission: false,
+        sourceModeOverride: mode,
+      ),
+    );
+  }
+
+  String _downloadModeLabel(
+    LocalizationProvider l10n,
+    DownloadSourceMode mode,
+  ) {
+    return switch (mode) {
+      DownloadSourceMode.auto => l10n.get('download_auto_fastest'),
+      DownloadSourceMode.githubFirst => l10n.get('download_github_first'),
+      DownloadSourceMode.mirrorFirst => l10n.get('download_mirror_first'),
+      DownloadSourceMode.githubOnly => l10n.get('download_github_only'),
+    };
   }
 
   /// 已下载安装包的常驻入口：随时可再次打开安装，或删除安装包。

@@ -14,7 +14,7 @@ enum DownloadSourceMode {
   /// GitHub 官方 → 用户自定义镜像 → ghfast.top → manifest 中的其他镜像
   githubFirst,
 
-  /// 用户自定义镜像 → GitHub 官方 → ghfast.top → 其他镜像
+  /// 用户自定义镜像 → ghfast.top → 其他镜像 → GitHub 官方
   mirrorFirst,
 
   /// 仅使用官方 GitHub 下载
@@ -43,7 +43,8 @@ class RouteCandidate {
 class RouteResolver {
   static const appApiPrimary = 'https://mianshizhilian-api.nontracey.de5.net';
   static const appApiBackup = 'https://mianshi-zhilian-api.pages.dev';
-  static const contentPrimary = 'https://mianshizhilian-content.nontracey.de5.net';
+  static const contentPrimary =
+      'https://mianshizhilian-content.nontracey.de5.net';
   static const contentBackup = 'https://mianshi-zhilian-content.pages.dev';
 
   const RouteResolver();
