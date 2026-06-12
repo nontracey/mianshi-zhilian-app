@@ -358,6 +358,9 @@ class L10n {
     'privacy_protection': '隐私保护',
     'privacy_protection_commitment': '隐私保护承诺',
     'privacy_settings': '隐私设置',
+    'usage_analytics_toggle': '匿名使用统计',
+    'usage_analytics_toggle_desc':
+        '上报功能使用计数和版面访问次数，帮助改进产品；不包含练习内容、回答原文或 API Key。关闭后立即停止上报并清空待发送数据。',
     'project_deep_dig_library': '项目深挖库',
     'question_mark': '吗？',
     'questions_count': '题',
@@ -2046,6 +2049,9 @@ class L10n {
     'privacy_protection': 'Privacy Protection',
     'privacy_protection_commitment': 'Privacy Protection Commitment',
     'privacy_settings': 'Privacy Settings',
+    'usage_analytics_toggle': 'Anonymous usage statistics',
+    'usage_analytics_toggle_desc':
+        'Reports feature usage counts and section visits to help improve the app. Never includes your practice content, answers, or API keys. Turning this off stops reporting immediately and clears pending data.',
     'project_deep_dig_library': 'Project Deep-Dive Library',
     'question_mark': '?',
     'questions_count': 'Questions',

@@ -59,7 +59,8 @@ class AiService {
             'content': _buildUserContent(topicTitle, userAnswer, imageBytes),
           },
         ],
-        'temperature': 0.3,
+        // 评估固定 0 温度，保证同一回答评分可复现（与 docs/design.md 一致）。
+        'temperature': 0,
         'max_tokens': 2000,
       }),
     );
@@ -115,7 +116,8 @@ class AiService {
             'content': _buildUserContent(topicTitle, userAnswer, imageBytes),
           },
         ],
-        'temperature': 0.3,
+        // 评估固定 0 温度，保证同一回答评分可复现（与 docs/design.md 一致）。
+        'temperature': 0,
         'max_tokens': 2000,
         'stream': true,
       });

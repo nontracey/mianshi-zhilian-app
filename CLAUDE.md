@@ -61,7 +61,7 @@ The app uses **Provider** for state management with a layered architecture:
 - `connectivity_provider.dart` — network state
 
 **Services** (infrastructure layer):
-- `storage_service.dart` — local storage via `shared_preferences` (all persistence goes through SharedPreferences; sqflite is not used and was removed as a dependency)
+- `storage_service.dart` — local storage via `shared_preferences` for app/business data (sqflite is not used and was removed as a dependency). **Exception: sensitive credentials are NOT stored in plain SharedPreferences** — AI API keys and remembered login passwords go to the OS secure store (Keychain/Keystore/DPAPI) via `flutter_secure_storage` on native platforms; see `credential_store.dart` and the secure-storage paths in `storage_service.dart`. Never move secrets back into plain SharedPreferences
 - `ai_service.dart` — AI API calls (streaming, evaluation)
 - `data_sync_service.dart` — file/WebDAV/GitHub/Gitee sync with whitelist snapshot
 - `content_api_service.dart` — fetches knowledge content from CDN (dual-source fallback)

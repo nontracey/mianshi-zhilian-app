@@ -846,7 +846,22 @@ class StorageService {
     return id;
   }
 
+  /// 匿名使用统计开关键（设备本地，不进同步快照）。与
+  /// AnalyticsService._disabledKey 保持同一字面量。
+  static const _analyticsDisabledKey = '_analyticsDisabled';
+
+  /// 统计是否被用户关闭。业务侧直接调用 [recordAnalyticsFeature] 的路径
+  /// 也要被开关拦截，所以判断下沉到这里。
+  Future<bool> isAnalyticsDisabled() async =>
+      ((await load(_analyticsDisabledKey)) as bool?) ?? false;
+
+  /// 清空待发送的统计缓冲（用户关闭统计上报时调用）。
+  Future<void> clearAnalyticsBuffer() async {
+    await save(_analyticsBufferKey, null);
+  }
+
   Future<void> recordAnalyticsFeature(String feature) async {
+    if (await isAnalyticsDisabled()) return;
     const allowed = {
       'ai_eval',
       'ai_eval_success',

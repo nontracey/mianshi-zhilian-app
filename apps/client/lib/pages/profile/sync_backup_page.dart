@@ -11,6 +11,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/services/analytics_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
 import 'package:mianshi_zhilian/l10n/l10n.dart';
@@ -643,6 +644,8 @@ class DataManagementPanel extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         const Divider(),
+        const AnalyticsToggleTile(),
+        const Divider(),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
@@ -672,6 +675,45 @@ class DataManagementPanel extends StatelessWidget {
         'onedrive' => 'OneDrive',
         _ => l10n.get('local_mode'),
       };
+}
+
+/// 匿名使用统计开关。设备本地设置，不进同步快照；
+/// 关闭后 [AnalyticsService] 立即停止上报并清空待发送缓冲。
+class AnalyticsToggleTile extends StatefulWidget {
+  const AnalyticsToggleTile({super.key});
+
+  @override
+  State<AnalyticsToggleTile> createState() => _AnalyticsToggleTileState();
+}
+
+class _AnalyticsToggleTileState extends State<AnalyticsToggleTile> {
+  bool? _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<AnalyticsService>().isEnabled().then((value) {
+      if (mounted) setState(() => _enabled = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final analytics = context.read<AnalyticsService>();
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: _enabled ?? true,
+      title: Text(l10n.get('usage_analytics_toggle')),
+      subtitle: Text(l10n.get('usage_analytics_toggle_desc')),
+      onChanged: _enabled == null
+          ? null
+          : (value) async {
+              setState(() => _enabled = value);
+              await analytics.setEnabled(value);
+            },
+    );
+  }
 }
 
 class InfoRow extends StatelessWidget {

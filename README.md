@@ -50,7 +50,7 @@
 
 ### 直接使用
 
-打开 [Web App](https://mianshi-zhilian-app.pages.dev)，首次进入会看到新手引导。你可以先不配置 AI，直接浏览知识路线和进行本地练习；需要 AI 评估时，再到个人中心添加自己的模型配置。
+打开 [Web App](https://mianshizhilian-app.nontracey.de5.net)，首次进入会看到新手引导。你可以先不配置 AI，直接浏览知识路线和进行本地练习；需要 AI 评估时，再到个人中心添加自己的模型配置。
 
 ### 下载客户端
 
@@ -121,8 +121,9 @@ mianshi-zhilian-app/
 
 | 仓库 | 说明 |
 | --- | --- |
-| [mianshi-zhilian-content]() | 知识内容仓库 |
-| [mianshi-zhilian-content-studio]() | 内容管理工作台(暂未开放) |
+| [mianshi-zhilian-content](https://github.com/nontracey/mianshi-zhilian-content) | 知识内容仓库 |
+| [mianshi-zhilian-studio](https://github.com/nontracey/mianshi-zhilian-studio) | 内容管理工作台 |
+| [mianshi-zhilian-site](https://github.com/nontracey/mianshi-zhilian-site) | 静态官网 |
 
 ## 贡献与反馈
 

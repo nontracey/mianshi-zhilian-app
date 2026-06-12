@@ -161,17 +161,18 @@ export default {
   },
 };
 
+// 主备口径与客户端 RouteResolver 保持一致：de5.net 为主用，pages.dev 为备用。
 function contentPrimaryBaseUrl(env: Env): string {
   return (
     env.CONTENT_PRIMARY_BASE_URL ||
-    "https://mianshi-zhilian-content.pages.dev"
+    "https://mianshizhilian-content.nontracey.de5.net"
   );
 }
 
 function contentBackupBaseUrl(env: Env): string {
   return (
     env.CONTENT_BACKUP_BASE_URL ||
-    "https://mianshizhilian-content.nontracey.de5.net"
+    "https://mianshi-zhilian-content.pages.dev"
   );
 }
 

@@ -65,6 +65,7 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 - `sync_settings`：同步方式、WebDAV/GitHub/Gitee 配置、本地同步状态。该配置只保存在当前设备。
 - `_syncDirty`、`_syncDirtyAt`、`_syncDeviceId`：同步脏标记和设备标识。
 - `_analyticsBuffer`：待发送的轻量埋点缓冲。
+- `_analyticsDisabled`：匿名使用统计开关（设备本地，默认开启）。关闭后停止上报并清空 `_analyticsBuffer`。
 - 本地诊断日志：仅保存在本机，导出/查看前会脱敏常见 Key、Authorization、token/password/secret 字段和本机用户目录路径；正式版不再把普通 `debugPrint` 写入用户可见日志。
 - 内容缓存：`topics_cache`、`domain_cache_*`、`content_version`、`domain_version_*` 等，用于减少内容库重复加载。
 - AI 配置 API Key：原生平台优先写入系统安全存储（Keychain/Keystore/DPAPI），Web 端受平台限制仍保存在本地浏览器存储；不进入同步快照和完整导出明文。

@@ -26,7 +26,10 @@ class AnalyticsService with WidgetsBindingObserver {
   bool _flushing = false;
   bool _isActive = false;
   bool _observingLifecycle = false;
+  bool? _disabledCache;
 
+  /// 设备本地的统计开关（不进同步快照）。默认开启，用户可在「同步与备份」中关闭。
+  static const _disabledKey = '_analyticsDisabled';
   static const _lastFlushKey = '_analyticsLastFlushAt';
   static const _flushInterval = Duration(minutes: 30);
   static const _sections = {
@@ -50,7 +53,34 @@ class AnalyticsService with WidgetsBindingObserver {
     'update_check',
   };
 
-  void start() {
+  Future<bool> _isDisabled() async {
+    _disabledCache ??= await _storage.isAnalyticsDisabled();
+    return _disabledCache!;
+  }
+
+  /// 统计上报是否开启（用户可关闭）。
+  Future<bool> isEnabled() async => !await _isDisabled();
+
+  /// 切换统计上报。关闭时立即停止上报并清空待发送缓冲。
+  Future<void> setEnabled(bool enabled) async {
+    _disabledCache = !enabled;
+    await _storage.save(_disabledKey, !enabled);
+    if (enabled) {
+      await start();
+      return;
+    }
+    _timer?.cancel();
+    _timer = null;
+    _activeStartedAt = null;
+    if (_observingLifecycle) {
+      WidgetsBinding.instance.removeObserver(this);
+      _observingLifecycle = false;
+    }
+    await _storage.clearAnalyticsBuffer();
+  }
+
+  Future<void> start() async {
+    if (await _isDisabled()) return;
     _isActive = true;
     _activeStartedAt ??= DateTime.now();
     if (!_observingLifecycle) {
@@ -94,20 +124,24 @@ class AnalyticsService with WidgetsBindingObserver {
   }
 
   Future<void> recordOpen() async {
+    if (await _isDisabled()) return;
     await _increment('open_count');
   }
 
   Future<void> recordSection(String section) async {
+    if (await _isDisabled()) return;
     if (!_sections.contains(section)) return;
     await _incrementNested('section_counts', section);
   }
 
   Future<void> recordFeature(String feature) async {
+    if (await _isDisabled()) return;
     if (!_features.contains(feature)) return;
     await _storage.recordAnalyticsFeature(feature);
   }
 
   Future<void> flush({String? token, bool restartActiveTimer = true}) async {
+    if (await _isDisabled()) return;
     if (_flushing) return;
     _flushing = true;
     try {

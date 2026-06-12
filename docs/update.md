@@ -126,11 +126,11 @@
 客户端默认使用 `RouteResolver.appApi + /update.json`。Pages Functions 会代理 GitHub latest release 中的 `update.json`，避免客户端直接依赖 GitHub API：
 
 ```
-https://mianshi-zhilian-api.pages.dev/update.json
 https://mianshizhilian-api.nontracey.de5.net/update.json
+https://mianshi-zhilian-api.pages.dev/update.json
 ```
 
-生产构建不再支持通过 `UPDATE_MANIFEST_URL` 固定官方更新域名；官方主备域名由客户端路由表统一维护。
+生产构建不再支持通过 `UPDATE_MANIFEST_URL` 固定官方更新域名；官方主备域名由客户端路由表统一维护，de5.net 为主用，pages.dev 为备用。
 
 `scripts/build_update_manifest.dart` 会为每个平台写入 `assetPath`，格式为 `/releases/latest/download/<asset>`。Worker 只代理体积很小的 `update.json`，并对旧 manifest 做兜底规范化；各平台安装包不会经过 Worker 转发。客户端会用 `assetPath` 和 manifest 构造下载候选，再按用户选择的下载源模式排序；默认自动模式会先探测候选源，优先使用最快可达线路。
 

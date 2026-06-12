@@ -36,9 +36,9 @@
 │                    Cloudflare                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │ Pages (App)  │  │ Pages        │  │ Pages Func-  │      │
-│  │              │  │ (Content)    │  │ tions (API)  │      │
-│  │ app.pages.   │  │ content.     │  │ api.pages.   │      │
-│  │ dev          │  │ pages.dev    │  │ dev          │      │
+│  │ de5.net 主用 │  │ (Content)    │  │ tions (API)  │      │
+│  │ pages.dev    │  │ de5.net 主用 │  │ de5.net 主用 │      │
+│  │ 备用         │  │ pages.dev 备 │  │ pages.dev 备 │      │
 │  └──────────────┘  └──────────────┘  └──────┬───────┘      │
 │                                             │               │
 │                                      ┌──────▼───────┐      │
@@ -50,11 +50,11 @@
 
 ## 访问地址
 
-| 服务 | 地址 |
-|------|------|
-| Web App | https://mianshi-zhilian-app.pages.dev |
-| 内容 CDN | https://mianshi-zhilian-content.pages.dev |
-| Worker API | https://mianshi-zhilian-api.pages.dev |
+| 服务 | 主用 | 备用 |
+|------|------|------|
+| Web App | https://mianshizhilian-app.nontracey.de5.net | https://mianshi-zhilian-app.pages.dev |
+| 内容 CDN | https://mianshizhilian-content.nontracey.de5.net | https://mianshi-zhilian-content.pages.dev |
+| Worker API | https://mianshizhilian-api.nontracey.de5.net | https://mianshi-zhilian-api.pages.dev |
 
 ## 必需配置
 
@@ -63,7 +63,7 @@
 | Secret | 说明 |
 |--------|------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token，需要 Pages 和 Workers 权限 |
-| `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio 后台使用同一个 D1 |
+| `D1_DATABASE_ID` | app Worker 绑定的 D1 数据库 ID，需要与 studio-api 共享同一个 D1；二者部署面和 API 实现分开，不互相覆盖 |
 | `D1_STAGING_DATABASE_ID` | PR 预览环境使用的 D1 数据库 ID |
 | `JWT_SECRET` | 用户认证 JWT 签名密钥，需要在 Cloudflare Pages Dashboard 中手动配置为加密环境变量 |
 | `KV_NAMESPACE_ID` | 生产 Worker KV 命名空间 ID |
@@ -286,7 +286,7 @@ git push origin vx.x.x
 1. 在 GitHub 仓库配置 `CLOUDFLARE_API_TOKEN` secret 后，Web 和 Pages Functions 部署会在 push 到 `main` 时自动触发。
 2. 在 Cloudflare Pages Dashboard 中配置 D1 数据库绑定、KV 命名空间绑定和环境变量。
 3. Android release 构建已支持 keystore secrets；未配置时使用 debug 签名兜底以保证本地和预览构建可用。正式分发前仍需补 Windows 代码签名、macOS Developer ID 签名和 notarization。
-4. 更新检查使用 `RouteResolver.appApi + /update.json`，由客户端自动在 `https://mianshi-zhilian-api.pages.dev` 与 `https://mianshizhilian-api.nontracey.de5.net` 间选择。生产构建不再使用 `API_BASE_URL` / `UPDATE_MANIFEST_URL`。下载安装包、本机语音模型和 ONNX Runtime 时默认会探测 GitHub 官方、用户自定义镜像和 ghfast.top，优先使用响应最快的可达线路；用户可在 App 的"关于与更新 → ⚙️ 下载设置"中配置自定义镜像站前缀，并在"线路诊断"中切换下载源模式。
+4. 更新检查使用 `RouteResolver.appApi + /update.json`，由客户端自动在主用 `https://mianshizhilian-api.nontracey.de5.net` 与备用 `https://mianshi-zhilian-api.pages.dev` 间选择。生产构建不再使用 `API_BASE_URL` / `UPDATE_MANIFEST_URL`。下载安装包、本机语音模型和 ONNX Runtime 时默认会探测 GitHub 官方、用户自定义镜像和 ghfast.top，优先使用响应最快的可达线路；用户可在 App 的"关于与更新 → ⚙️ 下载设置"中配置自定义镜像站前缀，并在"线路诊断"中切换下载源模式。
 
 ## 免费额度与用户量估算
 
