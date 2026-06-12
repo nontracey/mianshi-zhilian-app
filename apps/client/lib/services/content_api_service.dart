@@ -62,21 +62,40 @@ class ContentApiService {
     );
   }
 
-  /// 批量加载某个领域下的所有 topics
+  /// 单个领域批量拉取 topic 时的并发窗口大小。
+  /// 过大容易在弱网/移动端打满连接池，6 在大领域（70+ topic）下
+  /// 已能把首次加载从全串行的几十次 RTT 压缩到 ~1/6。
+  static const _topicFetchConcurrency = 6;
+
+  /// 批量加载某个领域下的所有 topics。
+  ///
+  /// 按固定窗口分批并发（替代逐个 await 的全串行），结果顺序仍与
+  /// 内容契约中分类/topic 的引用顺序一致；单个 topic 加载失败不阻断整体。
   Future<List<Topic>> fetchDomainTopics(Domain domain) async {
-    final topics = <Topic>[];
-    for (final category in domain.categories) {
-      for (final topicPath in category.topics) {
-        try {
-          final topic = await fetchTopic(topicPath);
-          topics.add(topic);
-        } catch (e) {
-          // 单个 topic 加载失败不阻断整体
-          debugPrint('Failed to load topic $topicPath: $e');
-        }
-      }
+    final paths = <String>[
+      for (final category in domain.categories) ...category.topics,
+    ];
+    final results = List<Topic?>.filled(paths.length, null);
+    for (var start = 0; start < paths.length; start += _topicFetchConcurrency) {
+      final end = start + _topicFetchConcurrency > paths.length
+          ? paths.length
+          : start + _topicFetchConcurrency;
+      await Future.wait([
+        for (var i = start; i < end; i++)
+          () async {
+            try {
+              results[i] = await fetchTopic(paths[i]);
+            } catch (e) {
+              // 单个 topic 加载失败不阻断整体
+              debugPrint('Failed to load topic ${paths[i]}: $e');
+            }
+          }(),
+      ]);
     }
-    return topics;
+    return [
+      for (final topic in results)
+        if (topic != null) topic,
+    ];
   }
 
   static String cacheKeyForTopicRef(String topicPath) =>
