@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  repository_dispatch:
+    types: [content-contract-updated]
+  schedule:
+    - cron: '0 5 * * 1'
 
 jobs:
   flutter:
@@ -13,6 +17,13 @@ jobs:
         working-directory: apps/client
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout content contract fixture
+        uses: actions/checkout@v4
+        with:
+          repository: nontracey/mianshi-zhilian-content
+          ref: ${{ github.event.client_payload.sha || 'main' }}
+          path: content-contract
       
       - uses: subosito/flutter-action@v2
         with:
@@ -41,6 +52,8 @@ jobs:
       - run: python3 lib/l10n/check_l10n_keys.py
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
+        env:
+          CONTENT_REPO_PATH: ${{ github.workspace }}/content-contract
       - run: flutter build web --release
 
   worker:

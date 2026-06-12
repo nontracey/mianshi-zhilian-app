@@ -444,6 +444,13 @@ function refreshTokenExpiresAt(): string {
   return new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000).toISOString();
 }
 
+function parseStoredDateMs(value: string): number {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return Date.parse(`${value.replace(" ", "T")}Z`);
+  }
+  return Date.parse(value);
+}
+
 async function issueRefreshToken(
   db: D1Database,
   userId: string,
@@ -1218,7 +1225,7 @@ async function handleRefreshToken(
 
     // 宽限期轮换：已吊销但在 60s 内的 token，沿 rotated_to 找到后继 token 再旋转
     if (tokenRow.revoked_at) {
-      const revokedMs = Date.parse(tokenRow.revoked_at);
+      const revokedMs = parseStoredDateMs(tokenRow.revoked_at);
       const graceOk = Date.now() - revokedMs < 60_000 && tokenRow.rotated_to;
       if (!graceOk) {
         return json({ error: "登录已过期，请重新登录" }, 401);
@@ -1232,7 +1239,7 @@ async function handleRefreshToken(
       if (
         !successor ||
         successor.revoked_at ||
-        Date.parse(successor.expires_at) <= Date.now()
+        parseStoredDateMs(successor.expires_at) <= Date.now()
       ) {
         return json({ error: "登录已过期，请重新登录" }, 401);
       }
@@ -1242,7 +1249,7 @@ async function handleRefreshToken(
       tokenRow.revoked_at = null;
     }
 
-    if (Date.parse(tokenRow.expires_at) <= Date.now()) {
+    if (parseStoredDateMs(tokenRow.expires_at) <= Date.now()) {
       return json({ error: "登录已过期，请重新登录" }, 401);
     }
 
@@ -1256,14 +1263,15 @@ async function handleRefreshToken(
       return json({ error: "用户不存在" }, 404);
     }
     if (user.is_disabled === 1) {
+      const nowIso = new Date().toISOString();
       await env.DB.prepare(
         `
         UPDATE refresh_tokens
-        SET revoked_at = COALESCE(revoked_at, datetime('now')), last_used_at = datetime('now')
+        SET revoked_at = COALESCE(revoked_at, ?), last_used_at = ?
         WHERE id = ?
       `,
       )
-        .bind(tokenRow.id)
+        .bind(nowIso, nowIso, tokenRow.id)
         .run();
       return json({ error: "账号已被禁用，请联系管理员" }, 403);
     }
@@ -1275,14 +1283,15 @@ async function handleRefreshToken(
     );
 
     // 吊销当前 token，并记录宽限期链接
+    const nowIso = new Date().toISOString();
     await env.DB.prepare(
       `
       UPDATE refresh_tokens
-      SET revoked_at = datetime('now'), last_used_at = datetime('now'), rotated_to = ?
+      SET revoked_at = ?, last_used_at = ?, rotated_to = ?
       WHERE id = ?
     `,
     )
-      .bind(refreshTokenId, tokenRow.id)
+      .bind(nowIso, nowIso, refreshTokenId, tokenRow.id)
       .run();
 
     return json({
@@ -1311,14 +1320,15 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
     if (refreshToken && typeof refreshToken === "string") {
       await initDatabase(env.DB);
       const tokenHash = await hashRefreshToken(refreshToken);
+      const nowIso = new Date().toISOString();
       await env.DB.prepare(
         `
         UPDATE refresh_tokens
-        SET revoked_at = COALESCE(revoked_at, datetime('now'))
+        SET revoked_at = COALESCE(revoked_at, ?)
         WHERE token_hash = ?
       `,
       )
-        .bind(tokenHash)
+        .bind(nowIso, tokenHash)
         .run();
     }
 
@@ -1411,14 +1421,15 @@ async function handleChangePassword(
       .bind(newHash, userId)
       .run();
 
+    const nowIso = new Date().toISOString();
     await env.DB.prepare(
       `
       UPDATE refresh_tokens
-      SET revoked_at = COALESCE(revoked_at, datetime('now'))
+      SET revoked_at = COALESCE(revoked_at, ?)
       WHERE user_id = ?
     `,
     )
-      .bind(userId)
+      .bind(nowIso, userId)
       .run();
 
     return json({ success: true, message: "密码修改成功" });
@@ -1587,10 +1598,11 @@ async function handleAdminResetPassword(
     )
       .bind(newHash, userId)
       .run();
+    const nowIso = new Date().toISOString();
     await env.DB.prepare(
-      "UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, datetime('now')) WHERE user_id = ?",
+      "UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE user_id = ?",
     )
-      .bind(userId)
+      .bind(nowIso, userId)
       .run();
     return json({ success: true, userId, username: target.username });
   } catch (e) {
