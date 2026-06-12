@@ -209,7 +209,7 @@ pendingVersion != domain_version_X ?
 
 1. 在内容仓库修改知识点、分类、领域等
 2. 更新 `manifest.json` 的 `contentVersion`（改为今天的日期）
-3. 验证内容：`npm run validate`
+3. 验证内容：`npm run validate`、`npm run quality:scan`、`npm run quality:audit`
 4. 提交并推送
 5. 用户下次打开 App 会自动检测到版本变化
 

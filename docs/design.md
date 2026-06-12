@@ -1019,11 +1019,12 @@ App 渲染约定：
 ```mermaid
 flowchart LR
   A["新增 Markdown/JSON 知识"] --> B["校验 schema"]
-  B --> C["生成或更新领域 JSON"]
-  C --> D["更新 manifest 版本"]
-  D --> E["发布到 Git/CDN"]
-  E --> F["App 检测内容版本"]
-  F --> G["下载增量内容"]
+  B --> C["质量扫描与评分"]
+  C --> D["生成或更新领域 JSON"]
+  D --> E["更新 manifest 版本"]
+  E --> F["发布到 Git/CDN"]
+  F --> G["App 检测内容版本"]
+  G --> H["下载增量内容"]
 ```
 
 兼容策略：
