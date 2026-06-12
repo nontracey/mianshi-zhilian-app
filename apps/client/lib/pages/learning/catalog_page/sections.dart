@@ -170,7 +170,7 @@ extension _CatalogPageSections on _CatalogPageState {
                   label: l10n.get('all_topics'),
                   selected: _crossDomainAllSelected,
                   count: routeTopics.length,
-                  onTap: () => setState(() => _crossDomainAllSelected = true),
+                  onTap: () => _refresh(() => _crossDomainAllSelected = true),
                   isDark: isDark,
                   isAll: true,
                 ),
@@ -187,7 +187,7 @@ extension _CatalogPageSections on _CatalogPageState {
                         // 再次点击已选领域 → 回到「全部」，让筛选可顺手切回全貌。
                         final backToAll =
                             !_crossDomainAllSelected && currentDomainId == d.id;
-                        setState(() => _crossDomainAllSelected = backToAll);
+                        _refresh(() => _crossDomainAllSelected = backToAll);
                         if (!backToAll) {
                           widget.onDomainChanged(d.id);
                           if (contentProvider.getLoadedTopicCount(d.id) == 0) {
@@ -365,7 +365,7 @@ extension _CatalogPageSections on _CatalogPageState {
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 16),
-                  onPressed: () => setState(() => _searchQuery = ''),
+                  onPressed: () => _refresh(() => _searchQuery = ''),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 )
@@ -383,7 +383,7 @@ extension _CatalogPageSections on _CatalogPageState {
           isDense: true,
         ),
         style: const TextStyle(fontSize: 13),
-        onChanged: (v) => setState(() => _searchQuery = v),
+        onChanged: (v) => _refresh(() => _searchQuery = v),
       ),
     );
   }
@@ -395,7 +395,7 @@ extension _CatalogPageSections on _CatalogPageState {
         size: 20,
         color: _hasActiveFilters ? Theme.of(context).colorScheme.primary : null,
       ),
-      onPressed: () => setState(() => _showFilters = !_showFilters),
+      onPressed: () => _refresh(() => _showFilters = !_showFilters),
       tooltip: _showFilters ? l10n.get('hide_filter') : l10n.get('show_filter'),
       style: IconButton.styleFrom(
         backgroundColor: _hasActiveFilters
@@ -412,7 +412,7 @@ extension _CatalogPageSections on _CatalogPageState {
         ButtonSegment(value: true, icon: Icon(Icons.account_tree, size: 16)),
       ],
       selected: {_roadmapView},
-      onSelectionChanged: (next) => setState(() => _roadmapView = next.first),
+      onSelectionChanged: (next) => _refresh(() => _roadmapView = next.first),
       style: ButtonStyle(
         visualDensity: VisualDensity.compact,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -503,7 +503,7 @@ extension _CatalogPageSections on _CatalogPageState {
             children: [
               Switch(
                 value: _routeScopeOnly,
-                onChanged: (v) => setState(() => _routeScopeOnly = v),
+                onChanged: (v) => _refresh(() => _routeScopeOnly = v),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               const SizedBox(width: 4),
@@ -563,7 +563,7 @@ extension _CatalogPageSections on _CatalogPageState {
                   selectedColor: colors[d]!.withValues(alpha: 0.2),
                   checkmarkColor: colors[d],
                   onSelected: (selected) {
-                    setState(() {
+                    _refresh(() {
                       if (selected) {
                         _difficultyFilters.add(d);
                       } else {
@@ -586,7 +586,7 @@ extension _CatalogPageSections on _CatalogPageState {
                 selected: _highFrequencyOnly,
                 selectedColor: AppColors.danger.withValues(alpha: 0.15),
                 checkmarkColor: AppColors.danger,
-                onSelected: (v) => setState(() => _highFrequencyOnly = v),
+                onSelected: (v) => _refresh(() => _highFrequencyOnly = v),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
@@ -601,7 +601,7 @@ extension _CatalogPageSections on _CatalogPageState {
                 selected: _hasCodeOnly,
                 selectedColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                 checkmarkColor: const Color(0xFF8B5CF6),
-                onSelected: (v) => setState(() => _hasCodeOnly = v),
+                onSelected: (v) => _refresh(() => _hasCodeOnly = v),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
@@ -613,7 +613,7 @@ extension _CatalogPageSections on _CatalogPageState {
                 selected: _hasLeetcodeOnly,
                 selectedColor: const Color(0xFF10B981).withValues(alpha: 0.15),
                 checkmarkColor: const Color(0xFF10B981),
-                onSelected: (v) => setState(() => _hasLeetcodeOnly = v),
+                onSelected: (v) => _refresh(() => _hasLeetcodeOnly = v),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
               ),
@@ -635,7 +635,7 @@ extension _CatalogPageSections on _CatalogPageState {
                   selectedColor: colors[e.key]!.withValues(alpha: 0.15),
                   checkmarkColor: colors[e.key],
                   onSelected: (selected) {
-                    setState(() {
+                    _refresh(() {
                       if (selected) {
                         _statusFilters.add(e.key);
                       } else {
@@ -691,7 +691,7 @@ extension _CatalogPageSections on _CatalogPageState {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
-        onTap: () => setState(() => _sortBy = value),
+        onTap: () => _refresh(() => _sortBy = value),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
@@ -882,7 +882,7 @@ extension _CatalogPageSections on _CatalogPageState {
               ),
             InkWell(
               onTap: () {
-                setState(() {
+                _refresh(() {
                   if (isCollapsed) {
                     _collapsedPhases.remove(phase.id);
                   } else {
@@ -1535,7 +1535,7 @@ extension _CatalogPageSections on _CatalogPageState {
                   progressPercent,
                   isDark,
                   isCollapsed,
-                  () => setState(() {
+                  () => _refresh(() {
                     if (isCollapsed) {
                       _collapsedRoadmapSections.remove(sectionKey);
                     } else {

@@ -35,6 +35,12 @@ class MockInterviewPage extends StatefulWidget {
 
 class _MockInterviewPageState extends State<MockInterviewPage> {
   LocalizationProvider get l10n => context.watch<LocalizationProvider>();
+
+  /// part 文件中的 extension（_MockInterviewPageSections）不是 State 的子类成员，
+  /// 直接调用 protected 的 setState 会触发 invalid_use_of_protected_member，
+  /// 统一经由该方法刷新。
+  void _refresh(VoidCallback fn) => setState(fn);
+
   final _answerController = TextEditingController();
   int _currentIndex = 0;
   bool _isEvaluating = false;

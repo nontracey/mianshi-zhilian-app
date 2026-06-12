@@ -357,11 +357,11 @@ extension _MockInterviewPageSections on _MockInterviewPageState {
                   );
                 },
                 onListeningChanged: (listening) {
-                  setState(() => _isVoiceListening = listening);
+                  _refresh(() => _isVoiceListening = listening);
                 },
               ),
             ),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _refresh(() {}),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -472,7 +472,7 @@ extension _MockInterviewPageSections on _MockInterviewPageState {
                 'gradual_question_count_not_expand_show_detail_feedback_end_after_7',
               ),
             ),
-            onChanged: (value) => setState(() => _formalMode = value),
+            onChanged: (value) => _refresh(() => _formalMode = value),
           ),
         ],
       ),
