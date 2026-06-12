@@ -28,7 +28,7 @@
 这些数据写入本地 `SharedPreferences`。当同步方式配置为文件导入导出、WebDAV、GitHub 或 Gitee 时，会被打包成同步快照；文件导入导出和远端渠道使用同一批业务数据。
 
 - `progress_map`：知识点掌握度、练习次数、下次复习时间。
-- `practice_attempts`：复述、代码、本地保存和 AI 评估后的练习记录。
+- `practice_attempts`：复述、代码、本地保存和 AI 评估后的练习记录。活跃列表只保留最近 1000 条，超过部分进入本地归档。
 - `sessions`：普通练习会话记录。
 - `mock_interview_sessions`：模拟面试会话与题目结果。
 - `prep_plan`、`prep_goal`、`training_plan`：备考计划、目标和训练计划。
@@ -66,6 +66,7 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 - `_syncDirty`、`_syncDirtyAt`、`_syncDeviceId`：同步脏标记和设备标识。
 - `_analyticsBuffer`：待发送的轻量埋点缓冲。
 - `_analyticsDisabled`：匿名使用统计开关（设备本地，默认开启）。关闭后停止上报并清空 `_analyticsBuffer`。
+- `practice_attempts_archive`：旧练习记录本地归档，最多 4000 条。完整导出会包含它，日常同步包不包含它，避免多端同步包无上限增长。
 - 本地诊断日志：仅保存在本机，导出/查看前会脱敏常见 Key、Authorization、token/password/secret 字段和本机用户目录路径；正式版不再把普通 `debugPrint` 写入用户可见日志。
 - 内容缓存：`topics_cache`、`domain_cache_*`、`content_version`、`domain_version_*` 等，用于减少内容库重复加载。
 - AI 配置 API Key：原生平台优先写入系统安全存储（Keychain/Keystore/DPAPI），Web 端受平台限制仍保存在本地浏览器存储；不进入同步快照和完整导出明文。
@@ -87,5 +88,5 @@ WebDAV 上传使用条件请求做并发冲突检测：已知 ETag 时带 `If-Ma
 
 ## 清空数据
 
-- 清空练习数据：只重置 `progress_map`、`sessions`、`practice_attempts`、`mock_interview_sessions`，用于用户试用后重新开始学习；保留 AI 配置、同步配置、内容缓存和个人资料。
+- 清空练习数据：只重置 `progress_map`、`sessions`、`practice_attempts`、`practice_attempts_archive`、`mock_interview_sessions`，用于用户试用后重新开始学习；保留 AI 配置、同步配置、内容缓存和个人资料。
 - 清除所有本地数据：清空本机全部存储，包括配置、缓存、资料和登录状态。该入口属于隐私/数据管理操作。

@@ -36,6 +36,10 @@ class StorageService {
   static const _syncDirtyAtKey = '_syncDirtyAt';
   static const _deviceIdKey = '_syncDeviceId';
   static const _analyticsBufferKey = '_analyticsBuffer';
+  static const _practiceAttemptsKey = 'practice_attempts';
+  static const _practiceAttemptsArchiveKey = 'practice_attempts_archive';
+  static const practiceAttemptsRetainLimit = 1000;
+  static const practiceAttemptsArchiveLimit = 4000;
   static const _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
@@ -53,7 +57,7 @@ class StorageService {
   static const Set<String> _syncKeys = {
     'progress_map',
     'sessions',
-    'practice_attempts',
+    _practiceAttemptsKey,
     'mock_interview_sessions',
     'prep_plan',
     'local_profile',
@@ -254,24 +258,114 @@ class StorageService {
   }
 
   Future<void> savePracticeAttempts(List<PracticeAttempt> attempts) async {
-    await save('practice_attempts', attempts.map((a) => a.toJson()).toList());
+    await _savePracticeAttemptMaps(
+      attempts.map((a) => a.toJson()).toList(),
+      strict: false,
+    );
   }
 
   Future<void> savePracticeAttemptsStrict(
     List<PracticeAttempt> attempts,
   ) async {
-    await saveStrict(
-      'practice_attempts',
+    await _savePracticeAttemptMaps(
       attempts.map((a) => a.toJson()).toList(),
+      strict: true,
     );
   }
 
   Future<List<PracticeAttempt>> loadPracticeAttempts() async {
-    final data = await load('practice_attempts');
+    final data = await load(_practiceAttemptsKey);
     if (data == null) return [];
     return (data as List)
         .map((e) => PracticeAttempt.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<PracticeAttempt>> loadArchivedPracticeAttempts() async {
+    final data = await load(_practiceAttemptsArchiveKey);
+    if (data == null) return [];
+    return (data as List)
+        .map((e) => PracticeAttempt.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static List<PracticeAttempt> retainedPracticeAttempts(
+    List<PracticeAttempt> attempts,
+  ) {
+    final sorted = List<PracticeAttempt>.from(attempts)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return sorted.take(practiceAttemptsRetainLimit).toList();
+  }
+
+  Future<void> _savePracticeAttemptMaps(
+    List<Map<String, dynamic>> attempts, {
+    required bool strict,
+  }) async {
+    final compacted = await _compactPracticeAttemptMaps(attempts);
+    await _save(_practiceAttemptsKey, compacted.active, strict: strict);
+    await _save(_practiceAttemptsArchiveKey, compacted.archive, strict: false);
+  }
+
+  Future<
+    ({List<Map<String, dynamic>> active, List<Map<String, dynamic>> archive})
+  >
+  _compactPracticeAttemptMaps(List<Map<String, dynamic>> attempts) async {
+    final byId = <String, Map<String, dynamic>>{};
+    for (final attempt in attempts) {
+      final id = attempt['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      byId[id] = Map<String, dynamic>.from(attempt);
+    }
+
+    final sorted = byId.values.toList()
+      ..sort(
+        (a, b) => _practiceAttemptCreatedAt(
+          b,
+        ).compareTo(_practiceAttemptCreatedAt(a)),
+      );
+    final active = sorted.take(practiceAttemptsRetainLimit).toList();
+    final activeIds = active.map((item) => item['id']?.toString()).toSet();
+
+    final archiveById = <String, Map<String, dynamic>>{};
+    for (final item in _normalizePracticeAttemptMaps(
+      await load(_practiceAttemptsArchiveKey),
+    )) {
+      final id = item['id']?.toString();
+      if (id == null || id.isEmpty || activeIds.contains(id)) continue;
+      archiveById[id] = item;
+    }
+    for (final item in sorted.skip(practiceAttemptsRetainLimit)) {
+      final id = item['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      archiveById[id] = item;
+    }
+    final archive = archiveById.values.toList()
+      ..sort(
+        (a, b) => _practiceAttemptCreatedAt(
+          b,
+        ).compareTo(_practiceAttemptCreatedAt(a)),
+      );
+
+    return (
+      active: active,
+      archive: archive.take(practiceAttemptsArchiveLimit).toList(),
+    );
+  }
+
+  List<Map<String, dynamic>> _normalizePracticeAttemptMaps(dynamic value) {
+    if (value is! List) return [];
+    return value
+        .whereType<Map>()
+        .map((item) => item.map((k, v) => MapEntry(k.toString(), v)))
+        .toList();
+  }
+
+  DateTime _practiceAttemptCreatedAt(Map<String, dynamic> attempt) {
+    final raw = attempt['createdAt'];
+    if (raw is String) {
+      return DateTime.tryParse(raw) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Future<void> saveMockInterviewSessions(
@@ -449,11 +543,13 @@ class StorageService {
     final prefs = await _instance;
 
     final attempts = await loadPracticeAttempts();
+    final archivedAttempts = await loadArchivedPracticeAttempts();
     final sessions = await loadSessions();
     final mockSessions = await loadMockInterviewSessions();
     final progressMap = await loadProgressMap();
     await recordDeletions([
       for (final a in attempts) ('practice_attempts', a.id),
+      for (final a in archivedAttempts) ('practice_attempts', a.id),
       for (final s in sessions) ('sessions', s.id),
       for (final m in mockSessions) ('mock_interview_sessions', m.id),
       for (final topicId in progressMap.keys) ('progress_map', topicId),
@@ -462,7 +558,8 @@ class StorageService {
     for (final key in [
       'progress_map',
       'sessions',
-      'practice_attempts',
+      _practiceAttemptsKey,
+      _practiceAttemptsArchiveKey,
       'mock_interview_sessions',
     ]) {
       await prefs.remove(key);
@@ -692,7 +789,14 @@ class StorageService {
             syncSettings: syncSettings,
             preserveLocalSensitiveData: preserveLocalSensitiveData,
           );
-          await prefs.setString(entry.key, json.encode(merged));
+          if (merged is List) {
+            await _savePracticeAttemptMaps(
+              _normalizePracticeAttemptMaps(merged),
+              strict: false,
+            );
+          } else {
+            await prefs.setString(entry.key, json.encode(merged));
+          }
           continue;
         }
         if (entry.key == 'sessions') {
@@ -754,6 +858,25 @@ class StorageService {
               .map((item) => AiConfig.fromJson(item.cast<String, dynamic>()))
               .toList();
           await saveAiConfigs(configs);
+          continue;
+        } else if (key == _practiceAttemptsKey && value is List) {
+          await _savePracticeAttemptMaps(
+            _normalizePracticeAttemptMaps(value),
+            strict: false,
+          );
+          continue;
+        } else if (key == _practiceAttemptsArchiveKey && value is List) {
+          final archive = _normalizePracticeAttemptMaps(value)
+            ..sort(
+              (a, b) => _practiceAttemptCreatedAt(
+                b,
+              ).compareTo(_practiceAttemptCreatedAt(a)),
+            );
+          await _save(
+            _practiceAttemptsArchiveKey,
+            archive.take(practiceAttemptsArchiveLimit).toList(),
+            strict: false,
+          );
           continue;
         }
         try {
