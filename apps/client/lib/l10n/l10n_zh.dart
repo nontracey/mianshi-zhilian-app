@@ -1527,6 +1527,9 @@ const _zh = <String, String>{
     'download_fail_network_error_please_check_network_and_retry':
         '下载失败，网络无法连接。请检查网络或配置 GitHub 镜像站后重试。',
     'download_settings': '下载设置',
+    'switch_download_route': '切换线路',
+    'download_route_dialog_title': '选择本次下载线路',
+    'download_slow_switch_hint': '当前下载速度持续偏慢，可切换到镜像线路继续本次下载。',
     'downloading_from_source_2': '正在从 {source} 下载',
     'audio_mode': '语音接口类型',
     'audio_mode_none': '不支持语音',

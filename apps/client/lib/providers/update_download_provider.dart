@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../services/app_version_service.dart';
@@ -26,9 +28,22 @@ class UpdateDownloadProvider extends ChangeNotifier {
   int _received = 0;
   int _total = 0;
   String _source = '';
+  double _bytesPerSecond = 0;
+  bool _shouldSuggestSourceSwitch = false;
+  DateTime? _downloadStartedAt;
+  DateTime? _lastProgressAt;
+  DateTime? _slowSpeedSince;
+  Timer? _slowWatchTimer;
+  int _downloadGeneration = 0;
   int get received => _received;
   int get total => _total;
   String get source => _source;
+  double get bytesPerSecond => _bytesPerSecond;
+  bool get shouldSuggestSourceSwitch => _shouldSuggestSourceSwitch;
+
+  static const _zeroSpeedHintAfter = Duration(seconds: 6);
+  static const _slowSpeedHintAfter = Duration(seconds: 8);
+  static const _slowSpeedThresholdBytesPerSecond = 1024 * 1024;
 
   String? _version;
   String? _filePath;
@@ -46,6 +61,7 @@ class UpdateDownloadProvider extends ChangeNotifier {
 
   UpdateService? _service;
   DownloadCancelToken? _cancelToken;
+  Future<(String?, DownloadResult)>? _activeDownloadTask;
 
   List<DownloadAttempt> get lastAttempts => _service?.lastAttempts ?? const [];
 
@@ -88,29 +104,52 @@ class UpdateDownloadProvider extends ChangeNotifier {
     required String version,
     required int buildNumber,
   }) async {
-    if (_status == InstallerStatus.downloading) return;
+    if (_status == InstallerStatus.downloading || _activeDownloadTask != null) {
+      return;
+    }
+    final generation = ++_downloadGeneration;
     _service = service;
     _status = InstallerStatus.downloading;
     _version = version;
     _received = 0;
     _total = platformUpdate.size;
     _source = '';
+    _bytesPerSecond = 0;
+    _shouldSuggestSourceSwitch = false;
+    _downloadStartedAt = DateTime.now();
+    _lastProgressAt = null;
+    _slowSpeedSince = null;
     _lastResult = null;
     _cancelToken = DownloadCancelToken();
+    _startSlowWatch();
     notifyListeners();
 
-    final (filePath, result) = await service.downloadUpdate(
+    final task = service.downloadUpdate(
       platformUpdate: platformUpdate,
       version: version,
       cancelToken: _cancelToken,
-      onProgress: (r, t, s) {
-        _received = r;
-        _total = t;
-        _source = s;
+      onProgress: (progress) {
+        if (generation != _downloadGeneration) return;
+        _received = progress.received;
+        _total = progress.total;
+        _source = progress.sourceLabel;
+        _bytesPerSecond = progress.bytesPerSecond;
+        if (progress.received > 0) {
+          _lastProgressAt = DateTime.now();
+        }
+        _updateSlowHint();
         notifyListeners();
       },
     );
+    _activeDownloadTask = task;
 
+    final (filePath, result) = await task;
+    if (_activeDownloadTask == task) {
+      _activeDownloadTask = null;
+    }
+
+    if (generation != _downloadGeneration) return;
+    _stopSlowWatch();
     _lastResult = result;
     _cancelToken = null;
     if (result == DownloadResult.success && filePath != null) {
@@ -132,12 +171,26 @@ class UpdateDownloadProvider extends ChangeNotifier {
   }
 
   /// 取消进行中的下载。
-  void cancel() {
-    _cancelToken?.cancel();
+  void cancel({bool keepPartialDownload = false}) {
+    _downloadGeneration++;
+    _cancelToken?.cancel(keepPartialDownload: keepPartialDownload);
     _cancelToken = null;
     if (_status == InstallerStatus.downloading) {
       _status = InstallerStatus.idle;
+      _bytesPerSecond = 0;
+      _shouldSuggestSourceSwitch = false;
+      _stopSlowWatch();
       notifyListeners();
+    }
+  }
+
+  Future<void> cancelAndWait({bool keepPartialDownload = false}) async {
+    final task = _activeDownloadTask;
+    cancel(keepPartialDownload: keepPartialDownload);
+    try {
+      await task;
+    } catch (_) {
+      // 下载任务内部会把错误折算成 DownloadResult，这里只兜底避免切线被阻断。
     }
   }
 
@@ -167,5 +220,65 @@ class UpdateDownloadProvider extends ChangeNotifier {
   Future<void> _clearRecord(UpdateService service, String filePath) async {
     await _storage.save(_recordKey, null);
     await service.deleteFileQuietly(filePath);
+  }
+
+  void _startSlowWatch() {
+    _slowWatchTimer?.cancel();
+    _slowWatchTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_status != InstallerStatus.downloading) {
+        _stopSlowWatch();
+        return;
+      }
+      final before = _shouldSuggestSourceSwitch;
+      _updateSlowHint();
+      if (before != _shouldSuggestSourceSwitch) {
+        notifyListeners();
+      }
+    });
+  }
+
+  void _stopSlowWatch() {
+    _slowWatchTimer?.cancel();
+    _slowWatchTimer = null;
+    _downloadStartedAt = null;
+    _lastProgressAt = null;
+    _slowSpeedSince = null;
+  }
+
+  void _updateSlowHint() {
+    if (_status != InstallerStatus.downloading) {
+      _shouldSuggestSourceSwitch = false;
+      return;
+    }
+
+    final now = DateTime.now();
+    final startedAt = _downloadStartedAt ?? now;
+    final noBytesYet =
+        _received <= 0 && now.difference(startedAt) >= _zeroSpeedHintAfter;
+    final stalledAfterProgress =
+        _received > 0 &&
+        _lastProgressAt != null &&
+        now.difference(_lastProgressAt!) >= _zeroSpeedHintAfter;
+
+    final isSlowButMoving =
+        _bytesPerSecond > 0 &&
+        _bytesPerSecond < _slowSpeedThresholdBytesPerSecond;
+    if (isSlowButMoving) {
+      _slowSpeedSince ??= now;
+    } else {
+      _slowSpeedSince = null;
+    }
+    final slowLongEnough =
+        _slowSpeedSince != null &&
+        now.difference(_slowSpeedSince!) >= _slowSpeedHintAfter;
+
+    _shouldSuggestSourceSwitch =
+        noBytesYet || stalledAfterProgress || slowLongEnough;
+  }
+
+  @override
+  void dispose() {
+    _slowWatchTimer?.cancel();
+    super.dispose();
   }
 }

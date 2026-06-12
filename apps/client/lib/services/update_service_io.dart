@@ -181,18 +181,35 @@ class DownloadAttempt {
   }
 }
 
-/// 下载进度回调
-/// [received] 已下载字节数, [total] 总字节数, [sourceLabel] 当前下载源描述
+class UpdateDownloadProgress {
+  const UpdateDownloadProgress({
+    required this.received,
+    required this.total,
+    required this.sourceLabel,
+    required this.bytesPerSecond,
+  });
+
+  final int received;
+  final int total;
+  final String sourceLabel;
+  final double bytesPerSecond;
+
+  double? get fraction => total > 0 ? (received / total).clamp(0.0, 1.0) : null;
+}
+
 typedef DownloadProgressCallback =
-    void Function(int received, int total, String sourceLabel);
+    void Function(UpdateDownloadProgress progress);
 
 class DownloadCancelToken {
   bool _isCancelled = false;
+  bool _keepPartialDownload = false;
   http.Client? _client;
 
   bool get isCancelled => _isCancelled;
+  bool get keepPartialDownload => _keepPartialDownload;
 
-  void cancel() {
+  void cancel({bool keepPartialDownload = false}) {
+    _keepPartialDownload = keepPartialDownload;
     _isCancelled = true;
     _client?.close();
   }
@@ -245,7 +262,7 @@ class UpdateService {
         EndpointService.appApi,
         'GET',
         '/update.json',
-        timeout: const Duration(seconds: 15),
+        timeout: const Duration(seconds: 8),
       );
       if (response.statusCode != 200) {
         debugPrint('Failed to check update: ${response.statusCode}');
@@ -400,17 +417,26 @@ class UpdateService {
         }
       }
 
-      // 下载前检查文件是否已存在且 SHA256 匹配
+      // 下载前检查文件是否已存在且 SHA256 匹配。
+      // 未完整的临时文件保留下来，后续请求用 Range 续传。
       final file = File(filePath);
       if (await file.exists()) {
-        final alreadyValid = await verifySha256(filePath, platformUpdate.sha256);
-        if (alreadyValid) {
-          await _cleanupOtherInstallers(tempDir.path, keepFileName: fileName);
-          _lastAttempts = attempts;
-          return (filePath, DownloadResult.success);
+        final length = await file.length();
+        final expectedSize = platformUpdate.size;
+        final completeEnough = expectedSize <= 0 || length >= expectedSize;
+        if (completeEnough) {
+          final alreadyValid = await verifySha256(
+            filePath,
+            platformUpdate.sha256,
+          );
+          if (alreadyValid) {
+            await _cleanupOtherInstallers(tempDir.path, keepFileName: fileName);
+            _lastAttempts = attempts;
+            return (filePath, DownloadResult.success);
+          }
+          // 完整文件校验不通过，删除后重新下载；半包不在这里删。
+          await file.delete();
         }
-        // SHA256 不匹配，删除旧文件重新下载
-        await file.delete();
       }
 
       final result = await _downloadFromUrl(
@@ -436,7 +462,8 @@ class UpdateService {
               url: url,
               sourceLabel: sourceLabel,
               reached: true,
-              errorSummary: '$sourceLabel 文件已下载但 SHA256 校验不通过（文件可能已损坏或与 GitHub 版本不一致）',
+              errorSummary:
+                  '$sourceLabel 文件已下载但 SHA256 校验不通过（文件可能已损坏或与 GitHub 版本不一致）',
             ),
           );
           lastVerificationFailed = true;
@@ -477,7 +504,7 @@ class UpdateService {
       final headRequest = http.Request('HEAD', Uri.parse(url));
       final headResponse = await client
           .send(headRequest)
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 5));
       cancelToken?._unbind(client);
       client.close();
 
@@ -556,20 +583,46 @@ class UpdateService {
     String sourceLabel = '',
     DownloadProgressCallback? onProgress,
     DownloadCancelToken? cancelToken,
+    bool allowRangeReset = true,
   }) async {
     final client = http.Client();
     cancelToken?._bind(client);
     final file = File(filePath);
     IOSink? sink;
+    final existingBytes = await file.exists() ? await file.length() : 0;
+    onProgress?.call(
+      UpdateDownloadProgress(
+        received: existingBytes,
+        total: platformUpdate.size,
+        sourceLabel: sourceLabel,
+        bytesPerSecond: 0,
+      ),
+    );
     try {
       // 文件已不存在（调用前已检查 SHA256，不匹配已删除）
       // 下载文件
       final request = http.Request('GET', Uri.parse(url));
+      if (existingBytes > 0) {
+        request.headers['Range'] = 'bytes=$existingBytes-';
+      }
       final response = await client
           .send(request)
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 8));
 
-      if (response.statusCode != 200) {
+      if (response.statusCode == 416 && existingBytes > 0 && allowRangeReset) {
+        await file.delete();
+        return _downloadFromUrl(
+          url: url,
+          filePath: filePath,
+          platformUpdate: platformUpdate,
+          sourceLabel: sourceLabel,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+          allowRangeReset: false,
+        );
+      }
+
+      if (response.statusCode != 200 && response.statusCode != 206) {
         debugPrint('Download failed from $url: ${response.statusCode}');
         unawaited(
           AppLog.warning(
@@ -580,18 +633,36 @@ class UpdateService {
         return _DownloadStatus.networkError;
       }
 
-      sink = file.openWrite();
-      int received = 0;
+      final appending = response.statusCode == 206 && existingBytes > 0;
+      if (!appending && existingBytes > 0) {
+        await file.delete();
+        onProgress?.call(
+          UpdateDownloadProgress(
+            received: 0,
+            total: platformUpdate.size,
+            sourceLabel: sourceLabel,
+            bytesPerSecond: 0,
+          ),
+        );
+      }
+
+      sink = file.openWrite(mode: appending ? FileMode.append : FileMode.write);
+      int received = appending ? existingBytes : 0;
       final total = platformUpdate.size > 0
           ? platformUpdate.size
+          : appending
+          ? existingBytes + (response.contentLength ?? 0)
           : response.contentLength ?? 0;
+      final stopwatch = Stopwatch()..start();
+      var speedBaseBytes = received;
+      var speedBaseElapsed = Duration.zero;
 
       await response.stream
           .timeout(
-            const Duration(seconds: 45),
+            const Duration(seconds: 12),
             onTimeout: (controller) {
               controller.addError(
-                TimeoutException('Download stalled for 45 seconds'),
+                TimeoutException('Download stalled for 12 seconds'),
               );
               controller.close();
             },
@@ -602,7 +673,25 @@ class UpdateService {
             }
             sink!.add(chunk);
             received += chunk.length;
-            onProgress?.call(received, total, sourceLabel);
+            final speed = _speedBytesPerSecond(
+              stopwatch,
+              received,
+              speedBaseBytes,
+              speedBaseElapsed,
+            );
+            if (stopwatch.elapsed - speedBaseElapsed >
+                const Duration(seconds: 1)) {
+              speedBaseBytes = received;
+              speedBaseElapsed = stopwatch.elapsed;
+            }
+            onProgress?.call(
+              UpdateDownloadProgress(
+                received: received,
+                total: total,
+                sourceLabel: sourceLabel,
+                bytesPerSecond: speed,
+              ),
+            );
           })
           .timeout(const Duration(minutes: 20));
 
@@ -641,12 +730,22 @@ class UpdateService {
       try {
         await sink?.close();
       } catch (_) {}
-      if (await file.exists()) {
+      if (!(cancelToken?.keepPartialDownload ?? false) && await file.exists()) {
         await file.delete();
       }
       return _DownloadStatus.cancelled;
     } catch (e) {
       debugPrint('Download error from $url: $e');
+      if (cancelToken?.isCancelled ?? false) {
+        try {
+          await sink?.close();
+        } catch (_) {}
+        if (!(cancelToken?.keepPartialDownload ?? false) &&
+            await file.exists()) {
+          await file.delete();
+        }
+        return _DownloadStatus.cancelled;
+      }
       unawaited(
         AppLog.warning(
           'Update download error: $sourceLabel',
@@ -657,9 +756,7 @@ class UpdateService {
       try {
         await sink?.close();
       } catch (_) {}
-      if (await file.exists()) {
-        await file.delete();
-      }
+      // 网络中断时保留半包，后续重试或临时切线可通过 Range 续传。
       return _DownloadStatus.networkError;
     } finally {
       cancelToken?._unbind(client);
@@ -786,11 +883,30 @@ class UpdateService {
     return 0;
   }
 
+  double _speedBytesPerSecond(
+    Stopwatch stopwatch,
+    int received,
+    int baseBytes,
+    Duration baseElapsed,
+  ) {
+    final elapsed = stopwatch.elapsed - baseElapsed;
+    if (elapsed.inMilliseconds <= 0) return 0;
+    return (received - baseBytes) * 1000 / elapsed.inMilliseconds;
+  }
+
   /// 格式化文件大小
   static String formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  static String formatSpeed(double bytesPerSecond) {
+    if (bytesPerSecond <= 0) return '0 KB/s';
+    if (bytesPerSecond < 1024 * 1024) {
+      return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${(bytesPerSecond / 1024 / 1024).toStringAsFixed(1)} MB/s';
   }
 }
 

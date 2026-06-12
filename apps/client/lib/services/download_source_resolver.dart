@@ -21,9 +21,13 @@ class DownloadSourceResolver {
   }) {
     if (originalUrl.isEmpty) return [];
 
-    final mirrorPrefix = (customMirrorPrefix ?? '').replaceAll(RegExp(r'/+$'), '');
+    final mirrorPrefix = (customMirrorPrefix ?? '').replaceAll(
+      RegExp(r'/+$'),
+      '',
+    );
     final customMirrorUrl = mirrorPrefix.isNotEmpty
-        ? (transformUrl?.call(originalUrl, mirrorPrefix) ?? '$mirrorPrefix/$originalUrl')
+        ? (transformUrl?.call(originalUrl, mirrorPrefix) ??
+              '$mirrorPrefix/$originalUrl')
         : '';
     final defaultMirrorUrl = '$defaultMirrorPrefix/$originalUrl';
 
@@ -35,28 +39,31 @@ class DownloadSourceResolver {
     switch (mode) {
       case DownloadSourceMode.githubOnly:
         add(originalUrl);
-        return urls.map((url) => DownloadCandidate(
-          url: url,
-          sourceLabel: sourceLabel(url, customMirrorPrefix: mirrorPrefix),
-        )).toList();
       case DownloadSourceMode.mirrorFirst:
         add(customMirrorUrl);
+        add(defaultMirrorUrl);
+        for (final mirror in additionalMirrors) {
+          add(mirror);
+        }
         add(originalUrl);
       case DownloadSourceMode.auto:
       case DownloadSourceMode.githubFirst:
         add(originalUrl);
         add(customMirrorUrl);
+        add(defaultMirrorUrl);
+        for (final mirror in additionalMirrors) {
+          add(mirror);
+        }
     }
 
-    add(defaultMirrorUrl);
-    for (final mirror in additionalMirrors) {
-      add(mirror);
-    }
-
-    return urls.map((url) => DownloadCandidate(
-      url: url,
-      sourceLabel: sourceLabel(url, customMirrorPrefix: mirrorPrefix),
-    )).toList();
+    return urls
+        .map(
+          (url) => DownloadCandidate(
+            url: url,
+            sourceLabel: sourceLabel(url, customMirrorPrefix: mirrorPrefix),
+          ),
+        )
+        .toList();
   }
 
   static Future<List<String>> orderByProbeLatency(List<String> urls) async {
@@ -83,7 +90,7 @@ class DownloadSourceResolver {
       final request = http.Request('HEAD', Uri.parse(url));
       final response = await client
           .send(request)
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 3));
       stopwatch.stop();
       return _ProbeResult(
         url: url,

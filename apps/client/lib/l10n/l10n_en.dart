@@ -1708,6 +1708,10 @@ const _en = <String, String>{
     'download_fail_network_error_please_check_network_and_retry':
         'Download failed due to network issues. Please check your network or configure a GitHub mirror and retry.',
     'download_settings': 'Download Settings',
+    'switch_download_route': 'Switch route',
+    'download_route_dialog_title': 'Choose route for this download',
+    'download_slow_switch_hint':
+        'The current download is staying slow. You can switch to a mirror route for this download.',
     'downloading_from_source_2': 'Downloading from {source}',
     'audio_mode': 'Audio interface type',
     'audio_mode_none': 'No audio support',
