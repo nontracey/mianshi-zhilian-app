@@ -265,6 +265,7 @@ class _LearningShellState extends State<LearningShell> {
           settings.updateSettings(
             settings.settings.copyWith(currentDomain: id),
           );
+          scope.setSingleDomain(id, contentProvider: content);
           if (content.getLoadedTopicCount(id) == 0) {
             content.loadDomainTopics(id);
           }
@@ -297,6 +298,7 @@ class _LearningShellState extends State<LearningShell> {
           settings.updateSettings(
             settings.settings.copyWith(currentDomain: id),
           );
+          scope.setSingleDomain(id, contentProvider: content);
           if (content.getLoadedTopicCount(id) == 0) {
             content.loadDomainTopics(id);
           }
@@ -347,9 +349,12 @@ class _LearningShellState extends State<LearningShell> {
         onNavigateToDashboard: () => _setSection(AppSection.dashboard),
       ),
       AppSection.mastery => MasteryPage(
-        onDomainChanged: (id) => settings.updateSettings(
-          settings.settings.copyWith(currentDomain: id),
-        ),
+        onDomainChanged: (id) {
+          settings.updateSettings(
+            settings.settings.copyWith(currentDomain: id),
+          );
+          scope.setSingleDomain(id, contentProvider: content);
+        },
         onStartTopicPractice: (topicId) => setState(() {
           _selectedTopicId = topicId;
           _selectedTopicInitialTab = 1;
