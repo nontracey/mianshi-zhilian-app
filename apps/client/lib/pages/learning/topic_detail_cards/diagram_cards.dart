@@ -176,11 +176,41 @@ class MermaidDiagramData {
       if (edge != null) edges.add(edge);
     }
 
+    // 收集所有已知的 node id → label 映射（label ≠ id 才算有效 label）
+    final labelMap = <String, String>{};
+    for (final edge in edges) {
+      _collectLabel(edge.source, labelMap);
+      _collectLabel(edge.target, labelMap);
+    }
+
+    // 回填：跨行引用只写 ID 不带 label 的节点，用已知 label 补上
+    final filled = edges.map((edge) {
+      return MermaidEdge(
+        source: _fillLabel(edge.source, labelMap),
+        target: _fillLabel(edge.target, labelMap),
+        label: edge.label,
+      );
+    }).toList();
+
     return MermaidDiagramData(
       source: source,
       direction: direction,
-      edges: edges,
+      edges: filled,
     );
+  }
+
+  static void _collectLabel(MermaidNode node, Map<String, String> map) {
+    if (node.label != node.id) {
+      map[node.id] = node.label;
+    }
+  }
+
+  static MermaidNode _fillLabel(MermaidNode node, Map<String, String> map) {
+    final known = map[node.id];
+    if (known != null && node.label == node.id) {
+      return MermaidNode(id: node.id, label: known);
+    }
+    return node;
   }
 
   static MermaidEdge? _parseEdge(String statement) {
