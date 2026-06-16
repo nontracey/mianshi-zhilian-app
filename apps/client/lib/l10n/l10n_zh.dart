@@ -1301,6 +1301,7 @@ const _zh = <String, String>{
     'distributed_rate_limit': '分布式限流',
     'distributed_search': '分布式搜索',
     'domain_knowledge_card': '领域知识卡片',
+    'temporary_browse': '临时浏览',
     'draft': '草稿',
     'draft_2': '草稿',
     'draft_content': '草稿内容',

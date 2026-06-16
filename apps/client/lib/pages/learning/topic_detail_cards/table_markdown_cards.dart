@@ -134,17 +134,22 @@ class MarkdownContent extends StatelessWidget {
       syntaxHighlighter: CodeSyntaxHighlighter(),
       styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
         p: baseStyle.copyWith(height: 1.7),
+        // 标题颜色跟随外层 DefaultTextStyle（深色卡片里包了浅色文字），
+        // 不能写死成主题 textTheme 颜色，否则浅色主题下深色卡片里标题会变黑看不见
         h1: Theme.of(context).textTheme.headlineSmall?.copyWith(
           fontWeight: FontWeight.w900,
           fontSize: 22,
+          color: baseStyle.color,
         ),
         h2: Theme.of(context).textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w900,
           fontSize: 18,
+          color: baseStyle.color,
         ),
         h3: Theme.of(context).textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w900,
           fontSize: 16,
+          color: baseStyle.color,
         ),
         code: TextStyle(
           fontFamily: 'JetBrainsMono',

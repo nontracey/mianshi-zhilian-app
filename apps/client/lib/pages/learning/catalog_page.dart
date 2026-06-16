@@ -21,11 +21,20 @@ class CatalogPage extends StatefulWidget {
     required this.onDomainChanged,
     required this.onTopicLearn,
     required this.onTopicPractice,
+    this.domainOverride,
+    this.onExitDomainOverride,
   });
 
   final ValueChanged<String> onDomainChanged;
   final ValueChanged<String> onTopicLearn;
   final ValueChanged<String> onTopicPractice;
+
+  /// 临时浏览的领域 ID：从「领域知识卡片」点入时，只看该领域的完整目录，
+  /// 不应用学习范围裁剪、也不改变全局范围（路线保持）。为 null 时按范围正常渲染。
+  final String? domainOverride;
+
+  /// 退出临时浏览（返回上一界面）。
+  final VoidCallback? onExitDomainOverride;
 
   @override
   State<CatalogPage> createState() => _CatalogPageState();
@@ -193,20 +202,30 @@ class _CatalogPageState extends State<CatalogPage> {
     final scope = context.watch<LearningScopeProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentDomainId = settingsProvider.settings.currentDomain;
 
     final allDomains = contentProvider.domains;
+    // 临时浏览：从「领域知识卡片」点入时只看该领域的完整目录，且不应用范围裁剪、
+    // 不读全局当前领域，避免改变 / 受制于学习范围（路线保持）。
+    final overrideId = widget.domainOverride;
+    final isDomainOverride =
+        overrideId != null && allDomains.any((d) => d.id == overrideId);
+    final currentDomainId = isDomainOverride
+        ? overrideId
+        : settingsProvider.settings.currentDomain;
+
     final domains = _filterDomains(allDomains);
     final currentDomain = allDomains
         .where((d) => d.id == currentDomainId)
         .firstOrNull;
-    final isCrossDomainRouteMode = _isCrossDomainRouteMode(scope);
+    final isCrossDomainRouteMode =
+        !isDomainOverride && _isCrossDomainRouteMode(scope);
     if (currentDomain == null && !isCrossDomainRouteMode) {
       return Center(child: Text(l10n.get('please_select_one_domain')));
     }
 
-    final isRouteScoped = scope.isRouteMode && _routeScopeOnly;
-    final isCrossDomain = scope.isCrossDomain;
+    final isRouteScoped =
+        !isDomainOverride && scope.isRouteMode && _routeScopeOnly;
+    final isCrossDomain = !isDomainOverride && scope.isCrossDomain;
     final routeTopicIds = Set<String>.from(scope.scopeTopicIds);
 
     List<Topic> domainTopics;
@@ -282,7 +301,15 @@ class _CatalogPageState extends State<CatalogPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isCrossDomainRouteMode)
+          if (isDomainOverride)
+            _buildOverrideHeader(
+              context,
+              currentDomain,
+              masteryPercent,
+              totalTopics,
+              isDark,
+            )
+          else if (isCrossDomainRouteMode)
             _buildCrossDomainHeader(
               context,
               domains,
@@ -307,8 +334,10 @@ class _CatalogPageState extends State<CatalogPage> {
             ),
           const SizedBox(height: 12),
 
-          if (scope.isRouteMode) _buildRouteBanner(context, isDark, scope),
-          if (scope.isRouteMode) const SizedBox(height: 12),
+          if (!isDomainOverride && scope.isRouteMode)
+            _buildRouteBanner(context, isDark, scope),
+          if (!isDomainOverride && scope.isRouteMode)
+            const SizedBox(height: 12),
 
           if (_showFilters) ...[
             _buildFilterBar(context, isDark),

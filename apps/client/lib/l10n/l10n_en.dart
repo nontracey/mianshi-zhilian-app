@@ -1365,6 +1365,7 @@ const _en = <String, String>{
     'pre_plan': 'Estimated',
     'pre_plan_use_time_25_min': 'Estimated time: 25 min',
     'domain_knowledge_card': 'Domain Knowledge Cards',
+    'temporary_browse': 'Browsing',
     'question_count': 'Questions',
     'wind_control_strategy': 'Risk Control Strategy',
     'high_low': 'High → Low',

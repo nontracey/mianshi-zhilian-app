@@ -116,6 +116,86 @@ extension _CatalogPageSections on _CatalogPageState {
     );
   }
 
+  /// 临时浏览某领域目录时的精简头部：返回按钮 + 领域名 + 「临时浏览」标记，
+  /// 不含领域下拉 / 范围切换，避免在临时态误改学习范围。
+  Widget _buildOverrideHeader(
+    BuildContext context,
+    Domain? domain,
+    int masteryPercent,
+    int totalTopics,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF30363D) : const Color(0xFFE8E8E8),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, size: 20),
+                tooltip: l10n.get('back'),
+                onPressed: () => widget.onExitDomainOverride?.call(),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  domain?.title ?? '',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  l10n.get('temporary_browse'),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildSearchField()),
+              const SizedBox(width: 8),
+              _buildFilterButton(),
+              const SizedBox(width: 4),
+              _buildViewToggle(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildProgressRow(totalTopics, masteryPercent, isDark),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCrossDomainHeader(
     BuildContext context,
     List<Domain> domains,

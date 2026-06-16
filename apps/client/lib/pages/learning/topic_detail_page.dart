@@ -21,12 +21,17 @@ class TopicDetailPage extends StatefulWidget {
     required this.onBack,
     this.initialTabIndex = 0,
     this.onRouteTopicTap,
+    this.showRouteNav = true,
   });
 
   final Topic topic;
   final VoidCallback onBack;
   final int initialTabIndex;
   final ValueChanged<String>? onRouteTopicTap;
+
+  /// 是否显示路线上一个/下一个知识点导航。临时浏览某领域目录时传 false——
+  /// 当前知识点不属于「正在学的路线」语境，路线顺序的上/下一个没有意义。
+  final bool showRouteNav;
 
   @override
   State<TopicDetailPage> createState() => _TopicDetailPageState();
@@ -82,6 +87,7 @@ class _TopicDetailPageState extends State<TopicDetailPage>
         _buildTopBar(context, topic, isDesktop),
         Builder(
           builder: (ctx) {
+            if (!widget.showRouteNav) return const SizedBox.shrink();
             final scope = ctx.watch<LearningScopeProvider>();
             if (scope.isRouteMode && scope.scopeTopicIds.isNotEmpty) {
               return _buildRouteNav(ctx, scope.scopeTopicIds);
