@@ -19,6 +19,7 @@ class DashboardPage extends StatelessWidget {
     required this.onPractice,
     required this.onTopicTap,
     required this.onViewDomainCatalog,
+    this.onBrowseDomainCatalog,
     this.onReview,
     this.onMockInterview,
     this.onPrepNavigation,
@@ -31,6 +32,7 @@ class DashboardPage extends StatelessWidget {
   final VoidCallback onPractice;
   final ValueChanged<String> onTopicTap;
   final ValueChanged<String> onViewDomainCatalog;
+  final ValueChanged<String>? onBrowseDomainCatalog;
   final VoidCallback? onReview;
   final VoidCallback? onMockInterview;
   final VoidCallback? onPrepNavigation;
@@ -252,6 +254,7 @@ class DashboardPage extends StatelessWidget {
                             onDomainChanged: onDomainChanged,
                             onTopicTap: onTopicTap,
                             onViewDomainCatalog: onViewDomainCatalog,
+                            onBrowseDomainCatalog: onBrowseDomainCatalog,
                             onPractice: onPractice,
                             onReview: onReview,
                             onMockInterview: onMockInterview,
@@ -333,6 +336,7 @@ class DashboardPage extends StatelessWidget {
                                 onDomainChanged: onDomainChanged,
                                 onTopicTap: onTopicTap,
                                 onViewDomainCatalog: onViewDomainCatalog,
+                                onBrowseDomainCatalog: onBrowseDomainCatalog,
                                 onPractice: onPractice,
                                 onReview: onReview,
                                 onMockInterview: onMockInterview,
@@ -399,6 +403,7 @@ class DashboardPage extends StatelessWidget {
                           onDomainChanged: onDomainChanged,
                           onTopicTap: onTopicTap,
                           onViewDomainCatalog: onViewDomainCatalog,
+                          onBrowseDomainCatalog: onBrowseDomainCatalog,
                           onPractice: onPractice,
                           onReview: onReview,
                           onMockInterview: onMockInterview,

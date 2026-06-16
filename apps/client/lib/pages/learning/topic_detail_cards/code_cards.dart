@@ -529,9 +529,11 @@ class HighlightedCode extends StatelessWidget {
                       ),
                       child: Text(
                         'L${entry.key}: ${entry.value}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          // 代码卡背景始终为深色，固定用浅色文字，
+                          // 不能跟随主题 onSurface（浅色主题下会变黑字看不见）
+                          color: AppColors.syntaxDefault,
                         ),
                       ),
                     ),

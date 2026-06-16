@@ -42,6 +42,9 @@ class _LearningShellState extends State<LearningShell> {
   AppSection _section = AppSection.dashboard;
   String? _selectedTopicId;
   int _selectedTopicInitialTab = 0;
+  // 「领域知识卡片」点入时的临时目录领域：仅供 CatalogPage 临时浏览该领域目录，
+  // 不改变学习范围（路线保持不变）。切换 section / 返回时清空。
+  String? _catalogDomainOverride;
   bool _isSidebarCollapsed = false;
   late AuthProvider _auth;
 
@@ -244,6 +247,9 @@ class _LearningShellState extends State<LearningShell> {
             _selectedTopicId = topicId;
             _selectedTopicInitialTab = 0;
           }),
+          // 临时浏览某领域目录时进入的知识点：不属于当前路线语境，
+          // 隐藏路线上一个/下一个导航。
+          showRouteNav: _catalogDomainOverride == null,
         );
       }
     }
@@ -275,6 +281,8 @@ class _LearningShellState extends State<LearningShell> {
           _selectedTopicId = topicId;
           _selectedTopicInitialTab = 0;
         }),
+        // 路线/领域列表项的「查看目录」：切到单领域范围（退出路线裁剪）再跳目录。
+        // 「领域知识卡片」走 onBrowseDomainCatalog（临时浏览，不切换范围）。
         onViewDomainCatalog: (domainId) {
           settings.updateSettings(
             settings.settings.copyWith(currentDomain: domainId),
@@ -282,9 +290,19 @@ class _LearningShellState extends State<LearningShell> {
           if (content.getLoadedTopicCount(domainId) == 0) {
             content.loadDomainTopics(domainId);
           }
-          // 点领域卡片 = 切到单领域范围（退出路线裁剪），再跳目录
           scope.setSingleDomain(domainId, contentProvider: content);
           setState(() => _section = AppSection.catalog);
+        },
+        // 点「领域知识卡片」= 临时进入该领域目录浏览，不切换学习范围（路线保持）。
+        onBrowseDomainCatalog: (domainId) {
+          if (content.getLoadedTopicCount(domainId) == 0) {
+            content.loadDomainTopics(domainId);
+          }
+          setState(() {
+            _catalogDomainOverride = domainId;
+            _section = AppSection.catalog;
+            _selectedTopicId = null;
+          });
         },
         onReview: () => _setSection(AppSection.practice),
         onMockInterview: () => _startMockInterview(content, settings, scope),
@@ -294,6 +312,11 @@ class _LearningShellState extends State<LearningShell> {
         onRegenerateAiRoute: () => _generateAiRoute(forceRegenerate: true),
       ),
       AppSection.catalog => CatalogPage(
+        domainOverride: _catalogDomainOverride,
+        onExitDomainOverride: () => setState(() {
+          _catalogDomainOverride = null;
+          _section = AppSection.dashboard;
+        }),
         onDomainChanged: (id) {
           settings.updateSettings(
             settings.settings.copyWith(currentDomain: id),
@@ -394,6 +417,8 @@ class _LearningShellState extends State<LearningShell> {
     setState(() {
       _section = value;
       _selectedTopicId = null;
+      // 经导航切换目录时退出临时浏览，回到按学习范围裁剪的目录视图。
+      _catalogDomainOverride = null;
     });
   }
 

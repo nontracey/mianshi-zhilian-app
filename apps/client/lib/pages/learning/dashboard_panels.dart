@@ -547,6 +547,7 @@ class CenterPanel extends StatefulWidget {
     required this.onDomainChanged,
     required this.onTopicTap,
     required this.onViewDomainCatalog,
+    this.onBrowseDomainCatalog,
     required this.onPractice,
     required this.onReview,
     required this.onMockInterview,
@@ -567,6 +568,7 @@ class CenterPanel extends StatefulWidget {
   final ValueChanged<String> onDomainChanged;
   final ValueChanged<String> onTopicTap;
   final ValueChanged<String> onViewDomainCatalog;
+  final ValueChanged<String>? onBrowseDomainCatalog;
   final VoidCallback onPractice;
   final VoidCallback? onReview;
   final VoidCallback? onMockInterview;
@@ -817,6 +819,13 @@ class CenterPanelState extends State<CenterPanel> {
                             masteryPercent: dp.masteryPercent,
                             practiceCount: practiceCount,
                             onTap: () {
+                              // 领域知识卡片 = 临时浏览该领域目录，不切换学习范围。
+                              final browse = widget.onBrowseDomainCatalog;
+                              if (browse != null) {
+                                browse(domain.id);
+                                return;
+                              }
+                              // 回退：未提供临时浏览回调时保持旧行为。
                               widget.onDomainChanged(domain.id);
                               if (widget.contentProvider.getLoadedTopicCount(
                                     domain.id,
