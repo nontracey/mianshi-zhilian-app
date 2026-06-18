@@ -50,6 +50,10 @@ class AppColors {
   static const Color categoryCyan = Color(0xFF00CCF9);
   static const Color categoryDeepBlue = Color(0xFF0F3460);
 
+  // Mermaid 5 色板 classDef（asyncState 避 Dart 关键字 async）
+  static const Color asyncState = Color(0xFF6366F1);
+  static const Color highlight = Color(0xFFEC4899);
+
   // 代码块背景
   static const Color codeBgDark = Color(0xFF07182A);
   static const Color codeBgDarker = Color(0xFF0B1220);

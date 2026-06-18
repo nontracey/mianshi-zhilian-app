@@ -262,6 +262,26 @@ class RecallPrompt {
   };
 }
 
+class CardSource {
+  final String kind;
+  final String? path;
+  final String? content;
+
+  const CardSource({required this.kind, this.path, this.content});
+
+  factory CardSource.fromJson(Map<String, dynamic> json) => CardSource(
+    kind: json['kind'] as String? ?? 'text',
+    path: json['path'] as String?,
+    content: json['content'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind,
+    if (path != null) 'path': path,
+    if (content != null) 'content': content,
+  };
+}
+
 class LearningCard {
   final String
   type; // explain, code, animation, diagram, svg, table, interview, checklist, interviewAnswer, compareTable
@@ -273,6 +293,7 @@ class LearningCard {
   final String? svgPath; // SVG 资源路径
   final String? format; // 图表格式（如 mermaid）
   final String? caption; // 图片/动画说明
+  final List<CardSource> sources;
   final String? language; // 代码语言
   final List<String> items; // for checklist / diagram type
   final List<Map<String, dynamic>> highlights; // 代码行高亮
@@ -289,6 +310,7 @@ class LearningCard {
     this.svgPath,
     this.format,
     this.caption,
+    this.sources = const [],
     this.language,
     this.items = const [],
     this.highlights = const [],
@@ -306,6 +328,11 @@ class LearningCard {
     svgPath: json['svgPath'] as String?,
     format: json['format'] as String?,
     caption: json['caption'] as String?,
+    sources:
+        (json['sources'] as List<dynamic>?)
+            ?.map((e) => CardSource.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [],
     language: json['language'] as String?,
     items:
         (json['items'] as List<dynamic>?)?.map((e) => e as String).toList() ??
@@ -337,12 +364,43 @@ class LearningCard {
     if (svgPath != null) 'svgPath': svgPath,
     if (format != null) 'format': format,
     if (caption != null) 'caption': caption,
+    if (sources.isNotEmpty) 'sources': sources.map((e) => e.toJson()).toList(),
     if (language != null) 'language': language,
     if (items.isNotEmpty) 'items': items,
     if (highlights.isNotEmpty) 'highlights': highlights,
     if (columns.isNotEmpty) 'columns': columns,
     if (rows.isNotEmpty) 'rows': rows,
   };
+
+  List<CardSource> toSources() {
+    if (sources.isNotEmpty) return sources;
+    final out = <CardSource>[];
+    // 降级链顺序：svg 资源 → mermaid → 文本
+    if (asset != null && asset!.isNotEmpty) {
+      out.add(CardSource(kind: _kindFromPath(asset!), path: asset));
+    }
+    if (svgPath != null && svgPath!.isNotEmpty) {
+      out.add(CardSource(kind: 'svg', path: svgPath));
+    }
+    if (svg != null && svg!.isNotEmpty) {
+      out.add(CardSource(kind: 'svg', content: svg));
+    }
+    // Mermaid 作为资源降级层（svg 资源不存在时展示结构图）
+    if (format == 'mermaid' && content.isNotEmpty) {
+      out.add(CardSource(kind: 'mermaid', content: content));
+    }
+    // 纯文本最后兜底
+    if (content.isNotEmpty && format != 'mermaid') {
+      out.add(CardSource(kind: 'text', content: content));
+    }
+    return out;
+  }
+
+  static String _kindFromPath(String value) {
+    final lower = value.toLowerCase();
+    if (lower.endsWith('.svg')) return 'svg';
+    return 'svg'; // 图片资源统一为 svg kind，走 Image.network / SvgPicture 加载
+  }
 }
 
 class Rubric {

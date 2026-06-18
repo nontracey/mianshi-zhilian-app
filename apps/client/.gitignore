@@ -37,6 +37,13 @@ migrate_working_dir/
 lib/generated/app_version.g.dart
 web/version.json
 
+# macOS CocoaPods
+**/macos/Podfile.lock
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Xcode user data
+**/macos/**/*.xcworkspacedata
+
 # Symbolication related
 app.*.symbols
 

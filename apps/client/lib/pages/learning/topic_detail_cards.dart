@@ -4,13 +4,15 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/topic.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
-
 
 part 'topic_detail_cards/basic_cards.dart';
 part 'topic_detail_cards/code_cards.dart';
 part 'topic_detail_cards/diagram_cards.dart';
 part 'topic_detail_cards/follow_up_cards.dart';
+part 'topic_detail_cards/state_diagram.dart';
+part 'topic_detail_cards/sequence_diagram.dart';
 part 'topic_detail_cards/table_markdown_cards.dart';
