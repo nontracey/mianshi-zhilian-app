@@ -1,96 +1,201 @@
 part of '../topic_detail_cards.dart';
 
+// Mermaid 5 色板 classDef → AppColors 映射
+// ok/warn/fail 复用 categoryGreen/Amber/Red（色值精确匹配 #10B981/#F59E0B/#EF4444）
+// async/highlight 是 AppColors 新增字段
+const Map<String, Color> kMermaidClassColors = {
+  'ok': AppColors.categoryGreen,
+  'warn': AppColors.categoryAmber,
+  'fail': AppColors.categoryRed,
+  'async': AppColors.asyncState,
+  'highlight': AppColors.highlight,
+};
+
 // ── 图解卡片（自动识别布局）─────────────────────────────────
 
 class DiagramCard extends StatelessWidget {
   const DiagramCard({required this.card});
   final LearningCard card;
 
-  bool _isMermaidCard() {
-    final format = card.format?.trim().toLowerCase();
-    if (format == 'mermaid') return true;
+  bool _isMermaidSource(CardSource source) => source.kind == 'mermaid';
 
-    final source = MermaidDiagramData.cleanSource(card.content);
-    if (source.isEmpty) return false;
-
-    final firstLine = source
-        .split('\n')
-        .map((line) => line.trim())
-        .firstWhere((line) => line.isNotEmpty, orElse: () => '');
-
-    return RegExp(
-      r'^(flowchart|graph)\s+(TB|TD|BT|LR|RL)\b',
-      caseSensitive: false,
-    ).hasMatch(firstLine);
+  String _assetUrl(BuildContext context, String path) {
+    final uri = Uri.tryParse(path);
+    if (uri?.hasScheme == true) return path;
+    final base = context.read<ContentProvider>().contentBaseUrl.replaceAll(
+      RegExp(r'/+$'),
+      '',
+    );
+    return '$base/${path.replaceFirst(RegExp(r'^/+'), '')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    final svgUrl = card.svgPath ?? card.asset;
-    final isMermaid = _isMermaidCard();
-
+    final sources = card.toSources();
+    Widget content;
+    try {
+      content = _SourceChainView(
+        card: card,
+        sources: sources,
+        assetUrl: (path) => _assetUrl(context, path),
+        isMermaidSource: _isMermaidSource,
+      );
+    } catch (_) {
+      content = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (card.content.isNotEmpty) Text(card.content, style: const TextStyle(height: 1.6)),
+        if (card.fallback != null && card.fallback!.isNotEmpty)
+          _DiagramFallback(text: card.fallback!),
+      ]);
+    }
     return WorkPanel(
       title: card.title,
       children: [
-        if (isMermaid)
-          MermaidDiagramView(card: card)
-        else if (svgUrl != null && svgUrl.isNotEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.codeBgDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.32),
-              ),
-            ),
-            child: svgUrl.endsWith('.svg')
-                ? SvgPicture.network(
-                    svgUrl,
-                    width: double.infinity,
-                    placeholderBuilder: (_) => Container(
-                      height: 120,
-                      alignment: Alignment.center,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    errorBuilder: (ctx, err, stack) => Text(
-                      card.fallback ?? l10n.get('svg_loading_fail'),
-                      style: TextStyle(color: AppColors.warning, fontSize: 13),
-                    ),
-                  )
-                : Image.network(
-                    svgUrl,
-                    width: double.infinity,
-                    errorBuilder: (ctx, err, stack) => Text(
-                      card.fallback ?? l10n.get('image_picture_loading_fail'),
-                      style: TextStyle(color: AppColors.warning, fontSize: 13),
-                    ),
-                  ),
-          )
-        else
-          SmartDiagram(card: card),
-        if (!isMermaid && card.content.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(card.content, style: const TextStyle(height: 1.6)),
-        ],
-        if (!isMermaid && card.caption != null && card.caption!.isNotEmpty)
+        content,
+        if (card.caption != null && card.caption!.isNotEmpty)
           _DiagramCaption(text: card.caption!),
       ],
     );
   }
 }
 
-// ── Mermaid 图解卡片 ────────────────────────────────────────
+class _SourceChainView extends StatefulWidget {
+  const _SourceChainView({
+    required this.card,
+    required this.sources,
+    required this.assetUrl,
+    required this.isMermaidSource,
+  });
 
-class MermaidDiagramView extends StatelessWidget {
-  const MermaidDiagramView({super.key, required this.card});
   final LearningCard card;
+  final List<CardSource> sources;
+  final String Function(String path) assetUrl;
+  final bool Function(CardSource source) isMermaidSource;
+
+  @override
+  State<_SourceChainView> createState() => _SourceChainViewState();
+}
+
+class _SourceChainViewState extends State<_SourceChainView> {
+  int index = 0;
+
+  void _next() {
+    if (!mounted) return;
+    if (index + 1 < widget.sources.length) {
+      setState(() => index += 1);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final data = MermaidDiagramData.parse(card.content);
+    if (widget.sources.isEmpty) return SmartDiagram(card: widget.card);
+    return _buildSource(widget.sources[index], allowErrorAdvance: true);
+  }
+
+  Widget _buildSource(CardSource source, {required bool allowErrorAdvance}) {
+    if (widget.isMermaidSource(source)) {
+      return MermaidDiagramView(card: widget.card, content: source.content ?? '');
+    }
+    if (source.kind == 'text') {
+      return Text(source.content ?? widget.card.fallback ?? '', style: const TextStyle(height: 1.6));
+    }
+    if (source.kind == 'svg' && source.path != null) {
+      return _AssetSourceView(
+        source: source,
+        url: widget.assetUrl(source.path!),
+        fallback: widget.card.fallback,
+        onError: allowErrorAdvance ? _next : () {},
+      );
+    }
+    if (allowErrorAdvance) WidgetsBinding.instance.addPostFrameCallback((_) => _next());
+    return Text(widget.card.fallback ?? '', style: TextStyle(color: AppColors.warning, fontSize: 13));
+  }
+}
+
+class _AssetSourceView extends StatelessWidget {
+  const _AssetSourceView({required this.source, required this.url, required this.onError, this.fallback});
+  final CardSource source;
+  final String url;
+  final VoidCallback onError;
+  final String? fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.codeBgDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: url.toLowerCase().endsWith('.svg')
+          ? SvgPicture.network(url, width: double.infinity,
+              placeholderBuilder: (_) => Container(height: 120, alignment: Alignment.center, child: const CircularProgressIndicator(strokeWidth: 2)),
+              errorBuilder: (ctx, err, stack) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+                return Text(fallback ?? l10n.get('svg_loading_fail'), style: TextStyle(color: AppColors.warning, fontSize: 13));
+              })
+          : Image.network(url, width: double.infinity,
+              errorBuilder: (ctx, err, stack) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+                return Text(fallback ?? l10n.get('image_picture_loading_fail'), style: TextStyle(color: AppColors.warning, fontSize: 13));
+              }),
+    );
+  }
+}
+
+// ── Mermaid 图解卡片 ────────────────────────────────────────
+
+/// 所有 mermaid 图种的抽象基类：flowchart / stateDiagram / sequenceDiagram
+abstract class MermaidDiagram {
+  String get source;
+  bool get isRenderable;
+}
+
+/// 顶层 dispatcher：按首行 header 关键字分派到对应图种 parser
+/// flowchart|graph → MermaidDiagramData.parse；stateDiagram/sequenceDiagram 暂走 flowchart parse（edges 空 → ASCII 兜底），Step 5/6 填充真分支
+MermaidDiagram parseMermaidDiagram(String content) {
+  final source = MermaidDiagramData.cleanSource(content);
+  final firstLine = source
+      .split('\n')
+      .map((l) => l.trim())
+      .firstWhere((l) => l.isNotEmpty, orElse: () => '');
+  if (RegExp(r'^stateDiagram(-v2)?\b', caseSensitive: false).hasMatch(firstLine)) {
+    return StateDiagramData.parse(content);
+  }
+  if (RegExp(r'^sequenceDiagram\b', caseSensitive: false).hasMatch(firstLine)) {
+    return SequenceDiagramData.parse(content);
+  }
+  return MermaidDiagramData.parse(content);
+}
+
+class MermaidDiagramView extends StatelessWidget {
+  const MermaidDiagramView({super.key, required this.card, this.content});
+  final LearningCard card;
+  final String? content;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = content ?? card.content;
+    final diagram = parseMermaidDiagram(source);
+
+    final Widget diagramWidget;
+    if (diagram is MermaidDiagramData) {
+      diagramWidget = diagram.isRenderable
+          ? _MermaidFlowDiagram(data: diagram)
+          : AsciiDiagramView(content: diagram.source);
+    } else if (diagram is StateDiagramData) {
+      diagramWidget = diagram.isRenderable
+          ? _StateDiagramView(data: diagram)
+          : AsciiDiagramView(content: diagram.source);
+    } else if (diagram is SequenceDiagramData) {
+      diagramWidget = diagram.isRenderable
+          ? _SequenceDiagramView(data: diagram)
+          : AsciiDiagramView(content: diagram.source);
+    } else {
+      diagramWidget = AsciiDiagramView(content: diagram.source);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,12 +208,8 @@ class MermaidDiagramView extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
           ),
-          child: data.isRenderable
-              ? _MermaidFlowDiagram(data: data)
-              : AsciiDiagramView(content: data.source),
+          child: diagramWidget,
         ),
-        if (card.caption != null && card.caption!.isNotEmpty)
-          _DiagramCaption(text: card.caption!),
         if (card.fallback != null && card.fallback!.isNotEmpty) ...[
           const SizedBox(height: 10),
           _DiagramFallback(text: card.fallback!),
@@ -118,17 +219,21 @@ class MermaidDiagramView extends StatelessWidget {
   }
 }
 
-class MermaidDiagramData {
+class MermaidDiagramData implements MermaidDiagram {
   const MermaidDiagramData({
     required this.source,
     required this.direction,
     required this.edges,
+    this.subgraphs = const [],
   });
 
+  @override
   final String source;
   final String direction;
   final List<MermaidEdge> edges;
+  final List<MermaidSubgraph> subgraphs;
 
+  @override
   bool get isRenderable => edges.isNotEmpty;
   bool get isHorizontal => direction == 'LR' || direction == 'RL';
 
@@ -171,9 +276,37 @@ class MermaidDiagramData {
     }
 
     final edges = <MermaidEdge>[];
+    final subgraphStack = <_SubgraphFrame>[];
+    final topSubgraphs = <MermaidSubgraph>[];
+    final subgraphOpenRe = RegExp(r'^subgraph\s+(\S+)(?:\s+\[([^\]]*)\])?\s*$');
     for (final statement in statements.skip(startIndex)) {
+      final subOpen = subgraphOpenRe.firstMatch(statement);
+      if (subOpen != null) {
+        final id = subOpen.group(1)!;
+        final title = subOpen.group(2) ?? id;
+        subgraphStack.add(_SubgraphFrame(id: id, title: title));
+        continue;
+      }
+      if (RegExp(r'^end$').hasMatch(statement)) {
+        if (subgraphStack.isNotEmpty) {
+          final frame = subgraphStack.removeLast();
+          final sg = frame.toSubgraph();
+          if (subgraphStack.isNotEmpty) {
+            subgraphStack.last.children.add(sg);
+          } else {
+            topSubgraphs.add(sg);
+          }
+        }
+        continue;
+      }
       final edge = _parseEdge(statement);
-      if (edge != null) edges.add(edge);
+      if (edge != null) {
+        edges.add(edge);
+        if (subgraphStack.isNotEmpty) {
+          subgraphStack.last.nodeIds.add(edge.source.id);
+          subgraphStack.last.nodeIds.add(edge.target.id);
+        }
+      }
     }
 
     // 收集所有已知的 node id → label 映射（label ≠ id 才算有效 label）
@@ -183,11 +316,25 @@ class MermaidDiagramData {
       _collectLabel(edge.target, labelMap);
     }
 
-    // 回填：跨行引用只写 ID 不带 label 的节点，用已知 label 补上
+    // 收集 class 声明：class A,B,C ok 或 class A ok（5 色板 classDef 应用）
+    final idToClass = <String, String>{};
+    final classDeclRe = RegExp(r'^class\s+([A-Za-z0-9_,\s]+?)\s+([A-Za-z0-9_-]+)\s*$');
+    for (final statement in statements.skip(startIndex)) {
+      final m = classDeclRe.firstMatch(statement);
+      if (m != null) {
+        final ids = m.group(1)!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+        final cls = m.group(2)!;
+        for (final id in ids) {
+          idToClass[id] = cls;
+        }
+      }
+    }
+
+    // 回填：跨行引用只写 ID 不带 label 的节点，用已知 label 补上；className 同理回填
     final filled = edges.map((edge) {
       return MermaidEdge(
-        source: _fillLabel(edge.source, labelMap),
-        target: _fillLabel(edge.target, labelMap),
+        source: _fillLabel(_fillClass(edge.source, idToClass), labelMap),
+        target: _fillLabel(_fillClass(edge.target, idToClass), labelMap),
         label: edge.label,
       );
     }).toList();
@@ -196,6 +343,7 @@ class MermaidDiagramData {
       source: source,
       direction: direction,
       edges: filled,
+      subgraphs: topSubgraphs,
     );
   }
 
@@ -208,7 +356,15 @@ class MermaidDiagramData {
   static MermaidNode _fillLabel(MermaidNode node, Map<String, String> map) {
     final known = map[node.id];
     if (known != null && node.label == node.id) {
-      return MermaidNode(id: node.id, label: known);
+      return MermaidNode(id: node.id, label: known, className: node.className);
+    }
+    return node;
+  }
+
+  static MermaidNode _fillClass(MermaidNode node, Map<String, String> map) {
+    final known = map[node.id];
+    if (known != null && node.className == null) {
+      return MermaidNode(id: node.id, label: node.label, className: known);
     }
     return node;
   }
@@ -252,28 +408,35 @@ class MermaidDiagramData {
 }
 
 class MermaidNode {
-  const MermaidNode({required this.id, required this.label});
+  const MermaidNode({required this.id, required this.label, this.className});
 
   final String id;
   final String label;
+  final String? className;
 
   static MermaidNode parse(String token) {
-    var cleaned = token
-        .trim()
-        .replaceAll(RegExp(r'\s+:::.*$'), '')
-        .replaceAll(RegExp(r'\s+$'), '');
+    var cleaned = token.trim();
+    // 提取 :::className（5 色板 classDef 应用）后再 strip
+    // mermaid 语法 A:::ok 紧贴，不要求 ::: 前有空白
+    String? className;
+    final classMatch = RegExp(r':::([A-Za-z0-9_-]+)\s*$').firstMatch(cleaned);
+    if (classMatch != null) {
+      className = classMatch.group(1);
+      cleaned = cleaned.replaceAll(RegExp(r':::[A-Za-z0-9_-]+\s*$'), '');
+    }
+    cleaned = cleaned.replaceAll(RegExp(r'\s+$'), '');
 
     final match = RegExp(
       r'^([A-Za-z0-9_.:-]+)\s*(?:\[\s*"?(.+?)"?\s*\]|\(\s*"?(.+?)"?\s*\)|\{\s*"?(.+?)"?\s*\})?$',
     ).firstMatch(cleaned);
 
     if (match == null) {
-      return MermaidNode(id: cleaned, label: _stripQuotes(cleaned));
+      return MermaidNode(id: cleaned, label: _stripQuotes(cleaned), className: className);
     }
 
     final id = match.group(1)!;
     final label = match.group(2) ?? match.group(3) ?? match.group(4) ?? id;
-    return MermaidNode(id: id, label: _stripQuotes(label));
+    return MermaidNode(id: id, label: _stripQuotes(label), className: className);
   }
 
   static String _stripQuotes(String value) {
@@ -294,6 +457,38 @@ class MermaidEdge {
   final String? label;
 }
 
+/// flowchart subgraph 分组（支持嵌套≤2层）
+class MermaidSubgraph {
+  const MermaidSubgraph({
+    required this.id,
+    required this.title,
+    this.nodeIds = const [],
+    this.children = const [],
+  });
+
+  final String id;
+  final String title;
+  final List<String> nodeIds;
+  final List<MermaidSubgraph> children;
+}
+
+/// parse 时使用的可变 subgraph 帧
+class _SubgraphFrame {
+  _SubgraphFrame({required this.id, required this.title});
+
+  final String id;
+  final String title;
+  final Set<String> nodeIds = {};
+  final List<MermaidSubgraph> children = [];
+
+  MermaidSubgraph toSubgraph() => MermaidSubgraph(
+        id: id,
+        title: title,
+        nodeIds: List.unmodifiable(nodeIds),
+        children: List.unmodifiable(children),
+      );
+}
+
 class _MermaidFlowDiagram extends StatelessWidget {
   const _MermaidFlowDiagram({required this.data});
 
@@ -307,13 +502,99 @@ class _MermaidFlowDiagram extends StatelessWidget {
       children: [
         _buildTypeTag(),
         const SizedBox(height: 16),
-        if (chain != null)
+        if (data.subgraphs.isNotEmpty)
+          _buildGroupedLayout()
+        else if (chain != null)
           data.isHorizontal
               ? _buildHorizontalChain(chain)
               : _buildVerticalChain(chain)
         else
           _buildEdgeList(data.edges),
       ],
+    );
+  }
+
+  /// subgraph 分组渲染：每个 subgraph 画带标题边框，组内边归到最小公共组，跨组边在底部平铺
+  Widget _buildGroupedLayout() {
+    final topGroups = data.subgraphs;
+
+    bool inSubtree(String nodeId, MermaidSubgraph sg) {
+      if (sg.nodeIds.contains(nodeId)) return true;
+      return sg.children.any((c) => inSubtree(nodeId, c));
+    }
+
+    List<MermaidEdge> edgesForSubgraph(MermaidSubgraph sg) {
+      return data.edges.where((e) {
+        if (!inSubtree(e.source.id, sg) || !inSubtree(e.target.id, sg)) return false;
+        // 不归到 sg 的任何子组（子组优先）
+        for (final child in sg.children) {
+          if (inSubtree(e.source.id, child) && inSubtree(e.target.id, child)) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+    }
+
+    final crossEdges = data.edges.where((e) {
+      for (final sg in topGroups) {
+        if (inSubtree(e.source.id, sg) && inSubtree(e.target.id, sg)) return false;
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final sg in topGroups) ...[
+          _buildSubgraphBox(sg, edgesForSubgraph),
+          const SizedBox(height: 12),
+        ],
+        if (crossEdges.isNotEmpty) ...[
+          for (var i = 0; i < crossEdges.length; i++) ...[
+            _buildEdgeRow(crossEdges[i], i),
+            if (i < crossEdges.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSubgraphBox(
+    MermaidSubgraph sg,
+    List<MermaidEdge> Function(MermaidSubgraph) edgesFor,
+  ) {
+    final ownEdges = edgesFor(sg);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            sg.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.accent,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final child in sg.children) ...[
+            _buildSubgraphBox(child, edgesFor),
+            const SizedBox(height: 8),
+          ],
+          for (var i = 0; i < ownEdges.length; i++) ...[
+            _buildEdgeRow(ownEdges[i], i),
+            if (i < ownEdges.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      ),
     );
   }
 
@@ -466,7 +747,15 @@ class _MermaidFlowDiagram extends StatelessWidget {
     );
   }
 
+  Color _resolveNodeColor(MermaidNode node, Color fallback) {
+    if (node.className != null && kMermaidClassColors.containsKey(node.className)) {
+      return kMermaidClassColors[node.className]!;
+    }
+    return fallback;
+  }
+
   Widget _buildNode(MermaidNode node, Color color, {bool compact = false}) {
+    final resolved = _resolveNodeColor(node, color);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -474,9 +763,9 @@ class _MermaidFlowDiagram extends StatelessWidget {
         vertical: compact ? 10 : 12,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: resolved.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.34)),
+        border: Border.all(color: resolved.withValues(alpha: 0.34)),
       ),
       child: Text(
         node.label,
