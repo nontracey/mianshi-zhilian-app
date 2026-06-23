@@ -41,11 +41,15 @@ class DiagramCard extends StatelessWidget {
         isMermaidSource: _isMermaidSource,
       );
     } catch (_) {
-      content = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (card.content.isNotEmpty) Text(card.content, style: const TextStyle(height: 1.6)),
-        if (card.fallback != null && card.fallback!.isNotEmpty)
-          _DiagramFallback(text: card.fallback!),
-      ]);
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (card.content.isNotEmpty)
+            Text(card.content, style: const TextStyle(height: 1.6)),
+          if (card.fallback != null && card.fallback!.isNotEmpty)
+            _DiagramFallback(text: card.fallback!),
+        ],
+      );
     }
     return WorkPanel(
       title: card.title,
@@ -93,26 +97,100 @@ class _SourceChainViewState extends State<_SourceChainView> {
 
   Widget _buildSource(CardSource source, {required bool allowErrorAdvance}) {
     if (widget.isMermaidSource(source)) {
-      return MermaidDiagramView(card: widget.card, content: source.content ?? '');
-    }
-    if (source.kind == 'text') {
-      return Text(source.content ?? widget.card.fallback ?? '', style: const TextStyle(height: 1.6));
-    }
-    if (source.kind == 'svg' && source.path != null) {
-      return _AssetSourceView(
-        source: source,
-        url: widget.assetUrl(source.path!),
-        fallback: widget.card.fallback,
-        onError: allowErrorAdvance ? _next : () {},
+      return MermaidDiagramView(
+        card: widget.card,
+        content: source.content ?? '',
       );
     }
-    if (allowErrorAdvance) WidgetsBinding.instance.addPostFrameCallback((_) => _next());
-    return Text(widget.card.fallback ?? '', style: TextStyle(color: AppColors.warning, fontSize: 13));
+    if (source.kind == 'text') {
+      return Text(
+        source.content ?? widget.card.fallback ?? '',
+        style: const TextStyle(height: 1.6),
+      );
+    }
+    if (source.kind == 'svg') {
+      final inline = source.content?.trim();
+      if (inline != null && inline.isNotEmpty) {
+        if (inline.startsWith('<svg')) {
+          return _InlineSvgSourceView(
+            svg: inline,
+            fallback: widget.card.fallback,
+            onError: allowErrorAdvance ? _next : () {},
+          );
+        }
+        return _AssetSourceView(
+          source: source,
+          url: widget.assetUrl(inline),
+          fallback: widget.card.fallback,
+          onError: allowErrorAdvance ? _next : () {},
+        );
+      }
+      if (source.path != null) {
+        return _AssetSourceView(
+          source: source,
+          url: widget.assetUrl(source.path!),
+          fallback: widget.card.fallback,
+          onError: allowErrorAdvance ? _next : () {},
+        );
+      }
+    }
+    if (allowErrorAdvance)
+      WidgetsBinding.instance.addPostFrameCallback((_) => _next());
+    return Text(
+      widget.card.fallback ?? '',
+      style: TextStyle(color: AppColors.warning, fontSize: 13),
+    );
+  }
+}
+
+class _InlineSvgSourceView extends StatelessWidget {
+  const _InlineSvgSourceView({
+    required this.svg,
+    required this.onError,
+    this.fallback,
+  });
+  final String svg;
+  final VoidCallback onError;
+  final String? fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.codeBgDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: SvgPicture.string(
+        svg,
+        width: double.infinity,
+        placeholderBuilder: (_) => Container(
+          height: 120,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(strokeWidth: 2),
+        ),
+        errorBuilder: (ctx, err, stack) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+          return Text(
+            fallback ?? l10n.get('svg_loading_fail'),
+            style: TextStyle(color: AppColors.warning, fontSize: 13),
+          );
+        },
+      ),
+    );
   }
 }
 
 class _AssetSourceView extends StatelessWidget {
-  const _AssetSourceView({required this.source, required this.url, required this.onError, this.fallback});
+  const _AssetSourceView({
+    required this.source,
+    required this.url,
+    required this.onError,
+    this.fallback,
+  });
   final CardSource source;
   final String url;
   final VoidCallback onError;
@@ -130,17 +208,33 @@ class _AssetSourceView extends StatelessWidget {
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
       child: url.toLowerCase().endsWith('.svg')
-          ? SvgPicture.network(url, width: double.infinity,
-              placeholderBuilder: (_) => Container(height: 120, alignment: Alignment.center, child: const CircularProgressIndicator(strokeWidth: 2)),
+          ? SvgPicture.network(
+              url,
+              width: double.infinity,
+              placeholderBuilder: (_) => Container(
+                height: 120,
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              ),
               errorBuilder: (ctx, err, stack) {
                 WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-                return Text(fallback ?? l10n.get('svg_loading_fail'), style: TextStyle(color: AppColors.warning, fontSize: 13));
-              })
-          : Image.network(url, width: double.infinity,
+                return Text(
+                  fallback ?? l10n.get('svg_loading_fail'),
+                  style: TextStyle(color: AppColors.warning, fontSize: 13),
+                );
+              },
+            )
+          : Image.network(
+              url,
+              width: double.infinity,
               errorBuilder: (ctx, err, stack) {
                 WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-                return Text(fallback ?? l10n.get('image_picture_loading_fail'), style: TextStyle(color: AppColors.warning, fontSize: 13));
-              }),
+                return Text(
+                  fallback ?? l10n.get('image_picture_loading_fail'),
+                  style: TextStyle(color: AppColors.warning, fontSize: 13),
+                );
+              },
+            ),
     );
   }
 }
@@ -161,7 +255,10 @@ MermaidDiagram parseMermaidDiagram(String content) {
       .split('\n')
       .map((l) => l.trim())
       .firstWhere((l) => l.isNotEmpty, orElse: () => '');
-  if (RegExp(r'^stateDiagram(-v2)?\b', caseSensitive: false).hasMatch(firstLine)) {
+  if (RegExp(
+    r'^stateDiagram(-v2)?\b',
+    caseSensitive: false,
+  ).hasMatch(firstLine)) {
     return StateDiagramData.parse(content);
   }
   if (RegExp(r'^sequenceDiagram\b', caseSensitive: false).hasMatch(firstLine)) {
@@ -318,11 +415,17 @@ class MermaidDiagramData implements MermaidDiagram {
 
     // 收集 class 声明：class A,B,C ok 或 class A ok（5 色板 classDef 应用）
     final idToClass = <String, String>{};
-    final classDeclRe = RegExp(r'^class\s+([A-Za-z0-9_,\s]+?)\s+([A-Za-z0-9_-]+)\s*$');
+    final classDeclRe = RegExp(
+      r'^class\s+([A-Za-z0-9_,\s]+?)\s+([A-Za-z0-9_-]+)\s*$',
+    );
     for (final statement in statements.skip(startIndex)) {
       final m = classDeclRe.firstMatch(statement);
       if (m != null) {
-        final ids = m.group(1)!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+        final ids = m
+            .group(1)!
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty);
         final cls = m.group(2)!;
         for (final id in ids) {
           idToClass[id] = cls;
@@ -431,12 +534,20 @@ class MermaidNode {
     ).firstMatch(cleaned);
 
     if (match == null) {
-      return MermaidNode(id: cleaned, label: _stripQuotes(cleaned), className: className);
+      return MermaidNode(
+        id: cleaned,
+        label: _stripQuotes(cleaned),
+        className: className,
+      );
     }
 
     final id = match.group(1)!;
     final label = match.group(2) ?? match.group(3) ?? match.group(4) ?? id;
-    return MermaidNode(id: id, label: _stripQuotes(label), className: className);
+    return MermaidNode(
+      id: id,
+      label: _stripQuotes(label),
+      className: className,
+    );
   }
 
   static String _stripQuotes(String value) {
@@ -482,11 +593,11 @@ class _SubgraphFrame {
   final List<MermaidSubgraph> children = [];
 
   MermaidSubgraph toSubgraph() => MermaidSubgraph(
-        id: id,
-        title: title,
-        nodeIds: List.unmodifiable(nodeIds),
-        children: List.unmodifiable(children),
-      );
+    id: id,
+    title: title,
+    nodeIds: List.unmodifiable(nodeIds),
+    children: List.unmodifiable(children),
+  );
 }
 
 class _MermaidFlowDiagram extends StatelessWidget {
@@ -525,7 +636,8 @@ class _MermaidFlowDiagram extends StatelessWidget {
 
     List<MermaidEdge> edgesForSubgraph(MermaidSubgraph sg) {
       return data.edges.where((e) {
-        if (!inSubtree(e.source.id, sg) || !inSubtree(e.target.id, sg)) return false;
+        if (!inSubtree(e.source.id, sg) || !inSubtree(e.target.id, sg))
+          return false;
         // 不归到 sg 的任何子组（子组优先）
         for (final child in sg.children) {
           if (inSubtree(e.source.id, child) && inSubtree(e.target.id, child)) {
@@ -538,7 +650,8 @@ class _MermaidFlowDiagram extends StatelessWidget {
 
     final crossEdges = data.edges.where((e) {
       for (final sg in topGroups) {
-        if (inSubtree(e.source.id, sg) && inSubtree(e.target.id, sg)) return false;
+        if (inSubtree(e.source.id, sg) && inSubtree(e.target.id, sg))
+          return false;
       }
       return true;
     }).toList();
@@ -748,7 +861,8 @@ class _MermaidFlowDiagram extends StatelessWidget {
   }
 
   Color _resolveNodeColor(MermaidNode node, Color fallback) {
-    if (node.className != null && kMermaidClassColors.containsKey(node.className)) {
+    if (node.className != null &&
+        kMermaidClassColors.containsKey(node.className)) {
       return kMermaidClassColors[node.className]!;
     }
     return fallback;

@@ -245,6 +245,7 @@ for (final key in domainCacheKeys) {
 - 知识目录中的 `知识查阅` 会打开知识详情的学习 Tab，`学习模式` 会直接进入复述练习 Tab。
 - App 按领域独立缓存 topic，切换领域时按需加载。
 - 内容仓库生成的 learningCards 包含解释、机制拆解、对比/图示/代码、面试回答模板和 checklist，App 按 schema 通用渲染。
+- 图解降级链按 `sources[]` 顺序渲染：`svg.path` 加载 `assets/` 资源，`svg.content` 渲染内联 `<svg...>`，`mermaid.content` 渲染轻量 Mermaid 子集，`text.content` 兜底。`compareTable` 是独立卡片，不作为 `diagram.sources`。
 
 ## 发布流程
 

@@ -1003,7 +1003,7 @@ App 渲染约定：
 | `domains` | 自动生成学习中心领域卡片和领域切换，`themeColor` 用于领域主题色 |
 | `categories` | 自动生成领域知识目录分组，`order` 控制排序 |
 | `topics` | 自动生成知识点列表 |
-| `learningCards` | 按 `type` 渲染，排列顺序必须为 explain → diagram/compareTable/code → interviewAnswer → checklist：explain（Markdown）、code（语法高亮，优先用 `language` 字段）、compareTable（优先用 `columns`/`rows` 结构化表格）、diagram（优先用 `svgPath`/`asset` 渲染 SVG/图片，兜底用 items 智能图解；Mermaid 只支持 `flowchart`/`graph`，不支持 `sequenceDiagram`/`subgraph`/`classDef`/`style`/带标签虚线边）、animation（图片/动画）、interviewAnswer（面试回答 + 追问）、checklist（检查清单） |
+| `learningCards` | 按 `type` 渲染，排列顺序必须为 explain → diagram/compareTable/code → interviewAnswer → checklist：explain（Markdown）、code（语法高亮，优先用 `language` 字段）、compareTable（优先用 `columns`/`rows` 结构化表格）、diagram/animation（优先按 `sources[]` 降级链渲染：`svg.path` 资源、`svg.content` 内联 SVG、`mermaid.content`、`text.content`；兼容 `svgPath`/`asset`/`svg`/`content+format=mermaid`；Mermaid 支持 flowchart/graph、stateDiagram、sequenceDiagram、subgraph 和 5 色板 classDef 的轻量子集）、interviewAnswer（面试回答 + 追问）、checklist（检查清单） |
 | `recallPrompts` | 生成主动复述题，支持 text/code/voice 模式 |
 | `rubric` | 生成 AI 评估 Prompt，包含 mustHave、goodToHave、commonMistakes、scoreWeights |
 | `order` | 控制默认学习路径 |
