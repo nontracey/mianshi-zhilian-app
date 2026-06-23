@@ -11,6 +11,245 @@ const Map<String, Color> kMermaidClassColors = {
   'highlight': AppColors.highlight,
 };
 
+// ── SVG 渲染辅助（Web/CanvasKit 中文修复）──────────────────────
+//
+// flutter_svg 渲染 <text> 时不读取 ThemeData 字体，CanvasKit 默认字体无中文字形，
+// 内容图解几乎全是中文 <text> → 中文变 tofu/空白，且不会抛错，导致降级链卡在空白 SVG。
+// 修复：渲染前把 SVG 内所有 font-family 改写为打包字体 [kAppFontFamily]（含中文字形）。
+// 另外这些 SVG 根节点用 width="100%"（相对尺寸），flutter_svg 量算会塌缩为 0 → 整图空白，
+// 故去掉根节点 width/height，改由外层按 viewBox 宽高比布局。
+String prepareDiagramSvg(String raw) {
+  var svg = raw;
+
+  // 1) 剥离 <marker> 定义与 marker-* 引用：flutter_svg/vector_graphics 不支持，
+  //    含 marker 的 SVG 会渲染异常。剥掉只丢失箭头尖，连接线仍在。
+  svg = svg.replaceAll(RegExp(r'<marker\b[^>]*>[\s\S]*?</marker>'), '');
+  svg = svg.replaceAll(RegExp(r'\s*marker-(?:start|mid|end)\s*=\s*"[^"]*"'), '');
+  svg = svg.replaceAll('context-stroke', 'currentColor');
+  svg = svg.replaceAll('context-fill', 'currentColor');
+
+  // 2) 把 <style> 里的 .class 规则内联成元素行内属性。
+  //    flutter_svg 不支持 CSS class 选择器：很多图解把 fill/stroke/font 全放在
+  //    `.section{fill:#fff}` 这类 class 里，不内联则元素拿不到填充 → 整图空白。
+  final styleMatch = RegExp(r'<style[^>]*>([\s\S]*?)</style>').firstMatch(svg);
+  if (styleMatch != null) {
+    final rules = <String, String>{};
+    for (final m in RegExp(r'\.([A-Za-z0-9_-]+)\s*\{([^}]*)\}')
+        .allMatches(styleMatch.group(1)!)) {
+      rules[m.group(1)!] = _cssDeclsToSvgAttrs(m.group(2)!);
+    }
+    svg = svg.replaceFirst(styleMatch.group(0)!, '');
+    svg = svg.replaceAllMapped(RegExp(r'\sclass="([^"]*)"'), (m) {
+      final attrs = <String>[];
+      for (final name in m.group(1)!.split(RegExp(r'\s+'))) {
+        final a = rules[name];
+        if (a != null && a.isNotEmpty) attrs.add(a);
+      }
+      return attrs.isEmpty ? '' : ' ${attrs.join(' ')}';
+    });
+  }
+
+  // 3) 行内 font-family → 打包字体（含中文字形），否则 CanvasKit 默认字体中文变 tofu
+  svg = svg.replaceAll(
+    RegExp(r'font-family\s*=\s*"[^"]*"'),
+    'font-family="$kAppFontFamily"',
+  );
+
+  // 4) 根 <svg> 未声明 font-family 时注入默认值，覆盖未显式声明的 <text>
+  final svgTagMatch = RegExp(r'<svg\b[^>]*>').firstMatch(svg);
+  if (svgTagMatch != null && !svgTagMatch.group(0)!.contains('font-family')) {
+    svg = svg.replaceFirst('<svg', '<svg font-family="$kAppFontFamily"');
+  }
+  return svg;
+}
+
+/// 把一组 CSS 声明（`fill:#fff;stroke:#ccc;font:700 16px X`）转成 SVG 行内
+/// presentation 属性串。字体一律改写为打包字体 [kAppFontFamily]。
+String _cssDeclsToSvgAttrs(String css) {
+  final out = <String>[];
+  for (final decl in css.split(';')) {
+    final i = decl.indexOf(':');
+    if (i < 0) continue;
+    final key = decl.substring(0, i).trim();
+    final val = decl.substring(i + 1).trim();
+    if (val.isEmpty) continue;
+    switch (key) {
+      case 'fill':
+      case 'stroke':
+      case 'opacity':
+      case 'fill-opacity':
+      case 'stroke-opacity':
+      case 'stroke-width':
+      case 'stroke-dasharray':
+      case 'stroke-linecap':
+      case 'stroke-linejoin':
+      case 'text-anchor':
+      case 'letter-spacing':
+      case 'dominant-baseline':
+        out.add('$key="$val"');
+        break;
+      case 'font-size':
+        out.add('font-size="${val.replaceAll('px', '')}"');
+        break;
+      case 'font-weight':
+        out.add('font-weight="$val"');
+        break;
+      case 'font-style':
+        out.add('font-style="$val"');
+        break;
+      case 'font-family':
+        out.add('font-family="$kAppFontFamily"');
+        break;
+      case 'font':
+        // shorthand: [weight] [size]px [families…]
+        final sz = RegExp(r'(\d+(?:\.\d+)?)px').firstMatch(val);
+        final wt = RegExp(r'\b([1-9]00)\b').firstMatch(val);
+        if (wt != null) out.add('font-weight="${wt.group(1)}"');
+        if (sz != null) out.add('font-size="${sz.group(1)}"');
+        out.add('font-family="$kAppFontFamily"');
+        break;
+    }
+  }
+  return out.join(' ');
+}
+
+/// 解析 viewBox 得到宽高比（用于按卡片宽度等比布局，避免相对尺寸塌缩）
+double? svgViewBoxAspect(String svg) {
+  final m = RegExp(
+    r'viewBox\s*=\s*"\s*[\d.eE+-]+[\s,]+[\d.eE+-]+[\s,]+([\d.eE+-]+)[\s,]+([\d.eE+-]+)',
+  ).firstMatch(svg);
+  if (m == null) return null;
+  final w = double.tryParse(m.group(1)!);
+  final h = double.tryParse(m.group(2)!);
+  if (w == null || h == null || h <= 0 || w <= 0) return null;
+  return w / h;
+}
+
+/// 已处理好的内联 SVG 渲染（统一供「内联源」与「网络源拉取后」复用）
+class _PreparedSvgView extends StatelessWidget {
+  const _PreparedSvgView({
+    required this.svg,
+    required this.onError,
+    this.fallback,
+  });
+  final String svg;
+  final VoidCallback onError;
+  final String? fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final aspect = svgViewBoxAspect(svg) ?? (16 / 9);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.codeBgDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: AspectRatio(
+        aspectRatio: aspect,
+        child: SvgPicture.string(
+          svg,
+          fit: BoxFit.contain,
+          placeholderBuilder: (_) => Container(
+            alignment: Alignment.center,
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          ),
+          errorBuilder: (ctx, err, stack) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+            return Text(
+              fallback ?? l10n.get('svg_loading_fail'),
+              style: TextStyle(color: AppColors.warning, fontSize: 13),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// 网络 SVG：先拉取文本 → UTF-8 解码 → 改写字体/尺寸 → SvgPicture.string 渲染。
+/// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
+class _CjkNetworkSvg extends StatefulWidget {
+  const _CjkNetworkSvg({
+    required this.url,
+    required this.onError,
+    this.fallback,
+  });
+  final String url;
+  final VoidCallback onError;
+  final String? fallback;
+
+  @override
+  State<_CjkNetworkSvg> createState() => _CjkNetworkSvgState();
+}
+
+class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
+  late Future<String> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(_CjkNetworkSvg oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _future = _load();
+    }
+  }
+
+  Future<String> _load() async {
+    final uri = Uri.parse(widget.url);
+    // 加超时：请求挂死时及时失败 → 触发 onError 降级到 mermaid/文本，而非一直转圈
+    final resp = await http.get(uri).timeout(const Duration(seconds: 15));
+    if (resp.statusCode != 200) {
+      throw http.ClientException('HTTP ${resp.statusCode}', uri);
+    }
+    // 响应头无 charset，必须显式按 UTF-8 解码，否则中文按 latin1 解出会变乱码
+    return prepareDiagramSvg(utf8.decode(resp.bodyBytes));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    return FutureBuilder<String>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError());
+          return Text(
+            widget.fallback ?? l10n.get('svg_loading_fail'),
+            style: TextStyle(color: AppColors.warning, fontSize: 13),
+          );
+        }
+        if (!snap.hasData) {
+          return Container(
+            width: double.infinity,
+            height: 140,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.codeBgDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+            ),
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        return _PreparedSvgView(
+          svg: snap.data!,
+          onError: widget.onError,
+          fallback: widget.fallback,
+        );
+      },
+    );
+  }
+}
+
 // ── 图解卡片（自动识别布局）─────────────────────────────────
 
 class DiagramCard extends StatelessWidget {
@@ -109,29 +348,21 @@ class _SourceChainViewState extends State<_SourceChainView> {
       );
     }
     if (source.kind == 'svg') {
+      final onError = allowErrorAdvance ? _next : () {};
       final inline = source.content?.trim();
       if (inline != null && inline.isNotEmpty) {
         if (inline.startsWith('<svg')) {
-          return _InlineSvgSourceView(
-            svg: inline,
+          // 内联 SVG：同样改写字体后渲染（修中文）
+          return _PreparedSvgView(
+            svg: prepareDiagramSvg(inline),
             fallback: widget.card.fallback,
-            onError: allowErrorAdvance ? _next : () {},
+            onError: onError,
           );
         }
-        return _AssetSourceView(
-          source: source,
-          url: widget.assetUrl(inline),
-          fallback: widget.card.fallback,
-          onError: allowErrorAdvance ? _next : () {},
-        );
+        return _buildAsset(widget.assetUrl(inline), onError);
       }
       if (source.path != null) {
-        return _AssetSourceView(
-          source: source,
-          url: widget.assetUrl(source.path!),
-          fallback: widget.card.fallback,
-          onError: allowErrorAdvance ? _next : () {},
-        );
+        return _buildAsset(widget.assetUrl(source.path!), onError);
       }
     }
     if (allowErrorAdvance)
@@ -141,57 +372,31 @@ class _SourceChainViewState extends State<_SourceChainView> {
       style: TextStyle(color: AppColors.warning, fontSize: 13),
     );
   }
-}
 
-class _InlineSvgSourceView extends StatelessWidget {
-  const _InlineSvgSourceView({
-    required this.svg,
-    required this.onError,
-    this.fallback,
-  });
-  final String svg;
-  final VoidCallback onError;
-  final String? fallback;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.watch<LocalizationProvider>();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.codeBgDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-      ),
-      child: SvgPicture.string(
-        svg,
-        width: double.infinity,
-        placeholderBuilder: (_) => Container(
-          height: 120,
-          alignment: Alignment.center,
-          child: const CircularProgressIndicator(strokeWidth: 2),
-        ),
-        errorBuilder: (ctx, err, stack) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-          return Text(
-            fallback ?? l10n.get('svg_loading_fail'),
-            style: TextStyle(color: AppColors.warning, fontSize: 13),
-          );
-        },
-      ),
+  /// 资源 URL 分流：.svg 走「拉取→改字体→渲染」管线（修中文）；其余按位图加载
+  Widget _buildAsset(String url, VoidCallback onError) {
+    if (url.toLowerCase().endsWith('.svg')) {
+      return _CjkNetworkSvg(
+        url: url,
+        fallback: widget.card.fallback,
+        onError: onError,
+      );
+    }
+    return _AssetImageView(
+      url: url,
+      fallback: widget.card.fallback,
+      onError: onError,
     );
   }
 }
 
-class _AssetSourceView extends StatelessWidget {
-  const _AssetSourceView({
-    required this.source,
+/// 位图资源（png/jpg 等）加载，SVG 不走这里
+class _AssetImageView extends StatelessWidget {
+  const _AssetImageView({
     required this.url,
     required this.onError,
     this.fallback,
   });
-  final CardSource source;
   final String url;
   final VoidCallback onError;
   final String? fallback;
@@ -207,34 +412,17 @@ class _AssetSourceView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
-      child: url.toLowerCase().endsWith('.svg')
-          ? SvgPicture.network(
-              url,
-              width: double.infinity,
-              placeholderBuilder: (_) => Container(
-                height: 120,
-                alignment: Alignment.center,
-                child: const CircularProgressIndicator(strokeWidth: 2),
-              ),
-              errorBuilder: (ctx, err, stack) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-                return Text(
-                  fallback ?? l10n.get('svg_loading_fail'),
-                  style: TextStyle(color: AppColors.warning, fontSize: 13),
-                );
-              },
-            )
-          : Image.network(
-              url,
-              width: double.infinity,
-              errorBuilder: (ctx, err, stack) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-                return Text(
-                  fallback ?? l10n.get('image_picture_loading_fail'),
-                  style: TextStyle(color: AppColors.warning, fontSize: 13),
-                );
-              },
-            ),
+      child: Image.network(
+        url,
+        width: double.infinity,
+        errorBuilder: (ctx, err, stack) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+          return Text(
+            fallback ?? l10n.get('image_picture_loading_fail'),
+            style: TextStyle(color: AppColors.warning, fontSize: 13),
+          );
+        },
+      ),
     );
   }
 }
@@ -1520,82 +1708,60 @@ class SvgDiagramCard extends StatelessWidget {
   const SvgDiagramCard({required this.card});
   final LearningCard card;
 
+  String _assetUrl(BuildContext context, String path) {
+    final uri = Uri.tryParse(path);
+    if (uri?.hasScheme == true) return path;
+    final base = context.read<ContentProvider>().contentBaseUrl.replaceAll(
+      RegExp(r'/+$'),
+      '',
+    );
+    return '$base/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final svgData = card.svg;
     final svgAsset = card.asset;
 
+    // 与 DiagramCard 走同一套「改写字体 + 受限尺寸」管线，保证中文渲染
+    final Widget media;
+    if (svgData != null && svgData.isNotEmpty) {
+      media = _PreparedSvgView(
+        svg: prepareDiagramSvg(svgData),
+        onError: () {},
+        fallback: card.fallback,
+      );
+    } else if (svgAsset != null && svgAsset.isNotEmpty) {
+      media = _CjkNetworkSvg(
+        url: _assetUrl(context, svgAsset),
+        onError: () {},
+        fallback: card.fallback,
+      );
+    } else {
+      media = Container(
+        width: double.infinity,
+        height: 120,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.codeBgDark,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+        ),
+        child: Text(
+          card.fallback ?? l10n.get('temporary_no_image_understand_content'),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 13,
+          ),
+        ),
+      );
+    }
+
     return WorkPanel(
       title: card.title,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.codeBgDark,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-          ),
-          child: Column(
-            children: [
-              if (svgData != null && svgData.isNotEmpty)
-                SvgPicture.string(
-                  svgData,
-                  width: double.infinity,
-                  placeholderBuilder: (_) => Container(
-                    height: 120,
-                    alignment: Alignment.center,
-                    child: const CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else if (svgAsset != null && svgAsset.isNotEmpty)
-                SvgPicture.network(
-                  svgAsset,
-                  width: double.infinity,
-                  placeholderBuilder: (_) => Container(
-                    height: 120,
-                    alignment: Alignment.center,
-                    child: const CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  errorBuilder: (ctx, err, stack) => Container(
-                    height: 120,
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.broken_image_outlined,
-                          color: AppColors.warning,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          card.fallback ?? l10n.get('svg_loading_fail'),
-                          style: TextStyle(
-                            color: AppColors.warning,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                Container(
-                  height: 120,
-                  alignment: Alignment.center,
-                  child: Text(
-                    card.fallback ??
-                        l10n.get('temporary_no_image_understand_content'),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        media,
         if (card.content.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(card.content, style: const TextStyle(height: 1.6)),

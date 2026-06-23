@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
+
+/// 应用打包的中文子集字体族名（见 pubspec.yaml fonts: AppSans）。
+/// 含拉丁与中文字形，避免运行时从 Google Fonts 下载 Noto 分片
+/// （此前的运行时下载会在滚动时按需拉取字形分片，造成全局卡顿）。
+const String kAppFontFamily = 'AppSans';
 
 /// 构建主题
 /// 
@@ -76,14 +80,20 @@ ThemeData buildTheme(
     surfaceBright: surfaceColor,
   );
 
-  final textTheme = GoogleFonts.interTextTheme(
-    isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+  final baseTextTheme = isDark
+      ? ThemeData.dark().textTheme
+      : ThemeData.light().textTheme;
+  final textTheme = baseTextTheme.apply(
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: const [kAppFontFamily],
   );
 
   final scaledTextTheme = textTheme.apply(fontSizeFactor: fontScale);
 
   return ThemeData(
     colorScheme: colorScheme,
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: const [kAppFontFamily],
     visualDensity: cardDensity == 'compact'
         ? VisualDensity.compact
         : VisualDensity.standard,

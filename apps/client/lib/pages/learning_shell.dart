@@ -98,15 +98,33 @@ class _LearningShellState extends State<LearningShell> {
 
   @override
   Widget build(BuildContext context) {
+    // l10n 用 watch：仅在语言切换时重建（低频）；下面的业务数据改用 select 精确订阅，
+    // 避免 settings/content/progress 任意变更都整页重建（这是之前滚动卡顿的诱因之一）。
     final l10n = context.watch<LocalizationProvider>();
     final wide = MediaQuery.sizeOf(context).width >= 860;
-    final settings = context.watch<SettingsProvider>();
-    final content = context.watch<ContentProvider>();
-    final progress = context.watch<ProgressProvider>();
+    final onboardingCompleted = context.select<SettingsProvider, bool>(
+      (p) => p.settings.onboardingCompleted,
+    );
 
-    if (!settings.settings.onboardingCompleted) {
+    if (!onboardingCompleted) {
       return const OnboardingScreen();
     }
+
+    final currentDomain = context.select<SettingsProvider, String>(
+      (p) => p.settings.currentDomain,
+    );
+    final topicCount = context.select<ContentProvider, int>(
+      (p) => p.topics.length,
+    );
+    final streakDays = context.select<ProgressProvider, int>(
+      (p) => p.streakDays,
+    );
+    final totalHours = context.select<ProgressProvider, double>(
+      (p) => p.totalHours,
+    );
+    final todayHoursGrowth = context.select<ProgressProvider, double>(
+      (p) => p.todayHoursGrowth,
+    );
 
     // Shell 内部用 _section / _selectedTopicId 切页（非 go_router 路由栈），
     // 所以系统返回键/侧滑返回没有可 pop 的路由，会直接最小化 App。
@@ -134,11 +152,11 @@ class _LearningShellState extends State<LearningShell> {
                     NavigationRailPanel(
                       section: _section,
                       onSelect: _setSection,
-                      currentDomain: settings.settings.currentDomain,
-                      topicCount: content.topics.length,
-                      streakDays: progress.streakDays,
-                      totalHours: progress.totalHours,
-                      todayHoursGrowth: progress.todayHoursGrowth,
+                      currentDomain: currentDomain,
+                      topicCount: topicCount,
+                      streakDays: streakDays,
+                      totalHours: totalHours,
+                      todayHoursGrowth: todayHoursGrowth,
                       isCollapsed: _isSidebarCollapsed,
                       onToggleCollapse: () => setState(
                         () => _isSidebarCollapsed = !_isSidebarCollapsed,
@@ -179,13 +197,13 @@ class _LearningShellState extends State<LearningShell> {
                               return;
                             }
 
-                            await settings.setContentEnv(contentEnv);
+                            final settingsProvider = context.read<SettingsProvider>();
+                            await settingsProvider.setContentEnv(contentEnv);
                             if (!context.mounted) return;
-                            final contentProvider = context
-                                .read<ContentProvider>();
+                            final contentProvider = context.read<ContentProvider>();
                             await contentProvider.switchContentEnv(
-                              settings.settings.contentBaseUrl,
-                              currentDomainId: settings.settings.currentDomain,
+                              settingsProvider.settings.contentBaseUrl,
+                              currentDomainId: settingsProvider.settings.currentDomain,
                             );
                           },
                         ),
