@@ -83,7 +83,8 @@ void main() {
                 sawMermaidDiagram = true;
                 expect(
                   card.content.trimLeft(),
-                  matches(RegExp(r'^(flowchart|graph)\s+(TB|TD|BT|RL|LR)\b')),
+                  matches(RegExp(
+                      r'^(?:(?:flowchart|graph)\s+(?:TB|TD|BT|RL|LR)\b|stateDiagram(?:-v2)?\b|sequenceDiagram\b)')),
                   reason: topicPath,
                 );
               }
