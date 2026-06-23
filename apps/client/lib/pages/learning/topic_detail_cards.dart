@@ -9,7 +9,6 @@ import 'package:mianshi_zhilian/models/topic.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
-import 'package:mianshi_zhilian/theme/app_theme.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 
 part 'topic_detail_cards/basic_cards.dart';

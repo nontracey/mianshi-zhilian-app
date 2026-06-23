@@ -1,5 +1,9 @@
 part of '../topic_detail_cards.dart';
 
+/// SVG 内中文字体族名（pubspec.yaml 中注册的 AppSans 子集字体）。
+/// 仅用于 SVG 文本改写，不注入 ThemeData，避免全局滚动卡顿。
+const String _kSvgFontFamily = 'AppSans';
+
 // Mermaid 5 色板 classDef → AppColors 映射
 // ok/warn/fail 复用 categoryGreen/Amber/Red（色值精确匹配 #10B981/#F59E0B/#EF4444）
 // async/highlight 是 AppColors 新增字段
@@ -15,7 +19,7 @@ const Map<String, Color> kMermaidClassColors = {
 //
 // flutter_svg 渲染 <text> 时不读取 ThemeData 字体，CanvasKit 默认字体无中文字形，
 // 内容图解几乎全是中文 <text> → 中文变 tofu/空白，且不会抛错，导致降级链卡在空白 SVG。
-// 修复：渲染前把 SVG 内所有 font-family 改写为打包字体 [kAppFontFamily]（含中文字形）。
+// 修复：渲染前把 SVG 内所有 font-family 改写为打包字体 [_kSvgFontFamily]（含中文字形）。
 // 另外这些 SVG 根节点用 width="100%"（相对尺寸），flutter_svg 量算会塌缩为 0 → 整图空白，
 // 故去掉根节点 width/height，改由外层按 viewBox 宽高比布局。
 String prepareDiagramSvg(String raw) {
@@ -52,19 +56,19 @@ String prepareDiagramSvg(String raw) {
   // 3) 行内 font-family → 打包字体（含中文字形），否则 CanvasKit 默认字体中文变 tofu
   svg = svg.replaceAll(
     RegExp(r'font-family\s*=\s*"[^"]*"'),
-    'font-family="$kAppFontFamily"',
+    'font-family="$_kSvgFontFamily"',
   );
 
   // 4) 根 <svg> 未声明 font-family 时注入默认值，覆盖未显式声明的 <text>
   final svgTagMatch = RegExp(r'<svg\b[^>]*>').firstMatch(svg);
   if (svgTagMatch != null && !svgTagMatch.group(0)!.contains('font-family')) {
-    svg = svg.replaceFirst('<svg', '<svg font-family="$kAppFontFamily"');
+    svg = svg.replaceFirst('<svg', '<svg font-family="$_kSvgFontFamily"');
   }
   return svg;
 }
 
 /// 把一组 CSS 声明（`fill:#fff;stroke:#ccc;font:700 16px X`）转成 SVG 行内
-/// presentation 属性串。字体一律改写为打包字体 [kAppFontFamily]。
+/// presentation 属性串。字体一律改写为打包字体 [_kSvgFontFamily]。
 String _cssDeclsToSvgAttrs(String css) {
   final out = <String>[];
   for (final decl in css.split(';')) {
@@ -98,7 +102,7 @@ String _cssDeclsToSvgAttrs(String css) {
         out.add('font-style="$val"');
         break;
       case 'font-family':
-        out.add('font-family="$kAppFontFamily"');
+        out.add('font-family="$_kSvgFontFamily"');
         break;
       case 'font':
         // shorthand: [weight] [size]px [families…]
@@ -106,7 +110,7 @@ String _cssDeclsToSvgAttrs(String css) {
         final wt = RegExp(r'\b([1-9]00)\b').firstMatch(val);
         if (wt != null) out.add('font-weight="${wt.group(1)}"');
         if (sz != null) out.add('font-size="${sz.group(1)}"');
-        out.add('font-family="$kAppFontFamily"');
+        out.add('font-family="$_kSvgFontFamily"');
         break;
     }
   }
@@ -126,6 +130,7 @@ double? svgViewBoxAspect(String svg) {
 }
 
 /// 已处理好的内联 SVG 渲染（统一供「内联源」与「网络源拉取后」复用）
+/// 支持双指缩放/拖拽，手机上可放大查看细节
 class _PreparedSvgView extends StatelessWidget {
   const _PreparedSvgView({
     required this.svg,
@@ -148,22 +153,26 @@ class _PreparedSvgView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
-      child: AspectRatio(
-        aspectRatio: aspect,
-        child: SvgPicture.string(
-          svg,
-          fit: BoxFit.contain,
-          placeholderBuilder: (_) => Container(
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(strokeWidth: 2),
+      child: InteractiveViewer(
+        maxScale: 5.0,
+        minScale: 1.0,
+        child: AspectRatio(
+          aspectRatio: aspect,
+          child: SvgPicture.string(
+            svg,
+            fit: BoxFit.contain,
+            placeholderBuilder: (_) => Container(
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+            errorBuilder: (ctx, err, stack) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+              return Text(
+                fallback ?? l10n.get('svg_loading_fail'),
+                style: TextStyle(color: AppColors.warning, fontSize: 13),
+              );
+            },
           ),
-          errorBuilder: (ctx, err, stack) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-            return Text(
-              fallback ?? l10n.get('svg_loading_fail'),
-              style: TextStyle(color: AppColors.warning, fontSize: 13),
-            );
-          },
         ),
       ),
     );
@@ -320,12 +329,24 @@ class _SourceChainView extends StatefulWidget {
 
 class _SourceChainViewState extends State<_SourceChainView> {
   int index = 0;
+  // 缓存已处理的 SVG 文本，避免每次 build 重复解析
+  String? _cachedRawSvg;
+  String? _cachedPreparedSvg;
 
   void _next() {
     if (!mounted) return;
     if (index + 1 < widget.sources.length) {
       setState(() => index += 1);
     }
+  }
+
+  String _prepareSvg(String raw) {
+    if (raw == _cachedRawSvg && _cachedPreparedSvg != null) {
+      return _cachedPreparedSvg!;
+    }
+    _cachedRawSvg = raw;
+    _cachedPreparedSvg = prepareDiagramSvg(raw);
+    return _cachedPreparedSvg!;
   }
 
   @override
@@ -336,9 +357,11 @@ class _SourceChainViewState extends State<_SourceChainView> {
 
   Widget _buildSource(CardSource source, {required bool allowErrorAdvance}) {
     if (widget.isMermaidSource(source)) {
-      return MermaidDiagramView(
-        card: widget.card,
-        content: source.content ?? '',
+      return RepaintBoundary(
+        child: MermaidDiagramView(
+          card: widget.card,
+          content: source.content ?? '',
+        ),
       );
     }
     if (source.kind == 'text') {
@@ -352,11 +375,12 @@ class _SourceChainViewState extends State<_SourceChainView> {
       final inline = source.content?.trim();
       if (inline != null && inline.isNotEmpty) {
         if (inline.startsWith('<svg')) {
-          // 内联 SVG：同样改写字体后渲染（修中文）
-          return _PreparedSvgView(
-            svg: prepareDiagramSvg(inline),
-            fallback: widget.card.fallback,
-            onError: onError,
+          return RepaintBoundary(
+            child: _PreparedSvgView(
+              svg: _prepareSvg(inline),
+              fallback: widget.card.fallback,
+              onError: onError,
+            ),
           );
         }
         return _buildAsset(widget.assetUrl(inline), onError);
@@ -493,7 +517,11 @@ class MermaidDiagramView extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
           ),
-          child: diagramWidget,
+          child: InteractiveViewer(
+            maxScale: 5.0,
+            minScale: 1.0,
+            child: diagramWidget,
+          ),
         ),
         if (card.fallback != null && card.fallback!.isNotEmpty) ...[
           const SizedBox(height: 10),
