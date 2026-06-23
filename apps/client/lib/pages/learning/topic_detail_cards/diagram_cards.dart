@@ -42,7 +42,12 @@ class DiagramWithFullscreen extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child,
+        // 整个内联图解区域可点击放大（点击与内部横向滚动/选择是不同手势，互不冲突），
+        // 比只点右上角小按钮更易用。
+        GestureDetector(
+          onTap: () => _openFullscreen(context),
+          child: child,
+        ),
         Positioned(
           top: 8,
           right: 8,
@@ -70,10 +75,49 @@ class DiagramWithFullscreen extends StatelessWidget {
 
 /// 全屏图解查看页。使用独立的 InteractiveViewer，不复用内联 widget 树，
 /// 避免嵌套 InteractiveViewer 抢手势。
-class _DiagramFullscreenView extends StatelessWidget {
+///
+/// 手势设计：内容宽度固定为视口宽度（避免 mermaid 节点 `width:double.infinity`
+/// 在无界约束下塌缩/溢出），高度按内容自然展开 → 长图可上下拖动。双击在点击处
+/// 放大/复位；boundaryMargin 取有限值，避免图被拖出屏幕后找不回来。
+class _DiagramFullscreenView extends StatefulWidget {
   const _DiagramFullscreenView({required this.content, this.title});
   final Widget content;
   final String? title;
+
+  @override
+  State<_DiagramFullscreenView> createState() => _DiagramFullscreenViewState();
+}
+
+class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
+  final TransformationController _controller = TransformationController();
+  TapDownDetails? _doubleTapDetails;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleDoubleTap() {
+    // 已放大 → 复位；否则以双击点为中心放大。
+    if (_controller.value.getMaxScaleOnAxis() > 1.01) {
+      _controller.value = Matrix4.identity();
+      return;
+    }
+    final pos = _doubleTapDetails?.localPosition;
+    if (pos == null) return;
+    const scale = 2.5;
+    final tx = -pos.dx * (scale - 1);
+    final ty = -pos.dy * (scale - 1);
+    // 以双击点为中心放大：等价于 identity..translate(tx,ty)..scale(scale)，
+    // 直接用列主序构造避免 Matrix4.translate/scale 的弃用告警。
+    _controller.value = Matrix4(
+      scale, 0, 0, 0, //
+      0, scale, 0, 0, //
+      0, 0, 1, 0, //
+      tx, ty, 0, 1, //
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,20 +126,35 @@ class _DiagramFullscreenView extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A2E),
         foregroundColor: Colors.white,
-        title: title != null
-            ? Text(title!, style: const TextStyle(fontSize: 16))
+        title: widget.title != null
+            ? Text(widget.title!, style: const TextStyle(fontSize: 16))
             : null,
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: InteractiveViewer(
-        maxScale: 8.0,
-        minScale: 0.5,
-        constrained: false,
-        boundaryMargin: const EdgeInsets.all(double.infinity),
-        child: content,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return GestureDetector(
+            onDoubleTapDown: (d) => _doubleTapDetails = d,
+            onDoubleTap: _handleDoubleTap,
+            child: InteractiveViewer(
+              transformationController: _controller,
+              maxScale: 8.0,
+              minScale: 0.5,
+              constrained: false,
+              boundaryMargin: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth,
+                vertical: constraints.maxHeight,
+              ),
+              child: SizedBox(
+                width: constraints.maxWidth,
+                child: widget.content,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -293,6 +352,11 @@ class _PreparedSvgView extends StatelessWidget {
   }
 }
 
+/// 已拉取并改写好的网络 SVG 缓存（按 URL）。同一张图在列表里被重建、切 Tab、
+/// 主题/语言切换或返回重进时复用结果，避免重复网络请求与正则改写 → 减少卡顿。
+/// 失败的 future 会被剔除，下次可重试。
+final Map<String, Future<String>> _preparedNetworkSvgCache = {};
+
 /// 网络 SVG：先拉取文本 → UTF-8 解码 → 改写字体/尺寸 → SvgPicture.string 渲染。
 /// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
 class _CjkNetworkSvg extends StatefulWidget {
@@ -326,8 +390,23 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
     }
   }
 
-  Future<String> _load() async {
-    final uri = Uri.parse(widget.url);
+  Future<String> _load() {
+    final cached = _preparedNetworkSvgCache[widget.url];
+    if (cached != null) return cached;
+    // 缓存「拉取+改写」结果；失败时剔除缓存以便下次重试。
+    final future = _fetchAndPrepare(widget.url).then(
+      (v) => v,
+      onError: (Object e, StackTrace s) {
+        _preparedNetworkSvgCache.remove(widget.url);
+        throw e;
+      },
+    );
+    _preparedNetworkSvgCache[widget.url] = future;
+    return future;
+  }
+
+  static Future<String> _fetchAndPrepare(String url) async {
+    final uri = Uri.parse(url);
     // 加超时：请求挂死时及时失败 → 触发 onError 降级到 mermaid/文本，而非一直转圈
     final resp = await http.get(uri).timeout(const Duration(seconds: 15));
     if (resp.statusCode != 200) {
@@ -593,15 +672,42 @@ MermaidDiagram parseMermaidDiagram(String content) {
   return MermaidDiagramData.parse(content);
 }
 
-class MermaidDiagramView extends StatelessWidget {
+class MermaidDiagramView extends StatefulWidget {
   const MermaidDiagramView({super.key, required this.card, this.content});
   final LearningCard card;
   final String? content;
 
   @override
+  State<MermaidDiagramView> createState() => _MermaidDiagramViewState();
+}
+
+class _MermaidDiagramViewState extends State<MermaidDiagramView> {
+  // 解析只在内容变化时做一次，避免每次重建（切 Tab/主题/语言都会触发）重跑正则。
+  late MermaidDiagram _diagram;
+
+  @override
+  void initState() {
+    super.initState();
+    _parse();
+  }
+
+  @override
+  void didUpdateWidget(MermaidDiagramView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.content != widget.content ||
+        oldWidget.card.content != widget.card.content) {
+      _parse();
+    }
+  }
+
+  void _parse() {
+    _diagram = parseMermaidDiagram(widget.content ?? widget.card.content);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final source = content ?? card.content;
-    final diagram = parseMermaidDiagram(source);
+    final card = widget.card;
+    final diagram = _diagram;
 
     final Widget diagramWidget;
     if (diagram is MermaidDiagramData) {
@@ -1888,16 +1994,20 @@ class _SvgDiagramCardState extends State<SvgDiagramCard> {
     // 与 DiagramCard 走同一套「改写字体 + 受限尺寸」管线，保证中文渲染
     final Widget media;
     if (svgData != null && svgData.isNotEmpty) {
-      media = _PreparedSvgView(
-        svg: _prepareSvg(svgData),
-        onError: () {},
-        fallback: widget.card.fallback,
+      media = RepaintBoundary(
+        child: _PreparedSvgView(
+          svg: _prepareSvg(svgData),
+          onError: () {},
+          fallback: widget.card.fallback,
+        ),
       );
     } else if (svgAsset != null && svgAsset.isNotEmpty) {
-      media = _CjkNetworkSvg(
-        url: _assetUrl(context, svgAsset),
-        onError: () {},
-        fallback: widget.card.fallback,
+      media = RepaintBoundary(
+        child: _CjkNetworkSvg(
+          url: _assetUrl(context, svgAsset),
+          onError: () {},
+          fallback: widget.card.fallback,
+        ),
       );
     } else {
       media = Container(

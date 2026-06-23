@@ -245,12 +245,15 @@ class KnowledgeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      children: [
-        if (topic.interviewerFocus != null &&
-            topic.interviewerFocus!.isNotEmpty) ...[
-          Container(
+    // 用 ListView.builder 虚拟化：只构建视口内（及附近）的卡片。屏幕外的图解卡片
+    // 不会立即发网络请求/解析/栅格化 SVG —— 这是「刚进页面就卡顿」的根因。
+    // 这里只构造轻量 Widget 配置对象，重活（initState 拉取、SVG 栅格）按需触发。
+    final items = <Widget>[
+      if (topic.interviewerFocus != null &&
+          topic.interviewerFocus!.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.08),
@@ -291,24 +294,29 @@ class KnowledgeTab extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-        ],
-        ...topic.learningCards.map(
-          (card) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: _buildCard(context, card),
-          ),
         ),
-        if (topic.rubric != null) ...[
-          const SizedBox(height: 8),
-          RubricSection(rubric: topic.rubric!),
-        ],
-        if (topic.followUps.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          FollowUpSection(followUps: topic.followUps),
-        ],
-        const SizedBox(height: 24),
-      ],
+      ...topic.learningCards.map(
+        (card) => Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildCard(context, card),
+        ),
+      ),
+      if (topic.rubric != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: RubricSection(rubric: topic.rubric!),
+        ),
+      if (topic.followUps.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: FollowUpSection(followUps: topic.followUps),
+        ),
+    ];
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      itemCount: items.length,
+      itemBuilder: (_, i) => items[i],
     );
   }
 
