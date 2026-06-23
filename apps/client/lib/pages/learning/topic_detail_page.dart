@@ -56,7 +56,8 @@ class _TopicDetailPageState extends State<TopicDetailPage>
       vsync: this,
     );
     _tabController.addListener(() {
-      if (mounted) setState(() {});
+      // 仅在 tab 切换完成时重建，而非每帧动画都 setState
+      if (mounted && !_tabController.indexIsChanging) setState(() {});
     });
   }
 

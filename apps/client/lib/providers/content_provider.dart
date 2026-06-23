@@ -15,6 +15,8 @@ class ContentProvider extends ChangeNotifier {
 
   List<Domain> _domains = [];
   Map<String, Topic> _topics = {};
+  // topics getter 的缓存视图，避免每次访问都创建新 Map
+  Map<String, Topic>? _topicsView;
   Map<String, dynamic>? _manifest;
   bool _isLoading = false;
   int _loadingDomainCount = 0; // 并发加载中的领域数；>0 即 isLoadingTopics
@@ -32,12 +34,26 @@ class ContentProvider extends ChangeNotifier {
   /// 返回按 topic.id 去重后的 topic 映射（key = topic.id）。
   /// `_topics` 内部可能以 cacheKey（斜杠）和 topic.id（点号）双键存储同一对象；
   /// 通过此 getter 暴露给外部的视图始终去重，确保 values / length / keys 不翻倍。
+  /// 结果被缓存，仅在 _topics 被修改后首次访问时重建。
   Map<String, Topic> get topics {
-    final seen = <String, Topic>{};
-    for (final t in _topics.values) {
-      seen[t.id] = t;
+    if (_topicsView == null) {
+      final seen = <String, Topic>{};
+      for (final t in _topics.values) {
+        seen[t.id] = t;
+      }
+      _topicsView = seen;
     }
-    return seen;
+    return _topicsView!;
+  }
+
+  void _invalidateTopicsView() {
+    _topicsView = null;
+  }
+
+  @override
+  void notifyListeners() {
+    _invalidateTopicsView();
+    super.notifyListeners();
   }
 
   Map<String, dynamic>? get manifest => _manifest;
@@ -145,6 +161,7 @@ class ContentProvider extends ChangeNotifier {
               _topics[entry.value.id] ??= entry.value;
             }
           }
+          _invalidateTopicsView();
           await _pruneCachedTopics();
         }
       }
@@ -265,6 +282,7 @@ class ContentProvider extends ChangeNotifier {
             _topics[entry.value.id] ??= entry.value;
           }
         }
+        _invalidateTopicsView();
         return; // finally 负责递减计数并 notify
       }
 
@@ -322,6 +340,7 @@ class ContentProvider extends ChangeNotifier {
             ),
           );
         }
+        _invalidateTopicsView();
         // 每批加载完后一次性通知 UI 更新
         notifyListeners();
       }

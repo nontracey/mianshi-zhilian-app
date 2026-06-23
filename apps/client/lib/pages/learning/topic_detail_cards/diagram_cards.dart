@@ -4,6 +4,96 @@ part of '../topic_detail_cards.dart';
 /// 仅用于 SVG 文本改写，不注入 ThemeData，避免全局滚动卡顿。
 const String _kSvgFontFamily = 'AppSans';
 
+// ── 图解全屏查看 ─────────────────────────────────────────────
+
+/// 在图解区域右上角叠加全屏按钮，点击后以全屏模式查看图解（支持缩放拖拽）。
+class DiagramWithFullscreen extends StatelessWidget {
+  const DiagramWithFullscreen({
+    super.key,
+    required this.child,
+    this.title,
+  });
+  final Widget child;
+  final String? title;
+
+  void _openFullscreen(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        barrierDismissible: true,
+        pageBuilder: (_, __, ___) => _DiagramFullscreenView(
+          child: child,
+          title: title,
+        ),
+        transitionsBuilder: (_, animation, __, page) {
+          return FadeTransition(opacity: animation, child: page);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _openFullscreen(context),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.fullscreen_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DiagramFullscreenView extends StatelessWidget {
+  const _DiagramFullscreenView({required this.child, this.title});
+  final Widget child;
+  final String? title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A1A2E),
+        foregroundColor: Colors.white,
+        title: title != null
+            ? Text(title!, style: const TextStyle(fontSize: 16))
+            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: InteractiveViewer(
+        maxScale: 8.0,
+        minScale: 0.5,
+        constrained: false,
+        boundaryMargin: const EdgeInsets.all(40),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
 // Mermaid 5 色板 classDef → AppColors 映射
 // ok/warn/fail 复用 categoryGreen/Amber/Red（色值精确匹配 #10B981/#F59E0B/#EF4444）
 // async/highlight 是 AppColors 新增字段
@@ -145,33 +235,37 @@ class _PreparedSvgView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final aspect = svgViewBoxAspect(svg) ?? (16 / 9);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.codeBgDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-      ),
-      child: InteractiveViewer(
-        maxScale: 5.0,
-        minScale: 1.0,
-        child: AspectRatio(
-          aspectRatio: aspect,
-          child: SvgPicture.string(
-            svg,
-            fit: BoxFit.contain,
-            placeholderBuilder: (_) => Container(
-              alignment: Alignment.center,
-              child: const CircularProgressIndicator(strokeWidth: 2),
+    return DiagramWithFullscreen(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.codeBgDark,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+        ),
+        child: InteractiveViewer(
+          maxScale: 5.0,
+          minScale: 1.0,
+          constrained: false,
+          boundaryMargin: const EdgeInsets.all(20),
+          child: AspectRatio(
+            aspectRatio: aspect,
+            child: SvgPicture.string(
+              svg,
+              fit: BoxFit.contain,
+              placeholderBuilder: (_) => Container(
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              ),
+              errorBuilder: (ctx, err, stack) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+                return Text(
+                  fallback ?? l10n.get('svg_loading_fail'),
+                  style: TextStyle(color: AppColors.warning, fontSize: 13),
+                );
+              },
             ),
-            errorBuilder: (ctx, err, stack) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-              return Text(
-                fallback ?? l10n.get('svg_loading_fail'),
-                style: TextStyle(color: AppColors.warning, fontSize: 13),
-              );
-            },
           ),
         ),
       ),
@@ -509,18 +603,23 @@ class MermaidDiagramView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.codeBgDark,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-          ),
-          child: InteractiveViewer(
-            maxScale: 5.0,
-            minScale: 1.0,
-            child: diagramWidget,
+        DiagramWithFullscreen(
+          title: card.title,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.codeBgDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+            ),
+            child: InteractiveViewer(
+              maxScale: 5.0,
+              minScale: 1.0,
+              constrained: false,
+              boundaryMargin: const EdgeInsets.all(20),
+              child: diagramWidget,
+            ),
           ),
         ),
         if (card.fallback != null && card.fallback!.isNotEmpty) ...[
@@ -1732,9 +1831,26 @@ class SmartDiagram extends StatelessWidget {
 
 // ── SVG 图解卡片 ─────────────────────────────────────────────
 
-class SvgDiagramCard extends StatelessWidget {
+class SvgDiagramCard extends StatefulWidget {
   const SvgDiagramCard({required this.card});
   final LearningCard card;
+
+  @override
+  State<SvgDiagramCard> createState() => _SvgDiagramCardState();
+}
+
+class _SvgDiagramCardState extends State<SvgDiagramCard> {
+  String? _cachedRawSvg;
+  String? _cachedPreparedSvg;
+
+  String _prepareSvg(String raw) {
+    if (raw == _cachedRawSvg && _cachedPreparedSvg != null) {
+      return _cachedPreparedSvg!;
+    }
+    _cachedRawSvg = raw;
+    _cachedPreparedSvg = prepareDiagramSvg(raw);
+    return _cachedPreparedSvg!;
+  }
 
   String _assetUrl(BuildContext context, String path) {
     final uri = Uri.tryParse(path);
@@ -1749,22 +1865,22 @@ class SvgDiagramCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    final svgData = card.svg;
-    final svgAsset = card.asset;
+    final svgData = widget.card.svg;
+    final svgAsset = widget.card.asset;
 
     // 与 DiagramCard 走同一套「改写字体 + 受限尺寸」管线，保证中文渲染
     final Widget media;
     if (svgData != null && svgData.isNotEmpty) {
       media = _PreparedSvgView(
-        svg: prepareDiagramSvg(svgData),
+        svg: _prepareSvg(svgData),
         onError: () {},
-        fallback: card.fallback,
+        fallback: widget.card.fallback,
       );
     } else if (svgAsset != null && svgAsset.isNotEmpty) {
       media = _CjkNetworkSvg(
         url: _assetUrl(context, svgAsset),
         onError: () {},
-        fallback: card.fallback,
+        fallback: widget.card.fallback,
       );
     } else {
       media = Container(
@@ -1777,7 +1893,7 @@ class SvgDiagramCard extends StatelessWidget {
           border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
         ),
         child: Text(
-          card.fallback ?? l10n.get('temporary_no_image_understand_content'),
+          widget.card.fallback ?? l10n.get('temporary_no_image_understand_content'),
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.6),
             fontSize: 13,
@@ -1787,12 +1903,12 @@ class SvgDiagramCard extends StatelessWidget {
     }
 
     return WorkPanel(
-      title: card.title,
+      title: widget.card.title,
       children: [
         media,
-        if (card.content.isNotEmpty) ...[
+        if (widget.card.content.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text(card.content, style: const TextStyle(height: 1.6)),
+          Text(widget.card.content, style: const TextStyle(height: 1.6)),
         ],
       ],
     );
