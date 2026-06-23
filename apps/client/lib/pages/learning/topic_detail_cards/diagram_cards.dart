@@ -7,13 +7,17 @@ const String _kSvgFontFamily = 'AppSans';
 // ── 图解全屏查看 ─────────────────────────────────────────────
 
 /// 在图解区域右上角叠加全屏按钮，点击后以全屏模式查看图解（支持缩放拖拽）。
+/// [child] 是内联显示的视图（不带 InteractiveViewer）。
+/// [fullscreenContent] 是全屏专用的原始图解内容（不含 InteractiveViewer，由全屏页自行包裹）。
 class DiagramWithFullscreen extends StatelessWidget {
   const DiagramWithFullscreen({
     super.key,
     required this.child,
+    required this.fullscreenContent,
     this.title,
   });
   final Widget child;
+  final Widget fullscreenContent;
   final String? title;
 
   void _openFullscreen(BuildContext context) {
@@ -23,7 +27,7 @@ class DiagramWithFullscreen extends StatelessWidget {
         barrierColor: Colors.black,
         barrierDismissible: true,
         pageBuilder: (_, __, ___) => _DiagramFullscreenView(
-          child: child,
+          content: fullscreenContent,
           title: title,
         ),
         transitionsBuilder: (_, animation, __, page) {
@@ -36,6 +40,7 @@ class DiagramWithFullscreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         child,
         Positioned(
@@ -63,9 +68,11 @@ class DiagramWithFullscreen extends StatelessWidget {
   }
 }
 
+/// 全屏图解查看页。使用独立的 InteractiveViewer，不复用内联 widget 树，
+/// 避免嵌套 InteractiveViewer 抢手势。
 class _DiagramFullscreenView extends StatelessWidget {
-  const _DiagramFullscreenView({required this.child, this.title});
-  final Widget child;
+  const _DiagramFullscreenView({required this.content, this.title});
+  final Widget content;
   final String? title;
 
   @override
@@ -87,8 +94,8 @@ class _DiagramFullscreenView extends StatelessWidget {
         maxScale: 8.0,
         minScale: 0.5,
         constrained: false,
-        boundaryMargin: const EdgeInsets.all(40),
-        child: Center(child: child),
+        boundaryMargin: const EdgeInsets.all(double.infinity),
+        child: content,
       ),
     );
   }
@@ -219,8 +226,9 @@ double? svgViewBoxAspect(String svg) {
   return w / h;
 }
 
-/// 已处理好的内联 SVG 渲染（统一供「内联源」与「网络源拉取后」复用）
-/// 支持双指缩放/拖拽，手机上可放大查看细节
+/// 已处理好的内联 SVG 渲染（统一供「内联源」与「网络源拉取后」复用）。
+/// 内联视图不使用 InteractiveViewer（避免与 ListView 滚动冲突），
+/// 全屏按钮提供独立的缩放拖拽能力。
 class _PreparedSvgView extends StatelessWidget {
   const _PreparedSvgView({
     required this.svg,
@@ -231,44 +239,56 @@ class _PreparedSvgView extends StatelessWidget {
   final VoidCallback onError;
   final String? fallback;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSvgContent(BuildContext context, {required bool forFullscreen}) {
     final l10n = context.watch<LocalizationProvider>();
     final aspect = svgViewBoxAspect(svg) ?? (16 / 9);
-    return DiagramWithFullscreen(
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.codeBgDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+    final svgWidget = AspectRatio(
+      aspectRatio: aspect,
+      child: SvgPicture.string(
+        svg,
+        fit: BoxFit.contain,
+        placeholderBuilder: (_) => Container(
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(strokeWidth: 2),
         ),
-        child: InteractiveViewer(
-          maxScale: 5.0,
-          minScale: 1.0,
-          constrained: false,
-          boundaryMargin: const EdgeInsets.all(20),
-          child: AspectRatio(
-            aspectRatio: aspect,
-            child: SvgPicture.string(
-              svg,
-              fit: BoxFit.contain,
-              placeholderBuilder: (_) => Container(
-                alignment: Alignment.center,
-                child: const CircularProgressIndicator(strokeWidth: 2),
-              ),
-              errorBuilder: (ctx, err, stack) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-                return Text(
-                  fallback ?? l10n.get('svg_loading_fail'),
-                  style: TextStyle(color: AppColors.warning, fontSize: 13),
-                );
-              },
+        errorBuilder: (ctx, err, stack) {
+          if (!forFullscreen) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+          }
+          return Text(
+            fallback ?? l10n.get('svg_loading_fail'),
+            style: TextStyle(
+              color: forFullscreen ? Colors.white : AppColors.warning,
+              fontSize: 13,
             ),
-          ),
-        ),
+          );
+        },
       ),
+    );
+
+    if (forFullscreen) {
+      // 全屏：直接返回内容，由 _DiagramFullscreenView 包裹 InteractiveViewer
+      return svgWidget;
+    }
+
+    // 内联：带背景容器，无 InteractiveViewer
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.codeBgDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+      ),
+      child: svgWidget,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DiagramWithFullscreen(
+      child: _buildSvgContent(context, forFullscreen: false),
+      fullscreenContent: _buildSvgContent(context, forFullscreen: true),
     );
   }
 }
@@ -605,6 +625,7 @@ class MermaidDiagramView extends StatelessWidget {
       children: [
         DiagramWithFullscreen(
           title: card.title,
+          // 内联：无 InteractiveViewer，避免与 ListView 滚动冲突
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
@@ -613,14 +634,10 @@ class MermaidDiagramView extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
             ),
-            child: InteractiveViewer(
-              maxScale: 5.0,
-              minScale: 1.0,
-              constrained: false,
-              boundaryMargin: const EdgeInsets.all(20),
-              child: diagramWidget,
-            ),
+            child: diagramWidget,
           ),
+          // 全屏：原始图解内容，由 _DiagramFullscreenView 包裹 InteractiveViewer
+          fullscreenContent: diagramWidget,
         ),
         if (card.fallback != null && card.fallback!.isNotEmpty) ...[
           const SizedBox(height: 10),
