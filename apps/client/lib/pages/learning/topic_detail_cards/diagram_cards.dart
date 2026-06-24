@@ -193,18 +193,46 @@ class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
           return GestureDetector(
             onDoubleTapDown: (d) => _doubleTapDetails = d,
             onDoubleTap: _handleDoubleTap,
-            child: InteractiveViewer(
-              transformationController: _controller,
-              maxScale: _kMaxScale,
-              minScale: _kMinScale,
-              constrained: false,
-              boundaryMargin: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth,
-                vertical: constraints.maxHeight,
-              ),
-              child: SizedBox(
-                width: constraints.maxWidth,
-                child: widget.content,
+            // Listener 拦截 web 端滚轮事件 → 手动缩放，
+            // 解决浏览器默认滚动行为抢占 InteractiveViewer 的缩放信号。
+            child: Listener(
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent) {
+                  final delta = event.scrollDelta.dy;
+                  final factor = delta > 0 ? 0.9 : 1.1;
+                  final newScale =
+                      (_scale * factor).clamp(_kMinScale, _kMaxScale);
+                  if (newScale == _scale) return;
+                  // 以鼠标位置为锚点缩放
+                  final pos = event.localPosition;
+                  final focal = MatrixUtils.transformPoint(
+                    Matrix4.inverted(_controller.value),
+                    pos,
+                  );
+                  final tx = focal.dx * (_scale - newScale);
+                  final ty = focal.dy * (_scale - newScale);
+                  final m = _controller.value.clone()
+                    ..translate(tx, ty)
+                    ..scale(newScale / _scale);
+                  setState(() {
+                    _scale = newScale;
+                    _controller.value = m;
+                  });
+                }
+              },
+              child: InteractiveViewer(
+                transformationController: _controller,
+                maxScale: _kMaxScale,
+                minScale: _kMinScale,
+                constrained: false,
+                boundaryMargin: EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth,
+                  vertical: constraints.maxHeight,
+                ),
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  child: widget.content,
+                ),
               ),
             ),
           );
@@ -411,10 +439,13 @@ class _PreparedSvgView extends StatelessWidget {
   }
 }
 
-/// 已拉取并改写好的网络 SVG 缓存（按 URL）。同一张图在列表里被重建、切 Tab、
-/// 主题/语言切换或返回重进时复用结果，避免重复网络请求与正则改写 → 减少卡顿。
-/// 失败的 future 会被剔除，下次可重试。
-final Map<String, Future<String>> _preparedNetworkSvgCache = {};
+/// 已拉取并改写好的网络 SVG 字符串缓存（按 URL → 已解码 SVG 文本）。
+/// 滚动导致 widget 被 dispose 再重建时直接命中缓存，不再触发网络请求。
+/// 没有命中缓存的 URL 会异步拉取，完成后写入缓存并 setState。
+final Map<String, String> _preparedNetworkSvgStringCache = {};
+
+/// 正在进行中的网络请求（按 URL），避免同一 URL 并发重复请求。
+final Map<String, Future<String>> _inflightSvgFetches = {};
 
 /// 网络 SVG：先拉取文本 → UTF-8 解码 → 改写字体/尺寸 → SvgPicture.string 渲染。
 /// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
@@ -433,35 +464,51 @@ class _CjkNetworkSvg extends StatefulWidget {
 }
 
 class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
-  late Future<String> _future;
+  String? _svg;
+  bool _loading = false;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _load();
   }
 
   @override
   void didUpdateWidget(_CjkNetworkSvg oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _future = _load();
+      _load();
     }
   }
 
-  Future<String> _load() {
-    final cached = _preparedNetworkSvgCache[widget.url];
-    if (cached != null) return cached;
-    // 缓存「拉取+改写」结果；失败时剔除缓存以便下次重试。
-    final future = _fetchAndPrepare(widget.url).then(
-      (v) => v,
+  void _load() {
+    // 命中字符串缓存 → 直接用，不再发网络请求
+    final cached = _preparedNetworkSvgStringCache[widget.url];
+    if (cached != null) {
+      _svg = cached;
+      _loading = false;
+      _error = null;
+      return;
+    }
+
+    _svg = null;
+    _loading = true;
+    _error = null;
+
+    // 共享进行中的请求，避免并发重复拉取
+    _inflightSvgFetches[widget.url] ??= _fetchAndPrepare(widget.url);
+    _inflightSvgFetches[widget.url]!.then(
+      (value) {
+        _inflightSvgFetches.remove(widget.url);
+        _preparedNetworkSvgStringCache[widget.url] = value;
+        if (mounted) setState(() { _svg = value; _loading = false; });
+      },
       onError: (Object e, StackTrace s) {
-        _preparedNetworkSvgCache.remove(widget.url);
-        throw e;
+        _inflightSvgFetches.remove(widget.url);
+        if (mounted) setState(() { _error = e; _loading = false; });
       },
     );
-    _preparedNetworkSvgCache[widget.url] = future;
-    return future;
   }
 
   static Future<String> _fetchAndPrepare(String url) async {
@@ -471,7 +518,7 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
     }
     final uri = Uri.parse(url);
     // 加超时：请求挂死时及时失败 → 触发 onError 降级到 mermaid/文本，而非一直转圈
-    final resp = await http.get(uri).timeout(const Duration(seconds: 15));
+    final resp = await http.get(uri).timeout(const Duration(seconds: 20));
     if (resp.statusCode != 200) {
       throw http.ClientException('HTTP ${resp.statusCode}', uri);
     }
@@ -482,35 +529,33 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-    return FutureBuilder<String>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.hasError) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError());
-          return Text(
-            widget.fallback ?? l10n.get('svg_loading_fail'),
-            style: TextStyle(color: AppColors.warning, fontSize: 13),
-          );
-        }
-        if (!snap.hasData) {
-          return Container(
-            width: double.infinity,
-            height: 140,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.codeBgDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-            ),
-            child: const CircularProgressIndicator(strokeWidth: 2),
-          );
-        }
-        return _PreparedSvgView(
-          svg: snap.data!,
-          onError: widget.onError,
-          fallback: widget.fallback,
-        );
-      },
+
+    if (_error != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError());
+      return Text(
+        widget.fallback ?? l10n.get('svg_loading_fail'),
+        style: TextStyle(color: AppColors.warning, fontSize: 13),
+      );
+    }
+
+    if (_loading || _svg == null) {
+      return Container(
+        width: double.infinity,
+        height: 140,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.codeBgDark,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+        ),
+        child: const CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    return _PreparedSvgView(
+      svg: _svg!,
+      onError: widget.onError,
+      fallback: widget.fallback,
     );
   }
 }
