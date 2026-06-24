@@ -565,12 +565,26 @@ class _HeaderBarState extends State<HeaderBar> {
             ? null
             : seedColor.withValues(alpha: 0.15),
         backgroundImage: hasAvatarUrl
-            ? NetworkImage(profile.avatarUrl!)
+            ? _resolveAvatarImage(profile.avatarUrl!)
             : diceBearUrl != null
             ? NetworkImage(diceBearUrl)
             : null,
       ),
     );
+  }
+
+  /// 头像可能是 `data:image/...;base64,...`（自定义上传的头像就是这种）。
+  /// native 端不能把 data URI 丢给 NetworkImage（会抛 "No host specified in URI"，
+  /// 且顶栏几乎每页都在，异常会反复触发拖累流畅度），必须解码成 MemoryImage。
+  ImageProvider? _resolveAvatarImage(String url) {
+    if (url.startsWith('data:')) {
+      try {
+        return MemoryImage(UriData.parse(url).contentAsBytes());
+      } catch (_) {
+        return null;
+      }
+    }
+    return NetworkImage(url);
   }
 }
 

@@ -452,6 +452,10 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
   }
 
   static Future<String> _fetchAndPrepare(String url) async {
+    // data: 内嵌 SVG —— 就地解码，不能走 http.get（native 端 data URI 无 host 会抛错）
+    if (url.startsWith('data:')) {
+      return prepareDiagramSvg(utf8.decode(UriData.parse(url).contentAsBytes()));
+    }
     final uri = Uri.parse(url);
     // 加超时：请求挂死时及时失败 → 触发 onError 降级到 mermaid/文本，而非一直转圈
     final resp = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -636,8 +640,37 @@ class _SourceChainViewState extends State<_SourceChainView> {
     );
   }
 
-  /// 资源 URL 分流：.svg 走「拉取→改字体→渲染」管线（修中文）；其余按位图加载
+  /// 资源 URL 分流：
+  /// - `data:` 内嵌资源（base64 图片/SVG）必须就地解码——native 端（Android/桌面）
+  ///   不能把 data URI 丢给 http.get/Image.network（会抛 "No host specified in URI"），
+  ///   只有 web 浏览器底层能直接吃 data URI。
+  /// - `.svg` 网络地址走「拉取→改字体→渲染」管线（修中文）；其余按位图加载。
   Widget _buildAsset(String url, VoidCallback onError) {
+    if (url.startsWith('data:')) {
+      if (_isSvgDataUri(url)) {
+        try {
+          final svg = utf8.decode(UriData.parse(url).contentAsBytes());
+          return RepaintBoundary(
+            child: _PreparedSvgView(
+              svg: _prepareSvg(svg),
+              fallback: widget.card.fallback,
+              onError: onError,
+            ),
+          );
+        } catch (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+          return Text(
+            widget.card.fallback ?? '',
+            style: TextStyle(color: AppColors.warning, fontSize: 13),
+          );
+        }
+      }
+      return _AssetImageView(
+        url: url,
+        fallback: widget.card.fallback,
+        onError: onError,
+      );
+    }
     if (url.toLowerCase().endsWith('.svg')) {
       return _CjkNetworkSvg(
         url: url,
@@ -651,6 +684,13 @@ class _SourceChainViewState extends State<_SourceChainView> {
       onError: onError,
     );
   }
+}
+
+/// data: URI 的 mime 是否是 SVG（`data:image/svg+xml...`）
+bool _isSvgDataUri(String url) {
+  final comma = url.indexOf(',');
+  final head = (comma < 0 ? url : url.substring(0, comma)).toLowerCase();
+  return head.contains('svg');
 }
 
 /// 位图资源（png/jpg 等）加载，SVG 不走这里
@@ -667,6 +707,36 @@ class _AssetImageView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
+
+    Widget errorText() {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onError());
+      return Text(
+        fallback ?? l10n.get('image_picture_loading_fail'),
+        style: TextStyle(color: AppColors.warning, fontSize: 13),
+      );
+    }
+
+    Widget image;
+    if (url.startsWith('data:')) {
+      // base64 内嵌位图：native 端不能走 Image.network（会因 data URI 无 host 抛错），
+      // 必须就地解码为字节后用 Image.memory。
+      try {
+        image = Image.memory(
+          UriData.parse(url).contentAsBytes(),
+          width: double.infinity,
+          errorBuilder: (ctx, err, stack) => errorText(),
+        );
+      } catch (_) {
+        image = errorText();
+      }
+    } else {
+      image = Image.network(
+        url,
+        width: double.infinity,
+        errorBuilder: (ctx, err, stack) => errorText(),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -675,17 +745,7 @@ class _AssetImageView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
-      child: Image.network(
-        url,
-        width: double.infinity,
-        errorBuilder: (ctx, err, stack) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-          return Text(
-            fallback ?? l10n.get('image_picture_loading_fail'),
-            style: TextStyle(color: AppColors.warning, fontSize: 13),
-          );
-        },
-      ),
+      child: image,
     );
   }
 }
