@@ -47,13 +47,8 @@ class FollowUpCard extends StatefulWidget {
   State<FollowUpCard> createState() => FollowUpCardState();
 }
 
-class FollowUpCardState extends State<FollowUpCard>
-    with AutomaticKeepAliveClientMixin {
+class FollowUpCardState extends State<FollowUpCard> {
   bool _expanded = false;
-
-  // 知识列表已虚拟化，展开后即使滚出视口也保活，避免回到此卡时展开态丢失。
-  @override
-  bool get wantKeepAlive => _expanded;
 
   Color get _difficultyColor {
     return switch (widget.question.difficulty) {
@@ -77,14 +72,8 @@ class FollowUpCardState extends State<FollowUpCard>
     };
   }
 
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    updateKeepAlive();
-  }
-
   @override
   Widget build(BuildContext context) {
-    super.build(context); // AutomaticKeepAliveClientMixin 要求
     final l10n = context.watch<LocalizationProvider>();
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
@@ -105,7 +94,7 @@ class FollowUpCardState extends State<FollowUpCard>
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: _toggle,
+            onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(

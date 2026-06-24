@@ -89,8 +89,13 @@ class _DiagramFullscreenView extends StatefulWidget {
 }
 
 class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
+  static const double _kMinScale = 0.5;
+  static const double _kMaxScale = 8.0;
+
   final TransformationController _controller = TransformationController();
   TapDownDetails? _doubleTapDetails;
+  Size _viewport = Size.zero;
+  double _scale = 1.0;
 
   @override
   void dispose() {
@@ -98,25 +103,46 @@ class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
     super.dispose();
   }
 
+  /// 以视口中心为锚点设置绝对缩放（按钮缩放走这里，跨平台可靠，不与 InteractiveViewer
+  /// 的拖动/捏合手势在手势竞技场里抢占）。复位即 scale=1 → 单位矩阵。
+  void _applyScale(double scale) {
+    final s = scale.clamp(_kMinScale, _kMaxScale);
+    final tx = -_viewport.width / 2 * (s - 1);
+    final ty = -_viewport.height / 2 * (s - 1);
+    setState(() {
+      _scale = s;
+      _controller.value = Matrix4(
+        s, 0, 0, 0, //
+        0, s, 0, 0, //
+        0, 0, 1, 0, //
+        tx, ty, 0, 1, //
+      );
+    });
+  }
+
+  /// 双击：以点击点为中心放大 / 复位（触摸端的便捷手势，桌面端用工具栏按钮）。
   void _handleDoubleTap() {
-    // 已放大 → 复位；否则以双击点为中心放大。
     if (_controller.value.getMaxScaleOnAxis() > 1.01) {
-      _controller.value = Matrix4.identity();
+      _applyScale(1.0);
       return;
     }
     final pos = _doubleTapDetails?.localPosition;
-    if (pos == null) return;
+    if (pos == null) {
+      _applyScale(2.5);
+      return;
+    }
     const scale = 2.5;
     final tx = -pos.dx * (scale - 1);
     final ty = -pos.dy * (scale - 1);
-    // 以双击点为中心放大：等价于 identity..translate(tx,ty)..scale(scale)，
-    // 直接用列主序构造避免 Matrix4.translate/scale 的弃用告警。
-    _controller.value = Matrix4(
-      scale, 0, 0, 0, //
-      0, scale, 0, 0, //
-      0, 0, 1, 0, //
-      tx, ty, 0, 1, //
-    );
+    setState(() {
+      _scale = scale;
+      _controller.value = Matrix4(
+        scale, 0, 0, 0, //
+        0, scale, 0, 0, //
+        0, 0, 1, 0, //
+        tx, ty, 0, 1, //
+      );
+    });
   }
 
   @override
@@ -133,16 +159,36 @@ class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.remove_rounded),
+            onPressed: _scale <= _kMinScale + 0.001
+                ? null
+                : () => _applyScale(_scale / 1.5),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            onPressed: _scale >= _kMaxScale - 0.001
+                ? null
+                : () => _applyScale(_scale * 1.5),
+          ),
+          IconButton(
+            icon: const Icon(Icons.fit_screen_rounded),
+            onPressed: _scale == 1.0 ? null : () => _applyScale(1.0),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          _viewport = Size(constraints.maxWidth, constraints.maxHeight);
           return GestureDetector(
             onDoubleTapDown: (d) => _doubleTapDetails = d,
             onDoubleTap: _handleDoubleTap,
             child: InteractiveViewer(
               transformationController: _controller,
-              maxScale: 8.0,
-              minScale: 0.5,
+              maxScale: _kMaxScale,
+              minScale: _kMinScale,
               constrained: false,
               boundaryMargin: EdgeInsets.symmetric(
                 horizontal: constraints.maxWidth,
