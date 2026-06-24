@@ -9,25 +9,33 @@ const String _kSvgFontFamily = 'AppSans';
 /// 在图解区域右上角叠加全屏按钮，点击后以全屏模式查看图解（支持缩放拖拽）。
 /// [child] 是内联显示的视图（不带 InteractiveViewer）。
 /// [fullscreenContent] 是全屏专用的原始图解内容（不含 InteractiveViewer，由全屏页自行包裹）。
+/// [fullscreenBuilder] 延迟构建全屏内容——仅在用户点击全屏时才调用，避免每次 build 都
+/// 创建两份 SvgPicture.string（省去未打开全屏时的无用解析开销）。
 class DiagramWithFullscreen extends StatelessWidget {
   const DiagramWithFullscreen({
     super.key,
     required this.child,
-    required this.fullscreenContent,
+    this.fullscreenContent,
+    this.fullscreenBuilder,
     this.title,
-  });
+  }) : assert(
+          fullscreenContent != null || fullscreenBuilder != null,
+          'Either fullscreenContent or fullscreenBuilder must be provided',
+        );
   final Widget child;
-  final Widget fullscreenContent;
+  final Widget? fullscreenContent;
+  final Widget Function(BuildContext)? fullscreenBuilder;
   final String? title;
 
   void _openFullscreen(BuildContext context) {
+    final content = fullscreenBuilder?.call(context) ?? fullscreenContent!;
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
         barrierDismissible: true,
         pageBuilder: (_, __, ___) => _DiagramFullscreenView(
-          content: fullscreenContent,
+          content: content,
           title: title,
         ),
         transitionsBuilder: (_, animation, __, page) {
@@ -344,8 +352,11 @@ class _PreparedSvgView extends StatelessWidget {
   final VoidCallback onError;
   final String? fallback;
 
-  Widget _buildSvgContent(BuildContext context, {required bool forFullscreen}) {
-    final l10n = context.watch<LocalizationProvider>();
+  Widget _buildSvgContent(
+    BuildContext context, {
+    required bool forFullscreen,
+    required LocalizationProvider l10n,
+  }) {
     final aspect = svgViewBoxAspect(svg) ?? (16 / 9);
     final svgWidget = AspectRatio(
       aspectRatio: aspect,
@@ -372,11 +383,9 @@ class _PreparedSvgView extends StatelessWidget {
     );
 
     if (forFullscreen) {
-      // 全屏：直接返回内容，由 _DiagramFullscreenView 包裹 InteractiveViewer
       return svgWidget;
     }
 
-    // 内联：带背景容器，无 InteractiveViewer
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -391,9 +400,13 @@ class _PreparedSvgView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
     return DiagramWithFullscreen(
-      child: _buildSvgContent(context, forFullscreen: false),
-      fullscreenContent: _buildSvgContent(context, forFullscreen: true),
+      child: _buildSvgContent(context, forFullscreen: false, l10n: l10n),
+      fullscreenBuilder: (ctx) {
+        final fsL10n = ctx.watch<LocalizationProvider>();
+        return _buildSvgContent(ctx, forFullscreen: true, l10n: fsL10n);
+      },
     );
   }
 }
@@ -665,23 +678,29 @@ class _SourceChainViewState extends State<_SourceChainView> {
           );
         }
       }
-      return _AssetImageView(
-        url: url,
-        fallback: widget.card.fallback,
-        onError: onError,
+      return RepaintBoundary(
+        child: _AssetImageView(
+          url: url,
+          fallback: widget.card.fallback,
+          onError: onError,
+        ),
       );
     }
     if (url.toLowerCase().endsWith('.svg')) {
-      return _CjkNetworkSvg(
+      return RepaintBoundary(
+        child: _CjkNetworkSvg(
+          url: url,
+          fallback: widget.card.fallback,
+          onError: onError,
+        ),
+      );
+    }
+    return RepaintBoundary(
+      child: _AssetImageView(
         url: url,
         fallback: widget.card.fallback,
         onError: onError,
-      );
-    }
-    return _AssetImageView(
-      url: url,
-      fallback: widget.card.fallback,
-      onError: onError,
+      ),
     );
   }
 }
