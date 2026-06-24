@@ -18,6 +18,18 @@ class ContentAssetCache {
   Directory? _cacheDir;
   bool _dirInitialized = false;
 
+  /// 进程内内存缓存的清理回调（如 UI 层的 SVG/位图缓存）。
+  /// 由 UI 层注册，[clear] 时一并触发，使其与磁盘缓存、topic 缓存
+  /// 生命周期一致——内容版本变更或用户主动清缓存时，图也一起换/清。
+  final List<void Function()> _memoryCacheClearers = [];
+
+  /// 注册一个内存缓存清理回调。重复注册同一函数会被忽略。
+  void registerMemoryCacheClearer(void Function() clearer) {
+    if (!_memoryCacheClearers.contains(clearer)) {
+      _memoryCacheClearers.add(clearer);
+    }
+  }
+
   Future<Directory?> _getCacheDir() async {
     if (_dirInitialized) return _cacheDir;
     _dirInitialized = true;
@@ -76,8 +88,12 @@ class ContentAssetCache {
     await writeBytes(url, Uint8List.fromList(utf8.encode(text)));
   }
 
-  /// 清除所有缓存文件。与 topic 缓存清理同步调用。
+  /// 清除所有缓存文件 + 内存缓存。与 topic 缓存清理同步调用。
   Future<void> clear() async {
+    // 内存缓存先清——保证 web 端（无磁盘缓存，下方提前 return）也生效。
+    for (final clearer in _memoryCacheClearers) {
+      clearer();
+    }
     final dir = await _getCacheDir();
     if (dir == null) return;
     try {

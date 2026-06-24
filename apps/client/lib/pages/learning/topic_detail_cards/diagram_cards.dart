@@ -452,9 +452,63 @@ class _PreparedSvgView extends StatelessWidget {
   }
 }
 
+/// 轻量 LRU 缓存：按条目数（可选再按总权重 [maxWeight]）淘汰最久未使用项，
+/// 避免会话期内浏览大量图片/SVG 时内存无上限增长。
+/// 重载 [] / []= 以便与原 Map 用法保持一致；读命中会把该项刷新为最近使用。
+class _LruCache<V> {
+  _LruCache({required this.maxEntries, this.maxWeight, this.weigh});
+
+  final int maxEntries;
+  final int? maxWeight;
+  final int Function(V value)? weigh;
+
+  // map 字面量即 LinkedHashMap，按插入顺序遍历，keys.first 即最久未使用。
+  final Map<String, V> _store = {};
+  int _weight = 0;
+
+  V? operator [](String key) {
+    final v = _store.remove(key);
+    if (v != null) _store[key] = v; // 移到末尾 = 最近使用
+    return v;
+  }
+
+  void operator []=(String key, V value) {
+    final old = _store.remove(key);
+    if (old != null) _weight -= weigh?.call(old) ?? 0;
+    _store[key] = value;
+    _weight += weigh?.call(value) ?? 0;
+    while (_store.isNotEmpty &&
+        (_store.length > maxEntries ||
+            (maxWeight != null && _weight > maxWeight!))) {
+      final removed = _store.remove(_store.keys.first);
+      if (removed != null) _weight -= weigh?.call(removed) ?? 0;
+    }
+  }
+
+  void clear() {
+    _store.clear();
+    _weight = 0;
+  }
+}
+
+/// 把上面两个进程内缓存的清理注册进 [ContentAssetCache]，使其与磁盘缓存、
+/// topic 缓存一起被清（内容版本变更 / 用户主动清缓存时图也换/清）。
+/// 幂等：首个 SVG/位图开始加载前调用一次即可。
+bool _assetMemCacheRegistered = false;
+void _ensureAssetMemCacheRegistered() {
+  if (_assetMemCacheRegistered) return;
+  _assetMemCacheRegistered = true;
+  ContentAssetCache.instance.registerMemoryCacheClearer(() {
+    _preparedNetworkSvgStringCache.clear();
+    _networkImageByteCache.clear();
+  });
+}
+
 /// 已拉取并改写好的网络 SVG 字符串缓存（按 URL → 已解码 SVG 文本）。
 /// 滚动导致 widget 被 dispose 再重建时直接命中缓存，不再触发网络请求。
-final Map<String, String> _preparedNetworkSvgStringCache = {};
+final _LruCache<String> _preparedNetworkSvgStringCache = _LruCache(
+  maxEntries: 64,
+);
 
 /// 网络 SVG：先拉取文本 → UTF-8 解码 → 改写字体/尺寸 → SvgPicture.string 渲染。
 /// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
@@ -478,13 +532,16 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
   @override
   void initState() {
     super.initState();
+    _ensureAssetMemCacheRegistered();
     _future = _load();
   }
 
   @override
   void didUpdateWidget(_CjkNetworkSvg oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.urls != widget.urls) {
+    // urls 每次 build 都是新 List 实例，必须按内容比较，
+    // 否则已缓存的图也会被重新 _load()，FutureBuilder 闪一帧占位图。
+    if (!listEquals(oldWidget.urls, widget.urls)) {
       _future = _load();
     }
   }
@@ -761,7 +818,12 @@ bool _isSvgDataUri(String url) {
 }
 
 /// 网络位图字节缓存（按首个 URL → 字节），避免滚动重建时重复网络请求。
-final Map<String, Uint8List> _networkImageByteCache = {};
+/// 位图单张可能较大，额外按总字节数（24MB）设上限，防止内存无上限增长。
+final _LruCache<Uint8List> _networkImageByteCache = _LruCache(
+  maxEntries: 64,
+  maxWeight: 24 * 1024 * 1024,
+  weigh: (bytes) => bytes.lengthInBytes,
+);
 
 /// 位图资源（png/jpg 等）加载，SVG 不走这里。
 /// [urls] 是按优先级排列的候选 URL 列表（primary + backup CDN），逐个尝试直到成功。
@@ -785,13 +847,16 @@ class _AssetImageViewState extends State<_AssetImageView> {
   @override
   void initState() {
     super.initState();
+    _ensureAssetMemCacheRegistered();
     _future = _load();
   }
 
   @override
   void didUpdateWidget(_AssetImageView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.urls != widget.urls) {
+    // urls 每次 build 都是新 List 实例，必须按内容比较，
+    // 否则已缓存的图也会被重新 _load()，FutureBuilder 闪一帧占位图。
+    if (!listEquals(oldWidget.urls, widget.urls)) {
       _future = _load();
     }
   }
