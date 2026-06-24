@@ -50,28 +50,32 @@ class DiagramWithFullscreen extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // 整个内联图解区域可点击放大（点击与内部横向滚动/选择是不同手势，互不冲突），
-        // 比只点右上角小按钮更易用。
-        GestureDetector(
-          onTap: () => _openFullscreen(context),
-          child: child,
+        child,
+        // 全屏按钮：用 Material + InkWell 覆盖整片区域，点击任意位置都可打开全屏。
+        // 不用 GestureDetector 包裹 child — web 端手势竞技场会吞掉子树的点击事件。
+        Positioned.fill(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _openFullscreen(context),
+            ),
+          ),
         ),
+        // 右上角全屏图标（纯视觉提示）
         Positioned(
           top: 8,
           right: 8,
-          child: Material(
-            color: Colors.black.withValues(alpha: 0.4),
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => _openFullscreen(context),
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(
-                  Icons.fullscreen_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(6),
+              child: const Icon(
+                Icons.fullscreen_rounded,
+                color: Colors.white,
+                size: 20,
               ),
             ),
           ),
@@ -432,7 +436,8 @@ class _PreparedSvgView extends StatelessWidget {
     return DiagramWithFullscreen(
       child: _buildSvgContent(context, forFullscreen: false, l10n: l10n),
       fullscreenBuilder: (ctx) {
-        final fsL10n = ctx.watch<LocalizationProvider>();
+        // fullscreenBuilder 在点击事件中调用（非 build 阶段），必须 listen: false
+        final fsL10n = Provider.of<LocalizationProvider>(ctx, listen: false);
         return _buildSvgContent(ctx, forFullscreen: true, l10n: fsL10n);
       },
     );
