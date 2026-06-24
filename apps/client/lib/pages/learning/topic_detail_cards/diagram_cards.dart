@@ -50,32 +50,26 @@ class DiagramWithFullscreen extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child,
-        // 全屏按钮：用 Material + InkWell 覆盖整片区域，点击任意位置都可打开全屏。
-        // 不用 GestureDetector 包裹 child — web 端手势竞技场会吞掉子树的点击事件。
-        Positioned.fill(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _openFullscreen(context),
-            ),
-          ),
+        GestureDetector(
+          onTap: () => _openFullscreen(context),
+          child: child,
         ),
-        // 右上角全屏图标（纯视觉提示）
         Positioned(
           top: 8,
           right: 8,
-          child: IgnorePointer(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.4),
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(6),
-              child: const Icon(
-                Icons.fullscreen_rounded,
-                color: Colors.white,
-                size: 20,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _openFullscreen(context),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.fullscreen_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),
@@ -197,52 +191,62 @@ class _DiagramFullscreenViewState extends State<_DiagramFullscreenView> {
           return GestureDetector(
             onDoubleTapDown: (d) => _doubleTapDetails = d,
             onDoubleTap: _handleDoubleTap,
-            // Listener 拦截 web 端滚轮事件 → 手动缩放，
-            // 解决浏览器默认滚动行为抢占 InteractiveViewer 的缩放信号。
-            child: Listener(
-              onPointerSignal: (event) {
-                if (event is PointerScrollEvent) {
-                  final delta = event.scrollDelta.dy;
-                  final factor = delta > 0 ? 0.9 : 1.1;
-                  final newScale =
-                      (_scale * factor).clamp(_kMinScale, _kMaxScale);
-                  if (newScale == _scale) return;
-                  // 以鼠标位置为锚点缩放
-                  final pos = event.localPosition;
-                  final focal = MatrixUtils.transformPoint(
-                    Matrix4.inverted(_controller.value),
-                    pos,
-                  );
-                  final tx = focal.dx * (_scale - newScale);
-                  final ty = focal.dy * (_scale - newScale);
-                  final m = _controller.value.clone()
-                    ..translate(tx, ty)
-                    ..scale(newScale / _scale);
-                  setState(() {
-                    _scale = newScale;
-                    _controller.value = m;
-                  });
-                }
-              },
-              child: InteractiveViewer(
-                transformationController: _controller,
-                maxScale: _kMaxScale,
-                minScale: _kMinScale,
-                constrained: false,
-                boundaryMargin: EdgeInsets.symmetric(
-                  horizontal: constraints.maxWidth,
-                  vertical: constraints.maxHeight,
-                ),
-                child: SizedBox(
-                  width: constraints.maxWidth,
-                  child: widget.content,
-                ),
-              ),
-            ),
+            // web 端：浏览器拦截滚轮事件，InteractiveViewer 收不到缩放信号，
+            // 需要 Listener 手动处理。native 端不加，否则触控板/鼠标滚轮会双重缩放。
+            child: _buildInteractiveViewer(constraints),
           );
         },
       ),
     );
+  }
+
+  Widget _buildInteractiveViewer(BoxConstraints constraints) {
+    final viewer = InteractiveViewer(
+      transformationController: _controller,
+      maxScale: _kMaxScale,
+      minScale: _kMinScale,
+      constrained: false,
+      boundaryMargin: EdgeInsets.symmetric(
+        horizontal: constraints.maxWidth,
+        vertical: constraints.maxHeight,
+      ),
+      child: SizedBox(
+        width: constraints.maxWidth,
+        child: widget.content,
+      ),
+    );
+
+    // web 端需要 Listener 拦截滚轮事件手动缩放，
+    // native 端 InteractiveViewer 自行处理触控板/鼠标滚轮，不加 Listener 避免双重缩放。
+    if (kIsWeb) {
+      return Listener(
+        onPointerSignal: (event) {
+          if (event is PointerScrollEvent) {
+            final delta = event.scrollDelta.dy;
+            final factor = delta > 0 ? 0.9 : 1.1;
+            final newScale =
+                (_scale * factor).clamp(_kMinScale, _kMaxScale);
+            if (newScale == _scale) return;
+            final pos = event.localPosition;
+            final focal = MatrixUtils.transformPoint(
+              Matrix4.inverted(_controller.value),
+              pos,
+            );
+            final tx = focal.dx * (_scale - newScale);
+            final ty = focal.dy * (_scale - newScale);
+            final m = _controller.value.clone()
+              ..translate(tx, ty)
+              ..scale(newScale / _scale);
+            setState(() {
+              _scale = newScale;
+              _controller.value = m;
+            });
+          }
+        },
+        child: viewer,
+      );
+    }
+    return viewer;
   }
 }
 
@@ -728,29 +732,23 @@ class _SourceChainViewState extends State<_SourceChainView> {
           );
         }
       }
-      return RepaintBoundary(
-        child: _AssetImageView(
-          url: url,
-          fallback: widget.card.fallback,
-          onError: onError,
-        ),
-      );
-    }
-    if (url.toLowerCase().endsWith('.svg')) {
-      return RepaintBoundary(
-        child: _CjkNetworkSvg(
-          url: url,
-          fallback: widget.card.fallback,
-          onError: onError,
-        ),
-      );
-    }
-    return RepaintBoundary(
-      child: _AssetImageView(
+      return _AssetImageView(
         url: url,
         fallback: widget.card.fallback,
         onError: onError,
-      ),
+      );
+    }
+    if (url.toLowerCase().endsWith('.svg')) {
+      return _CjkNetworkSvg(
+        url: url,
+        fallback: widget.card.fallback,
+        onError: onError,
+      );
+    }
+    return _AssetImageView(
+      url: url,
+      fallback: widget.card.fallback,
+      onError: onError,
     );
   }
 }
