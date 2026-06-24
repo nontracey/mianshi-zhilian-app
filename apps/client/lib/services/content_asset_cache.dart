@@ -34,6 +34,11 @@ class ContentAssetCache {
     if (_dirInitialized) return _cacheDir;
     _dirInitialized = true;
     if (kIsWeb) return null;
+    // flutter test 下 testWidgets 跑在 FakeAsync 假时钟里，getTemporaryDirectory
+    // 这种平台通道调用的响应永远不会被投递 → await 永久挂起，拖死调用 clear()
+    // 的 loadContent()（CI 表现为 10 分钟超时）。测试环境直接降级为仅内存缓存，
+    // 不触碰磁盘 / 平台通道。生产环境（非 FLUTTER_TEST）行为不变。
+    if (Platform.environment.containsKey('FLUTTER_TEST')) return null;
     try {
       final temp = await getTemporaryDirectory();
       _cacheDir = Directory('${temp.path}/content_assets');
