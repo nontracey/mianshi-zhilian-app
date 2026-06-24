@@ -5,6 +5,7 @@ import '../models/domain.dart';
 import '../models/topic.dart';
 import '../services/app_log_service.dart';
 import '../services/content_api_service.dart';
+import '../services/content_asset_cache.dart';
 import '../services/storage_service.dart';
 
 class ContentProvider extends ChangeNotifier {
@@ -64,6 +65,11 @@ class ContentProvider extends ChangeNotifier {
   List<String> get topicLoadFailures => List.unmodifiable(_topicLoadFailures);
   String? get contentVersion => _cachedContentVersion;
   String get contentBaseUrl => _api.baseUrl;
+
+  /// 返回某个内容资源路径的所有候选 URL（primary + backup），
+  /// 供图片/SVG 等静态资源加载使用 CDN fallback。
+  List<String> resolveContentUrls(String path) =>
+      _api.resolveContentUrls(path);
 
   String get _cacheScope => _api.baseUrl
       .replaceAll(RegExp(r'^https?://'), '')
@@ -144,6 +150,8 @@ class ContentProvider extends ChangeNotifier {
           _cacheKey('content_version_pending'),
           remoteVersion,
         );
+        // 内容版本变更 → 图片缓存一并清空，保证图与 topic 一致
+        await ContentAssetCache.instance.clear();
 
         // 清理已删除领域的缓存
         await _cleanupDeletedDomains();
@@ -226,6 +234,7 @@ class ContentProvider extends ChangeNotifier {
       // 清除缓存
       _topics = {};
       await _storage.save(_cacheKey('topics_cache'), {});
+      await ContentAssetCache.instance.clear();
 
       // 重新加载内容
       await loadContent();
@@ -378,6 +387,7 @@ class ContentProvider extends ChangeNotifier {
   Future<void> clearDomainCache(String domainId) async {
     await _storage.save(_domainCacheKey(domainId), null);
     _topics.removeWhere((key, topic) => topic.domainId == domainId);
+    await ContentAssetCache.instance.clear();
     notifyListeners();
   }
 
@@ -387,6 +397,7 @@ class ContentProvider extends ChangeNotifier {
       await _storage.save(_domainCacheKey(domain.id), null);
     }
     _topics = {};
+    await ContentAssetCache.instance.clear();
     notifyListeners();
   }
 
@@ -499,6 +510,7 @@ class ContentProvider extends ChangeNotifier {
           .where((k) => k.startsWith(domainCachePrefix))
           .toList();
 
+      var removed = false;
       for (final key in domainCacheKeys) {
         final domainId = key.replaceFirst(domainCachePrefix, '');
         if (!currentDomainIds.contains(domainId)) {
@@ -509,7 +521,11 @@ class ContentProvider extends ChangeNotifier {
 
           // 从内存中移除该领域的 topics
           _topics.removeWhere((_, topic) => topic.domainId == domainId);
+          removed = true;
         }
+      }
+      if (removed) {
+        await ContentAssetCache.instance.clear();
       }
     } catch (e) {
       debugPrint('Failed to cleanup deleted domains: $e');
@@ -532,6 +548,9 @@ class ContentProvider extends ChangeNotifier {
 
       // 清除 pending version
       await _storage.save(_cacheKey('content_version_pending'), null);
+
+      // 图片文件缓存与 topic 缓存生命周期一致
+      await ContentAssetCache.instance.clear();
 
       notifyListeners();
       debugPrint('All domain caches cleared');
@@ -568,6 +587,7 @@ class ContentProvider extends ChangeNotifier {
         _cacheKey('topics_cache'),
         _topics.map((k, v) => MapEntry(k, v.toJson())),
       );
+      await ContentAssetCache.instance.clear();
     }
   }
 }

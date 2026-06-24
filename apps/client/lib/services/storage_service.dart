@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../models/ai_config.dart';
 import '../models/user_progress.dart';
 import '../models/app_settings.dart';
+import 'content_asset_cache.dart';
 
 class StorageWriteException implements Exception {
   StorageWriteException(this.key, this.cause);
@@ -519,6 +520,8 @@ class StorageService {
     for (final k in cacheKeys) {
       await prefs.remove(k);
     }
+    // 图片文件缓存与 topic 缓存生命周期一致
+    await ContentAssetCache.instance.clear();
     return cacheKeys.length;
   }
 

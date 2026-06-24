@@ -20,6 +20,10 @@ class EndpointFallbackClient {
   final EndpointStateStore _stateStore;
   final http.Client _httpClient;
 
+  /// 内存中的 lane 缓存——request 成功后同步更新，resolveUrls 读取它
+  /// 保证图片等静态资源的 URL 顺序与最近成功的 API 请求一致。
+  final Map<EndpointService, EndpointLane> _laneMemoryCache = {};
+
   Future<http.Response> request(
     EndpointService service,
     String method,
@@ -61,6 +65,7 @@ class EndpointFallbackClient {
           continue;
         }
         if (_isHealthyRouteResponse(response.statusCode)) {
+          _laneMemoryCache[service] = candidate.endpoint.lane;
           await _stateStore.rememberActiveLane(
             service,
             candidate.endpoint.lane,
@@ -156,11 +161,16 @@ class EndpointFallbackClient {
   List<String> resolveUrls(
     EndpointService service,
     String path, {
-    EndpointMode mode = EndpointMode.auto,
+    EndpointMode? mode,
     EndpointLane? activeLane,
   }) {
     return _resolver
-        .resolveCandidates(service, path, mode: mode, activeLane: activeLane)
+        .resolveCandidates(
+          service,
+          path,
+          mode: mode ?? EndpointMode.auto,
+          activeLane: activeLane ?? _laneMemoryCache[service],
+        )
         .map((candidate) => candidate.url.toString())
         .toList();
   }

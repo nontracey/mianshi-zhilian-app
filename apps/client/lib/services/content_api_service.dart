@@ -23,6 +23,20 @@ class ContentApiService {
     return this;
   }
 
+  /// 返回某个内容资源路径的所有候选 URL（primary + backup）。
+  /// 用于图片/SVG 等静态资源加载，使它们也能享受 CDN fallback。
+  List<String> resolveContentUrls(String path) {
+    final uri = Uri.tryParse(path);
+    if (uri?.hasScheme == true) return [path];
+    final normalized = path.replaceFirst(RegExp(r'^/+'), '');
+    final official = _officialRoute('/$normalized');
+    if (official != null && routeClient != null) {
+      return routeClient!.resolveUrls(official.service, official.path);
+    }
+    final base = baseUrl.replaceAll(RegExp(r'/+$'), '');
+    return ['$base/$normalized'];
+  }
+
   Future<Map<String, dynamic>> fetchManifest() async {
     final response = await _get('/manifest.json');
     final apiResp = ApiResponse.fromJson(response);

@@ -401,7 +401,11 @@ class _PreparedSvgView extends StatelessWidget {
         fit: BoxFit.contain,
         placeholderBuilder: (_) => Container(
           alignment: Alignment.center,
-          child: const CircularProgressIndicator(strokeWidth: 2),
+          child: Icon(
+            Icons.image_outlined,
+            size: 24,
+            color: AppColors.accent.withValues(alpha: 0.3),
+          ),
         ),
         errorBuilder: (ctx, err, stack) {
           if (!forFullscreen) {
@@ -456,11 +460,11 @@ final Map<String, String> _preparedNetworkSvgStringCache = {};
 /// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
 class _CjkNetworkSvg extends StatefulWidget {
   const _CjkNetworkSvg({
-    required this.url,
+    required this.urls,
     required this.onError,
     this.fallback,
   });
-  final String url;
+  final List<String> urls;
   final VoidCallback onError;
   final String? fallback;
 
@@ -480,32 +484,53 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
   @override
   void didUpdateWidget(_CjkNetworkSvg oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.urls != widget.urls) {
       _future = _load();
     }
   }
 
   Future<String> _load() {
-    // 命中字符串缓存 → 同步返回，不发网络请求
-    final cached = _preparedNetworkSvgStringCache[widget.url];
+    final cacheKey = widget.urls.first;
+    // 1. 命中内存缓存 → 同步返回，不发网络请求
+    final cached = _preparedNetworkSvgStringCache[cacheKey];
     if (cached != null) return Future.value(cached);
 
-    return _fetchAndPrepare(widget.url).then((v) {
-      _preparedNetworkSvgStringCache[widget.url] = v;
-      return v;
-    });
+    // 2. 文件缓存 → 网络
+    return _loadFromCacheOrNetwork(cacheKey);
   }
 
-  static Future<String> _fetchAndPrepare(String url) async {
-    if (url.startsWith('data:')) {
-      return prepareDiagramSvg(utf8.decode(UriData.parse(url).contentAsBytes()));
+  Future<String> _loadFromCacheOrNetwork(String cacheKey) async {
+    final fileCached = await ContentAssetCache.instance.readString(cacheKey);
+    if (fileCached != null) {
+      _preparedNetworkSvgStringCache[cacheKey] = fileCached;
+      return fileCached;
     }
-    final uri = Uri.parse(url);
-    final resp = await http.get(uri).timeout(const Duration(seconds: 20));
-    if (resp.statusCode != 200) {
-      throw http.ClientException('HTTP ${resp.statusCode}', uri);
+    final v = await _fetchAndPrepare(widget.urls);
+    _preparedNetworkSvgStringCache[cacheKey] = v;
+    await ContentAssetCache.instance.writeString(cacheKey, v);
+    return v;
+  }
+
+  static Future<String> _fetchAndPrepare(List<String> urls) async {
+    final first = urls.first;
+    if (first.startsWith('data:')) {
+      return prepareDiagramSvg(utf8.decode(UriData.parse(first).contentAsBytes()));
     }
-    return prepareDiagramSvg(utf8.decode(resp.bodyBytes));
+    Object? lastError;
+    for (final url in urls) {
+      try {
+        final uri = Uri.parse(url);
+        final resp = await http.get(uri).timeout(const Duration(seconds: 20));
+        if (resp.statusCode != 200) {
+          lastError = http.ClientException('HTTP ${resp.statusCode}', uri);
+          continue;
+        }
+        return prepareDiagramSvg(utf8.decode(resp.bodyBytes));
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? http.ClientException('All SVG URLs failed: $urls');
   }
 
   @override
@@ -531,7 +556,11 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
             ),
-            child: const CircularProgressIndicator(strokeWidth: 2),
+            child: Icon(
+              Icons.image_outlined,
+              size: 28,
+              color: AppColors.accent.withValues(alpha: 0.4),
+            ),
           );
         }
         return _PreparedSvgView(
@@ -552,14 +581,8 @@ class DiagramCard extends StatelessWidget {
 
   bool _isMermaidSource(CardSource source) => source.kind == 'mermaid';
 
-  String _assetUrl(BuildContext context, String path) {
-    final uri = Uri.tryParse(path);
-    if (uri?.hasScheme == true) return path;
-    final base = context.read<ContentProvider>().contentBaseUrl.replaceAll(
-      RegExp(r'/+$'),
-      '',
-    );
-    return '$base/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  List<String> _assetUrls(BuildContext context, String path) {
+    return context.read<ContentProvider>().resolveContentUrls(path);
   }
 
   @override
@@ -570,7 +593,7 @@ class DiagramCard extends StatelessWidget {
       content = _SourceChainView(
         card: card,
         sources: sources,
-        assetUrl: (path) => _assetUrl(context, path),
+        assetUrls: (path) => _assetUrls(context, path),
         isMermaidSource: _isMermaidSource,
       );
     } catch (_) {
@@ -599,13 +622,13 @@ class _SourceChainView extends StatefulWidget {
   const _SourceChainView({
     required this.card,
     required this.sources,
-    required this.assetUrl,
+    required this.assetUrls,
     required this.isMermaidSource,
   });
 
   final LearningCard card;
   final List<CardSource> sources;
-  final String Function(String path) assetUrl;
+  final List<String> Function(String path) assetUrls;
   final bool Function(CardSource source) isMermaidSource;
 
   @override
@@ -668,10 +691,10 @@ class _SourceChainViewState extends State<_SourceChainView> {
             ),
           );
         }
-        return _buildAsset(widget.assetUrl(inline), onError);
+        return _buildAsset(widget.assetUrls(inline), onError);
       }
       if (source.path != null) {
-        return _buildAsset(widget.assetUrl(source.path!), onError);
+        return _buildAsset(widget.assetUrls(source.path!), onError);
       }
     }
     if (allowErrorAdvance)
@@ -687,7 +710,9 @@ class _SourceChainViewState extends State<_SourceChainView> {
   ///   不能把 data URI 丢给 http.get/Image.network（会抛 "No host specified in URI"），
   ///   只有 web 浏览器底层能直接吃 data URI。
   /// - `.svg` 网络地址走「拉取→改字体→渲染」管线（修中文）；其余按位图加载。
-  Widget _buildAsset(String url, VoidCallback onError) {
+  /// - [urls] 是按优先级排列的候选 URL 列表（primary + backup CDN），逐个尝试直到成功。
+  Widget _buildAsset(List<String> urls, VoidCallback onError) {
+    final url = urls.first;
     if (url.startsWith('data:')) {
       if (_isSvgDataUri(url)) {
         try {
@@ -708,20 +733,20 @@ class _SourceChainViewState extends State<_SourceChainView> {
         }
       }
       return _AssetImageView(
-        url: url,
+        urls: urls,
         fallback: widget.card.fallback,
         onError: onError,
       );
     }
     if (url.toLowerCase().endsWith('.svg')) {
       return _CjkNetworkSvg(
-        url: url,
+        urls: urls,
         fallback: widget.card.fallback,
         onError: onError,
       );
     }
     return _AssetImageView(
-      url: url,
+      urls: urls,
       fallback: widget.card.fallback,
       onError: onError,
     );
@@ -735,49 +760,93 @@ bool _isSvgDataUri(String url) {
   return head.contains('svg');
 }
 
-/// 位图资源（png/jpg 等）加载，SVG 不走这里
-class _AssetImageView extends StatelessWidget {
+/// 网络位图字节缓存（按首个 URL → 字节），避免滚动重建时重复网络请求。
+final Map<String, Uint8List> _networkImageByteCache = {};
+
+/// 位图资源（png/jpg 等）加载，SVG 不走这里。
+/// [urls] 是按优先级排列的候选 URL 列表（primary + backup CDN），逐个尝试直到成功。
+class _AssetImageView extends StatefulWidget {
   const _AssetImageView({
-    required this.url,
+    required this.urls,
     required this.onError,
     this.fallback,
   });
-  final String url;
+  final List<String> urls;
   final VoidCallback onError;
   final String? fallback;
 
   @override
+  State<_AssetImageView> createState() => _AssetImageViewState();
+}
+
+class _AssetImageViewState extends State<_AssetImageView> {
+  Future<Uint8List>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(_AssetImageView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.urls != widget.urls) {
+      _future = _load();
+    }
+  }
+
+  Future<Uint8List> _load() {
+    final first = widget.urls.first;
+    if (first.startsWith('data:')) {
+      try {
+        return Future.value(UriData.parse(first).contentAsBytes());
+      } catch (e) {
+        return Future.error(e);
+      }
+    }
+    final cacheKey = first;
+    // 1. 内存缓存
+    final cached = _networkImageByteCache[cacheKey];
+    if (cached != null) return Future.value(cached);
+
+    // 2. 文件缓存 → 网络
+    return _loadFromCacheOrNetwork(cacheKey);
+  }
+
+  Future<Uint8List> _loadFromCacheOrNetwork(String cacheKey) async {
+    final fileCached = await ContentAssetCache.instance.readBytes(cacheKey);
+    if (fileCached != null) {
+      _networkImageByteCache[cacheKey] = fileCached;
+      return fileCached;
+    }
+    final bytes = await _fetchBytes(widget.urls);
+    _networkImageByteCache[cacheKey] = bytes;
+    await ContentAssetCache.instance.writeBytes(cacheKey, bytes);
+    return bytes;
+  }
+
+  static Future<Uint8List> _fetchBytes(List<String> urls) async {
+    Object? lastError;
+    for (final url in urls) {
+      try {
+        final uri = Uri.parse(url);
+        final resp = await http.get(uri).timeout(const Duration(seconds: 20));
+        if (resp.statusCode != 200) {
+          lastError = http.ClientException('HTTP ${resp.statusCode}', uri);
+          continue;
+        }
+        return resp.bodyBytes;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? http.ClientException('All image URLs failed: $urls');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-
-    Widget errorText() {
-      WidgetsBinding.instance.addPostFrameCallback((_) => onError());
-      return Text(
-        fallback ?? l10n.get('image_picture_loading_fail'),
-        style: TextStyle(color: AppColors.warning, fontSize: 13),
-      );
-    }
-
-    Widget image;
-    if (url.startsWith('data:')) {
-      // base64 内嵌位图：native 端不能走 Image.network（会因 data URI 无 host 抛错），
-      // 必须就地解码为字节后用 Image.memory。
-      try {
-        image = Image.memory(
-          UriData.parse(url).contentAsBytes(),
-          width: double.infinity,
-          errorBuilder: (ctx, err, stack) => errorText(),
-        );
-      } catch (_) {
-        image = errorText();
-      }
-    } else {
-      image = Image.network(
-        url,
-        width: double.infinity,
-        errorBuilder: (ctx, err, stack) => errorText(),
-      );
-    }
 
     return Container(
       width: double.infinity,
@@ -787,7 +856,45 @@ class _AssetImageView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
       ),
-      child: image,
+      child: FutureBuilder<Uint8List>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.hasError) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => widget.onError(),
+            );
+            return Text(
+              widget.fallback ?? l10n.get('image_picture_loading_fail'),
+              style: TextStyle(color: AppColors.warning, fontSize: 13),
+            );
+          }
+          if (!snap.hasData) {
+            return Container(
+              width: double.infinity,
+              height: 140,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.image_outlined,
+                size: 28,
+                color: AppColors.accent.withValues(alpha: 0.4),
+              ),
+            );
+          }
+          return Image.memory(
+            snap.data!,
+            width: double.infinity,
+            errorBuilder: (ctx, err, stack) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => widget.onError(),
+              );
+              return Text(
+                widget.fallback ?? l10n.get('image_picture_loading_fail'),
+                style: TextStyle(color: AppColors.warning, fontSize: 13),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -2123,14 +2230,8 @@ class _SvgDiagramCardState extends State<SvgDiagramCard> {
     return _cachedPreparedSvg!;
   }
 
-  String _assetUrl(BuildContext context, String path) {
-    final uri = Uri.tryParse(path);
-    if (uri?.hasScheme == true) return path;
-    final base = context.read<ContentProvider>().contentBaseUrl.replaceAll(
-      RegExp(r'/+$'),
-      '',
-    );
-    return '$base/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  List<String> _assetUrls(BuildContext context, String path) {
+    return context.read<ContentProvider>().resolveContentUrls(path);
   }
 
   @override
@@ -2152,7 +2253,7 @@ class _SvgDiagramCardState extends State<SvgDiagramCard> {
     } else if (svgAsset != null && svgAsset.isNotEmpty) {
       media = RepaintBoundary(
         child: _CjkNetworkSvg(
-          url: _assetUrl(context, svgAsset),
+          urls: _assetUrls(context, svgAsset),
           onError: () {},
           fallback: widget.card.fallback,
         ),
