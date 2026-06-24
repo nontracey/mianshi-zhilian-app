@@ -123,7 +123,7 @@ void main() {
   );
 
   test(
-    'mirror-first uses built-in mirror before GitHub when no custom mirror is set',
+    'mirror-first: update.json mirrors come before built-in mirrors',
     () {
       const update = PlatformUpdate(
         url:
@@ -138,8 +138,28 @@ void main() {
 
       final urls = service.buildDownloadUrlsForTest(update);
 
+      expect(urls.first, 'https://mirror.example.test/android.apk');
+      expect(urls[1], 'https://ghfast.top/${update.url}');
+      expect(urls.last, update.url);
+    },
+  );
+
+  test(
+    'mirror-first: built-in mirrors used when no update.json mirrors',
+    () {
+      const update = PlatformUpdate(
+        url:
+            'https://github.com/nontracey/mianshi-zhilian-app/releases/download/v0.1.3/mianshi-zhilian-v0.1.3-android.apk',
+        sha256: 'abc',
+        size: 42,
+      );
+      final service = UpdateService(
+        downloadSourceMode: DownloadSourceMode.mirrorFirst,
+      );
+
+      final urls = service.buildDownloadUrlsForTest(update);
+
       expect(urls.first, 'https://ghfast.top/${update.url}');
-      expect(urls[1], 'https://mirror.example.test/android.apk');
       expect(urls.last, update.url);
     },
   );

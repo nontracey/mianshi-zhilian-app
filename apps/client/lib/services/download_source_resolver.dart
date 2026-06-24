@@ -50,22 +50,22 @@ class DownloadSourceResolver {
         add(originalUrl);
       case DownloadSourceMode.mirrorFirst:
         add(customMirrorUrl);
-        for (final prefix in builtinMirrorPrefixes) {
-          add('$prefix/$originalUrl');
-        }
         for (final mirror in additionalMirrors) {
           add(mirror);
+        }
+        for (final prefix in builtinMirrorPrefixes) {
+          add('$prefix/$originalUrl');
         }
         add(originalUrl);
       case DownloadSourceMode.auto:
       case DownloadSourceMode.githubFirst:
         add(originalUrl);
         add(customMirrorUrl);
-        for (final prefix in builtinMirrorPrefixes) {
-          add('$prefix/$originalUrl');
-        }
         for (final mirror in additionalMirrors) {
           add(mirror);
+        }
+        for (final prefix in builtinMirrorPrefixes) {
+          add('$prefix/$originalUrl');
         }
     }
 

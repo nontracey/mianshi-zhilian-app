@@ -261,11 +261,11 @@ class UpdateService {
 
     if (githubUrl.isNotEmpty) add(githubUrl);
     if (mirrorPrefix.isNotEmpty) add('$mirrorPrefix/$githubUrl');
-    for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
-      add('$prefix/$githubUrl');
-    }
     for (final mirror in platformUpdate.mirrors) {
       add(mirror.trim());
+    }
+    for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
+      add('$prefix/$githubUrl');
     }
     if (downloadSourceMode == DownloadSourceMode.githubOnly) {
       return githubUrl.isEmpty ? [] : [githubUrl];
@@ -279,11 +279,11 @@ class UpdateService {
       if (githubUrl.isNotEmpty && mirrorPrefix.isNotEmpty) {
         addOrdered('$mirrorPrefix/$githubUrl');
       }
-      for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
-        addOrdered('$prefix/$githubUrl');
-      }
       for (final mirror in platformUpdate.mirrors) {
         addOrdered(mirror.trim());
+      }
+      for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
+        addOrdered('$prefix/$githubUrl');
       }
       addOrdered(githubUrl);
       return ordered;
