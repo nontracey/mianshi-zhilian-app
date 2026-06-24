@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'app_version_service.dart';
+import 'download_source_resolver.dart';
 import 'endpoint_fallback_client.dart';
 import 'route_resolver.dart';
 import 'route_state_store.dart';
@@ -254,31 +255,37 @@ class UpdateService {
       '',
     );
     final urls = <String>[];
-    if (githubUrl.isNotEmpty) urls.add(githubUrl);
-    if (mirrorPrefix.isNotEmpty) urls.add('$mirrorPrefix/$githubUrl');
-    if (githubUrl.isNotEmpty) urls.add('$defaultMirrorPrefix/$githubUrl');
+    void add(String url) {
+      if (url.isNotEmpty && !urls.contains(url)) urls.add(url);
+    }
+
+    if (githubUrl.isNotEmpty) add(githubUrl);
+    if (mirrorPrefix.isNotEmpty) add('$mirrorPrefix/$githubUrl');
+    for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
+      add('$prefix/$githubUrl');
+    }
     for (final mirror in platformUpdate.mirrors) {
-      if (mirror.trim().isNotEmpty && !urls.contains(mirror)) {
-        urls.add(mirror);
-      }
+      add(mirror.trim());
     }
     if (downloadSourceMode == DownloadSourceMode.githubOnly) {
       return githubUrl.isEmpty ? [] : [githubUrl];
     }
     if (downloadSourceMode == DownloadSourceMode.mirrorFirst) {
       final ordered = <String>[];
-      void add(String url) {
+      void addOrdered(String url) {
         if (url.isNotEmpty && !ordered.contains(url)) ordered.add(url);
       }
 
       if (githubUrl.isNotEmpty && mirrorPrefix.isNotEmpty) {
-        add('$mirrorPrefix/$githubUrl');
+        addOrdered('$mirrorPrefix/$githubUrl');
       }
-      if (githubUrl.isNotEmpty) add('$defaultMirrorPrefix/$githubUrl');
+      for (final prefix in DownloadSourceResolver.builtinMirrorPrefixes) {
+        addOrdered('$prefix/$githubUrl');
+      }
       for (final mirror in platformUpdate.mirrors) {
-        add(mirror.trim());
+        addOrdered(mirror.trim());
       }
-      add(githubUrl);
+      addOrdered(githubUrl);
       return ordered;
     }
     return urls;

@@ -12,6 +12,16 @@ class DownloadCandidate {
 class DownloadSourceResolver {
   static const defaultMirrorPrefix = 'https://ghfast.top';
 
+  /// 内置国内 GitHub 镜像列表（按历史稳定性排序）。
+  /// 自动模式下会并发探测延迟，优先使用最快的可达线路。
+  static const builtinMirrorPrefixes = [
+    'https://ghfast.top',
+    'https://gh-proxy.com',
+    'https://github.moeyy.xyz',
+    'https://ghproxy.net',
+    'https://gh.ddlc.top',
+  ];
+
   static List<DownloadCandidate> resolve({
     required String originalUrl,
     String? customMirrorPrefix,
@@ -29,7 +39,6 @@ class DownloadSourceResolver {
         ? (transformUrl?.call(originalUrl, mirrorPrefix) ??
               '$mirrorPrefix/$originalUrl')
         : '';
-    final defaultMirrorUrl = '$defaultMirrorPrefix/$originalUrl';
 
     final urls = <String>[];
     void add(String url) {
@@ -41,7 +50,9 @@ class DownloadSourceResolver {
         add(originalUrl);
       case DownloadSourceMode.mirrorFirst:
         add(customMirrorUrl);
-        add(defaultMirrorUrl);
+        for (final prefix in builtinMirrorPrefixes) {
+          add('$prefix/$originalUrl');
+        }
         for (final mirror in additionalMirrors) {
           add(mirror);
         }
@@ -50,7 +61,9 @@ class DownloadSourceResolver {
       case DownloadSourceMode.githubFirst:
         add(originalUrl);
         add(customMirrorUrl);
-        add(defaultMirrorUrl);
+        for (final prefix in builtinMirrorPrefixes) {
+          add('$prefix/$originalUrl');
+        }
         for (final mirror in additionalMirrors) {
           add(mirror);
         }
@@ -116,7 +129,11 @@ class DownloadSourceResolver {
         return Uri.tryParse(prefix)?.host ?? prefix;
       }
     }
-    if (url.startsWith(defaultMirrorPrefix)) return 'ghfast.top';
+    for (final prefix in builtinMirrorPrefixes) {
+      if (url.startsWith(prefix)) {
+        return Uri.tryParse(prefix)?.host ?? prefix;
+      }
+    }
     if (url.contains('github.com')) return 'GitHub';
     try {
       return Uri.parse(url).host;

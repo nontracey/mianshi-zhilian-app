@@ -450,11 +450,7 @@ class _PreparedSvgView extends StatelessWidget {
 
 /// 已拉取并改写好的网络 SVG 字符串缓存（按 URL → 已解码 SVG 文本）。
 /// 滚动导致 widget 被 dispose 再重建时直接命中缓存，不再触发网络请求。
-/// 没有命中缓存的 URL 会异步拉取，完成后写入缓存并 setState。
 final Map<String, String> _preparedNetworkSvgStringCache = {};
-
-/// 正在进行中的网络请求（按 URL），避免同一 URL 并发重复请求。
-final Map<String, Future<String>> _inflightSvgFetches = {};
 
 /// 网络 SVG：先拉取文本 → UTF-8 解码 → 改写字体/尺寸 → SvgPicture.string 渲染。
 /// 不直接用 SvgPicture.network，因为需要在渲染前改写 SVG 文本（修中文）。
@@ -473,98 +469,77 @@ class _CjkNetworkSvg extends StatefulWidget {
 }
 
 class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
-  String? _svg;
-  bool _loading = false;
-  Object? _error;
+  late Future<String> _future;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _load();
   }
 
   @override
   void didUpdateWidget(_CjkNetworkSvg oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _load();
+      _future = _load();
     }
   }
 
-  void _load() {
-    // 命中字符串缓存 → 直接用，不再发网络请求
+  Future<String> _load() {
+    // 命中字符串缓存 → 同步返回，不发网络请求
     final cached = _preparedNetworkSvgStringCache[widget.url];
-    if (cached != null) {
-      _svg = cached;
-      _loading = false;
-      _error = null;
-      return;
-    }
+    if (cached != null) return Future.value(cached);
 
-    _svg = null;
-    _loading = true;
-    _error = null;
-
-    // 共享进行中的请求，避免并发重复拉取
-    _inflightSvgFetches[widget.url] ??= _fetchAndPrepare(widget.url);
-    _inflightSvgFetches[widget.url]!.then(
-      (value) {
-        _inflightSvgFetches.remove(widget.url);
-        _preparedNetworkSvgStringCache[widget.url] = value;
-        if (mounted) setState(() { _svg = value; _loading = false; });
-      },
-      onError: (Object e, StackTrace s) {
-        _inflightSvgFetches.remove(widget.url);
-        if (mounted) setState(() { _error = e; _loading = false; });
-      },
-    );
+    return _fetchAndPrepare(widget.url).then((v) {
+      _preparedNetworkSvgStringCache[widget.url] = v;
+      return v;
+    });
   }
 
   static Future<String> _fetchAndPrepare(String url) async {
-    // data: 内嵌 SVG —— 就地解码，不能走 http.get（native 端 data URI 无 host 会抛错）
     if (url.startsWith('data:')) {
       return prepareDiagramSvg(utf8.decode(UriData.parse(url).contentAsBytes()));
     }
     final uri = Uri.parse(url);
-    // 加超时：请求挂死时及时失败 → 触发 onError 降级到 mermaid/文本，而非一直转圈
     final resp = await http.get(uri).timeout(const Duration(seconds: 20));
     if (resp.statusCode != 200) {
       throw http.ClientException('HTTP ${resp.statusCode}', uri);
     }
-    // 响应头无 charset，必须显式按 UTF-8 解码，否则中文按 latin1 解出会变乱码
     return prepareDiagramSvg(utf8.decode(resp.bodyBytes));
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
-
-    if (_error != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError());
-      return Text(
-        widget.fallback ?? l10n.get('svg_loading_fail'),
-        style: TextStyle(color: AppColors.warning, fontSize: 13),
-      );
-    }
-
-    if (_loading || _svg == null) {
-      return Container(
-        width: double.infinity,
-        height: 140,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.codeBgDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
-        ),
-        child: const CircularProgressIndicator(strokeWidth: 2),
-      );
-    }
-
-    return _PreparedSvgView(
-      svg: _svg!,
-      onError: widget.onError,
-      fallback: widget.fallback,
+    return FutureBuilder<String>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError());
+          return Text(
+            widget.fallback ?? l10n.get('svg_loading_fail'),
+            style: TextStyle(color: AppColors.warning, fontSize: 13),
+          );
+        }
+        if (!snap.hasData) {
+          return Container(
+            width: double.infinity,
+            height: 140,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.codeBgDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.32)),
+            ),
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        return _PreparedSvgView(
+          svg: snap.data!,
+          onError: widget.onError,
+          fallback: widget.fallback,
+        );
+      },
     );
   }
 }
