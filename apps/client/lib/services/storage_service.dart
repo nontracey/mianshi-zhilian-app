@@ -1235,14 +1235,11 @@ class StorageService {
       return null;
     }
     if (key == 'local_profile' && value is Map<String, dynamic>) {
-      final stripped = {...value}
+      // 头像始终同步，不受 syncPrivatePrepData 限制；仅剥离账号绑定字段。
+      return {...value}
         ..remove('email')
         ..remove('emailBound')
         ..remove('wechatBound');
-      if (!syncSettings.syncPrivatePrepData) {
-        stripped.remove('avatarUrl');
-      }
-      return stripped;
     }
     return value;
   }

@@ -278,5 +278,74 @@ void main() {
         expect(sessions.single.score, 90);
       },
     );
+
+    test('avatarUrl is always synced regardless of syncPrivatePrepData', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      await storage.saveLocalProfile(
+        const LocalProfile(
+          nickname: 'Test User',
+          avatarSeed: 'seed123',
+          avatarUrl: 'https://example.com/avatar.png',
+          email: 'user@example.com',
+          emailBound: true,
+          wechatBound: true,
+        ),
+      );
+
+      // Even with syncPrivatePrepData=false, avatarUrl should survive.
+      final package = await storage.exportSyncPackage(
+        const SyncSettings(syncPrivatePrepData: false),
+      );
+      final data = package['data'] as Map<String, dynamic>;
+      final profile = data['local_profile'] as Map<String, dynamic>;
+
+      expect(profile['avatarUrl'], 'https://example.com/avatar.png',
+          reason: 'avatarUrl should always be synced');
+      expect(profile['nickname'], 'Test User');
+      expect(profile.containsKey('email'), isFalse,
+          reason: 'email should always be stripped');
+      expect(profile.containsKey('emailBound'), isFalse);
+      expect(profile.containsKey('wechatBound'), isFalse);
+    });
+
+    test('default export includes prep_plan (syncPrivatePrepData defaults to true)', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      final plan = PrepPlan(
+        targetRole: 'Java后端',
+        techStack: 'Spring,Redis',
+        dailyMinutes: 60,
+        updatedAt: DateTime(2026, 6, 1),
+      );
+      await storage.savePrepPlan(plan);
+
+      final package = await storage.exportSyncPackage(const SyncSettings());
+      final data = package['data'] as Map<String, dynamic>;
+
+      expect(data.containsKey('prep_plan'), isTrue,
+          reason: 'prep_plan should be included by default');
+      expect((data['prep_plan'] as Map)['targetRole'], 'Java后端');
+    });
+
+    test('export excludes prep_plan when syncPrivatePrepData is false', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      final plan = PrepPlan(
+        targetRole: 'Java后端',
+        techStack: 'Spring,Redis',
+        dailyMinutes: 60,
+        updatedAt: DateTime(2026, 6, 1),
+      );
+      await storage.savePrepPlan(plan);
+
+      final package = await storage.exportSyncPackage(
+        const SyncSettings(syncPrivatePrepData: false),
+      );
+      final data = package['data'] as Map<String, dynamic>;
+
+      expect(data.containsKey('prep_plan'), isFalse,
+          reason: 'prep_plan should be excluded when syncPrivatePrepData is false');
+    });
   });
 }

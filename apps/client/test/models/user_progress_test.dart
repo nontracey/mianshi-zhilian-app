@@ -504,6 +504,7 @@ void main() {
       expect(restored.webDavUrl, '');
       expect(restored.githubToken, '');
       expect(restored.giteeToken, '');
+      expect(restored.syncPrivatePrepData, true);
       expect(restored.syncAiConfigMetadata, false);
     });
 
@@ -602,6 +603,7 @@ void main() {
       expect(restored.giteePath, 'mianshi-zhilian/sync-state.json');
       expect(restored.autoSyncEnabled, true);
       expect(restored.autoSyncIntervalMinutes, 5);
+      expect(restored.syncPrivatePrepData, true);
       expect(restored.lastSyncAt, isNull);
       expect(restored.lastSyncStatus, 'local_mode');
       expect(restored.syncAiConfigMetadata, false);

@@ -385,6 +385,21 @@ class DataManagementPanel extends StatelessWidget {
           },
         ),
         if (syncSettings.isAutomaticMethod) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Theme.of(context).hintColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.get('sync_config_device_local'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).hintColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,

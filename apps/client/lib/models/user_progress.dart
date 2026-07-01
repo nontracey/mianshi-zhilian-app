@@ -498,7 +498,7 @@ class SyncSettings {
     this.autoSyncEnabled = true,
     this.autoSyncIntervalMinutes = 5,
     this.syncFullPracticeText = false,
-    this.syncPrivatePrepData = false,
+    this.syncPrivatePrepData = true,
     this.syncAiConfigMetadata = false,
     this.lastSyncAt,
     this.lastSyncStatus = 'local_mode',
@@ -525,7 +525,7 @@ class SyncSettings {
     autoSyncIntervalMinutes:
         (json['autoSyncIntervalMinutes'] as num?)?.toInt() ?? 5,
     syncFullPracticeText: json['syncFullPracticeText'] as bool? ?? false,
-    syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? false,
+    syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? true,
     syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? false,
     lastSyncAt: json['lastSyncAt'] != null
         ? DateTime.parse(json['lastSyncAt'] as String)

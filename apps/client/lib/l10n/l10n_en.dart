@@ -141,6 +141,8 @@ const _en = <String, String>{
     'sync_waiting_interval': 'Waiting for the next auto-sync interval',
     'auto_sync': 'Auto sync',
     'auto_sync_target_only': 'Sync only to the selected target.',
+    'sync_config_device_local':
+        'Sync settings are per-device only. You need to set them up again on each new device.',
     'auto_sync_interval_minutes': 'Auto sync interval (minutes)',
     'repository_owner': 'Owner',
     'repository_name': 'Repo',

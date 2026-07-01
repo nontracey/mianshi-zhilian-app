@@ -186,6 +186,7 @@ const _zh = <String, String>{
     'sync_waiting_interval': '等待下次自动同步间隔',
     'auto_sync': '自动同步',
     'auto_sync_target_only': '只同步到当前选择的目标。',
+    'sync_config_device_local': '同步配置仅保存在当前设备上，不会跨设备同步。新设备需重新配置。',
     'auto_sync_interval_minutes': '自动同步间隔（分钟）',
     'repository_owner': '所有者',
     'repository_name': '仓库',
