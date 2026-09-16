@@ -7,6 +7,7 @@ import 'package:mianshi_zhilian/providers/ai_provider.dart';
 import 'package:mianshi_zhilian/services/ai_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../helpers/secure_storage_mock.dart';
 
 class _FakeAiService extends AiService {
   _FakeAiService(this.streams);
@@ -46,6 +47,8 @@ AiConfig _textConfig() => AiConfig(
 
 Future<AiProvider> _providerWith(List<Stream<String>> streams) async {
   SharedPreferences.setMockInitialValues({});
+  // AI 配置的 key 只写入系统安全存储；测试环境没有钥匙串，用内存实现。
+  installFakeSecureStorage();
   final provider = AiProvider(_FakeAiService(streams), StorageService());
   await provider.addConfig(_textConfig());
   return provider;

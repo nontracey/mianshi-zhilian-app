@@ -10,6 +10,23 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  // 相对时间基准：`DataSyncService._mergeDeletions` 会 GC 掉 60 天以上的旧墓碑。
+  // 若这里写死绝对日期，时间一过 GC 窗口，墓碑就被清掉，删除传播类断言会
+  // 无缘无故失败（本质是"时间炸弹"测试）。改成相对 now 的偏移，语义不变且永不失效：
+  //   oldIso   = 90 天前 → 基线条目（远早于墓碑）
+  //   tombIso  = 10 天前 → 墓碑（仍在 60 天 GC 窗口内）
+  //   freshIso = 1 天前  → 墓碑之后的新建 / 重建
+  final DateTime now = DateTime.now();
+  final String oldIso = now
+      .subtract(const Duration(days: 90))
+      .toIso8601String();
+  final String tombIso = now
+      .subtract(const Duration(days: 10))
+      .toIso8601String();
+  final String freshIso = now
+      .subtract(const Duration(days: 1))
+      .toIso8601String();
+
   late DataSyncService sync;
 
   setUp(() {
@@ -46,13 +63,8 @@ void main() {
   group('列表合并 LWW + 墓碑', () {
     test('远端独有项被保留（无墓碑时是并集）', () {
       final merged = sync.mergePackagesForTest(
-        pkg(customRoutes: [route('A', '2026-01-01T00:00:00.000')]),
-        pkg(
-          customRoutes: [
-            route('A', '2026-01-01T00:00:00.000'),
-            route('C', '2026-01-01T00:00:00.000'),
-          ],
-        ),
+        pkg(customRoutes: [route('A', oldIso)]),
+        pkg(customRoutes: [route('A', oldIso), route('C', oldIso)]),
       );
       expect(mergedRouteIds(merged), containsAll(['A', 'C']));
     });
@@ -61,13 +73,13 @@ void main() {
       // 本地已删 C：本地列表无 C，但带墓碑 deletedAt 晚于远端 C 的 updatedAt
       final merged = sync.mergePackagesForTest(
         pkg(
-          customRoutes: [route('A', '2026-01-01T00:00:00.000')],
-          deletions: {'custom_routes:C': '2026-06-01T00:00:00.000'},
+          customRoutes: [route('A', oldIso)],
+          deletions: {'custom_routes:C': tombIso},
         ),
         pkg(
           customRoutes: [
-            route('A', '2026-01-01T00:00:00.000'),
-            route('C', '2026-01-01T00:00:00.000'), // 远端仍有旧的 C
+            route('A', oldIso),
+            route('C', oldIso), // 远端仍有旧的 C
           ],
         ),
       );
@@ -81,24 +93,24 @@ void main() {
       final merged = sync.mergePackagesForTest(
         pkg(
           customRoutes: [
-            route('A', '2026-01-01T00:00:00.000'),
-            route('C', '2026-07-01T00:00:00.000'), // 本地重建的新 C
+            route('A', oldIso),
+            route('C', freshIso), // 本地重建的新 C
           ],
-          deletions: {'custom_routes:C': '2026-06-01T00:00:00.000'},
+          deletions: {'custom_routes:C': tombIso},
         ),
-        pkg(customRoutes: [route('A', '2026-01-01T00:00:00.000')]),
+        pkg(customRoutes: [route('A', oldIso)]),
       );
       expect(mergedRouteIds(merged), containsAll(['A', 'C']));
     });
 
     test('同 id 取 updatedAt 较新者（LWW）', () {
       final merged = sync.mergePackagesForTest(
-        pkg(customRoutes: [route('A', '2026-07-01T00:00:00.000')]), // 本地较新
-        pkg(customRoutes: [route('A', '2026-01-01T00:00:00.000')]), // 远端较旧
+        pkg(customRoutes: [route('A', freshIso)]), // 本地较新
+        pkg(customRoutes: [route('A', oldIso)]), // 远端较旧
       );
       final a =
           ((merged['data'] as Map)['custom_routes'] as List).single as Map;
-      expect(a['updatedAt'], '2026-07-01T00:00:00.000');
+      expect(a['updatedAt'], freshIso);
     });
   });
 
@@ -106,12 +118,9 @@ void main() {
     test('本地删除一条路线后导出，与仍持有它的远端合并 → 被剔除', () async {
       final storage = StorageService();
       // 本地起初有 A、B 两条
-      await storage.saveCustomRoutes([
-        route('A', '2026-01-01T00:00:00.000'),
-        route('B', '2026-01-01T00:00:00.000'),
-      ]);
+      await storage.saveCustomRoutes([route('A', oldIso), route('B', oldIso)]);
       // 删除 B：移除并写墓碑（与 LearningScopeProvider.deleteRoute 行为一致）
-      await storage.saveCustomRoutes([route('A', '2026-01-01T00:00:00.000')]);
+      await storage.saveCustomRoutes([route('A', oldIso)]);
       await storage.recordDeletion('custom_routes', 'B');
 
       final localExport = await storage.exportSyncPackage(
@@ -119,10 +128,7 @@ void main() {
       );
       // 远端仍持有 A、B
       final remote = pkg(
-        customRoutes: [
-          route('A', '2026-01-01T00:00:00.000'),
-          route('B', '2026-01-01T00:00:00.000'),
-        ],
+        customRoutes: [route('A', oldIso), route('B', oldIso)],
       );
 
       final merged = DataSyncService(
@@ -143,9 +149,9 @@ void main() {
 
     test('清空墓碑 + 远端旧进度 → 不复活', () {
       final merged = DataSyncService.mergeProgressMaps(
-        {'java.a': prog('java.a', '2026-01-01T00:00:00.000')},
+        {'java.a': prog('java.a', oldIso)},
         <String, dynamic>{}, // 本地已清空
-        {'progress_map:java.a': '2026-06-01T00:00:00.000'},
+        {'progress_map:java.a': tombIso},
       );
       expect(merged.containsKey('java.a'), isFalse);
     });
@@ -153,15 +159,15 @@ void main() {
     test('删除后重新练习（lastPracticeAt 晚于墓碑）→ 恢复', () {
       final merged = DataSyncService.mergeProgressMaps(
         <String, dynamic>{},
-        {'java.a': prog('java.a', '2026-07-01T00:00:00.000')},
-        {'progress_map:java.a': '2026-06-01T00:00:00.000'},
+        {'java.a': prog('java.a', freshIso)},
+        {'progress_map:java.a': tombIso},
       );
       expect(merged.containsKey('java.a'), isTrue);
     });
 
     test('无墓碑 → 正常合并保留', () {
       final merged = DataSyncService.mergeProgressMaps({
-        'java.a': prog('java.a', '2026-01-01T00:00:00.000'),
+        'java.a': prog('java.a', oldIso),
       }, <String, dynamic>{});
       expect(merged.containsKey('java.a'), isTrue);
     });
@@ -174,7 +180,7 @@ void main() {
       'mode': 'recall',
       'question': 'q',
       'answer': 'a',
-      'createdAt': '2026-01-01T00:00:00.000',
+      'createdAt': oldIso,
     };
 
     test('删除墓碑 → 远端副本不复活', () {
@@ -183,7 +189,7 @@ void main() {
           'schemaVersion': 1,
           'data': {
             'practice_attempts': <Map<String, dynamic>>[],
-            'deletions': {'practice_attempts:at1': '2026-06-01T00:00:00.000'},
+            'deletions': {'practice_attempts:at1': tombIso},
           },
         },
         {
@@ -203,7 +209,7 @@ void main() {
       final version = {
         'type': 'draft',
         'content': 'answer v1',
-        'createdAt': '2026-01-01T00:00:00.000',
+        'createdAt': oldIso,
       };
       final versionId = StorageService.answerVersionIdFor(version);
       final collection = StorageService.answerVersionDeletionCollection(
@@ -215,7 +221,7 @@ void main() {
           'schemaVersion': 1,
           'data': {
             'answer_versions': {'java.a': <Map<String, dynamic>>[]},
-            'deletions': {'$collection:$versionId': '2026-06-01T00:00:00.000'},
+            'deletions': {'$collection:$versionId': tombIso},
           },
         },
         {
@@ -236,8 +242,8 @@ void main() {
         'id': 'v1',
         'type': 'draft',
         'content': 'answer v2',
-        'createdAt': '2026-07-01T00:00:00.000',
-        'updatedAt': '2026-07-01T00:00:00.000',
+        'createdAt': freshIso,
+        'updatedAt': freshIso,
       };
       final collection = StorageService.answerVersionDeletionCollection(
         'java.a',
@@ -250,7 +256,7 @@ void main() {
             'answer_versions': {
               'java.a': [version],
             },
-            'deletions': {'$collection:v1': '2026-06-01T00:00:00.000'},
+            'deletions': {'$collection:v1': tombIso},
           },
         },
         {'schemaVersion': 1, 'data': <String, dynamic>{}},
@@ -273,14 +279,8 @@ void main() {
 
     test('prep_plan 取 updatedAt 较新者（远端更新 → 远端胜）', () {
       final merged = sync.mergePackagesForTest(
-        singletonPkg('prep_plan', {
-          'targetRole': '本地旧',
-          'updatedAt': '2026-01-01T00:00:00.000',
-        }),
-        singletonPkg('prep_plan', {
-          'targetRole': '远端新',
-          'updatedAt': '2026-06-01T00:00:00.000',
-        }),
+        singletonPkg('prep_plan', {'targetRole': '本地旧', 'updatedAt': oldIso}),
+        singletonPkg('prep_plan', {'targetRole': '远端新', 'updatedAt': tombIso}),
       );
       expect(
         (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'],
@@ -292,12 +292,9 @@ void main() {
       final merged = sync.mergePackagesForTest(
         singletonPkg('local_profile', {
           'nickname': '本地新',
-          'updatedAt': '2026-06-01T00:00:00.000',
+          'updatedAt': tombIso,
         }),
-        singletonPkg('local_profile', {
-          'nickname': '远端旧',
-          'updatedAt': '2026-01-01T00:00:00.000',
-        }),
+        singletonPkg('local_profile', {'nickname': '远端旧', 'updatedAt': oldIso}),
       );
       expect(
         (mergedSingleton(merged, 'local_profile') as Map)['nickname'],
@@ -308,10 +305,7 @@ void main() {
     test('一侧缺失时保留另一侧', () {
       final merged = sync.mergePackagesForTest(
         {'schemaVersion': 1, 'data': <String, dynamic>{}},
-        singletonPkg('prep_plan', {
-          'targetRole': '远端独有',
-          'updatedAt': '2026-06-01T00:00:00.000',
-        }),
+        singletonPkg('prep_plan', {'targetRole': '远端独有', 'updatedAt': tombIso}),
       );
       expect(
         (mergedSingleton(merged, 'prep_plan') as Map)['targetRole'],
@@ -330,7 +324,7 @@ void main() {
           mode: 'recall',
           question: 'q',
           answer: 'a',
-          createdAt: DateTime.parse('2026-01-01T00:00:00.000'),
+          createdAt: DateTime.parse(oldIso),
         ),
       ]);
       await storage.saveProgressMap({
@@ -339,7 +333,7 @@ void main() {
           score: 80,
           status: 'learning',
           practiceCount: 1,
-          lastPracticeAt: DateTime.parse('2026-01-01T00:00:00.000'),
+          lastPracticeAt: DateTime.parse(oldIso),
         ),
       });
 
@@ -358,7 +352,7 @@ void main() {
               'mode': 'recall',
               'question': 'q',
               'answer': 'a',
-              'createdAt': '2026-01-01T00:00:00.000',
+              'createdAt': oldIso,
             },
           ],
           'progress_map': {
@@ -367,7 +361,7 @@ void main() {
               'score': 80,
               'status': 'learning',
               'practiceCount': 1,
-              'lastPracticeAt': '2026-01-01T00:00:00.000',
+              'lastPracticeAt': oldIso,
             },
           },
         },

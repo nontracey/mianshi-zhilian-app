@@ -137,7 +137,14 @@ class StorageService {
           config.id,
           config.apiKey,
         );
-        if (wroteSecurely) json['apiKey'] = '';
+        if (!wroteSecurely) {
+          writeFailure.value = 'ai_credentials';
+          throw StorageWriteException(
+            'ai_credentials',
+            StateError('Secure storage unavailable'),
+          );
+        }
+        json['apiKey'] = '';
       }
       payload.add(json);
     }
@@ -196,6 +203,37 @@ class StorageService {
   }
 
   String _aiConfigApiKeySecureKey(String id) => 'ai_config_api_key_$id';
+
+  /// 通用凭据槽：不在 SharedPreferences 里落任何明文。
+  ///
+  /// 与 AI 配置同一套安全存储策略；Web 端没有等价保护，调用方必须如实说明。
+  static const String jobSearchApiKeySlot = 'job_search_api_key';
+
+  /// 写入一个具名凭据。失败返回 false，由调用方报错，绝不回退明文。
+  Future<bool> writeSecret(String slot, String value) async {
+    try {
+      if (value.isEmpty) {
+        await deleteSecret(slot);
+      } else {
+        await _secureStorage.write(key: 'secret_$slot', value: value);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> readSecret(String slot) async {
+    try {
+      return await _secureStorage.read(key: 'secret_$slot');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> deleteSecret(String slot) async {
+    await _secureStorage.delete(key: 'secret_$slot');
+  }
 
   Future<bool> _writeAiConfigApiKey(String id, String apiKey) async {
     try {

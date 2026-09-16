@@ -1,6 +1,17 @@
 # 测试策略与设计原则
 
+> 教练改造测试使用 `apps/client/test/coach/` 内的合成资料和标准 Flutter 测试运行器，随 `flutter test` 一起执行；可用 `bash scripts/coach-tests.sh` 从仓库根目录单独运行。下文真实内容 fixture 的约定适用于旧内容链，不约束新教练的知识 ID、目标或成绩。落地与验收范围见 [审计](coach-implementation-audit.md)。
+
+
 本项目的测试目标：**防止核心功能、核心流程、核心业务偏离预期**。重点放在最容易出回归、又最稳定可测的**业务/数据层**，UI 层只对关键控件做少量冒烟兜底。
+
+## 教练集成与联网验证
+
+- 默认测试不会请求 AI 或招聘平台；`test/live/` 中的用例必须显式设置环境变量启用。
+- 智联真实搜索：`COACH_LIVE_JOBS=1 bash scripts/flutter-env.sh test test/live/coach_jobs_test.dart`。
+- Agnes 使用 `COACH_LIVE_API_KEY`，可用 `COACH_LIVE_REPORT` 指定本机报告；从安全配置注入，不把密钥放到参数、fixture 或仓库。HTTP 429 是服务未通过，不计入成功测试。
+- PDFium 测试使用合成中文 PDF 和无文本扫描件。必要时可设置 `COACH_PDFIUM_LIBRARY_PATH` 指向 Flutter 构建生成的本机原生库。
+- `scripts/check-coach-resources.py` 校验中性规则清单及 Web SQLite 运行资源哈希；实际浏览器持久化仍需要另行验证。
 
 ## 分层与取舍
 

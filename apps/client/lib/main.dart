@@ -41,7 +41,31 @@ import 'pages/profile/appearance_language_page.dart';
 import 'pages/profile/content_source_page.dart';
 import 'pages/profile/route_preference_page.dart';
 import 'pages/profile/about_update_page.dart';
-import 'pages/learning_shell.dart';
+import 'pages/profile/job_search_settings_page.dart';
+import 'pages/profile/profile_page.dart';
+import 'pages/profile/embedding_settings_page.dart';
+import 'pages/coach/legacy_archive_page.dart';
+import 'services/embedding_config_service.dart';
+import 'pages/coach/coach_shell.dart';
+
+import 'coach/domain/common.dart';
+import 'coach/jobs/jd_import_service.dart';
+import 'coach/knowledge/chunker.dart';
+import 'coach/knowledge/importer.dart';
+import 'coach/resume/claim_mapping.dart';
+import 'coach/resume/resume_parse.dart';
+import 'providers/coach_provider.dart';
+import 'providers/goal_provider.dart';
+import 'services/coach_store_factory.dart';
+import 'services/pdf_document_parser.dart';
+import 'services/coach_legacy_migration.dart';
+import 'services/coach_material_parsers.dart';
+import 'services/coach_model_binding.dart';
+import 'services/coach_rules_loader.dart';
+import 'services/http_jd_fetcher.dart';
+import 'pages/profile/mcp_settings_page.dart';
+import 'services/job_search_config.dart';
+import 'services/mcp_config_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,11 +112,95 @@ void main() async {
     routeClient: routeClient,
   );
   final aiService = AiService();
+  final aiProvider = AiProvider(aiService, storage);
+  await aiProvider.loadConfigs();
   final updateService = UpdateService(routeClient: routeClient);
   final dataSyncService = DataSyncService(storage);
   final analyticsService = AnalyticsService(storage, routeClient: routeClient)
     ..start();
   final connectivityProvider = ConnectivityProvider()..start();
+
+  // ── 教练模块（目标化改造）──
+  // 存储不可用时关闭教练写入，旧功能仍可使用。
+  final coachStoreHandle = await openCoachStore();
+  final coachStore = coachStoreHandle.store;
+  final idGen = IdGenerator();
+  final clock = const SystemClock();
+
+  // 教练用的模型网关：直接读用户在「AI 配置」里填的服务，不另建一套凭据。
+  // 没有可用文本配置时返回 null，教练如实显示“未配置”，不生成自动点评。
+  final coachModels = CoachModelBindingFactory(
+    selector: () =>
+        defaultCoachConfig(aiProvider.configs, aiProvider.defaultConfig),
+  );
+  final coachRules = CoachRulesLoader();
+
+  final mcpConfigService = McpConfigService(
+    store: coachStore,
+    storage: storage,
+  );
+  final embeddingService = EmbeddingConfigService(
+    store: coachStore,
+    storage: storage,
+    profileId: kDefaultProfileId,
+  );
+  if (coachStoreHandle.available) await embeddingService.load();
+  final coachProvider = CoachProvider(
+    store: coachStore,
+    modelBindingProvider: coachModels,
+    rulesProvider: coachRules.load,
+    remoteToolsProvider: mcpConfigService.openCoachTools,
+  );
+  if (coachStoreHandle.available) {
+    dataSyncService.attachCoach(
+      coachStore,
+      canImport: () => !coachProvider.isGenerating,
+      onImported: coachProvider.reload,
+    );
+  }
+  coachProvider.setEmbeddingProvider(embeddingService.provider);
+  embeddingService.addListener(
+    () => coachProvider.setEmbeddingProvider(embeddingService.provider),
+  );
+  final jobSearchConfig = JobSearchConfigController(storage: storage);
+  await jobSearchConfig.sync(savedSettings);
+
+  final goalProvider = GoalProvider(
+    store: coachStore,
+    canMutate: () => !coachProvider.isGenerating,
+    // 通道随设置变化，这里传“每次现取”的函数而不是固定实例。
+    jobSearchProvider: () => jobSearchConfig.service,
+    channelProvider: () => jobSearchConfig.state,
+    documents: DocumentImporter(
+      // 文本/粘贴导入不走字节解析器；PDF/DOCX 未配置时明确抛错，不静默通过。
+      parser: const PdfDocumentParser(),
+      chunker: Chunker(),
+      idGen: idGen,
+      clock: clock,
+    ),
+    resumeImport: ResumeImportService(
+      // 使用当前 AI 提取草稿，失败时保留离线解析和原文。
+      parser: ConfiguredResumeParser(coachModels.call),
+      idGen: idGen,
+      clock: clock,
+      matcher: KeywordClaimMatcher(),
+    ),
+    jdImport: JdImportService(
+      fetcher: HttpJdFetcher(),
+      // 模型提案必须锚定原文，否则标为待确认推断。
+      parser: ConfiguredJdParser(coachModels.call),
+      idGen: idGen,
+      clock: clock,
+    ),
+  );
+  // 目标/资料变更后，让教练状态（今天计划、目标要求）及时刷新。
+  goalProvider.onDataChanged = coachProvider.reload;
+  if (coachStoreHandle.available) {
+    await coachProvider.load();
+    // 旧版练习原答 → 教练库（可重入，失败不阻塞启动）。
+    await migrateLegacyPracticeData(storage: storage, store: coachStore);
+    await coachProvider.reload();
+  }
 
   runApp(
     MianshiZhilianApp(
@@ -104,8 +212,16 @@ void main() async {
       updateService: updateService,
       routeClient: routeClient,
       initialLanguage: savedSettings.language,
+      aiProvider: aiProvider,
       themeProvider: ThemeProvider(),
       connectivityProvider: connectivityProvider,
+      coachStoreHandle: coachStoreHandle,
+      coachProvider: coachProvider,
+      goalProvider: goalProvider,
+      coachModels: coachModels,
+      jobSearchConfig: jobSearchConfig,
+      mcpConfigService: mcpConfigService,
+      embeddingService: embeddingService,
     ),
   );
 }
@@ -121,6 +237,14 @@ class MianshiZhilianApp extends StatefulWidget {
   final String initialLanguage;
   final ThemeProvider themeProvider;
   final ConnectivityProvider connectivityProvider;
+  final CoachStoreHandle coachStoreHandle;
+  final CoachProvider coachProvider;
+  final GoalProvider goalProvider;
+  final CoachModelBindingFactory coachModels;
+  final JobSearchConfigController jobSearchConfig;
+  final McpConfigService mcpConfigService;
+  final AiProvider aiProvider;
+  final EmbeddingConfigService? embeddingService;
 
   const MianshiZhilianApp({
     super.key,
@@ -134,6 +258,14 @@ class MianshiZhilianApp extends StatefulWidget {
     required this.initialLanguage,
     required this.themeProvider,
     required this.connectivityProvider,
+    required this.coachStoreHandle,
+    required this.coachProvider,
+    required this.goalProvider,
+    required this.coachModels,
+    required this.jobSearchConfig,
+    required this.mcpConfigService,
+    required this.aiProvider,
+    this.embeddingService,
   });
 
   @override
@@ -141,13 +273,48 @@ class MianshiZhilianApp extends StatefulWidget {
 }
 
 class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
+  Widget _withCoachStorage(BuildContext context, Widget child) {
+    if (widget.coachStoreHandle.available) return child;
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            context.watch<LocalizationProvider>().get(
+              widget.coachStoreHandle.unavailableReasonKey!,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   bool _contentLoaded = false;
   late final GoRouter _router = GoRouter(
     initialLocation: '/',
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, __) => const LearningShell(),
+        builder: (context, _) => _withCoachStorage(context, const CoachShell()),
+      ),
+      GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
+      GoRoute(
+        path: '/profile/legacy',
+        builder: (context, _) =>
+            _withCoachStorage(context, const LegacyArchivePage()),
+      ),
+      GoRoute(
+        path: '/profile/embedding',
+        builder: (context, _) =>
+            _withCoachStorage(context, const EmbeddingSettingsPage()),
+      ),
+      GoRoute(
+        path: '/coach',
+        builder: (context, state) => _withCoachStorage(
+          context,
+          CoachShell(initialIndex: (state.extra as int?) ?? 0),
+        ),
       ),
       GoRoute(
         path: '/topic',
@@ -201,8 +368,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
       ),
       GoRoute(
         path: '/auth/login',
-        builder: (_, state) =>
-            state.extra as Widget? ?? const LoginPage(),
+        builder: (_, state) => state.extra as Widget? ?? const LoginPage(),
       ),
       GoRoute(
         path: '/auth/change-password',
@@ -216,8 +382,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
       ),
       GoRoute(
         path: '/profile/ai-config',
-        builder: (_, state) =>
-            state.extra as Widget? ?? const AiConfigPage(),
+        builder: (_, state) => state.extra as Widget? ?? const AiConfigPage(),
       ),
       GoRoute(
         path: '/profile/log-management',
@@ -231,8 +396,7 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
       ),
       GoRoute(
         path: '/profile/sync-backup',
-        builder: (_, state) =>
-            state.extra as Widget? ?? const SyncBackupPage(),
+        builder: (_, state) => state.extra as Widget? ?? const SyncBackupPage(),
       ),
       GoRoute(
         path: '/profile/ai-voice-settings',
@@ -264,6 +428,18 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         builder: (_, state) =>
             state.extra as Widget? ?? const AboutUpdatePage(),
       ),
+      GoRoute(
+        path: '/profile/job-search',
+        builder: (_, state) =>
+            state.extra as Widget? ?? const JobSearchSettingsPage(),
+      ),
+      GoRoute(
+        path: '/profile/mcp-services',
+        builder: (context, state) => _withCoachStorage(
+          context,
+          state.extra as Widget? ?? const McpSettingsPage(),
+        ),
+      ),
     ],
   );
 
@@ -272,6 +448,11 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
     widget.dataSyncService.stop();
     widget.analyticsService.stop();
     widget.connectivityProvider.dispose();
+    widget.coachProvider.dispose();
+    widget.goalProvider.dispose();
+    widget.coachStoreHandle.dispose();
+    widget.coachModels.dispose();
+    widget.embeddingService?.dispose();
     super.dispose();
   }
 
@@ -282,17 +463,16 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         ChangeNotifierProvider.value(value: widget.connectivityProvider),
         ChangeNotifierProvider.value(value: widget.themeProvider),
         ChangeNotifierProvider(
-          create: (_) =>
-              SettingsProvider(widget.storage, widget.dataSyncService, widget.themeProvider)
-                ..loadSettings(),
+          create: (_) => SettingsProvider(
+            widget.storage,
+            widget.dataSyncService,
+            widget.themeProvider,
+          )..loadSettings(),
         ),
         ChangeNotifierProvider(
           create: (_) => ContentProvider(widget.contentApi, widget.storage),
         ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              AiProvider(widget.aiService, widget.storage)..loadConfigs(),
-        ),
+        ChangeNotifierProvider.value(value: widget.aiProvider),
         ChangeNotifierProvider(
           create: (_) => ProgressProvider(widget.storage)..loadProgress(),
         ),
@@ -309,14 +489,35 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               LocalizationProvider(initialLanguage: widget.initialLanguage),
         ),
         Provider<AnalyticsService>.value(value: widget.analyticsService),
+        Provider<DataSyncService>.value(value: widget.dataSyncService),
+        if (widget.embeddingService != null)
+          ChangeNotifierProvider<EmbeddingConfigService>.value(
+            value: widget.embeddingService!,
+          ),
         ChangeNotifierProvider(
           create: (_) => UpdateDownloadProvider(widget.storage),
+        ),
+        // 教练模块：共享同一 CoachStore 的两个状态源。
+        ChangeNotifierProvider<CoachProvider>.value(
+          value: widget.coachProvider,
+        ),
+        ChangeNotifierProvider<GoalProvider>.value(value: widget.goalProvider),
+        ChangeNotifierProvider<JobSearchConfigController>.value(
+          value: widget.jobSearchConfig,
+        ),
+        ChangeNotifierProvider<McpConfigService>.value(
+          value: widget.mcpConfigService,
         ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {
           final l10n = context.watch<LocalizationProvider>();
           final settings = context.watch<SettingsProvider>();
+          // 岗位搜索通道随设置重建（幂等，设置没变不做事）。
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted)
+              widget.jobSearchConfig.syncIfChanged(settings.settings);
+          });
           // 设置加载完成后，再加载内容（使用当前领域）
           if (!settings.isLoading && !_contentLoaded) {
             _contentLoaded = true;
@@ -325,7 +526,8 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               final settingsProvider = context.read<SettingsProvider>();
               final aiProvider = context.read<AiProvider>();
               final localizationProvider = context.read<LocalizationProvider>();
-              final learningScopeProvider = context.read<LearningScopeProvider>();
+              final learningScopeProvider = context
+                  .read<LearningScopeProvider>();
               widget.dataSyncService.onDataImported = () async {
                 await progressProvider.loadProgress();
                 await settingsProvider.loadSettings();
@@ -345,11 +547,6 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
               // 加载学习范围（含旧键迁移）
               learningScopeProvider.load(
                 legacyDomainId: settings.settings.currentDomain,
-              );
-              // 加载内容
-              final contentProvider = context.read<ContentProvider>();
-              contentProvider.loadContent(
-                currentDomainId: settings.settings.currentDomain,
               );
             });
           }

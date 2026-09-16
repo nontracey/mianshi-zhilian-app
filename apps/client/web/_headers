@@ -1,0 +1,7 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+/sqlite3.wasm
+  Content-Type: application/wasm
+/drift_worker.js
+  Content-Type: application/javascript

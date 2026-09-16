@@ -104,7 +104,10 @@ void main() {
       expect(restored.whisperModel, 'medium');
       expect(restored.contentEnv, ContentEnv.staging);
       expect(restored.customTestContentUrl, 'https://test.example.com/content');
-      expect(restored.customDraftContentUrl, 'https://draft.example.com/content');
+      expect(
+        restored.customDraftContentUrl,
+        'https://draft.example.com/content',
+      );
       expect(restored.customProdContentUrl, 'https://prod.example.com/content');
       expect(restored.customGithubMirror, 'https://mirror.example.com');
     });
@@ -296,20 +299,23 @@ void main() {
       expect(restored.customGithubMirror, 'https://gh-mirror.url');
     });
 
-    test('nullable fields can be set to empty string and restore as empty string', () {
-      const settings = AppSettings(
-        customTestContentUrl: '',
-        customGithubMirror: '',
-      );
-      final json = settings.toJson();
+    test(
+      'nullable fields can be set to empty string and restore as empty string',
+      () {
+        const settings = AppSettings(
+          customTestContentUrl: '',
+          customGithubMirror: '',
+        );
+        final json = settings.toJson();
 
-      expect(json['customTestContentUrl'], '');
-      expect(json['customGithubMirror'], '');
+        expect(json['customTestContentUrl'], '');
+        expect(json['customGithubMirror'], '');
 
-      final restored = AppSettings.fromJson(json);
-      expect(restored.customTestContentUrl, '');
-      expect(restored.customGithubMirror, '');
-    });
+        final restored = AppSettings.fromJson(json);
+        expect(restored.customTestContentUrl, '');
+        expect(restored.customGithubMirror, '');
+      },
+    );
 
     test('fromJson with missing nullable keys returns null', () {
       final json = <String, dynamic>{};
@@ -515,7 +521,9 @@ void main() {
       const original = AppSettings();
       expect(original.customTestContentUrl, isNull);
 
-      final modified = original.copyWith(customTestContentUrl: 'https://new.url');
+      final modified = original.copyWith(
+        customTestContentUrl: 'https://new.url',
+      );
       expect(modified.customTestContentUrl, 'https://new.url');
     });
 
@@ -564,6 +572,38 @@ void main() {
       expect(json.containsKey('customGithubMirror'), isTrue);
     });
 
+    test('job search channel config round-trips and defaults to off', () {
+      expect(const AppSettings().jobSearchMode, 'off');
+      expect(const AppSettings().jobSearchEndpoint, isNull);
+
+      const custom = AppSettings(
+        jobSearchMode: 'custom',
+        jobSearchEndpoint: 'https://search.example.com/api/jobs',
+      );
+      final restored = AppSettings.fromJson(custom.toJson());
+      expect(restored.jobSearchMode, 'custom');
+      expect(restored.jobSearchEndpoint, 'https://search.example.com/api/jobs');
+
+      // 缺字段 → 默认关闭通道；损坏取值 → off（如实说“未配置”，不冒充真实结果）。
+      expect(AppSettings.fromJson(<String, dynamic>{}).jobSearchMode, 'off');
+      expect(
+        AppSettings.fromJson(<String, dynamic>{
+          'jobSearchMode': 'nonsense',
+        }).jobSearchMode,
+        'off',
+      );
+
+      // copyWith 不传时保留原值，传 null 可清空 endpoint。
+      expect(
+        custom.copyWith().jobSearchEndpoint,
+        'https://search.example.com/api/jobs',
+      );
+      expect(
+        custom.copyWith(jobSearchEndpoint: null).jobSearchEndpoint,
+        isNull,
+      );
+    });
+
     test('toJson does not include unexpected keys', () {
       const settings = AppSettings();
       final json = settings.toJson();
@@ -579,6 +619,8 @@ void main() {
         'onDeviceEngine', 'whisperModel', 'contentEnv',
         'customTestContentUrl', 'customDraftContentUrl',
         'customProdContentUrl', 'customGithubMirror',
+        // 岗位搜索通道配置（凭证不落在设置 JSON 里，走安全存储）
+        'jobSearchMode', 'jobSearchEndpoint',
       };
       expect(json.keys, unorderedEquals(expectedKeys));
     });

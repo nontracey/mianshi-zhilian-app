@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../coach/jobs/models.dart';
 import '../services/route_resolver.dart';
 
 const Object _unset = Object();
@@ -166,6 +167,11 @@ class AppSettings {
   // 更新下载配置
   final String? customGithubMirror;
 
+  // 岗位搜索通道（§6.7）
+  // 'off' = 未配置；'custom' = 用户自配搜索服务；'demo' = 本机演示通道（合成岗位，非真实招聘信息）
+  final String jobSearchMode;
+  final String? jobSearchEndpoint;
+
   const AppSettings({
     this.themeType = AppThemeType.system,
     this.primaryColor = const Color(0xFF1A2B4A),
@@ -196,6 +202,8 @@ class AppSettings {
     this.customDraftContentUrl,
     this.customProdContentUrl,
     this.customGithubMirror,
+    this.jobSearchMode = 'off',
+    this.jobSearchEndpoint,
   });
 
   /// 官方 App API 主用地址。业务请求会经 RouteResolver 自动纳入主备路由。
@@ -267,6 +275,8 @@ class AppSettings {
     Object? customDraftContentUrl = _unset,
     Object? customProdContentUrl = _unset,
     Object? customGithubMirror = _unset,
+    String? jobSearchMode,
+    Object? jobSearchEndpoint = _unset,
   }) => AppSettings(
     themeType: themeType ?? this.themeType,
     primaryColor: primaryColor ?? this.primaryColor,
@@ -309,6 +319,10 @@ class AppSettings {
     customGithubMirror: customGithubMirror == _unset
         ? this.customGithubMirror
         : customGithubMirror as String?,
+    jobSearchMode: jobSearchMode ?? this.jobSearchMode,
+    jobSearchEndpoint: jobSearchEndpoint == _unset
+        ? this.jobSearchEndpoint
+        : jobSearchEndpoint as String?,
   );
 
   /// 获取 ThemeMode（兼容旧代码）
@@ -382,6 +396,10 @@ class AppSettings {
     customDraftContentUrl: json['customDraftContentUrl'] as String?,
     customProdContentUrl: json['customProdContentUrl'] as String?,
     customGithubMirror: json['customGithubMirror'] as String?,
+    jobSearchMode: json['jobSearchMode'] == null
+        ? JobSearchMode.off
+        : JobSearchMode.normalize(json['jobSearchMode'] as String?),
+    jobSearchEndpoint: json['jobSearchEndpoint'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -414,5 +432,7 @@ class AppSettings {
     'customDraftContentUrl': customDraftContentUrl,
     'customProdContentUrl': customProdContentUrl,
     'customGithubMirror': customGithubMirror,
+    'jobSearchMode': jobSearchMode,
+    'jobSearchEndpoint': jobSearchEndpoint,
   };
 }

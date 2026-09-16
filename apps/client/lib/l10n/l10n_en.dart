@@ -1928,4 +1928,534 @@ const _en = <String, String>{
     'by_current_domain': 'By Current Domain',
     'phases_suffix': 'Phases',
     'route_info_separator': '·',
+
+    // Coach module additions.
+    'mcp_oauth_failed':
+        'Authorization did not complete or expired. Check client registration, redirect URI and service permissions, then retry.',
+    'mcp_oauth_login': 'Sign in and authorize',
+    'mcp_oauth_redirect': 'Registered redirect URI',
+    'mcp_oauth_scope': 'OAuth scopes (blank follows server requirements)',
+    'mcp_oauth_client_id': 'OAuth Client ID (registered public client, optional)',
+    'mcp_allow_session_materials': 'Allow retrieval for the current session',
+    'mcp_allow_session_materials_note':
+        'Selected tools may receive questions and excerpts of the current JD, resume and reference materials as query parameters. Other profiles and credentials are excluded. When disabled, only connection tests and tool discovery are available.',
+    'coach_platform_open_title': 'Search on recruitment platforms',
+    'coach_platform_open_note':
+        'Open BOSS, Liepin, Zhaopin or Lagou in your browser, choose location and salary there, and sign in if needed. Return with a job link or JD text. Signed-in listings are not read automatically.',
+    'coach_platform_open_failed': 'Could not open the browser. Please retry.',
+    'coach_legacy_title': 'Legacy materials and history',
+    'coach_legacy_note':
+        'Read-only targets, projects, original answers and old scores. Old scores do not grant independent credit. The original store remains available through backup export.',
+    'coach_legacy_retry': 'Retry migration',
+    'coach_legacy_export': 'Export migration archive',
+    'mcp_settings_title': 'Extensions (MCP)',
+    'mcp_settings_entry_subtitle':
+        'Connect remote read-only MCP services (jobs / docs / notes)',
+    'mcp_settings_desc':
+        'Remote reads support both protocol versions. Authorize tools and current-session materials separately. Use a Bearer Token, or sign in with a registered OAuth Client ID and PKCE. Credentials are service-bound and refreshable.',
+    'mcp_empty_hint':
+        'No MCP service configured yet. Paste a service Streamable HTTP URL to connect.',
+    'mcp_add_server': 'Add MCP service',
+    'mcp_edit_server': 'Edit MCP service',
+    'mcp_field_name': 'Name',
+    'mcp_field_url': 'Service URL',
+    'mcp_field_token': 'Bearer token (optional)',
+    'mcp_token_stored_hint':
+        'Leave empty to keep for this URL; enter again for a new URL',
+    'mcp_field_allowed': 'Explicitly allowed tools (optional)',
+    'mcp_field_allowed_helper':
+        'Comma-separated names of tools you have verified and authorized for reading. Read-only hints do not grant access.',
+    'mcp_test': 'Test connection',
+    'mcp_test_ok': 'Connected',
+    'mcp_test_summary': 'Found {total} tools; {readonly} declare read-only.',
+    'mcp_tool_not_readonly_hint':
+        'Tools marked ⚠ do not declare read-only behavior. Verify them first. All tools require explicit permission.',
+    'mcp_test_failed': 'Connection failed: {error}',
+    'mcp_delete_title': 'Delete MCP service',
+    'mcp_delete_body': 'Delete "{name}"? The stored token is removed as well.',
+    'mcp_invalid_input': 'Name is required and the URL must be valid',
+    'mcp_token_save_failed':
+        'Failed to write token to secure storage; config not saved',
+    'coach_backup_title': 'Coach data backup',
+    'coach_backup_desc':
+        'Backs up goals, resumes, answers, plans and cleanup records without service credentials. Restore merges by ID and rejects answer conflicts or cross-profile overwrites. Older backups may omit cleanup and historical revision records.',
+    'coach_backup_export': 'Export coach data',
+    'coach_backup_export_done': 'Coach data exported',
+    'coach_backup_import': 'Import coach data',
+    'coach_backup_import_done': 'Restored {count} entities',
+    'coach_backup_import_confirm_title': 'Import coach backup?',
+    'coach_backup_import_confirm_body':
+        'Restores the backup by merging IDs; data created after the backup is kept. The file must come from "Export coach data".',
+    'add': 'Add',
+    'coach_nav_today': 'Today',
+    'coach_nav_interview': 'Mock interview',
+    'coach_nav_goals': 'Goals & materials',
+    'coach_entry_title': 'Interview coach (beta)',
+    'coach_entry_subtitle':
+        'Train against your target job and resume; the classic flow stays available',
+    'coach_mode_learning': 'Learning',
+    'coach_mode_review': 'Review',
+    'coach_mode_interview': 'Mock',
+    'coach_mode_learning_desc':
+        'A minimal framework first, then you recall it. Saying "I don\'t know" only triggers a re-teach, never a fail.',
+    'coach_mode_review_desc':
+        'Short questions, closed-book answers, at most one neutral follow-up. Outcomes are described, not scored.',
+    'coach_mode_interview_desc':
+        'One question at a time; the next one depends on your answer. Scores and coaching come after the session.',
+    'coach_review_status_unseen': 'Not learned',
+    'coach_review_status_exposed': 'Learned, awaiting review',
+    'coach_review_status_recall': 'Can answer independently',
+    'coach_review_status_applied': 'Can apply',
+    'coach_review_status_mastered': 'Solidly mastered',
+    'coach_review_status_stale': 'Has stale scope to re-learn',
+    'coach_platform_boss': 'BOSS Zhipin',
+    'coach_platform_liepin': 'Liepin',
+    'coach_platform_lagou': 'Lagou',
+    'coach_platform_zhaopin': 'Zhaopin',
+    'coach_platform_hangzhou': 'Hangzhou Talent Net',
+    'coach_platform_custom': 'Custom link',
+    'coach_platform_demo': 'Local demo',
+    'coach_platform_unknown': 'Unknown platform',
+    'coach_today_title': 'Today',
+    'coach_today_subtitle_no_goal':
+        'No target role yet. Import a JD under "Goals & materials" so today has a basis.',
+    'coach_today_subtitle_goal': 'Goal: {title}',
+    'coach_today_subtitle_goal_company': 'Goal: {title} · {company}',
+    'coach_today_no_goal_banner':
+        'Without a target JD, only generic review runs — no role-specific questions.',
+    'coach_today_overview': "Today's overview",
+    'coach_today_stat_plan': 'Plan done',
+    'coach_today_stat_due': 'Due reviews',
+    'coach_today_stat_items': 'Knowledge items',
+    'coach_today_plan': "Today's plan",
+    'coach_today_add_extra': 'Extra practice',
+    'coach_today_plan_empty':
+        'No plan yet. Add a knowledge item and the schedule is built from the due pool.',
+    'coach_today_extra_title': 'Extra: review what you learned',
+    'coach_today_start': 'Start a session',
+    'coach_today_start_learn': 'Learn a knowledge item',
+    'coach_today_start_learn_sub': 'Framework first, then your own recall',
+    'coach_today_start_review': 'Review what you learned',
+    'coach_today_start_review_sub_due': '{count} review points due',
+    'coach_today_start_review_sub_none': 'Nothing due — borrow from the pool',
+    'coach_today_start_interview': 'Mock interview',
+    'coach_today_start_interview_sub':
+        'One question at a time, debrief at the end',
+    'coach_today_add_knowledge': 'Add knowledge item',
+    'coach_today_knowledge_label': 'Knowledge item name',
+    'coach_today_knowledge_hint': 'e.g. MySQL indexes and execution plans',
+    'coach_today_points_label': 'Review points (one per line)',
+    'coach_today_points_hint':
+        'e.g.\nWhy B+trees are shorter than B-trees\nLeftmost prefix rule\nLookups and covering indexes',
+    'coach_today_added': 'Added "{title}"',
+    'coach_learn_item_title': 'Learn a knowledge item',
+    'coach_review_item_title': 'Review what you learned',
+    'coach_project_item_title': 'Project training',
+    'coach_mock_item_title': 'Mock interview',
+    'coach_interview_title': 'Mock interview',
+    'coach_interview_subtitle_no_goal':
+        'Without a target role, questions can only come from the generic review pool.',
+    'coach_interview_subtitle_goal':
+        'Questions target "{title}". Each one is tagged with its basis (JD+resume / JD only / resume only).',
+    'coach_interview_goal_hint':
+        'Import a JD and a resume under "Goals & materials" so questions have a basis.',
+    'coach_interview_choose_mode': 'Choose a mode',
+    'coach_interview_start': 'Start {label}',
+    'coach_interview_continue': 'Continue last session',
+    'coach_interview_history': 'Session history',
+    'coach_interview_history_empty':
+        'No sessions yet. Answers and explanations will be kept here.',
+    'coach_interview_session_meta': '{label} · {count} messages',
+    'coach_interview_session_title': '{label} · Session',
+    'coach_interview_end': 'End',
+    'coach_interview_notice':
+        'Your answers are saved in full. Model feedback appears only after a model is connected in "AI settings"; the UI never invents comments.',
+    'coach_interview_empty':
+        'No messages yet. Write the question you want to practise, or your own answer, below.',
+    'coach_interview_input_learning':
+        'Write your question, or recall what you just learned…',
+    'coach_interview_input_review': 'Write your answer (closed book)…',
+    'coach_goals_title': 'Goals & materials',
+    'coach_goals_subtitle':
+        'Import a target JD and a resume so questions and priorities have a basis. Extracted content stays a draft until you confirm it.',
+    'coach_goals_section_targets': 'Target roles ({count})',
+    'coach_goals_targets_empty':
+        'No target yet. Paste a JD or a job link to create one.',
+    'coach_goals_import_link': 'Import link',
+    'coach_goals_paste_jd': 'Paste JD',
+    'coach_goals_section_requirements': 'Requirements ({count})',
+    'coach_goals_requirements_empty':
+        'No trainable requirements were extracted. Paste the full JD or add them manually.',
+    'coach_goals_importance_high': 'Required',
+    'coach_goals_importance_medium': 'Important',
+    'coach_goals_importance_low': 'Nice to have',
+    'coach_goals_inferred': 'Inferred — needs confirmation',
+    'coach_goals_section_resumes': 'Resumes ({count})',
+    'coach_goals_resumes_empty':
+        'No resume yet. Import one to compare what the role asks for with what you can actually explain.',
+    'coach_goals_paste_resume': 'Paste resume text',
+    'coach_goals_section_claims': 'Resume claim check',
+    'coach_goals_claims_note':
+        'Unconfirmed claims are only used to ask questions — never treated as things you have done.',
+    'coach_goals_claim_pending': 'Unconfirmed',
+    'coach_goals_claim_confirmed': 'Confirmed',
+    'coach_goals_claim_disputed': 'Disputed',
+    'coach_goals_claim_confirm_action': 'I really did this',
+    'coach_goals_claim_dispute_action': 'Needs correction',
+    'coach_goals_section_sources': 'Reference material ({count})',
+    'coach_goals_sources_empty':
+        'Paste notes or document text as the basis for teaching and follow-ups. Citations include the source.',
+    'coach_goals_add_source': 'Add reference material',
+    'coach_goals_source_meta': '{type} · v{revision} · {status}',
+    'coach_goals_resume_chars': '{count} chars',
+    'coach_goals_import_link_title': 'Import a job from a link',
+    'coach_goals_link_label': 'Job link',
+    'coach_goals_paste_jd_title': 'Paste a job description',
+    'coach_goals_paste_jd_hint':
+        'Paste the whole description from the job page, including the requirements section.',
+    'coach_goals_paste_resume_title': 'Paste resume text',
+    'coach_goals_paste_resume_hint':
+        'Paste the full resume. Anything not stated is left blank for you to confirm — nothing is filled in for you.',
+    'coach_goals_add_source_title': 'Add reference material',
+    'coach_goals_add_source_hint':
+        'Paste Markdown or plain-text notes. PDF / DOCX need a platform parser.',
+    'coach_goals_import': 'Import',
+    'coach_goals_delete_goal': 'Delete target',
+    'coach_goals_delete_goal_title': 'Delete this target?',
+    'coach_goals_delete_goal_body':
+        'This also deletes the requirements and links of "{title}".',
+    'coach_goals_source_default_name': 'Material {index}',
+    'coach_import_empty_jd': 'The JD is empty',
+    'coach_import_jd_ok': 'Created target "{title}" with {count} requirements',
+    'coach_import_jd_failed': 'JD import failed',
+    'coach_import_jd_url_failed': 'Fetch or parse failed',
+    'coach_import_no_link': 'No valid job link found',
+    'coach_import_goal_deleted': 'Target deleted',
+    'coach_import_empty_resume': 'The resume is empty',
+    'coach_import_resume_ok':
+        'Resume imported: {projects} projects, {claims} claims',
+    'coach_import_claims_pending_hint':
+        'Some claims await your confirmation (not used as facts until confirmed)',
+    'coach_import_claim_confirmed': 'Claim confirmed',
+    'coach_import_claim_pending': 'Claim marked for review',
+    'coach_import_empty_doc': 'The material is empty',
+    'coach_import_doc_ok': 'Imported "{title}" as {chunks} chunks',
+    'coach_source_update': 'Update source text',
+    'coach_source_update_hint':
+        'Editing creates a new revision. Older revisions remain for historical citations.',
+    'coach_source_updated':
+        'Updated "{title}" with {chunks} new chunks. Linked knowledge needs review.',
+    'coach_source_unchanged': 'No changes to "{title}"',
+    'coach_source_busy':
+        'Wait for the current coach response before updating this source',
+    'coach_source_update_conflict': 'This source changed. Reload and try again.',
+    'coach_import_parse_failed': 'Parse failed',
+    'coach_import_unknown_platform_hint':
+        'Unrecognised platform — paste the JD text instead',
+    'coach_report_no_assessment':
+        'No assessment was saved for this session. Your answers remain available.',
+    'coach_report_partial':
+        'This session ended early. Unasked topics are not failures.',
+    'coach_assessment_dispute': 'Dispute assessment',
+    'coach_assessment_reassess': 'Reassess original answers',
+    'coach_assessment_history_note':
+        'Disputing removes this judgment from progress. Reassessment appends a revision and preserves originals. Results without references remain unverified.',
+    'coach_assessment_revision': 'Previous revision {revision}',
+    'coach_assessment_review_failed':
+        'Review could not complete. Originals and the dispute are preserved. Check the AI configuration or retry later.',
+    'coach_report_finish_first':
+        'Finish this session before viewing assessments and the report.',
+    'coach_report_evidence': 'Assessment records',
+    'coach_result_independent_pass': 'Independent answer passed',
+    'coach_result_needs_reinforcement': 'Needs reinforcement',
+    'coach_result_hint_completed': 'Completed with help',
+    'coach_validity_accepted': 'Reference validated',
+    'coach_validity_pending': 'Reference pending; no independent credit',
+    'coach_validity_stale': 'Reference outdated',
+    'coach_validity_invalid': 'Invalid assessment',
+    'coach_generation_failed':
+        'Generation failed. Your answer was saved; you can retry.',
+    'coach_interview_options': 'Interview settings',
+    'coach_minutes': '{minutes} min',
+    'coach_style_neutral': 'Neutral',
+    'coach_style_supportive': 'Supportive',
+    'coach_style_pressure': 'Challenging',
+    'coach_cleanup_unlearned': 'Remove unlearned knowledge',
+    'coach_cleanup_records': '{answers} answers, {assessments} assessments',
+    'coach_cleanup_keep_knowledge_and_records': 'Keep knowledge and history',
+    'coach_cleanup_remove_knowledge_keep_history':
+        'Remove from training, retain history',
+    'coach_cleanup_remove_knowledge_and_records':
+        'Delete knowledge and learning records',
+    'coach_cleanup_confirm_records':
+        'Confirm deletion of knowledge and learning records',
+    'coach_clear_materials': 'Clear coach materials and training history',
+    'coach_clear_materials_note':
+        'Delete this profile’s goals, resumes, projects, sources, answers, assessments and plans. This cannot be undone; older backups will be rejected. AI settings remain. Exported files and local copies on other devices require separate cleanup.',
+    'coach_clear_done': 'Coach personal materials cleared',
+    'coach_sync_private_materials': 'Sync private coach materials',
+    'coach_sync_private_materials_note':
+        'Off by default. When enabled, JD, resume, project and reference text are uploaded to the selected sync target. Independent of legacy prep sync.',
+    'coach_sync_original_answers': 'Sync original coach answers',
+    'coach_sync_original_answers_note':
+        'Enable private coach materials first. Then original answer text is uploaded.',
+    'coach_sync_conflicts': 'Resolve coach sync conflicts',
+    'coach_sync_conflicts_note':
+        'Compare conflicting plans, templates, assessments or sources. Your choice creates a new revision; the other remains in sync history.',
+    'coach_sync_no_conflicts': 'No conflicts to resolve',
+    'coach_sync_conflict_changed':
+        'Conflict changed. Sync and refresh before choosing.',
+    'coach_sync_plan_conflict': 'Daily plan conflict',
+    'coach_sync_template_conflict': 'Workflow template conflict',
+    'coach_sync_assessment_conflict':
+        'Conflicting assessment (pending, not credited)',
+    'coach_sync_source_conflict': 'Reference source revision conflict',
+    'coach_sync_primary_version': 'Current version',
+    'coach_sync_variant_version': 'Other version',
+    'coach_sync_choose_primary': 'Keep current version',
+    'coach_sync_choose_variant': 'Choose other version',
+    'coach_sync_v2': 'Sync coach materials and progress',
+    'coach_sync_busy':
+        'A reply is being generated. Data sync will retry after the turn.',
+    'coach_sync_v2_note':
+        'Uses your configured transport and text/privacy switches. Automatic sync includes coach data at the same interval and defers imports while a reply is being generated.',
+    'coach_embedding_title': 'Embedding retrieval (optional)',
+    'coach_embedding_note':
+        'Enabling sends queries and relevant source chunks to this service to build an index on demand. Keyword retrieval remains available if disabled or unavailable.',
+    'coach_embedding_enable': 'Enable embedding retrieval',
+    'coach_embedding_endpoint': 'Full embeddings endpoint URL',
+    'coach_embedding_dimension': 'Model vector dimension',
+    'coach_embedding_key': 'API key (blank keeps existing)',
+    'coach_embedding_failed':
+        'Invalid configuration or secure storage failure. Check endpoint, model and dimension.',
+    'coach_report_title': 'Session review',
+    'coach_report_subtitle':
+        'Review what you actually said: answers and basis first, then gaps. Nothing you did not say is written for you.',
+    'coach_report_no_model':
+        'No model connected, so there is no automatic feedback this round. Nothing is invented when no model is available.',
+    'coach_report_answers': 'Your answers ({count})',
+    'coach_report_answers_empty': 'No answer was recorded this round.',
+    'coach_report_basis': 'Question basis for this round',
+    'coach_report_basis_jd_resume': 'Job requirements x resume experience',
+    'coach_report_basis_jd_only':
+        'Job requirements only (not covered by the resume)',
+    'coach_report_basis_resume_only': 'Resume claims only',
+    'coach_report_basis_general': 'No goal - general review pool',
+    'coach_report_gaps': 'Gaps to fill ({count})',
+    'coach_report_gaps_note':
+        'Unasked requirements use the frozen session scope; they are not failures.',
+    'coach_report_gaps_empty':
+        'No target requirements were available to compare against.',
+    'coach_report_gaps_none': 'Questions covered all recorded requirements.',
+    'coach_report_coverage': 'Coverage',
+    'coach_report_covered': 'Asked',
+    'coach_report_uncovered': 'Not asked',
+    'coach_job_search_title': 'Job search',
+    'coach_job_search_subtitle':
+        'Search results are leads only. Before the JD text is read, no acceptance criteria are generated - and nothing decides for you whether it is worth applying.',
+    'coach_job_search_channel': 'Search channel',
+    'coach_job_search_channel_ready': 'Configured - returns real postings',
+    'coach_job_search_channel_missing': 'Not configured',
+    'coach_job_search_channel_missing_note':
+        'No search channel is available yet. Use link import or paste the JD to create a goal; once a channel is configured, real postings appear here.',
+    'coach_job_search_criteria': 'Search criteria',
+    'coach_job_search_keywords': 'Keywords',
+    'coach_job_search_keywords_hint': 'e.g. Java backend',
+    'coach_job_search_region': 'Region',
+    'coach_job_search_salary': 'Salary',
+    'coach_job_search_run': 'Search',
+    'coach_job_search_running': 'Searching...',
+    'coach_job_search_results': 'Results ({count})',
+    'coach_job_search_empty':
+        'No results. Try other keywords, or import by link.',
+    'coach_job_search_truncated': 'The result list was truncated.',
+    'coach_job_search_failed': 'Search failed: {reason}',
+    'coach_job_search_partial_warning':
+        'Only a summary is available - the JD text has not been read, so no acceptance criteria are generated yet.',
+    'coach_job_search_link_only':
+        'This item has no usable link - it is a lead only.',
+    'coach_job_search_add': 'Add as JD',
+    'coach_job_search_added': 'Added "{title}"',
+    'coach_job_search_added_short': 'Added',
+    'coach_job_search_manual': 'Paste a JD instead',
+    'coach_job_search_completeness_full': 'full',
+    'coach_job_search_completeness_partial': 'partial',
+    'coach_job_search_completeness_summary': 'summary',
+    'coach_job_search_completeness_link_only': 'link only',
+    'coach_job_search_completeness_demo': 'demo data',
+    'coach_job_search_demo_note':
+        'Local demo channel: results are synthetic job posts, not real openings. Use it to walk through the flow, not to apply.',
+    'coach_job_search_configure': 'Configure channel',
+    'coach_job_search_settings_title': 'Job search channel',
+    'coach_job_search_settings_subtitle':
+        'Only the keywords and region you type are sent. Your resume, contacts and training records are never sent.',
+    'coach_job_search_settings_save': 'Save',
+    'coach_job_search_settings_saved': 'Saved',
+    'coach_job_search_settings_save_failed':
+        'Save failed: the key could not be written to secure storage',
+    'coach_job_search_mode': 'Channel mode',
+    'coach_job_search_mode_public': 'Zhaopin public search',
+    'coach_job_search_public_note':
+        'Shows the initial public-page summaries. City filtering applies only to this batch and may miss jobs. Open the platform for salary filters and more results. Use link import when network or verification restrictions prevent access.',
+    'coach_job_search_mode_off': 'Off (link import / paste JD only)',
+    'coach_job_search_mode_demo': 'Local demo channel (offline synthetic jobs)',
+    'coach_job_search_mode_demo_note':
+        'No setup required. Results are tagged as demo data so you can walk through the flow.',
+    'coach_job_search_mode_custom': 'Custom search service',
+    'coach_job_search_mode_custom_note':
+        'Point at your own search service to get real postings; coverage depends on that service.',
+    'coach_job_search_endpoint': 'Search service URL',
+    'coach_job_search_endpoint_hint': 'https://your-search.example.com/jobs',
+    'coach_job_search_api_key': 'API key (optional)',
+    'coach_job_search_api_key_hint': 'Leave empty to keep the stored key',
+    'coach_job_search_api_key_saved': 'Key saved (never shown)',
+    'coach_job_search_test': 'Test connection',
+    'coach_job_search_test_ok': 'Connection works',
+    'coach_job_search_test_failed': 'Connection failed; check URL and key',
+    'coach_job_search_privacy_note':
+        'The key is written to OS secure storage only. It is not stored in plain settings and never leaves the device in a sync package.',
+    'coach_resume_review_title': 'Resume check',
+    'coach_resume_review_subtitle':
+        'Compare the resume text with each extracted claim. Unconfirmed claims are used for questions only, never as facts about what you did.',
+    'coach_resume_review_no_resume':
+        'No resume yet. Import one from Goals and materials first.',
+    'coach_resume_review_claims': 'Extracted claims ({count})',
+    'coach_resume_review_claims_empty': 'No claims were extracted.',
+    'coach_resume_review_projects': 'Projects ({count})',
+    'coach_resume_review_projects_empty': 'No projects were recognised.',
+    'coach_resume_review_project_tidy': 'Tidy this project',
+    'coach_resume_review_project_ask': 'Ask about this project',
+    'coach_resume_review_original': 'Resume text',
+    'coach_resume_review_original_span': 'Source: {span}',
+    'coach_resume_review_linked_req': 'Maps to requirement: {title}',
+    'coach_resume_review_claim_reset': 'Back to pending',
+    'coach_arrange_title': 'Training plan',
+    'coach_arrange_subtitle':
+        'Templates are a starting point: cards can be added, removed and reordered. Pinned cards are never overwritten by automatic reordering.',
+    'coach_arrange_entry_note':
+        'Lay out what to practise as cards: add, remove, reorder, set the time budget, and review the diff before applying.',
+    'coach_arrange_open': 'Open training plan',
+    'coach_arrange_templates': 'Template',
+    'coach_arrange_cards': 'Cards ({count})',
+    'coach_arrange_cards_empty':
+        'No cards. Add at least one card to build a plan.',
+    'coach_arrange_card_minutes': '{minutes} min',
+    'coach_arrange_card_questions': '{count} questions',
+    'coach_arrange_card_conditional': 'conditional',
+    'coach_arrange_move_up': 'Move up',
+    'coach_arrange_move_down': 'Move down',
+    'coach_arrange_remove': 'Remove',
+    'coach_arrange_add_card': 'Add a card',
+    'coach_arrange_budget': 'Time budget',
+    'coach_arrange_budget_value': '{minutes} min',
+    'coach_arrange_scope': 'Scope and duration',
+    'coach_arrange_scope_today': 'Today only',
+    'coach_arrange_scope_default': 'Make default',
+    'coach_arrange_preview': 'Preview changes',
+    'coach_arrange_applying': 'Applying...',
+    'coach_arrange_apply': 'Apply',
+    'coach_arrange_applied': 'Applied',
+    'coach_arrange_save_template': 'Save as template',
+    'coach_arrange_template_name_hint': 'Name this arrangement (required)',
+    'coach_arrange_template_saved': 'Template saved. Pick it next time.',
+    'coach_arrange_template_deleted': 'Template deleted',
+    'coach_arrange_template_delete': 'Delete template',
+    'coach_arrange_template_delete_body':
+        'Delete "{name}"? Plans already generated are not affected.',
+    'coach_undo': 'Undo',
+    'coach_plan_undone': 'Restored the plan from before applying',
+    'coach_arrange_diff_title': 'Change preview',
+    'coach_arrange_diff_summary': '{count} cards, about {minutes} min',
+    'coach_arrange_issues': 'Issues to resolve ({count})',
+    'coach_arrange_skipped': 'Cards skipped this round',
+    'coach_arrange_needs_extend':
+        'Not enough time: extend today, or push part of it to tomorrow.',
+    'coach_arrange_extend': 'Extend today',
+    'coach_arrange_defer': 'Defer unstarted cards',
+    'coach_arrange_basis': 'Scope: goal {goal} · resume {resume}',
+    'coach_arrange_no_goal': 'none',
+    'coach_arrange_no_resume': 'none',
+    'coach_workflow_issue_empty_template': 'The template has no cards',
+    'coach_workflow_issue_too_many_cards': 'Too many cards (limit is 6)',
+    'coach_workflow_issue_over_time_budget': 'Exceeds the time budget',
+    'coach_workflow_issue_unknown_goal': 'A referenced goal no longer exists',
+    'coach_workflow_issue_unknown_resume': 'A referenced resume no longer exists',
+    'coach_workflow_issue_unknown_project':
+        'A referenced project no longer exists',
+    'coach_workflow_issue_unknown_knowledge':
+        'A referenced knowledge item no longer exists',
+    'coach_workflow_issue_over_weak_branch': 'Too many reteach branches',
+    'coach_workflow_skip_nothing_due': 'Nothing due today - skipped',
+    'coach_workflow_skip_not_needed': 'Not needed right now - skipped',
+    'coach_workflow_skip_time_short': 'Not enough time - skipped',
+    'coach_workflow_skip_source_deleted': 'Source was deleted - skipped',
+    'coach_workflow_card_source_removed':
+        'The source of this card was deleted - pick the scope again.',
+    'coach_workflow_tpl_daily': 'Daily progress',
+    'coach_workflow_tpl_daily_desc':
+        'Review what is due plus one new knowledge item, within a normal day.',
+    'coach_workflow_tpl_project': 'Project deep dive',
+    'coach_workflow_tpl_project_desc':
+        'Walk through one of your own projects, get questioned on one claim, and reteach the mechanism if needed.',
+    'coach_workflow_tpl_interview': 'Before an interview',
+    'coach_workflow_tpl_interview_desc':
+        'A quick review of key due items, one targeted mock interview, and light follow-up.',
+    'coach_deletion_retained_title': 'Keep knowledge and records',
+    'coach_deletion_retained_hint':
+        'Only the job and its links will be removed. Knowledge cleanup, trash and permanent erasure are not available yet.',
+    'coach_storage_failed':
+        'Coach storage could not be opened. Writes are disabled. Check disk space or permissions and restart. Existing data has not been replaced.',
+    'coach_storage_web_unavailable':
+        'This browser did not provide safe persistent storage. Allow site storage and retry, or use the desktop app.',
+    'coach_deletion_failed': 'Deletion failed and was rolled back. Please retry.',
+    'coach_arrange_today_only':
+        'Changes apply to today only. Saving custom defaults is not available yet.',
+    'coach_deletion_title': 'Delete goal',
+    'coach_deletion_subtitle':
+        'See the impact first: by default only this JD is deleted, linked knowledge is kept, and anything you have learned needs your explicit decision.',
+    'coach_deletion_goals': 'Goals to delete ({count})',
+    'coach_deletion_nothing': 'Nothing to delete.',
+    'coach_deletion_unknown': 'Not found in this profile - will not be deleted',
+    'coach_deletion_impact': 'Affected plans and sessions',
+    'coach_deletion_affected_plan': '{count} pending plan items are affected',
+    'coach_deletion_affected_sessions': '{count} paused sessions are affected',
+    'coach_deletion_kept_referenced':
+        'Still referenced by other goals - kept ({count})',
+    'coach_deletion_kept_referenced_hint':
+        'Other goals still use these items, so they are not cleaned up by this deletion.',
+    'coach_deletion_protected': 'Protected by other uses - kept ({count})',
+    'coach_deletion_cleanup_candidates':
+        'Unreferenced, not-yet-learned items ({count})',
+    'coach_deletion_cleanup_hint':
+        'Unchecked by default. Checked items leave retrieval and training.',
+    'coach_deletion_learned': 'Learned items needing your decision ({count})',
+    'coach_deletion_learned_hint':
+        'Learned content is never deleted automatically - choose per item.',
+    'coach_deletion_learned_records':
+        '{answers} answers · {assessments} accepted assessments',
+    'coach_deletion_action_keep': 'Keep: stays in your own review',
+    'coach_deletion_action_remove_keep_history':
+        'Remove from training, keep history (read-only)',
+    'coach_deletion_action_remove_all':
+        'Remove from training and delete its records',
+    'coach_deletion_confirm': 'Delete',
+    'coach_deletion_committing': 'Working...',
+    'coach_deletion_cancel': 'Cancel',
+    'coach_deletion_done':
+        'Deleted {goals} goal(s); removed {removed} knowledge item(s), kept {kept}',
+    'coach_deletion_conflict':
+        'This preview expired: new references or learning records appeared. The scope was refreshed - please confirm again.',
+    'coach_deletion_scope_error':
+        'The selection exceeded what this deletion allows; the commit was rejected.',
+    'coach_deletion_kept_badge': 'kept',
+    'coach_deletion_note_history_snapshots':
+        'Historical JD snapshots and past Q&A are retained as independent dependencies.',
+    'coach_deletion_note_offline_backup':
+        'Backups already exported off-device cannot be removed remotely from the app.',
+    'coach_deletion_note_trash_retention':
+        'Moving to trash is not the same as permanent deletion.',
+    'coach_deletion_note_planned_tasks_affected':
+        'Pending planned tasks are affected.',
+    'coach_deletion_note_paused_sessions_affected':
+        'Paused sessions are affected.',
   };

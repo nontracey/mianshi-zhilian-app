@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **面试智练 (MianShi ZhiLian)** — a local-first technical interview active-recall learning workbench. Users learn structured knowledge routes, practice active recall, get AI evaluation, and track mastery. Supports Flutter Web, Android, macOS, Windows clients plus a Cloudflare Workers API.
 
+## Coach Migration Status
+
+The default route now opens the three coach entry points. This is still an incomplete V1; see [implementation audit](docs/coach-implementation-audit.md) and the acceptance matrix before marking capabilities shipped. Native and Web coach stores share the Drift/SQLite schema. Web refuses non-durable or unsafe storage fallbacks; real browser persistence still needs acceptance. Settings and legacy archives retain their existing storage paths.
+
+New coach tests use neutral synthetic JD/resume/evidence data under `flutter test`. Do not derive evidence or IDs from legacy topic whitelists. Startup and CI no longer depend on the external content repository. Preserve legacy archives and migration recovery paths until the complete upgrade flow is verified. Real service tests are explicitly enabled; skipped tests are not acceptance evidence.
+
 ## Repository Structure
 
 ```

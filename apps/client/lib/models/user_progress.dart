@@ -477,6 +477,9 @@ class SyncSettings {
   final bool syncFullPracticeText;
   final bool syncPrivatePrepData;
   final bool syncAiConfigMetadata;
+  /// Coach V2 consent is independent of legacy prep/practice switches.
+  final bool syncCoachPrivateMaterials;
+  final bool syncCoachOriginalAnswers;
   final DateTime? lastSyncAt;
   final String lastSyncStatus;
 
@@ -500,6 +503,8 @@ class SyncSettings {
     this.syncFullPracticeText = false,
     this.syncPrivatePrepData = true,
     this.syncAiConfigMetadata = false,
+    this.syncCoachPrivateMaterials = false,
+    this.syncCoachOriginalAnswers = false,
     this.lastSyncAt,
     this.lastSyncStatus = 'local_mode',
   });
@@ -527,6 +532,8 @@ class SyncSettings {
     syncFullPracticeText: json['syncFullPracticeText'] as bool? ?? false,
     syncPrivatePrepData: json['syncPrivatePrepData'] as bool? ?? true,
     syncAiConfigMetadata: json['syncAiConfigMetadata'] as bool? ?? false,
+    syncCoachPrivateMaterials: json['syncCoachPrivateMaterials'] as bool? ?? false,
+    syncCoachOriginalAnswers: json['syncCoachOriginalAnswers'] as bool? ?? false,
     lastSyncAt: json['lastSyncAt'] != null
         ? DateTime.parse(json['lastSyncAt'] as String)
         : null,
@@ -553,6 +560,8 @@ class SyncSettings {
     'syncFullPracticeText': syncFullPracticeText,
     'syncPrivatePrepData': syncPrivatePrepData,
     'syncAiConfigMetadata': syncAiConfigMetadata,
+    'syncCoachPrivateMaterials': syncCoachPrivateMaterials,
+    'syncCoachOriginalAnswers': syncCoachOriginalAnswers,
     'lastSyncAt': lastSyncAt?.toIso8601String(),
     'lastSyncStatus': lastSyncStatus,
   };
@@ -585,6 +594,8 @@ class SyncSettings {
     bool? syncFullPracticeText,
     bool? syncPrivatePrepData,
     bool? syncAiConfigMetadata,
+    bool? syncCoachPrivateMaterials,
+    bool? syncCoachOriginalAnswers,
     DateTime? lastSyncAt,
     String? lastSyncStatus,
   }) => SyncSettings(
@@ -608,6 +619,8 @@ class SyncSettings {
     syncFullPracticeText: syncFullPracticeText ?? this.syncFullPracticeText,
     syncPrivatePrepData: syncPrivatePrepData ?? this.syncPrivatePrepData,
     syncAiConfigMetadata: syncAiConfigMetadata ?? this.syncAiConfigMetadata,
+    syncCoachPrivateMaterials: syncCoachPrivateMaterials ?? this.syncCoachPrivateMaterials,
+    syncCoachOriginalAnswers: syncCoachOriginalAnswers ?? this.syncCoachOriginalAnswers,
     lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     lastSyncStatus: lastSyncStatus ?? this.lastSyncStatus,
   );

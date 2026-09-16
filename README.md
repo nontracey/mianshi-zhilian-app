@@ -16,6 +16,8 @@
 | 隐私政策 | [docs/privacy-policy.md](./docs/privacy-policy.md) |
 | 支持项目 | [docs/sponsor.md](./docs/sponsor.md) |
 
+> Agent 教练已接入默认三入口，完整 V1 仍在开发和验收中。实际落地范围与待完成项见 [改造落地审计](docs/coach-implementation-audit.md)。
+
 ## 界面预览
 
 | 学习中心 | 知识目录 | 复述练习 | 掌握度 |

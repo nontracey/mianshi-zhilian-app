@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,8 @@ import 'package:mianshi_zhilian/models/ai_config.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   group('save / load round-trip', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({});

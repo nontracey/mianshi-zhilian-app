@@ -34,7 +34,10 @@ class SettingsProvider extends ChangeNotifier {
     _settings = await _storage.loadSettings();
     _settings = _applyPlatformDefaults(_settings);
 
-    await WhisperMigrationHelper.migrateIfNeeded(_storage, source: 'SettingsProvider');
+    await WhisperMigrationHelper.migrateIfNeeded(
+      _storage,
+      source: 'SettingsProvider',
+    );
 
     _isLoading = false;
     notifyListeners();
@@ -153,6 +156,21 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setCustomProdContentUrl(String? url) async {
     _settings = _settings.copyWith(
       customProdContentUrl: (url != null && url.isEmpty) ? null : url,
+    );
+    await _storage.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// 保存岗位搜索通道（§6.7）。密钥不经过这里——由调用方先写入安全存储。
+  Future<void> setJobSearchConfig({
+    required String mode,
+    String? endpoint,
+  }) async {
+    _settings = _settings.copyWith(
+      jobSearchMode: mode,
+      jobSearchEndpoint: (endpoint == null || endpoint.isEmpty)
+          ? null
+          : endpoint,
     );
     await _storage.saveSettings(_settings);
     notifyListeners();

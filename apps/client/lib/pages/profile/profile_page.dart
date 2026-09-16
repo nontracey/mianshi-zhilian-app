@@ -18,7 +18,6 @@ import 'package:mianshi_zhilian/pages/profile/sync_backup_page.dart';
 import 'package:mianshi_zhilian/pages/profile/ai_voice_settings_page.dart';
 import 'package:mianshi_zhilian/pages/profile/learning_preferences_page.dart';
 import 'package:mianshi_zhilian/pages/profile/appearance_language_page.dart';
-import 'package:mianshi_zhilian/pages/profile/content_source_page.dart';
 import 'package:mianshi_zhilian/pages/profile/route_preference_page.dart';
 import 'package:mianshi_zhilian/pages/profile/about_update_page.dart';
 import 'package:mianshi_zhilian/services/app_permission_service.dart';
@@ -62,17 +61,17 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!kIsWeb) {
       try {
         final tempDir = await getTemporaryDirectory();
-        final voiceFiles = tempDir
-            .listSync()
-            .whereType<File>()
-            .where((f) {
-              final name = f.path.split(Platform.pathSeparator).last;
-              return (name.startsWith('voice_') || name.startsWith('voice_diag_')) &&
-                  name.endsWith('.wav');
-            })
-            .toList();
+        final voiceFiles = tempDir.listSync().whereType<File>().where((f) {
+          final name = f.path.split(Platform.pathSeparator).last;
+          return (name.startsWith('voice_') ||
+                  name.startsWith('voice_diag_')) &&
+              name.endsWith('.wav');
+        }).toList();
         for (final f in voiceFiles) {
-          try { f.deleteSync(); recordingCount++; } catch (_) {}
+          try {
+            f.deleteSync();
+            recordingCount++;
+          } catch (_) {}
         }
       } catch (_) {}
     }
@@ -118,6 +117,18 @@ class _ProfilePageState extends State<ProfilePage> {
         _ProfileSectionGrid(
           items: [
             _ProfileSectionItem(
+              icon: Icons.history,
+              title: l10n.get('coach_legacy_title'),
+              subtitle: l10n.get('coach_legacy_note'),
+              onTap: () => context.push('/profile/legacy'),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.manage_search_outlined,
+              title: l10n.get('coach_embedding_title'),
+              subtitle: l10n.get('coach_embedding_note'),
+              onTap: () => context.push('/profile/embedding'),
+            ),
+            _ProfileSectionItem(
               icon: Icons.cloud_sync_outlined,
               title: l10n.get('sync_and_backup'),
               subtitle: l10n.getp('profile_sync_summary', {
@@ -150,6 +161,18 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             _ProfileSectionItem(
+              icon: Icons.school_outlined,
+              title: l10n.get('coach_entry_title'),
+              subtitle: l10n.get('coach_entry_subtitle'),
+              onTap: () => context.push('/coach'),
+            ),
+            _ProfileSectionItem(
+              icon: Icons.extension_outlined,
+              title: l10n.get('mcp_settings_title'),
+              subtitle: l10n.get('mcp_settings_entry_subtitle'),
+              onTap: () => context.push('/profile/mcp-services'),
+            ),
+            _ProfileSectionItem(
               icon: Icons.palette_outlined,
               title: l10n.get('appearance_language'),
               subtitle: l10n.getp('appearance_language_desc', {
@@ -158,15 +181,6 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => context.push(
                 '/profile/appearance-language',
                 extra: const AppearanceLanguagePage(),
-              ),
-            ),
-            _ProfileSectionItem(
-              icon: Icons.source_outlined,
-              title: l10n.get('content_source'),
-              subtitle: l10n.get(settings.contentEnv.labelKey),
-              onTap: () => context.push(
-                '/profile/content-source',
-                extra: const ContentSourcePage(),
               ),
             ),
             _ProfileSectionItem(
@@ -698,9 +712,9 @@ class _AccountPanel extends StatelessWidget {
       if (image != null) {
         final bytes = await image.readAsBytes();
         final b64 = base64Encode(bytes);
-        onProfileChanged(profile.copyWith(
-          avatarUrl: 'data:image/jpeg;base64,$b64',
-        ));
+        onProfileChanged(
+          profile.copyWith(avatarUrl: 'data:image/jpeg;base64,$b64'),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -729,9 +743,9 @@ class _AccountPanel extends StatelessWidget {
       if (image != null) {
         final bytes = await image.readAsBytes();
         final b64 = base64Encode(bytes);
-        onProfileChanged(profile.copyWith(
-          avatarUrl: 'data:image/jpeg;base64,$b64',
-        ));
+        onProfileChanged(
+          profile.copyWith(avatarUrl: 'data:image/jpeg;base64,$b64'),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -883,8 +897,7 @@ class _AccountPanel extends StatelessWidget {
                     backgroundColor: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.1),
-                    backgroundImage:
-                        _resolveAvatarImage(profile.avatarUrl),
+                    backgroundImage: _resolveAvatarImage(profile.avatarUrl),
                     child:
                         profile.avatarUrl == null || profile.avatarUrl!.isEmpty
                         ? Text(
@@ -1026,4 +1039,3 @@ class _MiniStat extends StatelessWidget {
     );
   }
 }
-

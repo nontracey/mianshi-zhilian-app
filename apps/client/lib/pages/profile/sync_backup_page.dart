@@ -8,9 +8,15 @@ import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/app_settings.dart';
 import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/ai_provider.dart';
+import 'package:mianshi_zhilian/providers/coach_provider.dart';
+import 'package:mianshi_zhilian/pages/coach/sync_conflicts_page.dart';
+import 'package:mianshi_zhilian/services/data_sync_service.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
 import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/providers/web_download/web_download_stub.dart'
+    if (dart.library.html) 'package:mianshi_zhilian/providers/web_download/web_download_web.dart'
+    as web_download;
 import 'package:mianshi_zhilian/services/analytics_service.dart';
 import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/utils/platform_file_reader.dart';
@@ -40,8 +46,84 @@ class SyncBackupPage extends StatelessWidget {
           onImport: () => _importFile(context),
           onClearPracticeData: () => _clearPracticeData(context),
         ),
+        CoachBackupPanel(
+          onExport: () => _exportCoachData(context),
+          onImport: () => _importCoachData(context),
+        ),
+        ListTile(
+          leading: const Icon(Icons.sync),
+          title: Text(l10n.get('coach_sync_v2')),
+          subtitle: Text(l10n.get('coach_sync_v2_note')),
+          onTap: () async {
+            final coach = context.read<CoachProvider>();
+            if (coach.isGenerating) return;
+            final result = await context.read<DataSyncService>().syncCoach(
+              coach.store,
+            );
+            await coach.reload();
+            if (context.mounted)
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(l10n.get(result.l10nKey))));
+          },
+        ),
+        ListTile(leading:const Icon(Icons.compare_arrows),title:Text(l10n.get('coach_sync_conflicts')),
+          subtitle:Text(l10n.get('coach_sync_conflicts_note')),
+          onTap:()=>Navigator.of(context).push(MaterialPageRoute<void>(
+            builder:(_)=>const CoachSyncConflictsPage()))),
+        Card(child:Column(children:[
+          CheckboxListTile(
+            title:Text(l10n.get('coach_sync_private_materials')),
+            subtitle:Text(l10n.get('coach_sync_private_materials_note')),
+            value:progressProvider.syncSettings.syncCoachPrivateMaterials,
+            onChanged:(value)=>progressProvider.updateSyncSettings(
+              progressProvider.syncSettings.copyWith(syncCoachPrivateMaterials:value??false,
+                syncCoachOriginalAnswers:value==true?null:false)),
+          ),
+          CheckboxListTile(
+            title:Text(l10n.get('coach_sync_original_answers')),
+            subtitle:Text(l10n.get('coach_sync_original_answers_note')),
+            value:progressProvider.syncSettings.syncCoachOriginalAnswers,
+            onChanged:progressProvider.syncSettings.syncCoachPrivateMaterials
+              ? (value)=>progressProvider.updateSyncSettings(
+                  progressProvider.syncSettings.copyWith(syncCoachOriginalAnswers:value??false))
+              : null,
+          ),
+        ])),
+        ListTile(
+          leading: const Icon(Icons.delete_forever_outlined),
+          title: Text(l10n.get('coach_clear_materials')),
+          onTap: () => _clearCoachMaterials(context),
+        ),
       ],
     );
+  }
+
+  Future<void> _clearCoachMaterials(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.get('coach_clear_materials')),
+        content: Text(l10n.get('coach_clear_materials_note')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.get('clear')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await context.read<CoachProvider>().clearPersonalMaterials();
+    if (context.mounted)
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.get('coach_clear_done'))));
   }
 
   Future<void> _clearPracticeData(BuildContext context) async {
@@ -156,6 +238,98 @@ class SyncBackupPage extends StatelessWidget {
         backgroundColor: result.success ? AppColors.success : AppColors.danger,
       ),
     );
+  }
+
+  Future<void> _exportCoachData(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final coach = context.read<CoachProvider>();
+      final jsonStr = await coach.exportCoachBackupJson();
+      final fileName =
+          'coach-backup-${DateTime.now().millisecondsSinceEpoch}.json';
+      if (kIsWeb) {
+        web_download.downloadFile(fileName, jsonStr);
+      } else {
+        final path = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.get('coach_backup_export'),
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: Uint8List.fromList(utf8.encode(jsonStr)),
+        );
+        if (path == null) return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.get('coach_backup_export_done')),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.getp('import_failed', {'error': '$e'})),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _importCoachData(BuildContext context) async {
+    final l10n = context.read<LocalizationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.single;
+      final bytes =
+          file.bytes ??
+          (file.path == null ? null : await readBytesFromPath(file.path!));
+      if (bytes == null) {
+        throw StateError('selected file has no readable bytes');
+      }
+      if (!context.mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.get('coach_backup_import_confirm_title')),
+          content: Text(l10n.get('coach_backup_import_confirm_body')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.get('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.get('confirm')),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      final coach = context.read<CoachProvider>();
+      final restored = await coach.importCoachBackupJson(utf8.decode(bytes));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.getp('coach_backup_import_done', {'count': restored}),
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.getp('import_failed', {'error': '$e'})),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
   }
 
   Future<void> _importFile(BuildContext context) async {
@@ -285,6 +459,56 @@ class BindingButton extends StatelessWidget {
   }
 }
 
+/// 教练库（目标 / 简历 / 会话 / 原答 / 计划）独立备份面板。
+///
+/// 与旧版数据导出分开：教练库在 Drift/SQLite，导出格式与旧版
+/// SharedPreferences 包不同，混在一个文件里会在恢复时产生歧义。
+class CoachBackupPanel extends StatelessWidget {
+  const CoachBackupPanel({required this.onExport, required this.onImport});
+
+  final VoidCallback onExport;
+  final VoidCallback onImport;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocalizationProvider>();
+    final coach = context.watch<CoachProvider>();
+    return WorkPanel(
+      title: l10n.get('coach_backup_title'),
+      children: [
+        Text(
+          l10n.get('coach_backup_desc'),
+          style: const TextStyle(fontSize: 12, height: 1.5),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.download_outlined, size: 16),
+                label: Text(l10n.get('coach_backup_export')),
+                onPressed: coach.loaded && !coach.isGenerating
+                    ? onExport
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.upload_outlined, size: 16),
+                label: Text(l10n.get('coach_backup_import')),
+                onPressed: coach.loaded && !coach.isGenerating
+                    ? onImport
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class DataManagementPanel extends StatelessWidget {
   const DataManagementPanel({
     required this.settings,
@@ -388,7 +612,11 @@ class DataManagementPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.info_outline, size: 14, color: Theme.of(context).hintColor),
+              Icon(
+                Icons.info_outline,
+                size: 14,
+                color: Theme.of(context).hintColor,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(

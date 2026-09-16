@@ -7,16 +7,34 @@ import 'package:http/http.dart' as http;
 import '../models/user_progress.dart';
 import 'app_log_service.dart';
 import 'storage_service.dart';
+import '../coach/persistence/coach_store.dart';
+import '../coach/persistence/coach_backup.dart';
+import '../coach/persistence/coach_sync.dart';
 
 class DataSyncService {
-  DataSyncService(this._storage);
+  DataSyncService(this._storage, {this.fileName = 'sync-state.json'});
+  final String fileName;
 
   final StorageService _storage;
   Timer? _timer;
   bool _running = false;
   Future<void> Function()? onDataImported;
+  CoachStore? _coachStore;
+  bool Function()? _canImportCoach;
+  Future<void> Function()? _onCoachImported;
+  DateTime? _lastCoachSyncAttempt;
+  bool _automaticCycleRunning = false;
 
-  static const _fileName = 'sync-state.json';
+  void attachCoach(
+    CoachStore store, {
+    required bool Function() canImport,
+    required Future<void> Function() onImported,
+  }) {
+    _coachStore = store;
+    _canImportCoach = canImport;
+    _onCoachImported = onImported;
+  }
+
   static const _timeout = Duration(seconds: 30);
   static const _uploadTimeout = Duration(seconds: 120);
 
@@ -25,6 +43,69 @@ class DataSyncService {
   // True when the last GET returned 404 (remote file absent): the next PUT sends
   // If-None-Match:* so two devices creating the file simultaneously don't overwrite.
   bool _webDavRemoteAbsent = false;
+
+  /// Explicit V2 sync uses a separate remote file and the existing user-selected
+  /// transport. Credentials remain in StorageService, outside coach snapshots.
+  Future<SyncResult> syncCoach(CoachStore store) async {
+    if (_running) return SyncResult.failure('sync_already_running');
+    if (_canImportCoach?.call() == false)
+      return SyncResult.failure('coach_sync_busy');
+    final settings = await _storage.loadSyncSettings();
+    final transport = DataSyncService(
+      _storage,
+      fileName: 'coach-state-v2.json',
+    );
+    final channel = transport._channelFor(
+      settings.copyWith(
+        githubPath: '${settings.githubPath}.coach-v2.json',
+        giteePath: '${settings.giteePath}.coach-v2.json',
+      ),
+    );
+    if (channel == null) return SyncResult.success('local_mode');
+    _running = true;
+    try {
+      Map<String, Object?>? incoming = await channel.download();
+      var combined = await mergeCoachBackups(
+        await exportCoachBackup(store),
+        incoming,
+      );
+      Map<String, dynamic> outgoing() => Map<String, dynamic>.from(
+        redactCoachBackup(
+          combined,
+          fullText: settings.syncCoachOriginalAnswers,
+          privateMaterials: settings.syncCoachPrivateMaterials,
+          configMetadata: settings.syncAiConfigMetadata,
+        ),
+      );
+      try {
+        await channel.upload(outgoing());
+      } on SyncConflictException {
+        incoming = await channel.download();
+        combined = await mergeCoachBackups(combined, incoming);
+        await channel.upload(outgoing());
+      }
+      if (_canImportCoach?.call() == false)
+        return SyncResult.failure('coach_sync_busy');
+      var imported = false;
+      await store.transaction(() async {
+        if (_canImportCoach?.call() == false) return;
+        final latest = await mergeCoachBackups(
+          await exportCoachBackup(store),
+          combined,
+        );
+        if (_canImportCoach?.call() == false) return;
+        await restoreCoachBackup(store, latest);
+        imported = true;
+      });
+      if (!imported) return SyncResult.failure('coach_sync_busy');
+      await _onCoachImported?.call();
+      return SyncResult.success('sync_success');
+    } catch (_) {
+      return SyncResult.failure('sync_failed');
+    } finally {
+      _running = false;
+    }
+  }
 
   void start() {
     _timer?.cancel();
@@ -40,6 +121,33 @@ class DataSyncService {
   }
 
   Future<SyncResult> syncIfNeeded({bool force = false}) async {
+    if (_automaticCycleRunning)
+      return SyncResult.failure('sync_already_running');
+    _automaticCycleRunning = true;
+    try {
+      final settings = await _storage.loadSyncSettings();
+      if (!_shouldAutoSync(settings, force: force))
+        return SyncResult.success('local_mode');
+      final legacy = await _syncLegacyIfNeeded(force: force);
+      final store = _coachStore;
+      final now = DateTime.now();
+      final due =
+          _lastCoachSyncAttempt == null ||
+          now.difference(_lastCoachSyncAttempt!) >=
+              Duration(
+                minutes: settings.autoSyncIntervalMinutes.clamp(1, 1440),
+              );
+      if (store == null || (!force && !due) || _canImportCoach?.call() == false)
+        return legacy;
+      _lastCoachSyncAttempt = now;
+      final coach = await syncCoach(store);
+      return legacy.success ? coach : legacy;
+    } finally {
+      _automaticCycleRunning = false;
+    }
+  }
+
+  Future<SyncResult> _syncLegacyIfNeeded({bool force = false}) async {
     final settings = await _storage.loadSyncSettings();
     if (!_shouldAutoSync(settings, force: force)) {
       return SyncResult.success('local_mode');
@@ -298,7 +406,7 @@ class DataSyncService {
   Future<Map<String, dynamic>?> _downloadWebDav(SyncSettings settings) async {
     _require(settings.webDavUrl.isNotEmpty, '缺少 WebDAV 地址');
     final base = _normalizeUrl(settings.webDavUrl);
-    final uri = Uri.parse('$base/$_fileName');
+    final uri = Uri.parse('$base/$fileName');
     final response = await _webDavRequest('GET', uri, settings);
     if (response.statusCode == 404) {
       _webDavEtag = null;
@@ -319,7 +427,7 @@ class DataSyncService {
     _require(settings.webDavUsername.isNotEmpty, '缺少 WebDAV 用户名');
     _require(settings.webDavPassword.isNotEmpty, '缺少 WebDAV 应用密码');
     final base = _normalizeUrl(settings.webDavUrl);
-    final uri = Uri.parse('$base/$_fileName');
+    final uri = Uri.parse('$base/$fileName');
     final etag = _webDavEtag;
     // 优先 If-Match（已知 ETag）；远端确认不存在时用 If-None-Match:* 防止
     // 两设备首次同步互相覆盖；状态未知时不带前置条件（保持兼容）。
@@ -371,6 +479,7 @@ class DataSyncService {
     Map<String, String>? headers,
   }) async {
     final request = http.Request(method, uri)
+      ..followRedirects = false
       ..headers['Authorization'] =
           'Basic ${base64Encode(utf8.encode('${settings.webDavUsername}:${settings.webDavPassword}'))}';
     if (headers != null) {
@@ -383,7 +492,19 @@ class DataSyncService {
     final client = http.Client();
     try {
       final streamed = await client.send(request).timeout(_timeout);
-      return http.Response.fromStream(streamed);
+      final bytes = await streamed.stream
+          .fold<List<int>>(<int>[], (data, chunk) {
+            if (data.length + chunk.length > 32 * 1024 * 1024)
+              throw const FormatException('Sync response is too large');
+            data.addAll(chunk);
+            return data;
+          })
+          .timeout(_timeout);
+      return http.Response.bytes(
+        bytes,
+        streamed.statusCode,
+        headers: streamed.headers,
+      );
     } finally {
       client.close();
     }

@@ -8,6 +8,7 @@ import 'package:mianshi_zhilian/providers/theme_provider.dart';
 import 'package:mianshi_zhilian/services/data_sync_service.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../helpers/secure_storage_mock.dart';
 
 class _MockDataSync extends DataSyncService {
   _MockDataSync() : super(StorageService());
@@ -27,6 +28,8 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
+      // 旧 whisper 配置迁移会把 key 写入系统安全存储；测试环境需要内存实现。
+      installFakeSecureStorage();
       storage = StorageService();
       dataSync = _MockDataSync();
       themeProvider = ThemeProvider();
@@ -44,34 +47,39 @@ void main() {
       expect(provider.isLoading, false);
     });
 
-    test('loadSettings with empty storage loads defaults and notifies', () async {
-      int notifyCount = 0;
-      provider.addListener(() => notifyCount++);
+    test(
+      'loadSettings with empty storage loads defaults and notifies',
+      () async {
+        int notifyCount = 0;
+        provider.addListener(() => notifyCount++);
 
-      await provider.loadSettings();
+        await provider.loadSettings();
 
-      expect(provider.settings.themeType, AppThemeType.system);
-      expect(provider.isLoading, false);
-      expect(notifyCount, 2);
-    });
+        expect(provider.settings.themeType, AppThemeType.system);
+        expect(provider.isLoading, false);
+        expect(notifyCount, 2);
+      },
+    );
 
-    test('loadSettings triggers whisper migration when old data exists',
-        () async {
-      SharedPreferences.setMockInitialValues({
-        'settings': '''
+    test(
+      'loadSettings triggers whisper migration when old data exists',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'settings': '''
 {"sttMode":"auto","whisperBaseUrl":"https://old-whisper.example.com","whisperApiKey":"old-key","whisperModel":"whisper-1"}
 ''',
-      });
-      storage = StorageService();
-      provider = SettingsProvider(storage, dataSync, themeProvider);
+        });
+        storage = StorageService();
+        provider = SettingsProvider(storage, dataSync, themeProvider);
 
-      await provider.loadSettings();
+        await provider.loadSettings();
 
-      final aiConfigs = await storage.loadAiConfigs();
-      expect(aiConfigs, hasLength(1));
-      expect(aiConfigs[0].baseUrl, 'https://old-whisper.example.com');
-      expect(aiConfigs[0].audioMode, AiAudioMode.transcriptionEndpoint);
-    });
+        final aiConfigs = await storage.loadAiConfigs();
+        expect(aiConfigs, hasLength(1));
+        expect(aiConfigs[0].baseUrl, 'https://old-whisper.example.com');
+        expect(aiConfigs[0].audioMode, AiAudioMode.transcriptionEndpoint);
+      },
+    );
 
     test('loadSettings converts whisper sttMode to auto', () async {
       SharedPreferences.setMockInitialValues({
@@ -146,34 +154,38 @@ void main() {
       expect(notifyCount, 1);
     });
 
-    test('setLanguage updates settings and calls themeProvider.updateLanguage',
-        () async {
-      int notifyCount = 0;
-      provider.addListener(() => notifyCount++);
-      int themeNotifyCount = 0;
-      themeProvider.addListener(() => themeNotifyCount++);
+    test(
+      'setLanguage updates settings and calls themeProvider.updateLanguage',
+      () async {
+        int notifyCount = 0;
+        provider.addListener(() => notifyCount++);
+        int themeNotifyCount = 0;
+        themeProvider.addListener(() => themeNotifyCount++);
 
-      await provider.setLanguage('en');
+        await provider.setLanguage('en');
 
-      expect(provider.settings.language, 'en');
-      expect(themeProvider.language, 'en');
-      expect(notifyCount, 1);
-      expect(themeNotifyCount, 1);
-    });
+        expect(provider.settings.language, 'en');
+        expect(themeProvider.language, 'en');
+        expect(notifyCount, 1);
+        expect(themeNotifyCount, 1);
+      },
+    );
 
-    test('setRecommendStrategy updates settings without themeProvider call',
-        () async {
-      int notifyCount = 0;
-      provider.addListener(() => notifyCount++);
-      int themeNotifyCount = 0;
-      themeProvider.addListener(() => themeNotifyCount++);
+    test(
+      'setRecommendStrategy updates settings without themeProvider call',
+      () async {
+        int notifyCount = 0;
+        provider.addListener(() => notifyCount++);
+        int themeNotifyCount = 0;
+        themeProvider.addListener(() => themeNotifyCount++);
 
-      await provider.setRecommendStrategy('smart');
+        await provider.setRecommendStrategy('smart');
 
-      expect(provider.settings.recommendStrategy, 'smart');
-      expect(notifyCount, 1);
-      expect(themeNotifyCount, 0);
-    });
+        expect(provider.settings.recommendStrategy, 'smart');
+        expect(notifyCount, 1);
+        expect(themeNotifyCount, 0);
+      },
+    );
 
     test('setCurrentDomain updates settings and notifies', () async {
       await provider.setCurrentDomain('go');
@@ -189,8 +201,10 @@ void main() {
 
     test('setCustomGithubMirror sets and clears value', () async {
       await provider.setCustomGithubMirror('https://mirror.example.com');
-      expect(provider.settings.customGithubMirror,
-          'https://mirror.example.com');
+      expect(
+        provider.settings.customGithubMirror,
+        'https://mirror.example.com',
+      );
 
       await provider.setCustomGithubMirror('');
       expect(provider.settings.customGithubMirror, null);
@@ -234,44 +248,52 @@ void main() {
       expect(themeProvider.cardDensity, 'compact');
     });
 
-    test('syncData delegates to DataSyncService.syncNow for automatic methods',
-        () async {
-      dataSync.lastResult = SyncResult.success('sync_merged_success');
+    test(
+      'syncData delegates to DataSyncService.syncNow for automatic methods',
+      () async {
+        dataSync.lastResult = SyncResult.success('sync_merged_success');
 
-      final result = await provider.syncData(const SyncSettings(
-        method: 'webdav',
-        webDavUrl: 'https://dav.example.com',
-        webDavUsername: 'user',
-        webDavPassword: 'pass',
-      ));
+        final result = await provider.syncData(
+          const SyncSettings(
+            method: 'webdav',
+            webDavUrl: 'https://dav.example.com',
+            webDavUsername: 'user',
+            webDavPassword: 'pass',
+          ),
+        );
 
-      expect(result, 'sync_merged_success');
-    });
+        expect(result, 'sync_merged_success');
+      },
+    );
 
     test('syncData returns local_mode_data_saved for local method', () async {
-      final result = await provider.syncData(const SyncSettings(
-        method: 'local',
-      ));
+      final result = await provider.syncData(
+        const SyncSettings(method: 'local'),
+      );
 
       expect(result, 'local_mode_data_saved');
     });
 
-    test('syncData returns third_party_sync_coming_soon for baidu method',
-        () async {
-      final result = await provider.syncData(const SyncSettings(
-        method: 'baidu',
-      ));
+    test(
+      'syncData returns third_party_sync_coming_soon for baidu method',
+      () async {
+        final result = await provider.syncData(
+          const SyncSettings(method: 'baidu'),
+        );
 
-      expect(result, 'third_party_sync_coming_soon');
-    });
+        expect(result, 'third_party_sync_coming_soon');
+      },
+    );
 
-    test('syncData returns cloud_sync_unavailable for unknown method',
-        () async {
-      final result = await provider.syncData(const SyncSettings(
-        method: 'unknown',
-      ));
+    test(
+      'syncData returns cloud_sync_unavailable for unknown method',
+      () async {
+        final result = await provider.syncData(
+          const SyncSettings(method: 'unknown'),
+        );
 
-      expect(result, 'cloud_sync_unavailable');
-    });
+        expect(result, 'cloud_sync_unavailable');
+      },
+    );
   });
 }

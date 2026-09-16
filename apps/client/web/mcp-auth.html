@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Authorization callback</title></head>
+<body><p>授权已返回。请回到应用。 / Return to the app to complete authorization.</p>
+<script>
+const message = {'flutter-web-auth-2': location.href};
+if (window.opener) { window.opener.postMessage(message, location.origin); window.close(); }
+else if (window.parent !== window) { window.parent.postMessage(message, location.origin); }
+else { localStorage.setItem('flutter-web-auth-2', location.href); window.close(); }
+history.replaceState(null, '', location.pathname);
+</script></body></html>

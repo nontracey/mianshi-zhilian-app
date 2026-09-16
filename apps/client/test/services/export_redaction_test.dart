@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,8 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 /// - 导入：脱敏占位符不覆盖本地真实凭据（round-trip 不损坏）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -19,12 +22,14 @@ void main() {
 
   test('exportAllData 脱敏 WebDAV 密码与 GitHub/Gitee token', () async {
     final storage = StorageService();
-    await storage.saveSyncSettings(const SyncSettings(
-      method: 'github',
-      webDavPassword: 'wd_secret',
-      githubToken: 'ghp_secret_token',
-      giteeToken: 'gitee_secret_token',
-    ));
+    await storage.saveSyncSettings(
+      const SyncSettings(
+        method: 'github',
+        webDavPassword: 'wd_secret',
+        githubToken: 'ghp_secret_token',
+        giteeToken: 'gitee_secret_token',
+      ),
+    );
     await storage.saveAiConfigs([
       const AiConfig(
         id: 'c1',
@@ -52,12 +57,14 @@ void main() {
 
   test('importAllData 跳过占位符，保留本地真实凭据（round-trip）', () async {
     final storage = StorageService();
-    await storage.saveSyncSettings(const SyncSettings(
-      method: 'github',
-      webDavPassword: 'real_wd',
-      githubToken: 'real_gh',
-      giteeToken: 'real_gitee',
-    ));
+    await storage.saveSyncSettings(
+      const SyncSettings(
+        method: 'github',
+        webDavPassword: 'real_wd',
+        githubToken: 'real_gh',
+        giteeToken: 'real_gitee',
+      ),
+    );
     await storage.saveAiConfigs([
       const AiConfig(
         id: 'c1',
@@ -70,8 +77,9 @@ void main() {
 
     // 导出（已脱敏）后再导入回本地，模拟用户用自己的备份文件恢复。
     final export = await storage.exportAllData();
-    await storage
-        .importAllData((export['data'] as Map).cast<String, dynamic>());
+    await storage.importAllData(
+      (export['data'] as Map).cast<String, dynamic>(),
+    );
 
     final settings = await storage.loadSyncSettings();
     expect(settings.githubToken, 'real_gh', reason: '占位符不应覆盖本地 token');
