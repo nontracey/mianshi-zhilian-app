@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 
 import '../../coach/domain/common.dart';
 import '../../coach/lifecycle/lifecycle.dart';
-import '../../coach/lifecycle/deletion_executor.dart';
 import '../../coach/tools/tool_contract.dart';
 import '../../providers/coach_provider.dart';
 import '../../providers/localization_provider.dart';

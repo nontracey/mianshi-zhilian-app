@@ -10,7 +10,7 @@ import 'package:mianshi_zhilian/services/route_resolver.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class ContentSourcePage extends StatelessWidget {
-  const ContentSourcePage();
+  const ContentSourcePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +67,7 @@ class ContentSourcePage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;

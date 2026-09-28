@@ -3,7 +3,7 @@ part of '../topic_detail_cards.dart';
 // ── 代码卡片（深色代码块 + 语法高亮）─────────────────────────
 
 class CodeCard extends StatelessWidget {
-  const CodeCard({required this.card});
+  const CodeCard({super.key, required this.card});
   final LearningCard card;
 
   ({String language, String code, bool isDiagram}) _parseCodeContent(
@@ -128,7 +128,7 @@ class CodeCard extends StatelessWidget {
 // ── ASCII 图形视图 ──────────────────────────────────────────
 
 class AsciiDiagramView extends StatelessWidget {
-  const AsciiDiagramView({required this.content});
+  const AsciiDiagramView({super.key, required this.content});
   final String content;
 
   @override
@@ -161,7 +161,7 @@ class AsciiDiagramView extends StatelessWidget {
 // ── 语法高亮代码组件 ─────────────────────────────────────────
 
 class HighlightedCode extends StatelessWidget {
-  const HighlightedCode({
+  const HighlightedCode({super.key, 
     required this.code,
     this.language = 'java',
     this.highlights = const [],

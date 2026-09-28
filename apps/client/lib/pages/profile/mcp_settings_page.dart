@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../coach/mcp/mcp_client.dart';
 import '../../providers/localization_provider.dart';
 import '../../services/mcp_config_service.dart';
+import '../../services/safe_endpoint.dart';
 import '../../theme/colors.dart';
 
 class McpSettingsPage extends StatefulWidget {
@@ -201,7 +202,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                                               .authorize(s);
                                           await _reload();
                                         } catch (_) {
-                                          if (context.mounted)
+                                          if (context.mounted) {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -211,11 +212,13 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                                                 ),
                                               ),
                                             );
+                                          }
                                         } finally {
-                                          if (mounted)
+                                          if (mounted) {
                                             setState(
                                               () => _testing.remove(s.id),
                                             );
+                                          }
                                         }
                                       },
                               ),
@@ -411,11 +414,9 @@ class _ServerDialogState extends State<_ServerDialog> {
     final name = _name.text.trim();
     final url = _url.text.trim();
     final uri = Uri.tryParse(url);
-    if (name.isEmpty ||
-        uri == null ||
-        !['http', 'https'].contains(uri.scheme) ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
+    // MCP 请求带 Bearer token：跨公网必须 https（OAuth 自身已强制 https，
+    // 这里补上手工填地址的入口）。
+    if (name.isEmpty || uri == null || !isAllowedCredentialEndpoint(uri)) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(l10n.get('mcp_invalid_input')),

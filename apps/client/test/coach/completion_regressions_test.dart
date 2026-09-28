@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mianshi_zhilian/coach/application/coach_agent.dart';
 import 'package:mianshi_zhilian/coach/domain/common.dart';
+import 'package:mianshi_zhilian/coach/domain/evidence.dart';
+import 'package:mianshi_zhilian/coach/domain/knowledge.dart';
 import 'package:mianshi_zhilian/coach/domain/plan.dart';
 import 'package:mianshi_zhilian/coach/domain/session.dart';
 import 'package:mianshi_zhilian/coach/jobs/jd_import_service.dart';
@@ -160,14 +162,18 @@ void main() {
       expect(current.revision, 2);
       expect((await store.listSourceChunks(original.id)), hasLength(2));
       expect((await store.getKnowledgeItem('k'))!.contentStatus, 'stale');
-      expect(
-        (await store.getExtension(
-          'p',
-          CoachExtensionKind.sourceRevision,
-          '${original.id}@1',
-        ))!.value['source'],
-        containsPair('content', original.content),
-      );
+      // 版本对账快照只保留元数据与哈希；旧全文不得进扩展记录，
+      // 否则被替换掉的原文会永久留存在数据库与备份包里。
+      final revisionSnapshot =
+          (await store.getExtension(
+                'p',
+                CoachExtensionKind.sourceRevision,
+                '${original.id}@1',
+              ))!
+              .value['source'] as Map;
+      expect(revisionSnapshot, containsPair('id', original.id));
+      expect(revisionSnapshot, containsPair('revision', 1));
+      expect(revisionSnapshot, isNot(contains('content')));
       final index = InMemoryIndex()..addSource(current);
       for (final chunk in await store.listSourceChunks(original.id)) {
         index.addChunk(IndexedChunk(chunk, 'p'));
@@ -247,6 +253,76 @@ void main() {
       await coach.ensureTodayPlan();
       expect(coach.extraPlans, hasLength(1));
       expect(coach.todayPlan!.denominator, denominator);
+    },
+  );
+
+  test(
+    'deferred cards stay inside the active goal scope even when out-of-scope knowledge exists',
+    () async {
+      final store = InMemoryCoachStore();
+      await seed(store);
+      // scope 外的知识点：没有任何 goal-knowledge link，也不在当前目标里。
+      await store.putKnowledgeItem(
+        KnowledgeItem(
+          id: 'k-out',
+          profileId: 'p',
+          title: 'Out of scope',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      // 把 scope 内唯一的 k 标成已学：此时 scope 内没有可学项，
+      // 若顺延卡片不过滤 scope，就会把 scope 外的 k-out 当新知识排进来。
+      await store.putReviewState(
+        ReviewState(
+          reviewPointId: 'rp',
+          profileId: 'p',
+          knowledgeItemId: 'k',
+          status: ReviewStatus.mastered,
+        ),
+      );
+      final clock = _MutableClock(now);
+      final coach = CoachProvider(
+        store: store,
+        profileId: 'p',
+        clock: clock,
+        idGen: IdGenerator.deterministic(),
+      );
+      await coach.load();
+      final template = WorkflowTemplate(
+        id: 'custom',
+        cards: const [
+          WorkflowCard(id: 'learn', type: PlanItemType.learnKnowledge),
+        ],
+      );
+      final plan = DailyPlan(
+        id: 'today',
+        profileId: 'p',
+        date: coach.todayKey,
+        timezone: 'CST',
+        planItems: [],
+        baseMinutes: 5,
+        version: 1,
+        frozenAt: now,
+        revisionNote: 'workflow:custom@v1',
+      );
+      await coach.applyPlan(
+        plan,
+        workflowTemplate: template,
+        deferredCardIds: const ['learn'],
+      );
+      clock.value = now.add(const Duration(days: 1));
+      await coach.reload();
+      await coach.ensureTodayPlan();
+      // 修复前顺延卡片的 duePool/learnable 不过滤当前目标 scope：
+      // scope 内唯一的 k 已掌握，旧实现会把它**重新当新知识**排进顺延计划；
+      // scope 外的 k-out 也可能被选中。修复后无可学内容就不物化卡片。
+      final knowledgeIds = coach.extraPlans
+          .expand((p) => p.planItems)
+          .map((item) => item.knowledgeItemId)
+          .whereType<String>()
+          .toList();
+      expect(knowledgeIds, isEmpty);
     },
   );
 

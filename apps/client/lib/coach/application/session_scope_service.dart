@@ -36,7 +36,7 @@ class SessionScopeService {
         ? <GoalKnowledgeLink>[]
         : await store.listGoalKnowledgeLinks(goal.id);
     final scope = <String>{
-      if (knowledgeItemId != null) knowledgeItemId,
+      ?knowledgeItemId,
       if (knowledgeItemId == null) ...links.map((l) => l.knowledgeItemId),
     };
     // Explicit review groups may span multiple knowledge items.
@@ -55,8 +55,9 @@ class SessionScopeService {
     final knowledge = (await store.listKnowledgeItems(
       profileId,
     )).where((k) => scope.contains(k.id)).toList();
-    if (knowledge.length != scope.length)
+    if (knowledge.length != scope.length) {
       throw StateError('Knowledge source removed');
+    }
     final points = <ReviewPoint>[];
     for (final item in knowledge) {
       points.addAll(

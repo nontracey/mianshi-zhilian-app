@@ -208,7 +208,7 @@ class _JobSearchPageState extends State<JobSearchPage> {
                         platform.searchUri(_keywords.text),
                         mode: LaunchMode.externalApplication,
                       );
-                      if (!opened && context.mounted)
+                      if (!opened && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -216,6 +216,7 @@ class _JobSearchPageState extends State<JobSearchPage> {
                             ),
                           ),
                         );
+                      }
                     },
                   ),
               ],
@@ -357,11 +358,16 @@ class _JobSearchPageState extends State<JobSearchPage> {
         ],
       ),
     );
-    if (ok != true) return;
-    final outcome = await goals.importJdFromText(controller.text);
-    messenger.showSnackBar(
-      SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
-    );
+    try {
+      if (ok != true) return;
+      final outcome = await goals.importJdFromText(controller.text);
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
+      );
+    } finally {
+      disposeControllersNextFrame([controller]);
+    }
   }
 }
 

@@ -15,21 +15,21 @@ void main() {
     installFakeSecureStorage();
   });
 
-  Future<StorageService> _setupStorageWithSettings({
+  Future<StorageService> setupStorageWithSettings({
     String? baseUrl,
     String? apiKey,
     String? model,
   }) async {
     final storage = StorageService();
     await storage.save('settings', {
-      if (baseUrl != null) 'whisperBaseUrl': baseUrl,
-      if (apiKey != null) 'whisperApiKey': apiKey,
-      if (model != null) 'whisperModel': model,
+      'whisperBaseUrl': ?baseUrl,
+      'whisperApiKey': ?apiKey,
+      'whisperModel': ?model,
     });
     return storage;
   }
 
-  Future<AiConfig?> _getMigratedConfig(StorageService storage) async {
+  Future<AiConfig?> getMigratedConfig(StorageService storage) async {
     final configs = await storage.loadAiConfigs();
     return configs.isNotEmpty ? configs.first : null;
   }
@@ -38,7 +38,7 @@ void main() {
     test(
       '1. creates AiConfig with correct fields when all whisper fields present',
       () async {
-        final storage = await _setupStorageWithSettings(
+        final storage = await setupStorageWithSettings(
           baseUrl: 'https://api.openai.com',
           apiKey: 'sk-test-key',
           model: 'whisper-1',
@@ -46,7 +46,7 @@ void main() {
 
         await WhisperMigrationHelper.migrateIfNeeded(storage);
 
-        final config = await _getMigratedConfig(storage);
+        final config = await getMigratedConfig(storage);
         expect(config, isNotNull);
         expect(config!.baseUrl, 'https://api.openai.com');
         expect(config.apiKey, 'sk-test-key');
@@ -73,7 +73,7 @@ void main() {
     });
 
     test('3. does nothing when whisperBaseUrl is empty', () async {
-      final storage = await _setupStorageWithSettings(
+      final storage = await setupStorageWithSettings(
         baseUrl: '',
         apiKey: 'sk-test-key',
         model: 'whisper-1',
@@ -88,7 +88,7 @@ void main() {
     test(
       '4. does nothing when already migrated (matching baseUrl + transcriptionEndpoint)',
       () async {
-        final storage = await _setupStorageWithSettings(
+        final storage = await setupStorageWithSettings(
           baseUrl: 'https://api.openai.com',
           apiKey: 'sk-test-key',
           model: 'whisper-1',
@@ -105,7 +105,7 @@ void main() {
     test(
       '5. sets supportsStreaming: true and audioMode: transcriptionEndpoint',
       () async {
-        final storage = await _setupStorageWithSettings(
+        final storage = await setupStorageWithSettings(
           baseUrl: 'https://api.openai.com',
           apiKey: 'sk-test-key',
           model: 'whisper-1',
@@ -113,21 +113,21 @@ void main() {
 
         await WhisperMigrationHelper.migrateIfNeeded(storage);
 
-        final config = await _getMigratedConfig(storage);
+        final config = await getMigratedConfig(storage);
         expect(config!.supportsStreaming, isTrue);
         expect(config.audioMode, AiAudioMode.transcriptionEndpoint);
       },
     );
 
     test('6. uses whisper-1 as default model when oldModel is null', () async {
-      final storage = await _setupStorageWithSettings(
+      final storage = await setupStorageWithSettings(
         baseUrl: 'https://api.openai.com',
         apiKey: 'sk-test-key',
       );
 
       await WhisperMigrationHelper.migrateIfNeeded(storage);
 
-      final config = await _getMigratedConfig(storage);
+      final config = await getMigratedConfig(storage);
       expect(config!.model, 'whisper-1');
       expect(
         config.name,
@@ -136,7 +136,7 @@ void main() {
     });
 
     test('7. sets usageTags to [stt]', () async {
-      final storage = await _setupStorageWithSettings(
+      final storage = await setupStorageWithSettings(
         baseUrl: 'https://api.openai.com',
         apiKey: 'sk-test-key',
         model: 'whisper-1',
@@ -144,12 +144,12 @@ void main() {
 
       await WhisperMigrationHelper.migrateIfNeeded(storage);
 
-      final config = await _getMigratedConfig(storage);
+      final config = await getMigratedConfig(storage);
       expect(config!.usageTags, ['stt']);
     });
 
     test('8. includes source name in debugPrint output', () async {
-      final storage = await _setupStorageWithSettings(
+      final storage = await setupStorageWithSettings(
         baseUrl: 'https://api.openai.com',
         apiKey: 'sk-test-key',
         model: 'whisper-1',

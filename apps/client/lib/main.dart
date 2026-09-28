@@ -147,7 +147,7 @@ void main() async {
   if (coachStoreHandle.available) await embeddingService.load();
   final coachProvider = CoachProvider(
     store: coachStore,
-    modelBindingProvider: coachModels,
+    modelBindingProvider: coachModels.call,
     rulesProvider: coachRules.load,
     remoteToolsProvider: mcpConfigService.openCoachTools,
   );
@@ -322,51 +322,6 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
         builder: (_, state) => state.extra as Widget,
       ),
       GoRoute(
-        path: '/practice/recall',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/mock-interview',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/today-review',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/weakness-training',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/answer-versions',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/follow-up-training',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/high-frequency',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/system-design',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
-        path: '/practice/project-dig',
-        redirect: (_, state) => state.extra == null ? '/' : null,
-        builder: (_, state) => state.extra as Widget,
-      ),
-      GoRoute(
         path: '/auth/login',
         builder: (_, state) => state.extra as Widget? ?? const LoginPage(),
       ),
@@ -515,8 +470,9 @@ class _MianshiZhilianAppState extends State<MianshiZhilianApp> {
           final settings = context.watch<SettingsProvider>();
           // 岗位搜索通道随设置重建（幂等，设置没变不做事）。
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted)
+            if (mounted) {
               widget.jobSearchConfig.syncIfChanged(settings.settings);
+            }
           });
           // 设置加载完成后，再加载内容（使用当前领域）
           if (!settings.isLoading && !_contentLoaded) {

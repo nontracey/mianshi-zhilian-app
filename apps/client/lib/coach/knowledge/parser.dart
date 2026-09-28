@@ -8,11 +8,31 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 /// 解析失败（格式不支持、损坏、扫描件无文本层等）。
+///
+/// [message] 一律是 l10n key，不是写死的中文：这些说明会直接上屏，
+/// 由 UI 按语言渲染（`L10n.get` 对未知 key 原样返回，故混排调试文本也是安全的）。
 class ParseException implements Exception {
   ParseException(this.message);
   final String message;
   @override
   String toString() => 'ParseException: $message';
+}
+
+/// 导入/解析失败原因的 l10n key。纯 Dart 层不持有任何语言文案。
+abstract final class ImportMessageKeys {
+  static const String noText = 'coach_import_err_no_text';
+  static const String tooLarge = 'coach_import_err_too_large';
+  static const String textTooLong = 'coach_import_err_text_too_long';
+  static const String notUtf8 = 'coach_import_err_not_utf8';
+  static const String unsupportedFormat = 'coach_import_err_unsupported_format';
+  static const String docxCorrupt = 'coach_import_err_docx_corrupt';
+  static const String docxNoBody = 'coach_import_err_docx_no_body';
+  static const String docxEmpty = 'coach_import_err_docx_empty';
+  static const String docxXmlBad = 'coach_import_err_docx_xml_bad';
+  static const String docxEncodingBad = 'coach_import_err_docx_encoding_bad';
+
+  /// 未命名资料的默认标题（UI 渲染时按语言替换，故存 key 而非文本）。
+  static const String defaultSourceTitle = 'coach_goals_source_default_name';
 }
 
 /// 文档解析器：把字节提取为纯文本。
@@ -30,7 +50,7 @@ class PlainTextParser implements DocumentParser {
     try {
       return utf8.decode(bytes);
     } on FormatException {
-      throw ParseException('文本不是有效 UTF-8，请转换编码或粘贴文本');
+      throw ParseException(ImportMessageKeys.notUtf8);
     }
   }
 }
@@ -53,7 +73,7 @@ class BuiltInDocumentParser implements DocumentParser {
     if (name.endsWith('.pdf') || _looksLikePdf(bytes)) {
       return _extractPdf(bytes);
     }
-    throw ParseException('不支持的文件格式，请使用 PDF、DOCX 或粘贴文本');
+    throw ParseException(ImportMessageKeys.unsupportedFormat);
   }
 
   static bool _looksLikeZip(List<int> bytes) =>
@@ -67,13 +87,13 @@ class BuiltInDocumentParser implements DocumentParser {
     try {
       archive = ZipDecoder().decodeBytes(bytes);
     } catch (e) {
-      throw ParseException('DOCX 文件损坏或不是有效的 Office 文档：$e');
+      throw ParseException(ImportMessageKeys.docxCorrupt);
     }
     final documents = archive.files
         .where((f) => f.isFile && f.name == 'word/document.xml')
         .toList();
     final document = documents.isEmpty ? null : documents.first;
-    if (document == null) throw ParseException('DOCX 缺少正文文档');
+    if (document == null) throw ParseException(ImportMessageKeys.docxNoBody);
     try {
       final documentXml = XmlDocument.parse(
         utf8.decode(document.content as List<int>),
@@ -88,14 +108,16 @@ class BuiltInDocumentParser implements DocumentParser {
         final word = namespaces.contains(node.namespaceUri);
         // Only visible word-processing text: no field instructions, deleted
         // revisions or unrelated metadata. Decode entities after XML parsing.
-        if (word && (node.name.local == 'del' || node.name.local == 'moveFrom'))
+        if (word && (node.name.local == 'del' || node.name.local == 'moveFrom')) {
           return;
+        }
         if (word && node.name.local == 't') {
           buffer.write(node.innerText);
           return;
         }
-        if (word && (node.name.local == 'br' || node.name.local == 'cr'))
+        if (word && (node.name.local == 'br' || node.name.local == 'cr')) {
           buffer.writeln();
+        }
         if (word && node.name.local == 'tab') buffer.write('\t');
         for (final child in node.children) {
           visit(child);
@@ -105,12 +127,12 @@ class BuiltInDocumentParser implements DocumentParser {
 
       visit(documentXml.rootElement);
       final text = buffer.toString().trim();
-      if (text.isEmpty) throw ParseException('DOCX 没有可提取的正文，请粘贴文本');
+      if (text.isEmpty) throw ParseException(ImportMessageKeys.docxEmpty);
       return text;
     } on XmlParserException {
-      throw ParseException('DOCX 正文 XML 损坏，请重新导出或粘贴文本');
+      throw ParseException(ImportMessageKeys.docxXmlBad);
     } on FormatException {
-      throw ParseException('DOCX 正文编码无效，请重新导出或粘贴文本');
+      throw ParseException(ImportMessageKeys.docxEncodingBad);
     }
   }
 

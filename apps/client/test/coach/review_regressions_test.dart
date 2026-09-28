@@ -298,6 +298,7 @@ void main() {
             expectedRevisions: preview.expectedRevisions,
           ),
           freshSnapshot: fresh,
+          now: now,
         ),
         throwsA(isA<DeletionConflictException>()),
       );

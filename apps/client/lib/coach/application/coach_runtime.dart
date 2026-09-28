@@ -225,7 +225,7 @@ class CoachRuntime {
       references: references,
     );
     await store.putMessage(message);
-    if (modelMetadata != null)
+    if (modelMetadata != null) {
       await store.putExtension(
         CoachExtensionRecord(
           profileId: session.profileId,
@@ -240,6 +240,7 @@ class CoachRuntime {
           updatedAt: clock.now(),
         ),
       );
+    }
     if (assessment != null) {
       await store.putAssessmentEvent(assessment);
       await store.putReviewState(reviewState!);
@@ -309,8 +310,9 @@ class CoachRuntime {
       CoachExtensionKind.runtimeLease,
       session.id,
     );
-    if (lease?.value['runId'] != handle.runId)
+    if (lease?.value['runId'] != handle.runId) {
       throw RuntimeConflictException('A newer window owns this model turn');
+    }
   }
 
   /// 保存教学检查点：中断恢复时查看最后提交的 checkpoint，不重放已成功写入（§7.3）。

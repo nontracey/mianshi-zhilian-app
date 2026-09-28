@@ -24,13 +24,15 @@ class LegacyMaterialMigrator {
   ) => store.transaction(() async {
     if ((await store.listTombstones(
       profileId,
-    )).any((m) => m.entityType == 'profile_reset'))
+    )).any((m) => m.entityType == 'profile_reset')) {
       return;
+    }
     final now = DateTime.now();
-    if (await store.getProfile(profileId) == null)
+    if (await store.getProfile(profileId) == null) {
       await store.putProfile(
         Profile(id: profileId, createdAt: now, updatedAt: now),
       );
+    }
     final encoded = jsonEncode(snapshot);
     final hash = sha256.convert(utf8.encode(encoded)).toString();
     final previous = await store.getExtension(

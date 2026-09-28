@@ -84,20 +84,13 @@ class _ResumeReviewPageState extends State<ResumeReviewPage> {
     final goals = context.watch<GoalProvider>();
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 找不到指定简历时必须走空态，不能用空壳对象顶替：否则用户看到的是
+    // 「标题空 + 正文空」的假简历，而不是「这份简历不存在」。
     final resume = widget.resumeId == null
         ? coach.activeResume
-        : coach.resumes.firstWhere(
-            (r) => r.id == widget.resumeId,
-            orElse: () =>
-                coach.activeResume ??
-                Resume(
-                  id: widget.resumeId!,
-                  profileId: coach.profileId,
-                  versionLabel: '',
-                  originalText: '',
-                  createdAt: DateTime.now(),
-                ),
-          );
+        : coach.resumes
+              .where((r) => r.id == widget.resumeId)
+              .firstOrNull;
     final claims = coach.activeClaims;
 
     if (resume == null) {
@@ -401,7 +394,7 @@ class _ProjectRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            project.name,
+            l10n.get(project.name),
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w600,

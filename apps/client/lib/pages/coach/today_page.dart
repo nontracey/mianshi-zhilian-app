@@ -13,6 +13,8 @@ import '../../providers/localization_provider.dart';
 import '../../theme/colors.dart';
 import 'coach_widgets.dart';
 import 'coach_session_page.dart';
+import 'goals_materials_page.dart';
+import 'interview_page.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -63,6 +65,20 @@ class _TodayPageState extends State<TodayPage> {
           tooltip: l10n.get('coach_today_add_knowledge'),
           icon: const Icon(Icons.add_circle_outline),
           onPressed: () => _showAddKnowledge(context, coach, l10n),
+        ),
+        IconButton(
+          tooltip: l10n.get('coach_nav_goals'),
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const GoalsMaterialsPage()),
+          ),
+        ),
+        IconButton(
+          tooltip: l10n.get('coach_nav_interview'),
+          icon: const Icon(Icons.record_voice_over_outlined),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const InterviewPage()),
+          ),
         ),
       ],
       children: [
@@ -214,8 +230,18 @@ class _TodayPageState extends State<TodayPage> {
 
   Future<void> _start(BuildContext context, SessionMode mode) async {
     final coach = context.read<CoachProvider>();
+    final l10n = context.read<LocalizationProvider>();
     coach.setMode(mode);
-    await coach.startSession(mode: mode);
+    try {
+      await coach.startSession(mode: mode);
+    } catch (_) {
+      // 失败要如实告诉用户，不能点了没反应。
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('coach_session_start_failed'))),
+      );
+      return;
+    }
     if (!context.mounted) return;
     Navigator.of(
       context,
@@ -268,18 +294,27 @@ class _TodayPageState extends State<TodayPage> {
         ],
       ),
     );
-    if (ok != true) return;
-    final title = titleController.text.trim();
-    if (title.isEmpty) return;
-    final labels = pointsController.text
-        .split(RegExp(r'\r?\n'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    await coach.addKnowledgeItem(title, reviewPointLabels: labels);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.getp('coach_today_added', {'title': title}))),
-    );
+    try {
+      if (ok != true) return;
+      final title = titleController.text.trim();
+      if (title.isEmpty) return;
+      final labels = pointsController.text
+          .split(RegExp(r'\r?\n'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      await coach.addKnowledgeItem(title, reviewPointLabels: labels);
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.getp('coach_today_added', {'title': title})),
+        ),
+      );
+    } finally {
+      // 弹窗路由的关闭动画结束前 TextField 仍持有 controller，立即 dispose
+      // 会让 focus scope 在错误的 build scope 里重建；等下一帧再释放。
+      disposeControllersNextFrame([titleController, pointsController]);
+    }
   }
 }
 

@@ -129,11 +129,15 @@ class CoachNoticeBanner extends StatelessWidget {
     required this.message,
     this.icon = Icons.info_outline,
     this.tone = CoachNoticeTone.info,
+    this.action,
   });
 
   final String message;
   final IconData icon;
   final CoachNoticeTone tone;
+
+  /// 可选的补救入口（如「重试」）。提示条本身不承载业务判断。
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +169,10 @@ class CoachNoticeBanner extends StatelessWidget {
               ),
             ),
           ),
+          if (action != null) ...[
+            const SizedBox(width: 8),
+            action!,
+          ],
         ],
       ),
     );
@@ -185,12 +193,26 @@ WorkPanel coachPanel({
 /// 把 [ImportOutcome] 渲染成本地化文案。
 ///
 /// provider 只回传 l10n key；翻译集中在这一处，避免各页面各自拼装。
-/// [diagnostics] 是解析器/网络的原始说明，按原样附在后面便于排错。
+/// [diagnostics] 同样是 key（解析/网络失败原因由纯 Dart 层以 key 抛出）。
+/// `L10n.get` 对未知 key 原样返回，所以偶发的原始调试文本也能安全显示。
 String coachOutcomeText(LocalizationProvider l10n, ImportOutcome outcome) {
   final parts = <String>[
     l10n.getp(outcome.messageKey, outcome.messageParams),
     ...outcome.noteKeys.map(l10n.get),
-    ...outcome.diagnostics,
+    ...outcome.diagnostics.map(l10n.get),
   ];
   return parts.where((s) => s.trim().isNotEmpty).join('\n');
+}
+
+/// 弹窗里的输入控制器统一在**下一帧**释放。
+///
+/// `await showDialog` 返回时弹窗路由的关闭动画可能尚未结束，TextField 仍持有
+/// controller；此刻 dispose 会让 focus scope 在错误的 build scope 里重建，
+/// 表现为 "Tried to build dirty widget in the wrong build scope"。
+void disposeControllersNextFrame(List<TextEditingController> controllers) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+  });
 }

@@ -76,8 +76,9 @@ class KnowledgeRetriever {
             : embedder is BatchEmbeddingProvider
             ? await embedder.embedBatch(texts)
             : await Future.wait(texts.map(embedder.embed));
-        if (vectors.length != candidates.length)
+        if (vectors.length != candidates.length) {
           throw StateError('Embedding batch mismatch');
+        }
         for (var i = 0; i < candidates.length; i++) {
           index.addEmbedding(candidates[i], embedder.profileId, vectors[i]);
         }

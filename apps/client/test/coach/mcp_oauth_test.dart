@@ -24,7 +24,7 @@ void main() {
         isFalse,
         reason: 'Discovery never receives a model key or existing bearer',
       );
-      if (request.url.toString() == resource)
+      if (request.url.toString() == resource) {
         return http.Response(
           '',
           401,
@@ -33,7 +33,8 @@ void main() {
                 'Bearer resource_metadata="https://mcp.example/metadata", scope="notes:read"',
           },
         );
-      if (request.url.path == '/metadata')
+      }
+      if (request.url.path == '/metadata') {
         return http.Response(
           jsonEncode({
             'resource': wrongResource ? 'https://other.example' : resource,
@@ -41,7 +42,8 @@ void main() {
           }),
           200,
         );
-      if (request.url.path == '/.well-known/oauth-authorization-server/tenant')
+      }
+      if (request.url.path == '/.well-known/oauth-authorization-server/tenant') {
         return http.Response(
           jsonEncode({
             'issuer': issuer,
@@ -52,13 +54,15 @@ void main() {
           }),
           200,
         );
+      }
       expect(request.url.toString(), '$issuer/token');
-      if (redirectToken)
+      if (redirectToken) {
         return http.Response(
           '',
           302,
           headers: {'location': 'https://evil.example/tokens'},
         );
+      }
       final form = request.bodyFields;
       expect(form['resource'], resource);
       expect(form['client_id'], 'registered-client');

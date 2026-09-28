@@ -197,13 +197,14 @@ class WorkflowCompiler {
         WorkflowIssueCode.unknownResumeReference,
       ),
     ]) {
-      if (check.$1 != null && check.$2 != null && !check.$2!.contains(check.$1))
+      if (check.$1 != null && check.$2 != null && !check.$2!.contains(check.$1)) {
         issues.add(
           WorkflowIssue(
             code: check.$3,
             detail: 'Template scope source is unavailable',
           ),
         );
+      }
     }
     // ── 引用归属校验 ──────────────────────────────────────────────────
     for (final card in template.cards) {
@@ -530,18 +531,7 @@ class WorkflowCompiler {
     }
   }
 
-  int _defaultMinutes(PlanItemType type) {
-    switch (type) {
-      case PlanItemType.learnKnowledge:
-        return 8;
-      case PlanItemType.reviewLearned:
-        return 6;
-      case PlanItemType.projectTraining:
-        return 10;
-      case PlanItemType.mockInterview:
-        return 15;
-    }
-  }
+  int _defaultMinutes(PlanItemType type) => type.defaultMinutes;
 
   int _dueCount(List<ReviewState> pool, DateTime now) =>
       pool.where((s) => s.status != ReviewStatus.unseen && s.isDue(now)).length;

@@ -96,6 +96,14 @@ abstract class CoachStore {
   Future<Source?> getSource(SourceId id);
   Future<List<Source>> listSources(ProfileId profileId);
 
+  /// 删除一条来源及其分块与入库任务。
+  ///
+  /// 原文快照属于用户私人资料，删除资料后不得残留（否则备份包里仍然带全文）。
+  Future<void> deleteSource(SourceId id);
+
+  /// 列出与某知识点关联的来源 ID。
+  Future<List<SourceId>> sourceIdsForKnowledge(KnowledgeItemId knowledgeItemId);
+
   // ---- 资料分块 ----
   Future<void> putSourceChunk(SourceChunk chunk);
   Future<void> putSourceChunks(List<SourceChunk> chunks);
@@ -163,6 +171,17 @@ abstract class CoachStore {
   );
   Future<void> putTombstone(CoachTombstone tombstone);
   Future<List<CoachTombstone>> listTombstones(ProfileId profileId);
+
+  /// 修剪墓碑：同一实体的旧代次记录在同步判定里本来就是冗余（消费方只取
+  /// 每个 key 的最大 generation 与 `profile_reset` 的最大 generation），
+  /// 不修剪会让墓碑表随清除次数单调膨胀并整体进入备份包。
+  ///
+  /// 返回删除的条数。`profile_reset` 墓碑始终保留。
+  Future<int> pruneTombstones(
+    ProfileId profileId, {
+    int keepPerEntity = 1,
+    int maxEntityTombstones = 500,
+  });
   Future<void> putCleanupTask(CoachCleanupTask task);
   Future<List<CoachCleanupTask>> listCleanupTasks(
     ProfileId profileId, {
@@ -171,7 +190,10 @@ abstract class CoachStore {
 }
 
 /// 轻量内存实现，供单测与运行时兜底使用。所有数据仅在进程内存中。
-class InMemoryCoachStore implements CoachStore {
+/// 内存实现。实现 [CoachStoreMaintenance]（空操作）：内存数据在实例销毁时
+/// 自然释放，没有 WAL/VACUUM 概念；实现该接口是为了让 `clearPersonalMaterials`
+/// 的清理分支在测试（默认用内存实现）里也被真实走到，而不是被类型判断静默跳过。
+class InMemoryCoachStore implements CoachStore, CoachStoreMaintenance {
   final Map<ProfileId, Profile> _profiles = {};
   final Map<GoalId, Goal> _goals = {};
   final List<GoalRequirement> _requirements = [];
@@ -592,6 +614,24 @@ class InMemoryCoachStore implements CoachStore {
   }
 
   @override
+  Future<List<SourceId>> sourceIdsForKnowledge(
+    KnowledgeItemId knowledgeItemId,
+  ) async => _chunks
+      .where((chunk) => chunk.knowledgeItemId == knowledgeItemId)
+      .map((chunk) => chunk.sourceId)
+      .toSet()
+      .toList();
+
+  @override
+  Future<void> deleteSource(SourceId id) async {
+    _sources.remove(id);
+    _chunks.removeWhere((chunk) => chunk.sourceId == id);
+    _ingestionJobs.removeWhere(
+      (_, job) => job.sourceId == id,
+    );
+  }
+
+  @override
   Future<void> putIngestionJob(IngestionJob job) async =>
       _ingestionJobs[job.id] = job;
 
@@ -727,9 +767,15 @@ class InMemoryCoachStore implements CoachStore {
   Future<List<CoachExtensionRecord>> listExtensions(
     ProfileId profileId,
     CoachExtensionKind kind,
-  ) async => _extensions.values
-      .where((record) => record.profileId == profileId && record.kind == kind)
-      .toList();
+  ) async {
+    final records = _extensions.values
+        .where((record) => record.profileId == profileId && record.kind == kind)
+        .toList()
+      // 与 Drift 实现（ORDER BY updatedAt ASC）保持同一排序契约，
+      // 否则依赖顺序的消费方在测试与生产里表现不同。
+      ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
+    return records;
+  }
 
   @override
   Future<void> deleteExtension(
@@ -751,6 +797,45 @@ class InMemoryCoachStore implements CoachStore {
       _tombstones.values.where((item) => item.profileId == profileId).toList();
 
   @override
+  Future<int> pruneTombstones(
+    ProfileId profileId, {
+    int keepPerEntity = 1,
+    int maxEntityTombstones = 500,
+  }) async {
+    final mine = _tombstones.entries
+        .where((e) => e.value.profileId == profileId)
+        .toList();
+    // 按实体分组，组内只留最新 keepPerEntity 个代次。
+    final byEntity = <String, List<MapEntry<String, CoachTombstone>>>{};
+    for (final entry in mine) {
+      if (entry.value.entityType == 'profile_reset') continue;
+      byEntity.putIfAbsent(entry.value.key, () => []).add(entry);
+    }
+    var removed = 0;
+    for (final group in byEntity.values) {
+      group.sort((a, b) => b.value.generation.compareTo(a.value.generation));
+      for (final stale in group.skip(keepPerEntity)) {
+        _tombstones.remove(stale.key);
+        removed++;
+      }
+    }
+    // 总量上限：仍超限时按删除时间从旧到新淘汰，profile_reset 不参与。
+    final survivors =
+        _tombstones.values
+            .where(
+              (t) => t.profileId == profileId && t.entityType != 'profile_reset',
+            )
+            .toList()
+          ..sort((a, b) => a.deletedAt.compareTo(b.deletedAt));
+    for (final t in survivors.take((survivors.length - maxEntityTombstones)
+        .clamp(0, survivors.length))) {
+      _tombstones.remove('${t.profileId}:${t.generation}:${t.key}');
+      removed++;
+    }
+    return removed;
+  }
+
+  @override
   Future<void> putCleanupTask(CoachCleanupTask task) async {
     _cleanupTasks[task.id] = task;
   }
@@ -766,4 +851,9 @@ class InMemoryCoachStore implements CoachStore {
             (status == null || item.status == status),
       )
       .toList();
+
+  /// 内存实现没有 WAL/VACUUM，无需物理压缩；此方法存在是为了让维护路径
+  /// 在测试中不因类型判断被跳过。
+  @override
+  Future<void> compactDeletedData() async {}
 }

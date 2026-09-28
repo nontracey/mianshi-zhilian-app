@@ -11,6 +11,25 @@ enum PlanItemType {
   mockInterview,
 }
 
+/// 卡片类型的默认时长（分钟）。
+///
+/// 编译器、今日计划生成与训练安排 UI 必须共用这一份；此前 (8, 6, 10, 15)
+/// 在四处各写了一遍，改一处忘三处是必然。
+extension PlanItemTypeDefaults on PlanItemType {
+  int get defaultMinutes {
+    switch (this) {
+      case PlanItemType.learnKnowledge:
+        return 8;
+      case PlanItemType.reviewLearned:
+        return 6;
+      case PlanItemType.projectTraining:
+        return 10;
+      case PlanItemType.mockInterview:
+        return 15;
+    }
+  }
+}
+
 /// 计划项。每个卡片的执行事实（证据、回测、完成）仍落在 session/plan 表中。
 class PlanItem {
   PlanItem({

@@ -43,7 +43,7 @@ class AiVoiceSettingsPage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -58,7 +58,7 @@ class ProfileSubPage extends StatelessWidget {
 }
 
 class AiConfigPanel extends StatelessWidget {
-  const AiConfigPanel({required this.onNavigateToConfig});
+  const AiConfigPanel({super.key, required this.onNavigateToConfig});
 
   final VoidCallback onNavigateToConfig;
 
@@ -143,7 +143,7 @@ class InfoRow extends StatelessWidget {
 }
 
 class SttConfigPanel extends StatefulWidget {
-  const SttConfigPanel({
+  const SttConfigPanel({super.key, 
     required this.settings,
     required this.onSettingsChanged,
   });
@@ -934,7 +934,7 @@ class SttConfigPanelState extends State<SttConfigPanel> {
 }
 
 class ResourceStatusBlock extends StatelessWidget {
-  const ResourceStatusBlock({
+  const ResourceStatusBlock({super.key, 
     required this.icon,
     required this.title,
     required this.ready,
@@ -1094,7 +1094,7 @@ class ResourceStatusBlock extends StatelessWidget {
 }
 
 class SttModeCard extends StatelessWidget {
-  const SttModeCard({
+  const SttModeCard({super.key, 
     required this.label,
     required this.icon,
     required this.description,

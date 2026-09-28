@@ -136,7 +136,7 @@ class ModelResumeParser implements ResumeParser {
   }
 
   ProjectDraft _project(Map<String, dynamic> m) => ProjectDraft(
-    name: m['name'] as String? ?? '未命名项目',
+    name: m['name'] as String? ?? 'coach_resume_unnamed_project',
     originalSpan: m['originalSpan'] as String?,
     goal: m['goal'] as String?,
     responsibilities: m['responsibilities'] as String?,
@@ -215,7 +215,7 @@ class _BufferProject {
   String? name;
   String? responsibilities;
   ProjectDraft build() => ProjectDraft(
-    name: name ?? '未命名项目',
+    name: name ?? 'coach_resume_unnamed_project',
     responsibilities: responsibilities,
     originalSpan: name,
   );

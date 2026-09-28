@@ -11,6 +11,8 @@ import 'package:mianshi_zhilian/coach/domain/goal.dart';
 import 'package:mianshi_zhilian/coach/domain/plan.dart';
 import 'package:mianshi_zhilian/coach/domain/session.dart';
 import 'package:mianshi_zhilian/coach/lifecycle/lifecycle.dart';
+import 'package:mianshi_zhilian/coach/persistence/coach_store.dart';
+import 'package:mianshi_zhilian/coach/persistence/extension_records.dart';
 import 'package:mianshi_zhilian/coach/tools/tool_contract.dart';
 import 'package:mianshi_zhilian/coach/workflows/workflows.dart';
 
@@ -20,6 +22,74 @@ Future<void> main() async {
   final clock = FixedClock(DateTime(2026, 9, 11, 9));
   var idSeed = 0;
   IdGenerator ids() => IdGenerator(factory: () => 'id-${idSeed++}');
+
+  group('墓碑修剪（只增不减问题）', () {
+    CoachTombstone marker(
+      String entity,
+      String id,
+      int generation, {
+      String profile = 'p1',
+    }) => CoachTombstone(
+      profileId: profile,
+      entityType: entity,
+      entityId: id,
+      generation: generation,
+      deletedAt: clock.now().add(Duration(minutes: generation)),
+      operationId: 'op-$entity-$id-$generation',
+    );
+
+    test('同一实体只保留最新代次，profile_reset 全部保留', () async {
+      final store = InMemoryCoachStore();
+      await store.putTombstone(marker('goal', 'g1', 1));
+      await store.putTombstone(marker('goal', 'g1', 2));
+      await store.putTombstone(marker('goal', 'g1', 3));
+      await store.putTombstone(marker('goal', 'g2', 1));
+      await store.putTombstone(marker('profile_reset', 'p1', 1));
+      await store.putTombstone(marker('profile_reset', 'p1', 2));
+
+      final removed = await store.pruneTombstones('p1');
+
+      expect(removed, 2); // g1 的 generation 1、2 被修剪
+      final left = await store.listTombstones('p1');
+      expect(left.where((t) => t.entityType == 'goal'), hasLength(2));
+      expect(
+        left
+            .where((t) => t.entityId == 'g1')
+            .every((t) => t.generation == 3),
+        isTrue,
+      );
+      expect(left.where((t) => t.entityType == 'profile_reset'), hasLength(2));
+    });
+
+    test('总量超限时从最旧开始淘汰，且不动 profile_reset', () async {
+      final store = InMemoryCoachStore();
+      for (var i = 0; i < 6; i++) {
+        await store.putTombstone(marker('goal', 'g$i', 1));
+      }
+      await store.putTombstone(marker('profile_reset', 'p1', 9));
+
+      final removed = await store.pruneTombstones('p1', maxEntityTombstones: 3);
+
+      expect(removed, 3);
+      final left = await store.listTombstones('p1');
+      expect(left.where((t) => t.entityType == 'goal'), hasLength(3));
+      expect(left.where((t) => t.entityType == 'profile_reset'), hasLength(1));
+    });
+
+    test('其他档案的墓碑不受影响', () async {
+      final store = InMemoryCoachStore();
+      await store.putTombstone(marker('goal', 'g1', 1));
+      await store.putTombstone(marker('goal', 'g1', 2));
+      // other 档案同样有旧代次墓碑，但修剪只针对 p1。
+      await store.putTombstone(marker('goal', 'g1', 1, profile: 'other'));
+      await store.putTombstone(marker('goal', 'g1', 2, profile: 'other'));
+
+      await store.pruneTombstones('p1');
+
+      expect(await store.listTombstones('other'), hasLength(2));
+      expect(await store.listTombstones('p1'), hasLength(1));
+    });
+  });
 
   Goal goal(String id, {bool archived = false, String hash = 'hash-1'}) => Goal(
     id: id,
@@ -292,11 +362,46 @@ Future<void> main() async {
         selection: DeletionSelection.none,
         token: tokenFor(preview),
         freshSnapshot: snapshot,
+        now: clock.now(),
       );
       expect(result.deletedGoalIds, ['g1']);
       expect(result.removedKnowledgeIds, isEmpty);
       expect(result.retainedKnowledgeIds.length, 2);
       expect(result.tombstones, ['goal:g1']);
+    });
+
+    test('令牌过期 → 必须重新预览，不能拿旧令牌提交', () {
+      final snapshot = twoKnowledgeSnapshot();
+      final preview = previewOf(snapshot, ['g1']);
+      final stale = ConfirmationToken(
+        operationId: preview.operationId,
+        issuedAt: clock.now().subtract(const Duration(hours: 2)),
+        subject: preview.goalIds.join(','),
+        expectedRevisions: preview.expectedRevisions,
+      );
+      expect(
+        () => planner.commit(
+          preview: preview,
+          selection: DeletionSelection.none,
+          token: stale,
+          freshSnapshot: snapshot,
+          now: clock.now(),
+        ),
+        throwsA(isA<DeletionConflictException>()),
+      );
+      // 刚签发的令牌仍然可用，说明拒绝原因确实是过期而非参数不匹配。
+      expect(
+        planner
+            .commit(
+              preview: preview,
+              selection: DeletionSelection.none,
+              token: tokenFor(preview),
+              freshSnapshot: snapshot,
+              now: clock.now(),
+            )
+            .deletedGoalIds,
+        ['g1'],
+      );
     });
 
     test('令牌 operationId 不匹配 → 拒绝', () {
@@ -312,6 +417,7 @@ Future<void> main() async {
             subject: 'g1',
           ),
           freshSnapshot: snapshot,
+          now: clock.now(),
         ),
         throwsA(isA<DeletionConflictException>()),
       );
@@ -326,6 +432,7 @@ Future<void> main() async {
           selection: const DeletionSelection(cleanupKnowledgeIds: ['k2']),
           token: tokenFor(preview),
           freshSnapshot: snapshot,
+          now: clock.now(),
         ),
         throwsA(isA<DeletionScopeException>()),
       );
@@ -347,6 +454,7 @@ Future<void> main() async {
         selection: DeletionSelection.none,
         token: tokenFor(preview),
         freshSnapshot: snapshot,
+        now: clock.now(),
       );
       expect(kept.removedKnowledgeIds, isEmpty);
 
@@ -357,6 +465,7 @@ Future<void> main() async {
         ),
         token: tokenFor(preview),
         freshSnapshot: snapshot,
+        now: clock.now(),
       );
       expect(removed.removedKnowledgeIds, ['k1']);
       expect(removed.tombstones.contains('knowledge:k1'), isTrue);
@@ -386,6 +495,7 @@ Future<void> main() async {
         ),
         token: tokenFor(preview),
         freshSnapshot: snapshot,
+        now: clock.now(),
       );
       expect(result.removedKnowledgeIds, ['k1']);
       expect(
@@ -421,6 +531,7 @@ Future<void> main() async {
           selection: const DeletionSelection(cleanupKnowledgeIds: ['k1']),
           token: tokenFor(preview),
           freshSnapshot: after,
+          now: clock.now(),
         );
       } on DeletionConflictException catch (e) {
         conflict = true;
@@ -458,6 +569,7 @@ Future<void> main() async {
           selection: const DeletionSelection(cleanupKnowledgeIds: ['k1']),
           token: tokenFor(preview),
           freshSnapshot: after,
+          now: clock.now(),
         ),
         throwsA(isA<DeletionConflictException>()),
       );
@@ -485,6 +597,7 @@ Future<void> main() async {
           selection: DeletionSelection.none,
           token: tokenFor(preview),
           freshSnapshot: after,
+          now: clock.now(),
         ),
         throwsA(isA<DeletionConflictException>()),
       );

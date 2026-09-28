@@ -3,7 +3,7 @@ part of '../topic_detail_cards.dart';
 // ── 追问区域（可折叠）────────────────────────────────────────
 
 class FollowUpSection extends StatelessWidget {
-  const FollowUpSection({required this.followUps});
+  const FollowUpSection({super.key, required this.followUps});
   final List<FollowUpQuestion> followUps;
 
   @override
@@ -39,7 +39,7 @@ class FollowUpSection extends StatelessWidget {
 }
 
 class FollowUpCard extends StatefulWidget {
-  const FollowUpCard({required this.index, required this.question});
+  const FollowUpCard({super.key, required this.index, required this.question});
   final int index;
   final FollowUpQuestion question;
 

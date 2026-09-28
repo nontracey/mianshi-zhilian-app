@@ -15,7 +15,7 @@ import 'topic_detail_page.dart';
 // ── 桌面端左侧目录栏 ─────────────────────────────────────────
 
 class LeftSidebar extends StatelessWidget {
-  const LeftSidebar({required this.topic});
+  const LeftSidebar({super.key, required this.topic});
   final Topic topic;
 
   @override
@@ -143,7 +143,7 @@ class LeftSidebar extends StatelessWidget {
 // ── 顶部标签信息 ──────────────────────────────────────────────
 
 class TopicHeader extends StatelessWidget {
-  const TopicHeader({required this.topic});
+  const TopicHeader({super.key, required this.topic});
 
   final Topic topic;
 
@@ -238,7 +238,7 @@ class TopicHeader extends StatelessWidget {
 // ── 知识学习 Tab ──────────────────────────────────────────────
 
 class KnowledgeTab extends StatelessWidget {
-  const KnowledgeTab({required this.topic});
+  const KnowledgeTab({super.key, required this.topic});
 
   final Topic topic;
 
@@ -332,7 +332,7 @@ class KnowledgeTab extends StatelessWidget {
 // ── 评分标准面板 ──────────────────────────────────────────────
 
 class RubricSection extends StatelessWidget {
-  const RubricSection({required this.rubric});
+  const RubricSection({super.key, required this.rubric});
   final Rubric rubric;
 
   @override
@@ -426,7 +426,7 @@ class RubricSection extends StatelessWidget {
 // ── 复述练习 Tab（Prompt / Answer 分栏布局）──────────────────
 
 class RecallTab extends StatelessWidget {
-  const RecallTab({
+  const RecallTab({super.key, 
     required this.topic,
     required this.answerController,
     required this.isEvaluating,
@@ -504,7 +504,7 @@ class RecallTab extends StatelessWidget {
 // ── 左侧 Prompt 面板 ────────────────────────────────────────
 
 class PromptPanel extends StatelessWidget {
-  const PromptPanel({required this.topic});
+  const PromptPanel({super.key, required this.topic});
   final Topic topic;
 
   @override
@@ -715,7 +715,7 @@ class PromptPanel extends StatelessWidget {
 // ── 右侧 Answer 面板 ────────────────────────────────────────
 
 class AnswerPanel extends StatelessWidget {
-  const AnswerPanel({
+  const AnswerPanel({super.key, 
     required this.topic,
     required this.answerController,
     required this.isEvaluating,
@@ -860,7 +860,7 @@ class AnswerPanel extends StatelessWidget {
 // ── AI 评估结果面板（含环形分数 + feedback tags）───────────────
 
 class EvaluationResultPanel extends StatelessWidget {
-  const EvaluationResultPanel({required this.result});
+  const EvaluationResultPanel({super.key, required this.result});
   final Map<String, dynamic> result;
 
   @override
@@ -1050,7 +1050,7 @@ class EvaluationResultPanel extends StatelessWidget {
 // ── 环形分数组件 ──────────────────────────────────────────────
 
 class ScoreRing extends StatelessWidget {
-  const ScoreRing({required this.score, this.size = 80});
+  const ScoreRing({super.key, required this.score, this.size = 80});
 
   final int score;
   final double size;

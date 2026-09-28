@@ -3,7 +3,7 @@ part of '../topic_detail_cards.dart';
 // ── 核心概念卡片（Markdown 渲染）──────────────────────────────
 
 class ExplainCard extends StatelessWidget {
-  const ExplainCard({required this.card});
+  const ExplainCard({super.key, required this.card});
   final LearningCard card;
 
   String _formatContent(String content) {
@@ -208,7 +208,7 @@ class ExplainCard extends StatelessWidget {
 // ── 面试回答模板卡片（深色背景）──────────────────────────────
 
 class InterviewAnswerCard extends StatelessWidget {
-  const InterviewAnswerCard({required this.card});
+  const InterviewAnswerCard({super.key, required this.card});
   final LearningCard card;
 
   String _formatInterviewContent(String content) {
@@ -293,7 +293,7 @@ class InterviewAnswerCard extends StatelessWidget {
 // ── Checklist 卡片（勾选项）────────────────────────────────────
 
 class ChecklistCard extends StatelessWidget {
-  const ChecklistCard({required this.card});
+  const ChecklistCard({super.key, required this.card});
   final LearningCard card;
 
   @override

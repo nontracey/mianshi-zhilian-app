@@ -803,11 +803,15 @@ Widget _buildDiagnosticCards(
                           ),
                         ),
                       ),
-                    Text(
-                      '${topic.domain} · ${topic.difficultyLabel}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white54 : Colors.grey,
+                    Expanded(
+                      child: Text(
+                        '${topic.domain} · ${topic.difficultyLabel}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.white54 : Colors.grey,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

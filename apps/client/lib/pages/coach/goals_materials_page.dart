@@ -241,7 +241,7 @@ class GoalsMaterialsPage extends StatelessWidget {
                   dense: true,
                   leading: Icon(_sourceIcon(src.type), size: 18),
                   title: Text(
-                    src.title,
+                    l10n.get(src.title),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -385,11 +385,15 @@ class GoalsMaterialsPage extends StatelessWidget {
         ],
       ),
     );
-    final title = edited?.trim();
-    if (title == null || title.isEmpty || title == requirement.title) return;
-    await goals.updateRequirement(
-      requirement.copyWith(title: title, inferred: false),
-    );
+    try {
+      final title = edited?.trim();
+      if (title == null || title.isEmpty || title == requirement.title) return;
+      await goals.updateRequirement(
+        requirement.copyWith(title: title, inferred: false),
+      );
+    } finally {
+      disposeControllersNextFrame([controller]);
+    }
   }
 
   static Future<void> _promptLinkImport(
@@ -423,11 +427,16 @@ class GoalsMaterialsPage extends StatelessWidget {
         ],
       ),
     );
-    if (ok != true) return;
-    final outcome = await goals.importJdFromUrl(controller.text.trim());
-    messenger.showSnackBar(
-      SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
-    );
+    try {
+      if (ok != true) return;
+      final outcome = await goals.importJdFromUrl(controller.text.trim());
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
+      );
+    } finally {
+      disposeControllersNextFrame([controller]);
+    }
   }
 
   static Future<void> _promptTextImport(
@@ -469,11 +478,16 @@ class GoalsMaterialsPage extends StatelessWidget {
         ],
       ),
     );
-    if (ok != true) return;
-    final outcome = await onSubmit(controller.text);
-    messenger.showSnackBar(
-      SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
-    );
+    try {
+      if (ok != true) return;
+      final outcome = await onSubmit(controller.text);
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(coachOutcomeText(l10n, outcome))),
+      );
+    } finally {
+      disposeControllersNextFrame([controller]);
+    }
   }
 }
 

@@ -60,26 +60,30 @@ class McpOAuthService {
     if (!await storage.writeSecret(
       _slot(config),
       jsonEncode(grant.toSecretJson()),
-    ))
+    )) {
       throw const McpOAuthException('secure_storage_failed');
+    }
   }
 
   Future<String?> token(McpServerConfig config) async {
     final raw = await storage.readSecret(_slot(config));
     if (raw == null || raw.isEmpty) return null;
     var grant = McpOAuthGrant.fromSecretJson(jsonDecode(raw));
-    if (grant.resource != config.url || grant.clientId != config.oauthClientId)
+    if (grant.resource != config.url || grant.clientId != config.oauthClientId) {
       throw const McpOAuthException('token_resource_mismatch');
+    }
     if (grant.expiring && grant.refreshToken != null) {
       grant = await _withClient((client) => client.refresh(grant));
       if (!await storage.writeSecret(
         _slot(config),
         jsonEncode(grant.toSecretJson()),
-      ))
+      )) {
         throw const McpOAuthException('secure_storage_failed');
+      }
     }
-    if (grant.expiresAt != null && grant.expiresAt!.isBefore(DateTime.now()))
+    if (grant.expiresAt != null && grant.expiresAt!.isBefore(DateTime.now())) {
       throw const McpOAuthException('login_required');
+    }
     return grant.accessToken;
   }
 

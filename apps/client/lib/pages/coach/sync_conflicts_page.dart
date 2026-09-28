@@ -41,10 +41,11 @@ class _CoachSyncConflictsPageState extends State<CoachSyncConflictsPage> {
       await coach.reload();
       if (mounted) setState(_reload);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.get('coach_sync_conflict_changed'))),
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -61,16 +62,18 @@ class _CoachSyncConflictsPageState extends State<CoachSyncConflictsPage> {
         FutureBuilder<List<CoachSyncConflict>>(
           future: _future,
           builder: (context, snapshot) {
-            if (snapshot.hasError)
+            if (snapshot.hasError) {
               return CoachNoticeBanner(
                 message: l10n.get('coach_sync_conflict_changed'),
               );
+            }
             if (!snapshot.hasData) return const LinearProgressIndicator();
-            if (snapshot.data!.isEmpty)
+            if (snapshot.data!.isEmpty) {
               return CoachEmptyHint(
                 icon: Icons.check_circle_outline,
                 message: l10n.get('coach_sync_no_conflicts'),
               );
+            }
             return Column(
               children: [
                 for (final conflict in snapshot.data!)

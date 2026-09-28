@@ -88,6 +88,7 @@ class DeletionPlanner {
     required DeletionSelection selection,
     required ConfirmationToken token,
     required DeletionSnapshot freshSnapshot,
+    required DateTime now,
   }) {
     // 令牌必须对应本次操作，不能跨操作复用。
     if (freshSnapshot.profileId != preview.profileId ||
@@ -100,6 +101,15 @@ class DeletionPlanner {
       throw DeletionConflictException(
         operationId: preview.operationId,
         reasons: const ['confirmation token does not match this operation'],
+        refreshedPreview: _refresh(preview, freshSnapshot),
+      );
+    }
+    // 确认必须是"刚刚"发生的：令牌过期后用户看到的影响面可能已经变了，
+    // 必须重新预览并重新确认，而不是拿旧令牌继续提交。
+    if (token.isExpired(now)) {
+      throw DeletionConflictException(
+        operationId: preview.operationId,
+        reasons: const ['confirmation expired; refresh the preview'],
         refreshedPreview: _refresh(preview, freshSnapshot),
       );
     }

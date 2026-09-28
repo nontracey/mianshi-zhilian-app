@@ -6,7 +6,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class LearningPreferencesPage extends StatelessWidget {
-  const LearningPreferencesPage();
+  const LearningPreferencesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,7 @@ class LearningPreferencesPage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -40,7 +40,7 @@ class ProfileSubPage extends StatelessWidget {
 }
 
 class LearningSettingsPanel extends StatelessWidget {
-  const LearningSettingsPanel({
+  const LearningSettingsPanel({super.key, 
     required this.settings,
     required this.onSettingsChanged,
   });
@@ -257,7 +257,7 @@ class LearningSettingsPanel extends StatelessWidget {
 }
 
 class NumberSetting extends StatelessWidget {
-  const NumberSetting({
+  const NumberSetting({super.key, 
     required this.label,
     required this.value,
     required this.onChanged,

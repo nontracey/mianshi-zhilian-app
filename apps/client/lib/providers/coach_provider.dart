@@ -123,10 +123,11 @@ class CoachProvider extends ChangeNotifier {
         binding: _modelBindingProvider ?? () => null,
         clock: _clock,
       );
-      if (reassess)
+      if (reassess) {
         await service.reassess(event);
-      else
+      } else {
         await service.dispute(event);
+      }
       await reload();
     } finally {
       _reviewingAssessment = false;
@@ -168,10 +169,7 @@ class CoachProvider extends ChangeNotifier {
   Goal? get activeGoal {
     final id = _activeGoalId;
     if (id == null) return null;
-    for (final g in _goals) {
-      if (g.id == id) return g;
-    }
-    return null;
+    return _goals.where((g) => g.id == id).firstOrNull;
   }
 
   List<GoalRequirement> _activeRequirements = const [];
@@ -187,10 +185,7 @@ class CoachProvider extends ChangeNotifier {
   Resume? get activeResume {
     final id = _activeResumeId;
     if (id == null) return null;
-    for (final r in _resumes) {
-      if (r.id == id) return r;
-    }
-    return null;
+    return _resumes.where((r) => r.id == id).firstOrNull;
   }
 
   List<ResumeClaim> _activeClaims = const [];
@@ -377,15 +372,12 @@ class CoachProvider extends ChangeNotifier {
     _todayPlan = plans.firstWhere((p) => !p.isExtra, orElse: () => plans.first);
   }
 
-  /// 确保今天有基础计划；没有则按到期池与可学项生成并冻结（§9.6）。
-  Future<DailyPlan> ensureTodayPlan() => _store.transaction(() async {
-    await _loadTodayPlan();
-    final existing = todayPlan;
-    if (existing != null) {
-      await _materializeDeferredWorkflowCards();
-      return existing;
-    }
-
+  /// 计划候选范围：当前目标关联的知识点集合，以及其中「 scoped、未学、未失效」的可学项。
+  ///
+  /// 基础计划与顺延卡片必须共用同一份候选池，否则顺延卡片会跨出当前目标范围、
+  /// 或把已学过的知识点重新当作新知识排进今天（§9.7）。
+  Future<({Set<String> scope, List<KnowledgeItem> learnable})>
+  _planCandidates() async {
     final links = _activeGoalId == null
         ? <GoalKnowledgeLink>[]
         : await _store.listGoalKnowledgeLinks(_activeGoalId!);
@@ -404,6 +396,52 @@ class CoachProvider extends ChangeNotifier {
               k.contentStatus != 'stale',
         )
         .toList();
+    return (scope: scope, learnable: learnable);
+  }
+
+  /// 装配一次工作流编译请求。三处调用点（基础计划 / 顺延卡片 / 训练安排预览）
+  /// 必须走这里，避免参数各自手抄后产生行为分歧。
+  Future<WorkflowCompileRequest> _buildCompileRequest({
+    required WorkflowTemplate template,
+    required int minutesBudget,
+    String? rotationCursor,
+  }) async {
+    final candidates = await _planCandidates();
+    final projectIds = <ProjectId>{};
+    for (final resume in _resumes) {
+      projectIds.addAll((await _store.listProjects(resume.id)).map((p) => p.id));
+    }
+    return WorkflowCompileRequest(
+      profileId: profileId,
+      date: todayKey,
+      timezone: _clock.now().timeZoneName,
+      template: template,
+      idGen: _idGen,
+      clock: _clock,
+      minutesBudget: minutesBudget,
+      duePool: _reviewStates
+          .where((r) => candidates.scope.contains(r.knowledgeItemId))
+          .toList(),
+      learnable: candidates.learnable
+          .map((k) => LearnableKnowledgeRef(id: k.id, title: k.title))
+          .toList(),
+      knownGoalIds: _goals.map((g) => g.id).toSet(),
+      knownResumeIds: _resumes.map((r) => r.id).toSet(),
+      knownProjectIds: projectIds,
+      knownKnowledgeIds: _knowledgeItems.map((k) => k.id).toSet(),
+      rotationCursor: rotationCursor,
+    );
+  }
+
+  /// 确保今天有基础计划；没有则按到期池与可学项生成并冻结（§9.6）。
+  Future<DailyPlan> ensureTodayPlan() => _store.transaction(() async {
+    await _loadTodayPlan();
+    final existing = todayPlan;
+    if (existing != null) {
+      await _materializeDeferredWorkflowCards();
+      return existing;
+    }
+
     final budget = _profile?.dailyMinutesBudget ?? 25;
     final cursorRecord = await _store.getExtension(
       profileId,
@@ -418,40 +456,22 @@ class CoachProvider extends ChangeNotifier {
         ...BuiltInWorkflows.all,
         ...await _workflowRepo.listTemplates(profileId),
       ];
-      for (final t in candidates) {
-        if (t.id == templateId) template = t;
-      }
+      template = candidates.where((t) => t.id == templateId).firstOrNull;
       if (template == null) throw StateError('Default workflow source removed');
     }
     final compiled = template == null
         ? null
         : const WorkflowCompiler().compile(
-            WorkflowCompileRequest(
-              profileId: profileId,
-              date: todayKey,
-              timezone: _clock.now().timeZoneName,
+            await _buildCompileRequest(
               template: template,
-              idGen: _idGen,
-              clock: _clock,
               minutesBudget: budget,
-              duePool: _reviewStates
-                  .where((r) => scope.contains(r.knowledgeItemId))
-                  .toList(),
-              learnable: learnable
-                  .map((k) => LearnableKnowledgeRef(id: k.id, title: k.title))
-                  .toList(),
-              knownGoalIds: _goals.map((g) => g.id).toSet(),
-              knownResumeIds: _resumes.map((r) => r.id).toSet(),
-              knownProjectIds: {
-                for (final r in _resumes)
-                  ...(await _store.listProjects(r.id)).map((p) => p.id),
-              },
-              knownKnowledgeIds: _knowledgeItems.map((k) => k.id).toSet(),
               rotationCursor: cursor,
             ),
           );
-    if (compiled != null && !compiled.ok)
+    if (compiled != null && !compiled.ok) {
       throw StateError('Default workflow needs source selection');
+    }
+    final candidates = await _planCandidates();
     final plan =
         compiled?.plan ??
         _planService.generateBasePlan(
@@ -459,9 +479,9 @@ class CoachProvider extends ChangeNotifier {
           date: todayKey,
           timezone: _clock.now().timeZoneName,
           duePool: _reviewStates
-              .where((s) => scope.contains(s.knowledgeItemId))
+              .where((s) => candidates.scope.contains(s.knowledgeItemId))
               .toList(),
-          learnable: learnable,
+          learnable: candidates.learnable,
           idGen: _idGen,
           baseMinutes: budget,
           rotationCursor: cursor,
@@ -517,8 +537,9 @@ class CoachProvider extends ChangeNotifier {
     );
     for (final record in records) {
       if (record.value['deferredToDate'] != todayKey ||
-          record.value['deferredConsumed'] == true)
+          record.value['deferredConsumed'] == true) {
         continue;
+      }
       final raw = record.value['template'];
       final ids = (record.value['deferredCardIds'] as List? ?? const [])
           .whereType<String>()
@@ -535,36 +556,12 @@ class CoachProvider extends ChangeNotifier {
       final requiredMinutes = cards.fold<int>(
         0,
         (sum, card) =>
-            sum +
-            (card.estimatedMinutes ??
-                switch (card.type) {
-                  PlanItemType.learnKnowledge => 8,
-                  PlanItemType.reviewLearned => 6,
-                  PlanItemType.projectTraining => 10,
-                  PlanItemType.mockInterview => 15,
-                }),
+            sum + (card.estimatedMinutes ?? card.type.defaultMinutes),
       );
       final compiled = const WorkflowCompiler().compile(
-        WorkflowCompileRequest(
-          profileId: profileId,
-          date: todayKey,
-          timezone: _clock.now().timeZoneName,
+        await _buildCompileRequest(
           template: deferredTemplate,
-          idGen: _idGen,
-          clock: _clock,
           minutesBudget: requiredMinutes,
-          duePool: _reviewStates,
-          learnable: _knowledgeItems
-              .where((k) => k.contentStatus != 'stale')
-              .map((k) => LearnableKnowledgeRef(id: k.id, title: k.title))
-              .toList(),
-          knownGoalIds: _goals.map((g) => g.id).toSet(),
-          knownResumeIds: _resumes.map((r) => r.id).toSet(),
-          knownProjectIds: {
-            for (final resume in _resumes)
-              ...(await _store.listProjects(resume.id)).map((p) => p.id),
-          },
-          knownKnowledgeIds: _knowledgeItems.map((k) => k.id).toSet(),
         ),
       );
       if (!compiled.ok) continue;
@@ -806,8 +803,9 @@ class CoachProvider extends ChangeNotifier {
     String? planItemId,
     String? parentSessionId,
   }) async {
-    if (isGenerating)
+    if (isGenerating) {
       throw StateError('Wait for the current turn or cancel it');
+    }
     final selectedGoal = goalId ?? _activeGoalId;
     final selectedResume = resumeId ?? _activeResumeId;
     if (durationMinutes != null &&
@@ -937,8 +935,9 @@ class CoachProvider extends ChangeNotifier {
       _activeSession = await _store.getSession(session.id);
       _messages = await _store.messagesOf(session.id);
       _reviewStates = await _store.listReviewStates(profileId);
-      if (_activeSession?.status == RuntimeStatus.completed)
+      if (_activeSession?.status == RuntimeStatus.completed) {
         await _completeLinkedPlanItem();
+      }
       _sessions = await _store.listSessions(profileId);
       _sessions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return result;
@@ -1072,8 +1071,9 @@ class CoachProvider extends ChangeNotifier {
     ].where((p) => p.planItems.any((i) => i.id == itemId));
     if (matching.isEmpty) return;
     final plan = matching.first;
-    if (!plan.planItems.firstWhere((i) => i.id == itemId).completed)
+    if (!plan.planItems.firstWhere((i) => i.id == itemId).completed) {
       await togglePlanItem(itemId);
+    }
     for (final run in await _workflowRepo.listRuns(profileId)) {
       if (run.planId == plan.id && run.currentCardId == itemId) {
         await _workflowRepo.putRun(run.advance(), updatedAt: _clock.now());
@@ -1114,8 +1114,9 @@ class CoachProvider extends ChangeNotifier {
       final knowledge = await _store.getKnowledgeItem(knowledgeId);
       if (knowledge == null ||
           knowledge.profileId != profileId ||
-          knowledge.contentStatus == 'stale')
+          knowledge.contentStatus == 'stale') {
         continue;
+      }
       final extra = DailyPlan(
         id: _idGen.next(),
         profileId: profileId,
@@ -1256,10 +1257,7 @@ class CoachProvider extends ChangeNotifier {
     final id = _lastAdjustmentId;
     if (id == null) return false;
     final adjustments = await _workflowRepo.listAdjustments(profileId);
-    PlanAdjustment? adjustment;
-    for (final a in adjustments) {
-      if (a.id == id) adjustment = a;
-    }
+    final adjustment = adjustments.where((a) => a.id == id).firstOrNull;
     if (adjustment == null || !adjustment.undoAllowed) return false;
     await _loadTodayPlan();
     if (todayPlan == null ||
@@ -1348,8 +1346,9 @@ class CoachProvider extends ChangeNotifier {
   /// 从备份 JSON 恢复（合并式 upsert，不删除备份后新增的数据）。
   /// 返回恢复的实体数；结构或完整性校验失败时抛 [FormatException]。
   Future<int> importCoachBackupJson(String content) async {
-    if (isGenerating)
+    if (isGenerating) {
       throw StateError('Cannot restore during model generation');
+    }
     final decoded = jsonDecode(content);
     if (decoded is! Map) {
       throw const FormatException('backup must be a json object');
@@ -1385,10 +1384,7 @@ class CoachProvider extends ChangeNotifier {
       throw ArgumentError.value(name, 'name', 'template name is empty');
     }
     final existing = await _workflowRepo.listTemplates(profileId);
-    WorkflowTemplate? same;
-    for (final t in existing) {
-      if (t.name == trimmed) same = t;
-    }
+    final same = existing.where((t) => t.name == trimmed).firstOrNull;
     final now = _clock.now();
     if (same != null) {
       final updated = same.copyWith(
@@ -1427,11 +1423,7 @@ class CoachProvider extends ChangeNotifier {
   Future<bool> deleteWorkflowTemplate(String id) async {
     if (!id.startsWith('user.')) return false;
     final existing = await _workflowRepo.listTemplates(profileId);
-    var found = false;
-    for (final t in existing) {
-      if (t.id == id) found = true;
-    }
-    if (!found) return false;
+    if (!existing.any((t) => t.id == id)) return false;
     final current = _profile;
     if (current != null && current.defaultWorkflowTemplateId == id) {
       final cleared = current.copyWith(
@@ -1484,8 +1476,9 @@ class CoachProvider extends ChangeNotifier {
             case CleanupTaskIds.sourceChunks:
               _retriever.index.clearProfile(profileId);
               final embedding = _retriever.embedding;
-              if (embedding is EmbeddingCache)
+              if (embedding is EmbeddingCache) {
                 (embedding as EmbeddingCache).clearCache();
+              }
             default:
               throw StateError('Unknown cleanup task');
           }
@@ -1510,20 +1503,25 @@ class CoachProvider extends ChangeNotifier {
           operationId: _idGen.next(),
         ),
       );
-      if (_profile != null)
+      // 墓碑只增不减会让墓碑表随清除次数单调膨胀、并整体进入备份包；
+      // 同步判定只需要每个实体的最新代次与 profile_reset 的最大代次，旧的可以修剪。
+      await _store.pruneTombstones(profileId);
+      if (_profile != null) {
         await _store.putProfile(
           _profile!.copyWith(
             clearDefaultWorkflowTemplateId: true,
             updatedAt: _clock.now(),
           ),
         );
+      }
     });
     _retriever.index.clearProfile(profileId);
     final embedding = _retriever.embedding;
     if (embedding is EmbeddingCache) (embedding as EmbeddingCache).clearCache();
     final storage = _store;
-    if (storage is CoachStoreMaintenance)
+    if (storage is CoachStoreMaintenance) {
       await (storage as CoachStoreMaintenance).compactDeletedData();
+    }
     _activeSession = null;
     _messages = const [];
     _sessions = const [];

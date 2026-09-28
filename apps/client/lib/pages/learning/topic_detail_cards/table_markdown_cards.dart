@@ -3,7 +3,7 @@ part of '../topic_detail_cards.dart';
 // ── 表格卡片 ─────────────────────────────────────────────────
 
 class TableCard extends StatelessWidget {
-  const TableCard({required this.card});
+  const TableCard({super.key, required this.card});
   final LearningCard card;
 
   String _formatTableContent(String content) {
@@ -75,7 +75,7 @@ class TableCard extends StatelessWidget {
 // ── 通用卡片 ─────────────────────────────────────────────────
 
 class GenericCard extends StatelessWidget {
-  const GenericCard({required this.card});
+  const GenericCard({super.key, required this.card});
   final LearningCard card;
 
   bool _shouldUseMarkdown(String content) {
@@ -121,7 +121,7 @@ class GenericCard extends StatelessWidget {
 // ── Markdown 渲染组件 ────────────────────────────────────────
 
 class MarkdownContent extends StatelessWidget {
-  const MarkdownContent({required this.data});
+  const MarkdownContent({super.key, required this.data});
   final String data;
 
   @override

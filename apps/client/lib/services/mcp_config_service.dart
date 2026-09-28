@@ -176,8 +176,9 @@ class McpConfigService extends ChangeNotifier {
         execute: (call, token) async {
           final entry = entries[call.name];
           if (entry == null) throw StateError('Tool has not been authorized');
-          if (jsonEncode(call.arguments).length > 6000)
+          if (jsonEncode(call.arguments).length > 6000) {
             throw StateError('Tool arguments too large');
+          }
           // Re-read grants before every call so revocation takes effect mid-turn.
           final configs = await list();
           if (!configs.any(

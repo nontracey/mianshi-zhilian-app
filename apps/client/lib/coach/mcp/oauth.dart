@@ -66,8 +66,9 @@ class McpOAuthClient {
     if (uri.scheme != 'https' ||
         uri.host.isEmpty ||
         uri.userInfo.isNotEmpty ||
-        uri.hasFragment)
+        uri.hasFragment) {
       throw const McpOAuthException('insecure_endpoint');
+    }
     return uri;
   }
 
@@ -84,8 +85,9 @@ class McpOAuthClient {
       const Duration(seconds: 20),
     )) {
       bytes.addAll(chunk);
-      if (bytes.length > 1024 * 1024)
+      if (bytes.length > 1024 * 1024) {
         throw const McpOAuthException('response_too_large');
+      }
     }
     return http.Response.bytes(
       bytes,
@@ -95,11 +97,13 @@ class McpOAuthClient {
   }
 
   Map<String, dynamic> _json(http.Response response) {
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw const McpOAuthException('request_failed');
+    }
     final value = jsonDecode(response.body);
-    if (value is! Map<String, dynamic>)
+    if (value is! Map<String, dynamic>) {
       throw const McpOAuthException('invalid_response');
+    }
     return value;
   }
 
@@ -110,8 +114,9 @@ class McpOAuthClient {
     String requestedScope = '',
   }) async {
     final target = _https(resource);
-    if (clientId.trim().isEmpty)
+    if (clientId.trim().isEmpty) {
       throw const McpOAuthException('client_id_required');
+    }
     final probe = await _request(target);
     final challenge = probe.headers['www-authenticate'] ?? '';
     String? challengeValue(String key) => RegExp(
@@ -138,11 +143,13 @@ class McpOAuthClient {
       protected = _json(response);
       break;
     }
-    if (protected == null || protected['resource'] != resource)
+    if (protected == null || protected['resource'] != resource) {
       throw const McpOAuthException('resource_mismatch');
+    }
     final issuers = protected['authorization_servers'];
-    if (issuers is! List || issuers.isEmpty || issuers.first is! String)
+    if (issuers is! List || issuers.isEmpty || issuers.first is! String) {
       throw const McpOAuthException('issuer_missing');
+    }
     final issuer = issuers.first as String;
     final authority = _https(issuer);
     final suffix = authority.path == '/' ? '' : authority.path;
@@ -167,12 +174,14 @@ class McpOAuthClient {
       metadata = _json(response);
       break;
     }
-    if (metadata == null || metadata['issuer'] != issuer)
+    if (metadata == null || metadata['issuer'] != issuer) {
       throw const McpOAuthException('issuer_mismatch');
+    }
     if (!(metadata['code_challenge_methods_supported'] as List? ?? []).contains(
       'S256',
-    ))
+    )) {
       throw const McpOAuthException('pkce_s256_required');
+    }
     final endpoint = _https(metadata['authorization_endpoint'] as String);
     final tokenEndpoint = _https(metadata['token_endpoint'] as String);
     final verifier = _random(), state = _random();
@@ -199,18 +208,22 @@ class McpOAuthClient {
     if (callback.replace(query: '', fragment: '') !=
             redirectUri.replace(query: '', fragment: '') ||
         callback.queryParametersAll.values.any((v) => v.length != 1) ||
-        callback.queryParameters['state'] != state)
+        callback.queryParameters['state'] != state) {
       throw const McpOAuthException('callback_mismatch');
+    }
     final responseIssuer = callback.queryParameters['iss'];
     if ((metadata['authorization_response_iss_parameter_supported'] == true &&
             responseIssuer == null) ||
-        (responseIssuer != null && responseIssuer != issuer))
+        (responseIssuer != null && responseIssuer != issuer)) {
       throw const McpOAuthException('callback_issuer_mismatch');
-    if (callback.queryParameters.containsKey('error'))
+    }
+    if (callback.queryParameters.containsKey('error')) {
       throw const McpOAuthException('authorization_denied');
+    }
     final code = callback.queryParameters['code'];
-    if (code == null || code.isEmpty)
+    if (code == null || code.isEmpty) {
       throw const McpOAuthException('code_missing');
+    }
     final response = _json(
       await _request(
         tokenEndpoint,
@@ -235,8 +248,9 @@ class McpOAuthClient {
   }
 
   Future<McpOAuthGrant> refresh(McpOAuthGrant previous) async {
-    if (previous.refreshToken == null)
+    if (previous.refreshToken == null) {
       throw const McpOAuthException('login_required');
+    }
     final json = _json(
       await _request(
         _https(previous.tokenEndpoint),
@@ -271,8 +285,9 @@ class McpOAuthClient {
   }) {
     if ((json['token_type'] as String? ?? '').toLowerCase() != 'bearer' ||
         json['access_token'] is! String ||
-        (json['access_token'] as String).isEmpty)
+        (json['access_token'] as String).isEmpty) {
       throw const McpOAuthException('invalid_token');
+    }
     final seconds = json['expires_in'];
     return McpOAuthGrant(
       resource: resource,

@@ -45,7 +45,7 @@ Future<void> _fetch(http.Client client) async {
       for (final topicPath in topicPaths) {
         try {
           final topicData = await _getJson(client, '$_baseUrl/$topicPath');
-          final fileName = topicPath.replaceAll('/', '_').replaceAll('.json', '') + '.json';
+          final fileName = '${topicPath.replaceAll('/', '_').replaceAll('.json', '')}.json';
           _write('$_outDir/$domainId/$fileName', topicData);
           print('✓ $domainId/$fileName');
         } catch (e) {

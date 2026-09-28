@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mianshi_zhilian/coach/domain/common.dart';
 import 'package:mianshi_zhilian/coach/jobs/jd_import_service.dart';
@@ -34,8 +35,18 @@ import 'package:mianshi_zhilian/pages/coach/resume_review_page.dart';
 import 'package:mianshi_zhilian/pages/coach/today_page.dart';
 import 'package:mianshi_zhilian/pages/coach/training_arrangement_page.dart';
 import 'package:mianshi_zhilian/providers/coach_provider.dart';
+import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/goal_provider.dart';
+import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/localization_provider.dart';
+import 'package:mianshi_zhilian/providers/progress_provider.dart';
+import 'package:mianshi_zhilian/providers/settings_provider.dart';
+import 'package:mianshi_zhilian/providers/theme_provider.dart';
+import 'package:mianshi_zhilian/services/content_api_service.dart';
+import 'package:mianshi_zhilian/services/data_sync_service.dart';
+import 'package:mianshi_zhilian/services/storage_service.dart';
+
+import '../helpers/fake_content_client.dart';
 
 /// 不联网的 JD 抓取器：导入链路会返回明确的失败状态。
 class _UnsupportedJdFetcher implements JdFetcher {
@@ -100,11 +111,90 @@ Future<void> _pumpCoach(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('CoachShell 三入口都能 build', (tester) async {
-    await _pumpCoach(tester, const CoachShell());
+  // NavigationBar 里选中项显示 selectedIcon，其余显示 outlined 图标。
+  // 按初始选中顺序依次切换：tab0 选中(filled) → tab1 → tab2。
+  const _tabIcons = [
+    Icons.menu_book,
+    Icons.today_outlined,
+    Icons.donut_large_outlined,
+  ];
+
+  /// CoachShell 现在内嵌内容库/掌握度页（CDN 内容源），
+  /// 需要完整的内容侧 provider 组合。
+  Future<void> _pumpShell(WidgetTester tester, Widget page) async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    final content = ContentProvider(
+      ContentApiService(
+        baseUrl: 'https://fake.test',
+        httpClient: FakeContentClient(),
+      ),
+      storage,
+    );
+    final settings = SettingsProvider(
+      storage,
+      DataSyncService(storage),
+      ThemeProvider(),
+    );
+    await settings.loadSettings();
+    final progress = ProgressProvider(storage)..loadProgress();
+    final scope = LearningScopeProvider(storage)..load();
+    await content.loadContent();
+
+    final shared = InMemoryCoachStore();
+    final idGen = IdGenerator();
+    final coachProvider = CoachProvider(store: shared, idGen: idGen);
+    final goalProvider = GoalProvider(
+      store: shared,
+      documents: DocumentImporter(
+        parser: const BuiltInDocumentParser(),
+        chunker: Chunker(),
+        idGen: idGen,
+        clock: const SystemClock(),
+      ),
+      resumeImport: ResumeImportService(
+        parser: const RuleBasedResumeParser(),
+        idGen: idGen,
+        clock: const SystemClock(),
+        matcher: KeywordClaimMatcher(),
+      ),
+      jdImport: JdImportService(
+        fetcher: _UnsupportedJdFetcher(),
+        parser: const HeuristicJdParser(),
+        idGen: idGen,
+        clock: const SystemClock(),
+      ),
+    );
+    await coachProvider.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<LocalizationProvider>.value(
+            value: LocalizationProvider(initialLanguage: 'zh'),
+          ),
+          ChangeNotifierProvider<ContentProvider>.value(value: content),
+          ChangeNotifierProvider<ProgressProvider>.value(value: progress),
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<LearningScopeProvider>.value(value: scope),
+          ChangeNotifierProvider<CoachProvider>.value(value: coachProvider),
+          ChangeNotifierProvider<GoalProvider>.value(value: goalProvider),
+        ],
+        child: MaterialApp(home: page),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('CoachShell 三入口（知识/学习/掌握度）都能 build', (tester) async {
+    await _pumpShell(tester, const CoachShell());
     expect(find.byType(CoachShell), findsOneWidget);
-    // 今天 / 模拟面试 / 目标与资料 三个 tab 都在。
     expect(find.byType(NavigationBar), findsOneWidget);
+    // 三个 tab 依次可切换且都能完成首帧。
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byIcon(_tabIcons[i]));
+      await tester.pumpAndSettle();
+    }
   });
 
   testWidgets('TodayPage 空状态可渲染', (tester) async {
@@ -266,8 +356,10 @@ void main() {
       store: store,
     );
     expect(find.byType(InterviewReportPage), findsOneWidget);
-    // 不编造评语：必须出现「未接入模型」的说明。
-    expect(find.textContaining('没有已保存的有效评价'), findsWidgets);
+    // 未接入模型时必须如实说明「没有自动点评、界面不会编造评语」，
+    // 而不是笼统地说「没有已保存的评价」——后者会把"未接入"和"接入了但没评价"
+    // 混为一谈，让用户以为评价已经跑过。
+    expect(find.textContaining('未接入模型'), findsWidgets);
     // 原答必须原样回显。
     expect(find.textContaining('演示数据：我的原答'), findsWidgets);
   });

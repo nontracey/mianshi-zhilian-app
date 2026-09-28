@@ -72,8 +72,9 @@ class WorkflowRun {
       for (var i = 0; i <= currentIndex && i < cardIds.length; i++) i,
     ]) {
       if (!completed.contains(cardIds[index]) &&
-          !skipped.contains(cardIds[index]))
+          !skipped.contains(cardIds[index])) {
         return index;
+      }
     }
     return cardIds.length;
   }
@@ -82,7 +83,7 @@ class WorkflowRun {
     if (finished) return this;
     final completed = {
       ...completedCardIds,
-      if (currentCardId != null) currentCardId!,
+      ?currentCardId,
     };
     final next = _nextIndex(completed, skippedCardIds);
     return copyWith(

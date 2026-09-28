@@ -10,11 +10,12 @@ import 'coach_store.dart';
 
 Map<String, Object?> coachBackupFromData(Map<String, Object?> data) {
   Object? canonical(Object? value) {
-    if (value is Map)
+    if (value is Map) {
       return {
         for (final key in value.keys.map((k) => k.toString()).toList()..sort())
           key: canonical(value[key]),
       };
+    }
     if (value is List) return value.map(canonical).toList();
     return value;
   }
@@ -96,8 +97,9 @@ Future<Map<String, Object?>> mergeCoachBackups(
             generation(side, profile) <
                 (generation(left, profile) > generation(right, profile)
                     ? generation(left, profile)
-                    : generation(right, profile)))
+                    : generation(right, profile))) {
           continue;
+        }
         final key = _id(table, row);
         final previous = rows[key];
         if (previous == null) {
@@ -105,10 +107,11 @@ Future<Map<String, Object?>> mergeCoachBackups(
           if (table == 'sources') sourceOwners[key] = side;
           continue;
         }
-        if (previous['profileId'] != row['profileId'])
+        if (previous['profileId'] != row['profileId']) {
           throw const FormatException(
             'Sync identity collision across profiles',
           );
+        }
         _fillRedactedFields(previous, row);
         _fillRedactedFields(row, previous);
         if (table == 'sources' &&
@@ -178,14 +181,16 @@ Future<Map<String, Object?>> mergeCoachBackups(
         if (table == 'assessmentEvents' && _stable(previous) != _stable(row)) {
           if (previous['rationale'] == 'sync_conflict_pending') {
             if ((row['assessmentRevision'] as int? ?? 0) >
-                (previous['assessmentRevision'] as int? ?? 0))
+                (previous['assessmentRevision'] as int? ?? 0)) {
               rows[key] = row;
+            }
             continue;
           }
           if (row['rationale'] == 'sync_conflict_pending') {
             if ((row['assessmentRevision'] as int? ?? 0) >=
-                (previous['assessmentRevision'] as int? ?? 0))
+                (previous['assessmentRevision'] as int? ?? 0)) {
               rows[key] = row;
+            }
             continue;
           }
           final variants = [previous, row]
@@ -229,8 +234,9 @@ Future<Map<String, Object?>> mergeCoachBackups(
               'Conflicting original messages; neither copy was overwritten',
             );
           }
-          if (previous['content'] == '' && row['content'] != '')
+          if (previous['content'] == '' && row['content'] != '') {
             rows[key] = row;
+          }
           continue;
         }
         int version(Map r) =>
@@ -262,10 +268,12 @@ Future<Map<String, Object?>> mergeCoachBackups(
             ...variant,
             'id': '${variant['id']}.conflict.$suffix',
           };
-          if (table == 'dailyPlans')
+          if (table == 'dailyPlans') {
             copy['revisionNote'] = 'sync_conflict:${row['id']}';
-          if (table == 'extensions' && variant['value'] is Map)
+          }
+          if (table == 'extensions' && variant['value'] is Map) {
             copy['value'] = {...variant['value'] as Map, 'id': copy['id']};
+          }
           rows[_id(table, copy)] = copy;
           conflicts.add({
             'profileId': profile,
@@ -291,8 +299,9 @@ Future<Map<String, Object?>> mergeCoachBackups(
             (v == 0 &&
                 (timestamp > 0 ||
                     (timestamp == 0 &&
-                        _stable(row).compareTo(_stable(previous)) > 0))))
+                        _stable(row).compareTo(_stable(previous)) > 0)))) {
           rows[key] = row;
+        }
       }
     }
     out[table] = rows.values.toList();
@@ -328,9 +337,10 @@ Future<Map<String, Object?>> mergeCoachBackups(
       }
       if (profile == null) return false;
       if (table == 'goals') return deleted(profile, 'goal', r['id']);
-      if (table == 'knowledgeItems')
+      if (table == 'knowledgeItems') {
         return deleted(profile, 'knowledge', r['id']) &&
             r['contentStatus'] != 'removed';
+      }
       return deleted(profile, 'goal', r['goalId']);
     });
   }
@@ -472,7 +482,7 @@ Map<String, Object?> redactCoachBackup(
         )
         .toList();
   }
-  if (!configMetadata)
+  if (!configMetadata) {
     data['extensions'] = (data['extensions'] as List)
         .where(
           (e) => ![
@@ -482,6 +492,7 @@ Map<String, Object?> redactCoachBackup(
           ].contains(e['kind']),
         )
         .toList();
+  }
   if (!privateMaterials || !fullText) {
     for (final extension in data['extensions'] as List) {
       if (extension['kind'] != 'syncMetadata') continue;
@@ -505,11 +516,13 @@ Map<String, Object?> redactCoachBackup(
       };
       for (final key in row.keys.cast<String>()) {
         if (!key.startsWith('_coach') &&
-            jsonEncode(prior[key]) != jsonEncode(row[key]))
+            jsonEncode(prior[key]) != jsonEncode(row[key])) {
           fields.add(key);
+        }
       }
-      if (fields.isNotEmpty)
+      if (fields.isNotEmpty) {
         row['_coachRedactedFields'] = fields.toList()..sort();
+      }
     }
   }
   _writeRedactionLedger(data);
@@ -518,11 +531,12 @@ Map<String, Object?> redactCoachBackup(
 
 String _stable(Object? value) {
   Object? sorted(Object? v) {
-    if (v is Map)
+    if (v is Map) {
       return {
         for (final k in v.keys.map((k) => k.toString()).toList()..sort())
           if (!k.startsWith('_coachRedacted')) k: sorted(v[k]),
       };
+    }
     if (v is List) return v.map(sorted).toList();
     return v;
   }
@@ -546,8 +560,9 @@ void _restoreRedactionMarkers(Map data) {
       for (final row in data[table] as List) {
         if (_profileOf(data, table, row) != record['profileId']) continue;
         final fields = (rows[table] as Map)[_id(table, row)];
-        if (fields is List)
+        if (fields is List) {
           row['_coachRedactedFields'] = fields.whereType<String>().toList();
+        }
       }
     }
   }
@@ -596,10 +611,11 @@ void _fillRedactedFields(Map target, Map source) {
     }
   }
   target.remove('_coachRedacted');
-  if (fields.isEmpty)
+  if (fields.isEmpty) {
     target.remove('_coachRedactedFields');
-  else
+  } else {
     target['_coachRedactedFields'] = fields.toList()..sort();
+  }
 }
 
 void _writeRedactionLedger(Map data) {

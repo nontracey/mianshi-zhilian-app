@@ -6,11 +6,13 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import '../coach/jobs/jd_import_service.dart';
 import '../coach/model/http_client.dart';
+import 'safe_endpoint.dart';
 
 /// JD 抓取失败（网络错误、非 2xx、非法链接）。
 class JdFetchException implements Exception {
@@ -38,13 +40,15 @@ class HttpJdFetcher implements JdFetcher {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
+  /// 抓取体积上限（字节）。岗位页正常在几十 KB 量级；无上限时一个超大页面
+  /// 会直接撑爆内存，也会带着整页正文进模型上下文。
+  static const int maxResponseBytes = 2 * 1024 * 1024;
+
   @override
   Future<String> fetchText(String url, {CancelToken? cancel}) async {
     final uri = Uri.tryParse(url);
-    if (uri == null ||
-        !['http', 'https'].contains(uri.scheme) ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
+    // 链接来自用户粘贴、目标不可信：排除内网地址，否则一条链接就能探测内网。
+    if (uri == null || !isAllowedFetchTarget(uri)) {
       throw JdFetchException('无效的岗位链接', url: url);
     }
     if (cancel?.isCancelled ?? false) {
@@ -53,16 +57,28 @@ class HttpJdFetcher implements JdFetcher {
 
     final http.Response resp;
     try {
-      resp = await _client
-          .get(
-            uri,
-            headers: {
-              'User-Agent': _ua,
-              'Accept': 'text/html,application/xhtml+xml',
-              'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            },
-          )
-          .timeout(timeout);
+      // 不跟随重定向：否则一条公网链接可以 302 跳到内网地址绕过上面的校验。
+      final request = http.Request('GET', uri)
+        ..followRedirects = false
+        ..maxRedirects = 0
+        ..headers.addAll({
+          'User-Agent': _ua,
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        });
+      final streamed = await _client.send(request).timeout(timeout);
+      final bytes = await _readCapped(
+        streamed.stream,
+        maxResponseBytes,
+        url: url,
+      ).timeout(timeout);
+      resp = http.Response.bytes(
+        bytes,
+        streamed.statusCode,
+        headers: streamed.headers,
+      );
+    } on JdFetchException {
+      rethrow;
     } catch (e) {
       throw JdFetchException('网络请求失败：$e', url: url);
     }
@@ -83,6 +99,22 @@ class HttpJdFetcher implements JdFetcher {
   }
 
   void close() => _client.close();
+
+  /// 边读边计数，超过上限立刻中断，避免先把整份响应读进内存再判断。
+  static Future<Uint8List> _readCapped(
+    Stream<List<int>> stream,
+    int limit, {
+    String? url,
+  }) async {
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in stream) {
+      builder.add(chunk);
+      if (builder.length > limit) {
+        throw JdFetchException('岗位页面过大，请粘贴岗位正文', url: url);
+      }
+    }
+    return builder.takeBytes();
+  }
 
   /// Unsupported encodings fail visibly instead of importing garbled requirements.
   static String _decodeBody(http.Response resp) {

@@ -40,6 +40,7 @@ class DeletionExecutor {
       selection: selection,
       token: token,
       freshSnapshot: fresh,
+      now: clock.now(),
     );
     final now = clock.now();
     for (final goalId in result.deletedGoalIds) {
@@ -186,7 +187,16 @@ class DeletionExecutor {
           : const <String>[];
       if (task.type == CleanupTaskIds.sourceChunks) {
         for (final id in ids) {
+          // 先记下关联来源，删完分块后检查：一个来源若不再有任何分块
+          // （其全部知识都随本次删除移除），原文快照必须一并删除，
+          // 否则用户以为已删的资料仍以全文躺在数据库和备份包里。
+          final sourceIds = await store.sourceIdsForKnowledge(id);
           await store.deleteSourceChunksForKnowledge(id);
+          for (final sourceId in sourceIds) {
+            if ((await store.listSourceChunks(sourceId)).isEmpty) {
+              await store.deleteSource(sourceId);
+            }
+          }
         }
       }
       if (task.type != CleanupTaskIds.sourceChunks && externalCleaner == null) {

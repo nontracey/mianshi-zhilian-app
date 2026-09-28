@@ -1,20 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mianshi_zhilian/models/learning_route.dart';
 import 'package:mianshi_zhilian/models/learning_scope.dart';
-import 'package:mianshi_zhilian/models/user_progress.dart';
 import 'package:mianshi_zhilian/providers/content_provider.dart';
 import 'package:mianshi_zhilian/providers/learning_scope_provider.dart';
 import 'package:mianshi_zhilian/providers/progress_provider.dart';
-import 'package:mianshi_zhilian/services/ai_route_generator.dart';
 import 'package:mianshi_zhilian/services/content_api_service.dart';
 import 'package:mianshi_zhilian/services/route_composer.dart';
 import 'package:mianshi_zhilian/services/storage_service.dart';
 
 import '../helpers/fake_content_client.dart';
-import '../helpers/mocks.mocks.dart';
 
 /// 核心业务流程端到端（数据/业务层）：用真实 ContentApiService + ContentProvider
 /// 加载贴真的 java/agent/python 三领域内容，跑通 内容加载 → 路线生成 → 范围解析
@@ -89,55 +85,6 @@ void main() {
       final orders = content.getTopicsByDomain('java').map((t) => t.order).toList();
       final sorted = [...orders]..sort();
       expect(orders, sorted);
-    });
-  });
-
-  group('路线生成（无 AI 走本地降级）+ 组装一致性', () {
-    test('多领域目标 → 覆盖全部相关领域，声称领域==有内容领域', () async {
-      final mockAi = MockAiService();
-      when(mockAi.isConfigAvailable(any)).thenReturn(false);
-      final gen = AiRouteGenerator(content.domains);
-
-      final route = await gen.generateRoute(
-        plan: PrepPlan(
-          targetRole: 'Agent 开发工程师',
-          techStack: 'Python Java Spring',
-          jobDescription: '',
-          updatedAt: DateTime(2026),
-        ),
-        allTopics: const [],
-        progressProvider: progress,
-        aiService: mockAi,
-        contentProvider: content,
-        forceRegenerate: true,
-      );
-
-      expect(route.effectiveDomainIds, containsAll(['java', 'agent', 'python']));
-      expect(route.effectiveDomainIds.toSet(),
-          RouteComposer.domainsOf(route.phases!).toSet());
-      expect(route.allTopicIds.length, totalCount);
-    });
-
-    test('单领域目标 → 只覆盖该领域', () async {
-      final mockAi = MockAiService();
-      when(mockAi.isConfigAvailable(any)).thenReturn(false);
-      final gen = AiRouteGenerator(content.domains);
-
-      final route = await gen.generateRoute(
-        plan: PrepPlan(
-          targetRole: 'Python 工程师',
-          techStack: 'Python',
-          jobDescription: '',
-          updatedAt: DateTime(2026),
-        ),
-        allTopics: const [],
-        progressProvider: progress,
-        aiService: mockAi,
-        contentProvider: content,
-        forceRegenerate: true,
-      );
-      expect(route.effectiveDomainIds, ['python']);
-      expect(route.allTopicIds.length, pythonCount);
     });
   });
 

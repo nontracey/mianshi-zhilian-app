@@ -48,8 +48,9 @@ class DataSyncService {
   /// transport. Credentials remain in StorageService, outside coach snapshots.
   Future<SyncResult> syncCoach(CoachStore store) async {
     if (_running) return SyncResult.failure('sync_already_running');
-    if (_canImportCoach?.call() == false)
+    if (_canImportCoach?.call() == false) {
       return SyncResult.failure('coach_sync_busy');
+    }
     final settings = await _storage.loadSyncSettings();
     final transport = DataSyncService(
       _storage,
@@ -84,8 +85,9 @@ class DataSyncService {
         combined = await mergeCoachBackups(combined, incoming);
         await channel.upload(outgoing());
       }
-      if (_canImportCoach?.call() == false)
+      if (_canImportCoach?.call() == false) {
         return SyncResult.failure('coach_sync_busy');
+      }
       var imported = false;
       await store.transaction(() async {
         if (_canImportCoach?.call() == false) return;
@@ -121,13 +123,15 @@ class DataSyncService {
   }
 
   Future<SyncResult> syncIfNeeded({bool force = false}) async {
-    if (_automaticCycleRunning)
+    if (_automaticCycleRunning) {
       return SyncResult.failure('sync_already_running');
+    }
     _automaticCycleRunning = true;
     try {
       final settings = await _storage.loadSyncSettings();
-      if (!_shouldAutoSync(settings, force: force))
+      if (!_shouldAutoSync(settings, force: force)) {
         return SyncResult.success('local_mode');
+      }
       final legacy = await _syncLegacyIfNeeded(force: force);
       final store = _coachStore;
       final now = DateTime.now();
@@ -137,8 +141,9 @@ class DataSyncService {
               Duration(
                 minutes: settings.autoSyncIntervalMinutes.clamp(1, 1440),
               );
-      if (store == null || (!force && !due) || _canImportCoach?.call() == false)
+      if (store == null || (!force && !due) || _canImportCoach?.call() == false) {
         return legacy;
+      }
       _lastCoachSyncAttempt = now;
       final coach = await syncCoach(store);
       return legacy.success ? coach : legacy;
@@ -494,8 +499,9 @@ class DataSyncService {
       final streamed = await client.send(request).timeout(_timeout);
       final bytes = await streamed.stream
           .fold<List<int>>(<int>[], (data, chunk) {
-            if (data.length + chunk.length > 32 * 1024 * 1024)
+            if (data.length + chunk.length > 32 * 1024 * 1024) {
               throw const FormatException('Sync response is too large');
+            }
             data.addAll(chunk);
             return data;
           })

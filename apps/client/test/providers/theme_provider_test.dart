@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../lib/models/app_settings.dart';
-import '../../lib/providers/theme_provider.dart';
+import 'package:mianshi_zhilian/models/app_settings.dart';
+import 'package:mianshi_zhilian/providers/theme_provider.dart';
 
 void main() {
   group('ThemeProvider', () {

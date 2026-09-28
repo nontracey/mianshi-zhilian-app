@@ -160,9 +160,20 @@ class _InterviewPageState extends State<InterviewPage> {
                                 : null,
                             interviewStyle: _style,
                           );
-                        } finally {
+                        } catch (_) {
+                          // 起会话失败必须让用户看到，不能只是按钮弹回原状。
                           if (mounted) setState(() => _starting = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                l10n.get('coach_session_start_failed'),
+                              ),
+                            ),
+                          );
+                          return;
                         }
+                        if (mounted) setState(() => _starting = false);
                         if (!context.mounted) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(

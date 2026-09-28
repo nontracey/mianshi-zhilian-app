@@ -62,8 +62,9 @@ class StoreDeletionSnapshotSource {
       if ((await store.messagesOf(
         session.id,
       )).any((m) => m.role == 'user' && m.content.trim().isNotEmpty)) {
-        if (session.knowledgeItemId != null)
+        if (session.knowledgeItemId != null) {
           rawAnswerKnowledge.add(session.knowledgeItemId!);
+        }
         rawAnswerKnowledge.addAll(
           session.coverageSnapshot?.knowledgeItemIds ?? const [],
         );

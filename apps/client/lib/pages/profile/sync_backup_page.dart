@@ -25,7 +25,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class SyncBackupPage extends StatelessWidget {
-  const SyncBackupPage();
+  const SyncBackupPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,10 +61,11 @@ class SyncBackupPage extends StatelessWidget {
               coach.store,
             );
             await coach.reload();
-            if (context.mounted)
+            if (context.mounted) {
               ScaffoldMessenger.of(
                 context,
               ).showSnackBar(SnackBar(content: Text(l10n.get(result.l10nKey))));
+            }
           },
         ),
         ListTile(leading:const Icon(Icons.compare_arrows),title:Text(l10n.get('coach_sync_conflicts')),
@@ -120,10 +121,11 @@ class SyncBackupPage extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     await context.read<CoachProvider>().clearPersonalMaterials();
-    if (context.mounted)
+    if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.get('coach_clear_done'))));
+    }
   }
 
   Future<void> _clearPracticeData(BuildContext context) async {
@@ -396,7 +398,7 @@ class SyncBackupPage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -411,7 +413,7 @@ class ProfileSubPage extends StatelessWidget {
 }
 
 class MiniStat extends StatelessWidget {
-  const MiniStat({required this.label, required this.value});
+  const MiniStat({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
@@ -437,7 +439,7 @@ class MiniStat extends StatelessWidget {
 }
 
 class BindingButton extends StatelessWidget {
-  const BindingButton({
+  const BindingButton({super.key, 
     required this.icon,
     required this.label,
     required this.status,
@@ -464,7 +466,7 @@ class BindingButton extends StatelessWidget {
 /// 与旧版数据导出分开：教练库在 Drift/SQLite，导出格式与旧版
 /// SharedPreferences 包不同，混在一个文件里会在恢复时产生歧义。
 class CoachBackupPanel extends StatelessWidget {
-  const CoachBackupPanel({required this.onExport, required this.onImport});
+  const CoachBackupPanel({super.key, required this.onExport, required this.onImport});
 
   final VoidCallback onExport;
   final VoidCallback onImport;
@@ -510,7 +512,7 @@ class CoachBackupPanel extends StatelessWidget {
 }
 
 class DataManagementPanel extends StatelessWidget {
-  const DataManagementPanel({
+  const DataManagementPanel({super.key, 
     required this.settings,
     required this.syncSettings,
     required this.onSyncSettingsChanged,
@@ -999,7 +1001,7 @@ class InfoRow extends StatelessWidget {
 }
 
 class LinkTile extends StatelessWidget {
-  const LinkTile({
+  const LinkTile({super.key, 
     required this.icon,
     required this.title,
     required this.subtitle,

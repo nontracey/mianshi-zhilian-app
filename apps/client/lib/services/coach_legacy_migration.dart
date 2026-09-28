@@ -22,8 +22,9 @@ Future<LegacyMigrationReport?> migrateLegacyPracticeData({
   try {
     if ((await store.listTombstones(
       profileId,
-    )).any((t) => t.entityType == 'profile_reset'))
+    )).any((t) => t.entityType == 'profile_reset')) {
       return null;
+    }
     final active = await storage.loadPracticeAttempts();
     final archived = await storage.loadArchivedPracticeAttempts();
     final attempts = {

@@ -91,13 +91,21 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
         .customSelect('PRAGMA wal_checkpoint(TRUNCATE)')
         .get();
     if (checkpoint.isNotEmpty &&
-        (checkpoint.first.data['busy'] as int? ?? 0) != 0)
+        (checkpoint.first.data['busy'] as int? ?? 0) != 0) {
       throw StateError('Storage is in use; retry cleanup');
+    }
     await db.customStatement('VACUUM');
     await db.customSelect('PRAGMA wal_checkpoint(TRUNCATE)').get();
   }
 
   Future<void> close() => db.close();
+
+  /// schema 就绪只需要确认一次：连接打开时 drift 已跑过版本化 migration，
+  /// 这里的心跳只是防御性确认，不能每条业务 SQL 都重复执行（负载直接翻倍）。
+  Future<void>? _schemaReady;
+
+  Future<void> _ensureSchemaOnce() =>
+      _schemaReady ??= db.ensureSchema();
 
   // ---- 通用 SQL 助手 ----
   List<Variable<Object>> _vars(List<Object?> values) =>
@@ -107,17 +115,17 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
     String sql, [
     List<Object?> values = const [],
   ]) async {
-    await db.ensureSchema();
+    await _ensureSchemaOnce();
     return db.customSelect(sql, variables: _vars(values)).get();
   }
 
   Future<void> _exec(String sql, [List<Object?> values = const []]) async {
-    await db.ensureSchema();
+    await _ensureSchemaOnce();
     await db.customInsert(sql, variables: _vars(values));
   }
 
   Future<void> _delete(String sql, [List<Object?> values = const []]) async {
-    await db.ensureSchema();
+    await _ensureSchemaOnce();
     await db.customUpdate(sql, variables: _vars(values));
   }
 
@@ -803,6 +811,25 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
     knowledgeItemId,
   ]);
 
+  @override
+  Future<List<SourceId>> sourceIdsForKnowledge(
+    KnowledgeItemId knowledgeItemId,
+  ) async {
+    final rows = await _select(
+      'SELECT DISTINCT sourceId FROM sourceChunks WHERE knowledgeItemId = ?',
+      [knowledgeItemId],
+    );
+    return rows.map((row) => row.read<String>('sourceId')).toList();
+  }
+
+  @override
+  Future<void> deleteSource(SourceId id) async {
+    // drift 的 customUpdate 一次只接受一条语句，分条执行。
+    await _delete('DELETE FROM sourceChunks WHERE sourceId = ?', [id]);
+    await _delete('DELETE FROM ingestionJobs WHERE sourceId = ?', [id]);
+    await _delete('DELETE FROM sources WHERE id = ?', [id]);
+  }
+
   // ---- IngestionJob ----
   @override
   Future<void> putIngestionJob(IngestionJob j) => _exec(
@@ -1371,9 +1398,24 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
     return rows.map(_extensionFromRow).toList();
   }
 
+  /// 清理任务状态宽容解码。
+  ///
+  /// `listCleanupTasks` 的 SQL 不按 status 过滤（过滤在调用方），数据库里可能
+  /// 存有更高版本写入的新状态名；此时按 pending 处理而不是抛 ArgumentError
+  /// 导致整个档案打不开。清理任务本身是幂等的，重跑是安全的最坏情况。
+  CleanupTaskStatus _cleanupStatusOrPending(QueryRow row, String col) {
+    final s = row.read<String?>(col);
+    for (final v in CleanupTaskStatus.values) {
+      if (v.name == s) return v;
+    }
+    return CleanupTaskStatus.pending;
+  }
+
   CoachExtensionRecord _extensionFromRow(QueryRow row) {
     final decoded = jsonDecode(row.read<String>('valueJson'));
     if (decoded is! Map) throw const FormatException('invalid extension JSON');
+    // kind 的 byName 是安全的：查询条件里就是当前版本的 kind.name，
+    // 其他版本写入的 kind 行根本不会被这条 SQL 读出来。
     return CoachExtensionRecord(
       profileId: row.read<String>('profileId'),
       kind: CoachExtensionKind.values.byName(row.read<String>('kind')),
@@ -1430,6 +1472,48 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
   }
 
   @override
+  Future<int> pruneTombstones(
+    ProfileId profileId, {
+    int keepPerEntity = 1,
+    int maxEntityTombstones = 500,
+  }) async {
+    // 同一实体只保留最新代次；profile_reset 墓碑是同步代次判定的依据，全部保留。
+    final staleRows = await db.customUpdate(
+      "DELETE FROM coachTombstones WHERE profileId = ? "
+      "AND entityType != 'profile_reset' AND generation < ("
+      "  SELECT MAX(generation) FROM coachTombstones t2"
+      "  WHERE t2.profileId = coachTombstones.profileId"
+      "    AND t2.entityType = coachTombstones.entityType"
+      "    AND t2.entityId = coachTombstones.entityId);",
+      variables: [Variable.withString(profileId)],
+    );
+    var removed = staleRows;
+    // 总量上限：仍超限时按删除时间从旧到新逐条淘汰。
+    final rows = await _select(
+      "SELECT entityType, entityId, generation FROM coachTombstones "
+      "WHERE profileId = ? AND entityType != 'profile_reset' "
+      'ORDER BY deletedAt ASC',
+      [profileId],
+    );
+    var excess = (rows.length - maxEntityTombstones).clamp(0, rows.length);
+    for (final row in rows) {
+      if (excess == 0) break;
+      removed += await db.customUpdate(
+        'DELETE FROM coachTombstones WHERE profileId = ? '
+        'AND entityType = ? AND entityId = ? AND generation = ?',
+        variables: [
+          Variable.withString(profileId),
+          Variable.withString(row.read<String>('entityType')),
+          Variable.withString(row.read<String>('entityId')),
+          Variable.withInt(row.read<int>('generation')),
+        ],
+      );
+      excess--;
+    }
+    return removed;
+  }
+
+  @override
   Future<void> putCleanupTask(CoachCleanupTask task) => _exec(
     'INSERT OR REPLACE INTO coachCleanupTasks '
     '(id, profileId, type, operationId, status, createdAt, updatedAt, error) '
@@ -1464,7 +1548,7 @@ class DriftCoachStore implements CoachStore, CoachStoreMaintenance {
             profileId: row.read<String>('profileId'),
             type: row.read<String>('type'),
             operationId: row.read<String>('operationId'),
-            status: CleanupTaskStatus.values.byName(row.read<String>('status')),
+            status: _cleanupStatusOrPending(row, 'status'),
             createdAt: _dt(row, 'createdAt')!,
             updatedAt: _dt(row, 'updatedAt'),
             error: row.read<String?>('error'),

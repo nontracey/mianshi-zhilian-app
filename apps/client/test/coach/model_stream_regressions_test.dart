@@ -45,18 +45,16 @@ void main() {
     'CRLF split across chunks and usage-only choices are accepted',
     () async {
       final text =
-          event({
+          '${event({
             'choices': [
               {
                 'delta': {'content': 'hello'},
               },
             ],
-          }) +
-          event({
+          })}${event({
             'choices': [],
             'usage': {'total_tokens': 12},
-          }) +
-          'data: [DONE]\r\n\r\n';
+          })}data: [DONE]\r\n\r\n';
       final events = await gateway(
         Stream.fromIterable(text.split('')),
       ).stream(request()).toList();

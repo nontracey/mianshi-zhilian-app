@@ -108,7 +108,7 @@ class ContentApiService {
     }
     return [
       for (final topic in results)
-        if (topic != null) topic,
+        ?topic,
     ];
   }
 

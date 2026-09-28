@@ -409,10 +409,11 @@ class ContextBuilder {
           'original_span': project.originalSpan,
         }.entries) {
           final text = entry.value;
-          if (text != null)
+          if (text != null) {
             buf.writeln(
               '    ${entry.key}: ${text.substring(0, text.length.clamp(0, 1200))}',
             );
+          }
         }
       }
     }

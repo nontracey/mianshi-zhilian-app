@@ -6,7 +6,7 @@ import 'package:mianshi_zhilian/providers/settings_provider.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class AppearanceLanguagePage extends StatelessWidget {
-  const AppearanceLanguagePage();
+  const AppearanceLanguagePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +38,7 @@ class AppearanceLanguagePage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -53,7 +53,7 @@ class ProfileSubPage extends StatelessWidget {
 }
 
 class AppearancePanel extends StatelessWidget {
-  const AppearancePanel({
+  const AppearancePanel({super.key, 
     required this.settings,
     required this.onThemeTypeChanged,
     required this.onPrimaryColorChanged,
@@ -220,7 +220,7 @@ class AppearancePanel extends StatelessWidget {
 }
 
 class ColorButton extends StatelessWidget {
-  const ColorButton({
+  const ColorButton({super.key, 
     required this.color,
     required this.selected,
     required this.onTap,
@@ -250,7 +250,7 @@ class ColorButton extends StatelessWidget {
 }
 
 class LanguagePanel extends StatelessWidget {
-  const LanguagePanel({
+  const LanguagePanel({super.key, 
     required this.settings,
     required this.onLanguageChanged,
   });

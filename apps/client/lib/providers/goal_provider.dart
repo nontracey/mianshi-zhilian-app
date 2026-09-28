@@ -322,8 +322,9 @@ class GoalProvider extends ChangeNotifier {
     }
     await _store.transaction(() async {
       final saved = await _store.listGoalRequirements(goal.id);
-      if (!saved.any((r) => r.id == requirement.id))
+      if (!saved.any((r) => r.id == requirement.id)) {
         throw StateError('Requirement no longer exists');
+      }
       await _store.putGoalRequirement(requirement);
       final revisions = await _store.listGoalRevisions(
         goal.id,
@@ -448,9 +449,15 @@ class GoalProvider extends ChangeNotifier {
         );
         await _store.transaction(() async {
           await _store.putResume(result.resume);
-          for (final p in result.projects) await _store.putProject(p);
-          for (final c in result.claims) await _store.putResumeClaim(c);
-          for (final l in result.links) await _store.putClaimRequirementLink(l);
+          for (final p in result.projects) {
+            await _store.putProject(p);
+          }
+          for (final c in result.claims) {
+            await _store.putResumeClaim(c);
+          }
+          for (final l in result.links) {
+            await _store.putClaimRequirementLink(l);
+          }
           for (final goalId in requirements.map((r) => r.goalId).toSet()) {
             final goal = await _store.getGoal(goalId);
             if (goal?.profileId != profileId) continue;
@@ -500,8 +507,9 @@ class GoalProvider extends ChangeNotifier {
   /// 只更新主张记录本身；**不会**因此把它升级成 Jd/Resume 事实之外的东西——
   /// 已确认主张才允许在提示词里当事实使用（见 `CoachPromptBuilder`）。
   Future<void> updateClaim(ResumeClaim claim) async {
-    if (claim.profileId != profileId)
+    if (claim.profileId != profileId) {
       throw StateError("Claim belongs to another profile");
+    }
     await _store.putResumeClaim(claim);
     _setOutcome(
       ImportOutcome(
@@ -583,12 +591,15 @@ class GoalProvider extends ChangeNotifier {
       if (canMutate?.call() == false) {
         return _setOutcome(_fail('coach_source_busy'));
       }
-      if (text.trim().isEmpty)
+      if (text.trim().isEmpty) {
         return _setOutcome(_fail('coach_import_empty_doc'));
-      if (source.profileId != profileId)
+      }
+      if (source.profileId != profileId) {
         return _setOutcome(_fail('coach_source_update_conflict'));
-      if (source.status != IngestionStatus.ready)
+      }
+      if (source.status != IngestionStatus.ready) {
         return _setOutcome(_fail('coach_source_update_conflict'));
+      }
       var changed = false;
       var chunkCount = 0;
       try {
@@ -601,8 +612,9 @@ class GoalProvider extends ChangeNotifier {
             throw StateError('source changed; reload before updating');
           }
           if (current.contentHash == computeContentHash(text) &&
-              current.content == text)
+              current.content == text) {
             return;
+          }
           final oldChunks = await _store.listSourceChunks(current.id);
           final linked = oldChunks
               .map((c) => c.knowledgeItemId)
@@ -620,7 +632,9 @@ class GoalProvider extends ChangeNotifier {
               id: '${current.id}@${current.revision}',
               revision: 1,
               value: {
-                'source': current.toJson(),
+                // 版本对账只需要元数据与哈希；旧全文不进扩展记录，
+                // 否则被替换掉的原文会永久留存在数据库与备份包里。
+                'source': current.toJson()..remove('content'),
                 'chunkIds': oldChunks.map((c) => c.id).toList(),
               },
               updatedAt: _documents.clock.now(),

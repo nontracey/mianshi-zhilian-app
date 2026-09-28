@@ -122,52 +122,57 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
     final l10n = context.read<LocalizationProvider>();
     final coach = context.read<CoachProvider>();
     final messenger = ScaffoldMessenger.of(context);
+    // 控制器提到外层：弹窗每次 rebuild 都会重建 builder，放里面会泄漏一串实例。
+    final controller = TextEditingController(
+      text: _template.isBuiltIn ? '' : (_template.name ?? ''),
+    );
     final name = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        final controller = TextEditingController(
-          text: _template.isBuiltIn ? '' : (_template.name ?? ''),
-        );
-        return AlertDialog(
-          title: Text(l10n.get('coach_arrange_save_template')),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            maxLength: 24,
-            decoration: InputDecoration(
-              hintText: l10n.get('coach_arrange_template_name_hint'),
-            ),
-            onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.get('coach_arrange_save_template')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 24,
+          decoration: InputDecoration(
+            hintText: l10n.get('coach_arrange_template_name_hint'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(l10n.get('cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: Text(l10n.get('confirm')),
-            ),
-          ],
-        );
-      },
+          onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.get('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text(l10n.get('confirm')),
+          ),
+        ],
+      ),
     );
-    if (name == null || name.trim().isEmpty) return;
-    if (!mounted) return;
     try {
-      await coach.saveWorkflowTemplate(
-        name: name,
-        cards: _cards,
-        fromTemplate: _template,
-      );
-      await _load();
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.get('coach_arrange_template_saved'))),
-      );
-    } on ArgumentError {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.get('coach_arrange_template_name_hint'))),
-      );
+      if (name == null || name.trim().isEmpty) return;
+      if (!mounted) return;
+      try {
+        await coach.saveWorkflowTemplate(
+          name: name,
+          cards: _cards,
+          fromTemplate: _template,
+        );
+        await _load();
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.get('coach_arrange_template_saved'))),
+        );
+      } on ArgumentError {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.get('coach_arrange_template_name_hint'))),
+        );
+      }
+    } finally {
+      disposeControllersNextFrame([controller]);
     }
   }
 
@@ -201,6 +206,7 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
     if (!mounted) return;
     if (ok) {
       await _load();
+      if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.get('coach_arrange_template_deleted'))),
       );
@@ -458,12 +464,7 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
       WorkflowCard(
         id: 'user.${type.name}.${DateTime.now().microsecondsSinceEpoch}',
         type: type,
-        estimatedMinutes: switch (type) {
-          PlanItemType.learnKnowledge => 8,
-          PlanItemType.reviewLearned => 6,
-          PlanItemType.projectTraining => 10,
-          PlanItemType.mockInterview => 15,
-        },
+        estimatedMinutes: type.defaultMinutes,
       ),
     ];
     setState(() {
@@ -574,13 +575,7 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
           0,
           (total, card) =>
               total +
-              (card.estimatedMinutes ??
-                  switch (card.type) {
-                    PlanItemType.learnKnowledge => 8,
-                    PlanItemType.reviewLearned => 6,
-                    PlanItemType.projectTraining => 10,
-                    PlanItemType.mockInterview => 15,
-                  }),
+              (card.estimatedMinutes ?? card.type.defaultMinutes),
         );
         final raisedBudget = required > _budget ? required : _budget;
         result = _compileWithBudget(raisedBudget);
@@ -601,11 +596,21 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
 
     setState(() => _applying = true);
     final frozen = const PlanService().freeze(plan, clock: coach.clock);
-    await coach.applyPlan(
-      frozen,
-      workflowTemplate: _effectiveTemplate(),
-      deferredCardIds: deferred,
-    );
+    try {
+      await coach.applyPlan(
+        frozen,
+        workflowTemplate: _effectiveTemplate(),
+        deferredCardIds: deferred,
+      );
+    } catch (_) {
+      // 失败时必须解除禁用态，否则「应用」按钮会永久不可点且没有任何提示。
+      if (mounted) setState(() => _applying = false);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.get('coach_arrange_apply_failed'))),
+      );
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _applying = false);
@@ -618,7 +623,7 @@ class _TrainingArrangementPageState extends State<TrainingArrangementPage> {
                 label: l10n.get('coach_undo'),
                 onPressed: () async {
                   final ok = await coach.undoPlanApply();
-                  if (!ok) return;
+                  if (!ok || !mounted) return;
                   messenger.showSnackBar(
                     SnackBar(content: Text(l10n.get('coach_plan_undone'))),
                   );

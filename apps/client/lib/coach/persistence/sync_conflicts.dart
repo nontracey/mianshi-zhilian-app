@@ -37,8 +37,9 @@ class CoachSyncConflictService {
     final result = <CoachSyncConflict>[];
     for (final record in records) {
       if (!record.id.startsWith('conflict.') ||
-          record.value['status'] == 'resolved')
+          record.value['status'] == 'resolved') {
         continue;
+      }
       final table = record.value['table'],
           entity = record.value['entityId'],
           variant = record.value['variantId'];
@@ -86,8 +87,9 @@ class CoachSyncConflictService {
           variant.profileId != profileId ||
           primary.date != variant.date ||
           primary.isExtra ||
-          variant.isExtra)
+          variant.isExtra) {
         throw StateError('Plan conflict scope changed');
+      }
       final selected = chooseVariant ? variant : primary;
       final losing = chooseVariant ? primary : variant;
       final chosenIds = selected.planItems.map((i) => i.id).toSet();
@@ -221,8 +223,9 @@ class CoachSyncConflictService {
     } else if (conflict.table == 'assessmentEvents') {
       Map<String, Object?> readRow(String key) {
         final raw = saved.value[key];
-        if (raw is! Map)
+        if (raw is! Map) {
           throw StateError('Assessment conflict snapshot missing');
+        }
         return raw.map((k, v) => MapEntry(k.toString(), v));
       }
 
@@ -266,8 +269,9 @@ class CoachSyncConflictService {
       if (primary == null ||
           variant == null ||
           primary.isBuiltIn ||
-          variant.isBuiltIn)
+          variant.isBuiltIn) {
         throw StateError('Template conflict scope changed');
+      }
       final selected = chooseVariant ? variant : primary;
       await repo.putTemplate(
         WorkflowTemplate.fromJson({

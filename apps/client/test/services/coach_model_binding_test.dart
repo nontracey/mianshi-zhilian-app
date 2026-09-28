@@ -33,8 +33,9 @@ void main() {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           requests.add(body);
           if (body.containsKey('temperature')) return http.Response('{}', 400);
-          if (body['stream'] == true)
+          if (body['stream'] == true) {
             return http.Response('data: [DONE]\n\n', 200);
+          }
           return http.Response(
             jsonEncode({
               'choices': [

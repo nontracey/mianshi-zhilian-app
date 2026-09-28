@@ -25,8 +25,9 @@ void replayCoachReviewStates(Map<String, Object?> data) {
     )) {
       final key = '${event.sessionId}:${event.turnGroupId}';
       final old = latest[key];
-      if (old == null || event.assessmentRevision > old.assessmentRevision)
+      if (old == null || event.assessmentRevision > old.assessmentRevision) {
         latest[key] = event;
+      }
     }
     final related = latest.values.toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));

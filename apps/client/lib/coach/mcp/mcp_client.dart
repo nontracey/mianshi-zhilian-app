@@ -167,9 +167,8 @@ class McpRemoteClient {
     'Accept': 'application/json, text/event-stream',
     if (config.token?.isNotEmpty == true)
       'Authorization': 'Bearer ${config.token}',
-    if (_serverProtocolVersion != null)
-      'MCP-Protocol-Version': _serverProtocolVersion!,
-    if (_sessionId != null) 'Mcp-Session-Id': _sessionId!,
+    'MCP-Protocol-Version': ?_serverProtocolVersion,
+    'Mcp-Session-Id': ?_sessionId,
   };
 
   Future<Map<String, Object?>> _rpc(
@@ -350,13 +349,14 @@ class McpRemoteClient {
     do {
       final resp = await _rpc(
         'tools/list',
-        params: {if (cursor != null) 'cursor': cursor},
+        params: {'cursor': ?cursor},
         cancel: cancel,
       );
       final result = _asMap(resp['result']);
       final tools = result['tools'];
-      if (tools is! List)
+      if (tools is! List) {
         throw const McpClientException('MCP tools list missing');
+      }
       all.addAll(
         tools.whereType<Map>().map((raw) {
           final t = raw.map((k, v) => MapEntry(k.toString(), v));
@@ -407,10 +407,7 @@ class McpRemoteClient {
   }) async {
     _requireConnected();
     final tools = await listTools(cancel: cancel);
-    McpToolInfo? target;
-    for (final t in tools) {
-      if (t.name == name) target = t;
-    }
+    final target = tools.where((t) => t.name == name).firstOrNull;
     if (target == null) {
       throw McpClientException('MCP tool not found on server: $name');
     }

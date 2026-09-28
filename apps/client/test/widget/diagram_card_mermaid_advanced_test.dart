@@ -222,7 +222,7 @@ void main() {
   });
 
   group('MermaidDiagramView 渲染 smoke', () {
-    Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+    Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
     testWidgets('flowchart 渲染不崩 + 找到 MERMAID 标签', (tester) async {
       final card = LearningCard(
@@ -231,7 +231,7 @@ void main() {
         content: 'flowchart LR\nA --> B',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       expect(find.text('MERMAID'), findsOneWidget);
     });
 
@@ -242,7 +242,7 @@ void main() {
         content: 'flowchart TD\nsubgraph g1 [组一]\nA:::ok --> B:::warn\nend\nA --> C',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       expect(find.text('组一'), findsOneWidget);
     });
 
@@ -253,7 +253,7 @@ void main() {
         content: 'stateDiagram-v2\n[*] --> Active\nActive --> Inactive : sleep\nInactive --> [*]',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       expect(find.text('STATE'), findsOneWidget);
       expect(find.text('sleep'), findsOneWidget);
     });
@@ -265,7 +265,7 @@ void main() {
         content: 'sequenceDiagram\nparticipant A\nparticipant B\nA->>B: 请求\nB-->>A: 响应',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       expect(find.text('SEQUENCE'), findsOneWidget);
       expect(find.text('请求'), findsOneWidget);
     });
@@ -277,7 +277,7 @@ void main() {
         content: 'sequenceDiagram\nparticipant A\nparticipant B\nA->>B: 开始\nloop 重试\nA->>B: 询问\nend',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       expect(find.text('loop: 重试'), findsOneWidget);
     });
 
@@ -288,7 +288,7 @@ void main() {
         content: 'garbageNoHeader',
         format: 'mermaid',
       );
-      await tester.pumpWidget(_wrap(MermaidDiagramView(card: card)));
+      await tester.pumpWidget(wrap(MermaidDiagramView(card: card)));
       // 不崩即可
       expect(find.byType(MermaidDiagramView), findsOneWidget);
     });

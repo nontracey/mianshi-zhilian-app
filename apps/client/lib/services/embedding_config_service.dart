@@ -11,6 +11,7 @@ import '../coach/model/http_client.dart';
 import '../coach/persistence/coach_store.dart';
 import '../coach/persistence/extension_records.dart';
 import 'coach_http_client.dart';
+import 'safe_endpoint.dart';
 import 'storage_service.dart';
 
 class HttpEmbeddingProvider implements BatchEmbeddingProvider, EmbeddingCache {
@@ -65,11 +66,13 @@ class HttpEmbeddingProvider implements BatchEmbeddingProvider, EmbeddingCache {
               throw TimeoutException('Embedding timed out');
             },
           );
-      if (!response.isOk)
+      if (!response.isOk) {
         throw StateError('Embedding request failed (${response.statusCode})');
+      }
       final data = (jsonDecode(response.body) as Map)['data'];
-      if (data is! List || data.length != missing.length)
+      if (data is! List || data.length != missing.length) {
         throw const FormatException('Embedding result count mismatch');
+      }
       final byIndex = <int, List<double>>{};
       for (final item in data) {
         final index = item['index'];
@@ -81,8 +84,9 @@ class HttpEmbeddingProvider implements BatchEmbeddingProvider, EmbeddingCache {
             index >= missing.length ||
             byIndex.containsKey(index) ||
             vector.length != dimension ||
-            vector.any((v) => !v.isFinite))
+            vector.any((v) => !v.isFinite)) {
           throw const FormatException('Invalid embedding vector');
+        }
         byIndex[index] = vector;
       }
       for (var i = 0; i < missing.length; i++) {
@@ -144,18 +148,19 @@ class EmbeddingConfigService extends ChangeNotifier {
     String? key,
   }) async {
     final uri = Uri.tryParse(endpoint.trim());
+    // embedding 请求体是用户私有资料的分片正文，同 apiKey 一起外发：
+    // 跨公网必须 https，仅回环/本网段允许明文。
     if (enabled &&
         (uri == null ||
-            !['https', 'http'].contains(uri.scheme) ||
-            uri.host.isEmpty ||
-            uri.userInfo.isNotEmpty ||
+            !isAllowedCredentialEndpoint(uri) ||
             model.trim().isEmpty ||
             dimension < 1 ||
             dimension > 32768)) {
       throw const FormatException('Invalid embedding configuration');
     }
-    if (key != null && !await storage.writeSecret(_slot(endpoint.trim()), key))
+    if (key != null && !await storage.writeSecret(_slot(endpoint.trim()), key)) {
       throw StateError('Secure storage write failed');
+    }
     final old = await store.getExtension(
       profileId,
       CoachExtensionKind.embeddingConfigMetadata,

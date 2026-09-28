@@ -1987,7 +1987,9 @@ const _en = <String, String>{
     'coach_backup_import_confirm_body':
         'Restores the backup by merging IDs; data created after the backup is kept. The file must come from "Export coach data".',
     'add': 'Add',
-    'coach_nav_today': 'Today',
+    'coach_nav_today': 'Study',
+    'coach_nav_knowledge': 'Knowledge',
+    'coach_nav_mastery': 'Mastery',
     'coach_nav_interview': 'Mock interview',
     'coach_nav_goals': 'Goals & materials',
     'coach_entry_title': 'Interview coach (beta)',
@@ -2125,6 +2127,23 @@ const _en = <String, String>{
     'coach_goals_delete_goal_body':
         'This also deletes the requirements and links of "{title}".',
     'coach_goals_source_default_name': 'Material {index}',
+    'coach_resume_unnamed_project': 'Unnamed project',
+    'coach_import_err_no_text':
+        'No extractable text — probably a scan. Paste the text or run OCR first',
+    'coach_import_err_too_large': 'File too large. Split it or paste the text',
+    'coach_import_err_text_too_long': 'Text too long. Split it before importing',
+    'coach_import_err_not_utf8': 'Not valid UTF-8. Convert the encoding and retry',
+    'coach_import_err_unsupported_format':
+        'Unsupported format. Use PDF, DOCX or pasted text',
+    'coach_import_err_docx_corrupt':
+        'The DOCX is corrupt or not a valid Office document',
+    'coach_import_err_docx_no_body': 'The DOCX has no body document',
+    'coach_import_err_docx_empty':
+        'No extractable body in the DOCX. Paste the text instead',
+    'coach_import_err_docx_xml_bad':
+        'The DOCX body XML is corrupt. Re-export or paste the text',
+    'coach_import_err_docx_encoding_bad':
+        'The DOCX body encoding is invalid. Re-export or paste the text',
     'coach_import_empty_jd': 'The JD is empty',
     'coach_import_jd_ok': 'Created target "{title}" with {count} requirements',
     'coach_import_jd_failed': 'JD import failed',
@@ -2154,6 +2173,8 @@ const _en = <String, String>{
         'Unrecognised platform — paste the JD text instead',
     'coach_report_no_assessment':
         'No assessment was saved for this session. Your answers remain available.',
+    'coach_report_load_failed':
+        'Could not load the review data. Please retry.',
     'coach_report_partial':
         'This session ended early. Unasked topics are not failures.',
     'coach_assessment_dispute': 'Dispute assessment',
@@ -2173,6 +2194,9 @@ const _en = <String, String>{
     'coach_validity_pending': 'Reference pending; no independent credit',
     'coach_validity_stale': 'Reference outdated',
     'coach_validity_invalid': 'Invalid assessment',
+    'coach_session_start_failed': 'Could not start the session. Please retry.',
+    'ai_config_web_key_warning':
+        'Browsers cannot encrypt stored keys. Your apiKey is saved in plain text in this browser — use only on personal devices.',
     'coach_generation_failed':
         'Generation failed. Your answer was saved; you can retry.',
     'coach_interview_options': 'Interview settings',
@@ -2355,6 +2379,8 @@ const _en = <String, String>{
     'coach_arrange_applying': 'Applying...',
     'coach_arrange_apply': 'Apply',
     'coach_arrange_applied': 'Applied',
+    'coach_arrange_apply_failed':
+        'Not applied; the plan is unchanged. Please retry.',
     'coach_arrange_save_template': 'Save as template',
     'coach_arrange_template_name_hint': 'Name this arrangement (required)',
     'coach_arrange_template_saved': 'Template saved. Pick it next time.',

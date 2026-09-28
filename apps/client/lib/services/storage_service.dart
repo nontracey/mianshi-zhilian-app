@@ -540,10 +540,42 @@ class StorageService {
     return exportData;
   }
 
-  /// 清除所有本地数据
+  /// 清除所有本地数据。
+  ///
+  /// 必须连安全存储一起清：AI apiKey、MCP token（含 OAuth refresh token）、
+  /// embedding key、岗位搜索 key 都只存在钥匙串里，只清 SharedPreferences
+  /// 会让用户以为「数据已清除」而密钥仍在，且 refresh token 可长期续期。
   Future<void> clearAllData() async {
     final prefs = await _instance;
     await prefs.clear();
+    await clearStoredCredentials();
+  }
+
+  /// 清除安全存储中的全部凭据槽位。
+  ///
+  /// 失败不静默：返回值供调用方如实提示，避免「显示已清除但实际还在」。
+  Future<bool> clearStoredCredentials() async {
+    try {
+      await _secureStorage.deleteAll();
+      return true;
+    } catch (_) {
+      // deleteAll 在部分平台不可用：退化为枚举现有条目逐个删，
+      // 槽位名是动态派生的（含 id/endpoint 摘要），必须读出来才知道。
+    }
+    try {
+      final existing = await _secureStorage.readAll();
+      var ok = true;
+      for (final key in existing.keys) {
+        try {
+          await _secureStorage.delete(key: key);
+        } catch (_) {
+          ok = false;
+        }
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 清除内容缓存与 AI 路线缓存（content_cache_* 和 route_cache_*），保留用户数据。

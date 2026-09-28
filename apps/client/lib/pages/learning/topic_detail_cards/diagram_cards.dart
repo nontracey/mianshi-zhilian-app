@@ -34,11 +34,11 @@ class DiagramWithFullscreen extends StatelessWidget {
         opaque: false,
         barrierColor: Colors.black,
         barrierDismissible: true,
-        pageBuilder: (_, __, ___) => _DiagramFullscreenView(
+        pageBuilder: (_, _, _) => _DiagramFullscreenView(
           content: content,
           title: title,
         ),
-        transitionsBuilder: (_, animation, __, page) {
+        transitionsBuilder: (_, animation, _, page) {
           return FadeTransition(opacity: animation, child: page);
         },
       ),
@@ -633,7 +633,7 @@ class _CjkNetworkSvgState extends State<_CjkNetworkSvg> {
 // ── 图解卡片（自动识别布局）─────────────────────────────────
 
 class DiagramCard extends StatelessWidget {
-  const DiagramCard({required this.card});
+  const DiagramCard({super.key, required this.card});
   final LearningCard card;
 
   bool _isMermaidSource(CardSource source) => source.kind == 'mermaid';
@@ -754,8 +754,9 @@ class _SourceChainViewState extends State<_SourceChainView> {
         return _buildAsset(widget.assetUrls(source.path!), onError);
       }
     }
-    if (allowErrorAdvance)
+    if (allowErrorAdvance) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _next());
+    }
     return Text(
       widget.card.fallback ?? '',
       style: TextStyle(color: AppColors.warning, fontSize: 13),
@@ -1051,6 +1052,8 @@ class _MermaidDiagramViewState extends State<MermaidDiagramView> {
       children: [
         DiagramWithFullscreen(
           title: card.title,
+          // 全屏：原始图解内容，由 _DiagramFullscreenView 包裹 InteractiveViewer
+          fullscreenContent: diagramWidget,
           // 内联：无 InteractiveViewer，避免与 ListView 滚动冲突
           child: Container(
             width: double.infinity,
@@ -1062,8 +1065,6 @@ class _MermaidDiagramViewState extends State<MermaidDiagramView> {
             ),
             child: diagramWidget,
           ),
-          // 全屏：原始图解内容，由 _DiagramFullscreenView 包裹 InteractiveViewer
-          fullscreenContent: diagramWidget,
         ),
         if (card.fallback != null && card.fallback!.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -1394,8 +1395,9 @@ class _MermaidFlowDiagram extends StatelessWidget {
 
     List<MermaidEdge> edgesForSubgraph(MermaidSubgraph sg) {
       return data.edges.where((e) {
-        if (!inSubtree(e.source.id, sg) || !inSubtree(e.target.id, sg))
+        if (!inSubtree(e.source.id, sg) || !inSubtree(e.target.id, sg)) {
           return false;
+        }
         // 不归到 sg 的任何子组（子组优先）
         for (final child in sg.children) {
           if (inSubtree(e.source.id, child) && inSubtree(e.target.id, child)) {
@@ -1408,8 +1410,9 @@ class _MermaidFlowDiagram extends StatelessWidget {
 
     final crossEdges = data.edges.where((e) {
       for (final sg in topGroups) {
-        if (inSubtree(e.source.id, sg) && inSubtree(e.target.id, sg))
+        if (inSubtree(e.source.id, sg) && inSubtree(e.target.id, sg)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -1776,7 +1779,7 @@ class HierarchyItem {
 }
 
 class SmartDiagram extends StatelessWidget {
-  const SmartDiagram({required this.card});
+  const SmartDiagram({super.key, required this.card});
   final LearningCard card;
 
   DiagramType _detectType() {
@@ -2275,7 +2278,7 @@ class SmartDiagram extends StatelessWidget {
 // ── SVG 图解卡片 ─────────────────────────────────────────────
 
 class SvgDiagramCard extends StatefulWidget {
-  const SvgDiagramCard({required this.card});
+  const SvgDiagramCard({super.key, required this.card});
   final LearningCard card;
 
   @override

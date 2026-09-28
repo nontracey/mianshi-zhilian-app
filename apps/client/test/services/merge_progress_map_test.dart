@@ -14,8 +14,8 @@ void main() {
         'score': score,
         'status': 'learning',
         'practiceCount': practiceCount,
-        if (lastPracticeAt != null) 'lastPracticeAt': lastPracticeAt,
-        if (nextReviewAt != null) 'nextReviewAt': nextReviewAt,
+        'lastPracticeAt': ?lastPracticeAt,
+        'nextReviewAt': ?nextReviewAt,
       };
 
   group('mergeProgressMaps — time LWW by lastPracticeAt', () {

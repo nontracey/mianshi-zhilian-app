@@ -254,10 +254,12 @@ Future<CoachBackupRestoreResult> restoreCoachBackup(
           .fold(0, (value, t) => t.generation > value ? t.generation : value);
       final localGeneration = generation(localMarkers);
       final incomingGeneration = generation(incomingMarkers);
-      if (incomingGeneration < localGeneration)
+      if (incomingGeneration < localGeneration) {
         throw const FormatException('Backup predates personal data reset');
-      if (incomingGeneration > localGeneration)
+      }
+      if (incomingGeneration > localGeneration) {
         await store.clearProfileData(profile);
+      }
     }
     for (final marker in [...localMarkers, ...incomingMarkers]) {
       final table = switch (marker.entityType) {
@@ -395,14 +397,16 @@ Future<CoachBackupRestoreResult> restoreCoachBackup(
       final marker = CoachTombstone.fromJson(json);
       if (marker.entityType == 'goal') {
         final goal = await store.getGoal(marker.entityId);
-        if (goal != null && goal.profileId != marker.profileId)
+        if (goal != null && goal.profileId != marker.profileId) {
           throw const FormatException('Cross-profile deletion marker');
+        }
         await store.deleteGoal(marker.entityId);
       }
       if (marker.entityType == 'knowledge') {
         final knowledge = await store.getKnowledgeItem(marker.entityId);
-        if (knowledge != null && knowledge.profileId != marker.profileId)
+        if (knowledge != null && knowledge.profileId != marker.profileId) {
           throw const FormatException('Cross-profile deletion marker');
+        }
         if (knowledge != null && knowledge.contentStatus != 'removed') {
           await store.putKnowledgeItem(
             knowledge.copyWith(

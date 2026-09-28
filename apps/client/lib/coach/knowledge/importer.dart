@@ -51,6 +51,17 @@ class ImportResult {
   final bool duplicated;
 }
 
+/// 导入体积上限。
+///
+/// - [maxImportBytes]：原始字节。docx 是 zip，解压后可能膨胀上百倍，
+///   不设上限时一个小文件就能把内存打满。
+/// - [maxImportChars]：提取后的正文。正文会进检索索引、备份包与模型上下文，
+///   超长内容既撑爆上下文也放大费用。
+abstract final class ImportLimits {
+  static const int maxImportBytes = 25 * 1024 * 1024;
+  static const int maxImportChars = 1 * 1000 * 1000;
+}
+
 /// 文档导入器。组合解析器与切块器，产出可索引的 Source 与分块。
 class DocumentImporter {
   DocumentImporter({
@@ -69,17 +80,26 @@ class DocumentImporter {
   /// reuses the same parser so PDF/DOCX and pasted text follow one validation
   /// path. An empty extraction is always an error (common for scanned PDFs).
   Future<String> extractText(List<int> bytes, {String? fileName}) async {
+    if (bytes.length > ImportLimits.maxImportBytes) {
+      throw ParseException(ImportMessageKeys.tooLarge);
+    }
     final text = await parser.extractText(bytes, fileName: fileName);
     if (text.trim().isEmpty) {
-      throw ParseException('文件没有可提取的文字，可能是扫描件；请粘贴文本或使用 OCR');
+      throw ParseException(ImportMessageKeys.noText);
+    }
+    if (text.length > ImportLimits.maxImportChars) {
+      throw ParseException(ImportMessageKeys.textTooLong);
     }
     return text;
   }
 
   /// 从文本导入：哈希 -> 生成 Source -> 切块。
   Future<ImportResult> importText(ImportRequest req) async {
+    if (req.text.length > ImportLimits.maxImportChars) {
+      throw ParseException(ImportMessageKeys.textTooLong);
+    }
     final hash = computeContentHash(req.text);
-    final title = req.title ?? '导入资料 ${hash.substring(0, 6)}';
+    final title = req.title ?? ImportMessageKeys.defaultSourceTitle;
     final now = clock.now();
     final source = Source(
       id: idGen.next(),

@@ -9,7 +9,7 @@ import 'package:mianshi_zhilian/services/storage_service.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class RoutePreferencePage extends StatelessWidget {
-  const RoutePreferencePage();
+  const RoutePreferencePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,7 @@ class RoutePreferencePage extends StatelessWidget {
 }
 
 class RoutePreferencePanel extends StatefulWidget {
-  const RoutePreferencePanel();
+  const RoutePreferencePanel({super.key});
 
   @override
   State<RoutePreferencePanel> createState() => RoutePreferencePanelState();

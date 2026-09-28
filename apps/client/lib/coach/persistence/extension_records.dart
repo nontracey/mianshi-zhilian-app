@@ -51,11 +51,13 @@ class CoachExtensionRecord {
 
   factory CoachExtensionRecord.fromJson(Map<String, Object?> json) {
     final kindName = json['kind'];
-    if (kindName is! String)
+    if (kindName is! String) {
       throw const FormatException('extension kind missing');
+    }
     final value = json['value'];
-    if (value is! Map)
+    if (value is! Map) {
       throw const FormatException('extension value must be object');
+    }
     return CoachExtensionRecord(
       profileId: json['profileId'] as String,
       kind: CoachExtensionKind.values.byName(kindName),
@@ -191,10 +193,12 @@ Map<String, Object?> _copyAndValidate(Map<String, Object?> value) {
         'coach extension must not contain credentials',
       );
     }
-    if (node == null || node is String || node is num || node is bool)
+    if (node == null || node is String || node is num || node is bool) {
       return node;
-    if (node is List)
+    }
+    if (node is List) {
       return List.unmodifiable(node.map((item) => visit(item, null)));
+    }
     if (node is Map) {
       return Map.unmodifiable({
         for (final entry in node.entries)

@@ -136,8 +136,9 @@ class ZhaopinPublicSearchTransport implements JobSearchTransport {
           uri.host != 'www.zhaopin.com' ||
           uri.userInfo.isNotEmpty ||
           uri.hasPort ||
-          !RegExp(r'^/jobdetail/[A-Za-z0-9]+\.htm$').hasMatch(uri.path))
+          !RegExp(r'^/jobdetail/[A-Za-z0-9]+\.htm$').hasMatch(uri.path)) {
         continue;
+      }
       final url = uri
           .replace(scheme: 'https', query: '', fragment: '')
           .toString();

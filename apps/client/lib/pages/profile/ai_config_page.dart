@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mianshi_zhilian/models/ai_config.dart';
@@ -456,6 +457,19 @@ class _AiConfigPageState extends State<AiConfigPage> {
                     capabilityTests: capabilityTests,
                   );
                   aiProvider.addConfig(newConfig);
+                }
+
+                // Web 端没有安全存储等价物，apiKey 实际以明文存在 localStorage；
+                // 必须如实告知，不能让用户误以为与桌面/移动端同等安全。
+                if (kIsWeb) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        l10n.get('ai_config_web_key_warning'),
+                      ),
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
                 }
 
                 Navigator.pop(ctx);

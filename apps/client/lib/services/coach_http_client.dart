@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../coach/model/errors.dart';
 import '../coach/model/http_client.dart' as coach;
+import 'safe_endpoint.dart';
 
 /// One HTTP transport for native and browser model connections. Credentials only
 /// go to the requested endpoint; redirects are disabled to prevent forwarding.
@@ -20,9 +21,9 @@ class CoachHttpClient implements coach.HttpClient {
   ) {
     if (cancel?.isCancelled ?? false) throw coach.HttpCanceledException();
     final uri = Uri.parse(url);
-    if (!['http', 'https'].contains(uri.scheme) ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
+    // 模型端点携带 Bearer apiKey 与整段私有资料正文：跨公网必须 https，
+    // 仅回环/本网段允许明文（自建模型场景）。
+    if (!isAllowedCredentialEndpoint(uri)) {
       throw ModelGatewayException('Invalid model endpoint');
     }
     return http.AbortableRequest(

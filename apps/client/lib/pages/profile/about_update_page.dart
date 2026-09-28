@@ -19,7 +19,7 @@ import 'package:mianshi_zhilian/theme/colors.dart';
 import 'package:mianshi_zhilian/widgets/work_panel.dart';
 
 class AboutUpdatePage extends StatelessWidget {
-  const AboutUpdatePage();
+  const AboutUpdatePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class AboutUpdatePage extends StatelessWidget {
 }
 
 class ProfileSubPage extends StatelessWidget {
-  const ProfileSubPage({required this.title, required this.children});
+  const ProfileSubPage({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -47,7 +47,7 @@ class ProfileSubPage extends StatelessWidget {
 }
 
 class AboutPanel extends StatefulWidget {
-  const AboutPanel();
+  const AboutPanel({super.key});
 
   @override
   State<AboutPanel> createState() => AboutPanelState();
@@ -767,7 +767,7 @@ class InfoRow extends StatelessWidget {
 }
 
 class LinkTile extends StatelessWidget {
-  const LinkTile({
+  const LinkTile({super.key, 
     required this.icon,
     required this.title,
     required this.subtitle,

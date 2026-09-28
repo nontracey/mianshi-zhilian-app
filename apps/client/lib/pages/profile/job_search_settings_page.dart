@@ -64,8 +64,9 @@ class _JobSearchSettingsPageState extends State<JobSearchSettingsPage> {
           AnimatedBuilder(
             animation: _c,
             builder: (context, _) {
-              if (_c.mode != JobSearchMode.custom)
+              if (_c.mode != JobSearchMode.custom) {
                 return const SizedBox.shrink();
+              }
               return _customCard(l10n, isDark);
             },
           ),

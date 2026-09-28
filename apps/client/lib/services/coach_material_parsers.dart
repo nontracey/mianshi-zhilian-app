@@ -104,7 +104,7 @@ class ConfiguredResumeParser implements ResumeParser {
               ),
             )
             .toList();
-        if (projects.isNotEmpty || claims.isNotEmpty)
+        if (projects.isNotEmpty || claims.isNotEmpty) {
           return ResumeParseResult(
             fields: result.fields,
             projects: projects,
@@ -113,6 +113,7 @@ class ConfiguredResumeParser implements ResumeParser {
               'Model drafts require confirmation against the preserved original text.',
             ],
           );
+        }
       } catch (_) {
         /* Never manufacture a project after a failed model request. */
       }

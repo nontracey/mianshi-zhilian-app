@@ -308,6 +308,14 @@ class ToolCatalog {
   bool isKnown(String name) => byName(name) != null;
 }
 
+/// 确认令牌的有效期。
+///
+/// 破坏性操作（删除 JD 及其关联知识、学习记录）不能凭一张永久有效的令牌提交：
+/// 预览页挂机数小时后，用户看到的内容与提交时的事实可能已经不同。
+abstract final class ConfirmationTtl {
+  static const Duration deletion = Duration(minutes: 15);
+}
+
 /// UI 侧签发的确认令牌。
 ///
 /// 只有用户在界面上真正点击确认后，UI 才会创建并传入；模型在文本里声称“用户已
@@ -318,6 +326,7 @@ class ConfirmationToken {
     required this.issuedAt,
     required this.subject,
     this.expectedRevisions = const {},
+    this.ttl = ConfirmationTtl.deletion,
   });
 
   /// 与 `preview` 返回的 operationId 一致，防止跨操作复用令牌。
@@ -329,6 +338,12 @@ class ConfirmationToken {
 
   /// 预览时观察到的版本号；提交时若不一致则拒绝，必须刷新预览。
   final Map<String, String> expectedRevisions;
+
+  /// 令牌有效期。过期后必须重新预览并重新确认。
+  final Duration ttl;
+
+  /// 令牌是否已过期。提交方必须传入"现在"，否则无从判断新鲜度。
+  bool isExpired(DateTime now) => now.difference(issuedAt) > ttl;
 
   Map<String, dynamic> toJson() => {
     'operationId': operationId,

@@ -92,12 +92,13 @@ class _EmbeddingSettingsPageState extends State<EmbeddingSettingsPage> {
                       );
                       if (context.mounted) Navigator.pop(context);
                     } catch (_) {
-                      if (context.mounted)
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(l10n.get('coach_embedding_failed')),
                           ),
                         );
+                      }
                     } finally {
                       if (mounted) setState(() => _saving = false);
                     }

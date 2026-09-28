@@ -15,6 +15,7 @@ import '../../coach/domain/common.dart';
 import '../../coach/domain/goal.dart';
 import '../../coach/domain/evidence.dart';
 import '../../coach/domain/session.dart';
+import '../../coach/persistence/coach_store.dart';
 import '../../providers/coach_provider.dart';
 import '../../providers/localization_provider.dart';
 import '../../theme/colors.dart';
@@ -26,6 +27,14 @@ class _CoverageRow {
 
   final GoalRequirement requirement;
   final bool covered;
+}
+
+/// 复盘数据加载失败（会话不属于本档案或存储不可用）。
+class CoachReportLoadException implements Exception {
+  const CoachReportLoadException(this.reason);
+  final String reason;
+  @override
+  String toString() => 'CoachReportLoadException: $reason';
 }
 
 class InterviewReportPage extends StatefulWidget {
@@ -49,6 +58,7 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
   CoachSession? _session;
   bool _loading = true;
   bool _reviewing = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -60,14 +70,28 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
   Future<void> _load() async {
     final coach = context.read<CoachProvider>();
     final store = coach.store;
+    try {
+      await _loadInto(coach, store);
+    } catch (_) {
+      // 加载失败必须让用户看到并可重试，不能停在永久转圈里。
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+    }
+  }
+
+  Future<void> _loadInto(CoachProvider coach, CoachStore store) async {
     final messages = await store.messagesOf(widget.sessionId);
     final session = await store.getSession(widget.sessionId);
 
     final answers = messages.where((m) => m.role == 'user').toList()
       ..sort((a, b) => a.sequence.compareTo(b.sequence));
 
-    if (session?.profileId != coach.profileId)
-      throw StateError('Session scope mismatch');
+    if (session?.profileId != coach.profileId) {
+      throw const CoachReportLoadException('Session scope mismatch');
+    }
     final events = await store.listAssessmentEvents(widget.sessionId);
     final snapshot = session?.coverageSnapshot;
     final asked = messages
@@ -111,7 +135,7 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
       );
       if (mounted) await _load();
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -121,6 +145,7 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
             ),
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _reviewing = false);
     }
@@ -130,6 +155,7 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
   Widget build(BuildContext context) {
     final l10n = context.watch<LocalizationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final coach = context.watch<CoachProvider>();
 
     if (_loading) {
       return Scaffold(
@@ -140,6 +166,29 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
           elevation: 0,
         ),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadFailed) {
+      return CoachPageScaffold(
+        title: l10n.get('coach_report_title'),
+        subtitle: l10n.get('coach_report_subtitle'),
+        children: [
+          CoachNoticeBanner(
+            message: l10n.get('coach_report_load_failed'),
+            tone: CoachNoticeTone.warning,
+            action: TextButton(
+              onPressed: () {
+                setState(() {
+                  _loading = true;
+                  _loadFailed = false;
+                });
+                _load();
+              },
+              child: Text(l10n.get('retry')),
+            ),
+          ),
+        ],
       );
     }
 
@@ -155,8 +204,9 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
     final latest = <String, AssessmentEvent>{};
     for (final e in _events) {
       final prior = latest[e.turnGroupId];
-      if (prior == null || e.assessmentRevision > prior.assessmentRevision)
+      if (prior == null || e.assessmentRevision > prior.assessmentRevision) {
         latest[e.turnGroupId] = e;
+      }
     }
     final gaps = _coverage.where((r) => !r.covered).toList();
 
@@ -164,8 +214,13 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
       title: l10n.get('coach_report_title'),
       subtitle: l10n.get('coach_report_subtitle'),
       children: [
+        // 未接入模型时如实说明「没有自动点评」，不把「无评价」包装成「评价已通过」。
         if (_events.isEmpty)
-          CoachNoticeBanner(message: l10n.get('coach_report_no_assessment')),
+          CoachNoticeBanner(
+            message: coach.modelConfigured
+                ? l10n.get('coach_report_no_assessment')
+                : l10n.get('coach_report_no_model'),
+          ),
         if (_session?.partial == true)
           CoachNoticeBanner(message: l10n.get('coach_report_partial')),
         if (_events.isNotEmpty)
@@ -176,6 +231,9 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
                 .map(
                   (e) => ExpansionTile(
                     title: Text(l10n.get(_outcomeKey(e.result))),
+                    subtitle: Text(
+                      '${e.askedDimensions.join(', ')} · ${l10n.get(_validityKey(e.validity))}\n${e.rationale ?? ''}',
+                    ),
                     children: [
                       if (_reviewing) const LinearProgressIndicator(),
                       Wrap(
@@ -221,9 +279,6 @@ class _InterviewReportPageState extends State<InterviewReportPage> {
                           ),
                         ),
                     ],
-                    subtitle: Text(
-                      '${e.askedDimensions.join(', ')} · ${l10n.get(_validityKey(e.validity))}\n${e.rationale ?? ''}',
-                    ),
                   ),
                 )
                 .toList(),
